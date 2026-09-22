@@ -2,7 +2,7 @@
 
 > **Status:** Working name; early design draft.  
 > **Current format draft:** 0.1  
-> **Reference implementation:** not yet started.
+> **Reference implementation:** first Rust milestone in progress.
 
 Carta Space is an experimental document environment inspired by Jef Raskin's work on the Canon Cat and later humane-interface research.
 
@@ -92,7 +92,20 @@ A portable `.cat` package is a ZIP-based container of that tree. Its purpose is 
 
 ## Current scope
 
-The next step after this documentation is a minimal Rust prototype: first the format/core and keyboard-event experiment, then a deliberately small terminal frontend. Features such as images, bibliographies, tags, semantic search, synchronization, collaboration, and AI assistance are intentionally deferred until real use demonstrates a need for them.
+The current Rust workspace contains `carta-format` and `carta-core`. It can create, read, and validate the current filesystem state of a Draft 0.1 archive, including Documents, monthly Volumes, Works, UTF-8 content, UUIDv7 identities, unknown JSON members, and a minimally initialized Git repository. It does not yet claim complete Reader or Writer conformance.
+
+The enhanced-keyboard-reporting experiment remains separate under `experiments/keyboard-events`. The CLI, TUI, LEAP behavior, Git history management, purge, and portable `.cat` packaging have not been implemented.
+
+Development commands run in the Debian Distrobox described in `AGENTS.md`. The container requires Rust, Cargo, rustfmt, Clippy, and Git. From the repository root, validate the workspace with:
+
+```bash
+distrobox enter carta-dev
+cargo fmt --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace
+```
+
+Features such as images, bibliographies, tags, semantic search, synchronization, collaboration, and AI assistance remain intentionally deferred until real use demonstrates a need for them.
 
 The working rule is:
 
