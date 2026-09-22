@@ -146,9 +146,9 @@ The reference interface is expected to provide two LEAP operations:
 - LEAP backward;
 - LEAP forward.
 
-In the initial Emacs/Linux prototype, the preferred experiment is to map the left and right Alt keys to independent modifiers so that holding one while typing performs incremental backward or forward search.
+In the initial Rust terminal prototype, the preferred experiment is to use the physical left and right Control keys as the two momentary LEAP controls. The terminal frontend should use a modern keyboard protocol capable of preserving physical-key identity and press/release events, allowing LEAP to behave as a true quasimode: hold a LEAP key, type the search string, release the key, and immediately return to ordinary editing.
 
-The exact physical keys are not part of the storage format. They are an interface binding.
+This mapping is an implementation profile, not a storage-format rule. Carta Space defines LEAP backward and LEAP forward as interaction concepts; individual frontends may bind them differently when platform constraints require it.
 
 LEAP should operate within an explicit scope. Likely scopes include:
 
@@ -336,7 +336,7 @@ The first implementation should prefer structural safety over cleverness.
 
 Carta Space should feel smaller than the technology underneath it.
 
-Internally it may use Emacs, Git, Markdown parsers, renderers, and conversion tools. None of those should become conceptual burdens for ordinary writing.
+Internally the reference implementation may use Rust libraries, Git, Markdown parsers, terminal protocols, renderers, and conversion tools. None of those should become conceptual burdens for ordinary writing.
 
 The desired mental model is approximately:
 
@@ -349,3 +349,26 @@ The desired mental model is approximately:
 If the user routinely needs to think about UUIDs, paths, Git commits, JSON, ZIP files, or renderer configuration, the implementation has exposed too much of itself.
 
 Carta Space succeeds only if its internal sophistication produces external simplicity.
+
+---
+
+## 14. Reference implementation architecture
+
+Carta Space deliberately separates the information model from its interactive presentation.
+
+The planned reference implementation uses Rust and is divided into layers:
+
+- **carta-format** defines the format-facing data model, serialization, validation, and compatibility behavior;
+- **carta-core** implements archive semantics such as Document creation, monthly Volumes, Works, search, LEAP logic, Git-backed history, purge, and portable-package operations;
+- **carta-cli** exposes scriptable and administrative operations in a conventional Unix command-line form;
+- **carta-tui** provides the first full-screen interactive writing environment using Ratatui and Crossterm.
+
+The TUI MUST NOT become the sole place where archive semantics live. Interactive frontends should call the core rather than directly editing archive structure behind its back.
+
+This architecture serves two purposes. First, most Carta Space behavior can be tested without a graphical or terminal interface. Second, alternative frontends can be developed later without changing the format or reimplementing the difficult parts of the system.
+
+A graphical frontend is therefore a possible future implementation, not a requirement. An Emacs frontend is likewise possible, but Emacs is no longer the planned reference implementation.
+
+The terminal is preferred initially because Carta Space is keyboard-centered, text-centered, and intentionally non-WYSIWYG. Publication-quality appearance belongs to renderers such as LaTeX, HTML, or EPUB rather than to the composition interface itself.
+
+The principal terminal-specific risk is keyboard fidelity. A traditional terminal often loses the distinction between physical modifier keys and does not report key release events. The reference TUI should therefore detect and use enhanced keyboard reporting where available and provide an explicit fallback when it is not.

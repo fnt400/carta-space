@@ -45,7 +45,7 @@ This also maximizes recoverability with generic tools.
 
 **Why not Pandoc Markdown:** It is powerful precisely because it has many extensions. Adopting the whole dialect would prematurely enlarge the language.
 
-**Why not Org:** The first implementation may use Emacs, but the storage format must not depend on Emacs.
+**Why not Org:** The storage format must remain independent of any editor or frontend. Emacs may later be supported as an alternate frontend, but it is not the reference implementation.
 
 **Why not separate rich-text ranges:** Range metadata becomes fragile when text is edited outside the reference frontend.
 
@@ -236,11 +236,11 @@ No empty `assets`, `tags`, `bibliography`, `ai`, or similar directories are crea
 
 ## DD-020 — LEAP is an interface concept, not a storage-format property
 
-**Decision:** The reference frontend will experiment with LEAP-style incremental forward/backward navigation, preferably mapped to physically distinct left/right Alt keys where the platform allows it.
+**Decision:** Carta Space defines two momentary LEAP controls, backward and forward. The initial terminal frontend will experimentally map them to the physical left and right Control keys.
 
-**Why:** This follows the Raskin-inspired interaction model while keeping the archive usable by frontends on platforms whose keyboard event systems differ.
+**Why:** AltGr is required for normal text entry on common international keyboard layouts, making the two Alt keys a poor default. The two Control keys are physically convenient and preserve the intended two-handed quasimodal interaction. Modern terminal keyboard protocols can distinguish the physical controls and report press/release events.
 
-Exact key bindings are outside the format specification.
+Exact key bindings remain outside the storage-format specification. A frontend on a platform that cannot expose the two physical Control keys may choose a different mapping.
 
 ---
 
@@ -253,3 +253,53 @@ The first prototype must test rather than theorize away three major risks:
 3. whether a continuous editable Work View can remain simple while safely projecting edits into multiple underlying Markdown Documents.
 
 No additional organizational system should be introduced until one of these risks produces a concrete problem.
+
+---
+
+## DD-021 — Rust is the reference implementation language
+
+**Decision:** The first reference implementation will be written in Rust.
+
+**Why:** Carta Space is intended to be a durable standalone system rather than an editor-specific package. Rust provides strong types for the format model, explicit error handling, good testing support, efficient Unicode/text processing, mature serialization libraries, straightforward CLI distribution, and the ability to share one core across multiple frontends.
+
+This is an implementation decision, not a format requirement. Independent implementations may use any language.
+
+---
+
+## DD-022 — Separate format, core, CLI, and frontend
+
+**Decision:** The reference implementation will be split into at least four logical components: `carta-format`, `carta-core`, `carta-cli`, and `carta-tui`.
+
+**Why:** Archive semantics must not become entangled with one user interface.
+
+The core should be testable without a terminal or GUI. The CLI should make administrative and scripted operations available in a conventional Unix form. Interactive frontends should use the same core operations rather than maintaining a second implementation of Documents, Works, history, or purge.
+
+This separation is also the foundation for possible future GTK, Emacs, web, or other frontends.
+
+---
+
+## DD-023 — The first interactive frontend is a TUI
+
+**Decision:** The initial interactive frontend will be a full-screen terminal application built with Ratatui and Crossterm rather than GTK.
+
+**Why:** Carta Space is primarily a keyboard-driven text environment and deliberately separates writing from final page presentation. A terminal UI therefore matches the project's minimal interaction model, works naturally over SSH, has low runtime overhead, and discourages premature addition of toolbars, panels, and presentation-oriented controls.
+
+**Trade-off:** Traditional terminal protocols do not reliably expose physical left/right modifiers or key-release events. The reference TUI will therefore rely on modern enhanced keyboard reporting when available and must detect when the required event fidelity is unavailable.
+
+A graphical frontend remains a possible future frontend, not a competing core implementation.
+
+---
+
+## DD-024 — Left and right Control are the initial LEAP bindings
+
+**Decision:** In the reference TUI, physical left Control is the default experimental binding for LEAP backward and physical right Control for LEAP forward.
+
+**Alternatives considered:** left/right Alt, function keys, Caps Lock, dedicated remapped keys.
+
+**Why not Alt:** On international keyboard layouts AltGr is required for ordinary character entry, including accented characters.
+
+**Why not function keys or Caps Lock:** They are less attractive ergonomically for the intended momentary, frequently held LEAP gesture.
+
+**Why Control:** The two keys are physically distinct, convenient to hold, and available on standard keyboards.
+
+This remains an experiment. Real use may justify a different default. Carta Space itself defines two LEAP controls, not two specific keyboard scancodes.

@@ -10,7 +10,7 @@ The planned reference implementation should be released under:
 
 **GNU General Public License v3.0 or later — `GPL-3.0-or-later`**
 
-This is a natural fit for an Emacs-based free-software implementation and ensures that distributed modified versions of the reference program remain free software under the terms of the GPL.
+This is a deliberate copyleft choice for the Rust-based reference implementation and its CLI/TUI frontends. It ensures that distributed modified versions of the reference program remain free software under the terms of the GPL while leaving independent implementations of the Carta Space format free to choose their own software license.
 
 The repository should include the official GPLv3 license text when implementation work begins.
 

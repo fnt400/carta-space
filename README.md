@@ -10,7 +10,20 @@ Its central idea is simple: the user should primarily deal with **content**, not
 
 Carta Space stores documents as ordinary UTF-8 Markdown, gives every document a stable identity, arranges newly created documents in automatic monthly volumes, and allows documents to be assembled into larger **Works** without copying or moving them. A Work can therefore span months or years while remaining editable as a single continuous view.
 
-The first reference implementation is intended for Emacs, but the format is explicitly independent of Emacs.
+The reference implementation is planned in Rust and is explicitly split into a frontend-independent core, a Unix-style command-line interface, and a terminal user interface. The format remains independent of Rust and of any particular frontend.
+
+## Reference implementation architecture
+
+The initial implementation is planned as a small set of separable Rust components:
+
+- `carta-format` — format types, validation, serialization, and compatibility rules;
+- `carta-core` — archive operations, Documents, Volumes, Works, LEAP search, history, purge, import/export;
+- `carta-cli` — scriptable Unix-style administrative commands;
+- `carta-tui` — the first interactive frontend, built with Ratatui and Crossterm.
+
+The TUI is the reference interactive environment, not the definition of Carta Space. Future GTK, Emacs, web, or other frontends should use the same core model rather than reimplementing archive semantics.
+
+The reference TUI will experimentally map the two momentary LEAP controls to the physical left and right Control keys. A modern terminal keyboard protocol capable of distinguishing physical modifier keys and key press/release events is therefore preferred. The key mapping is an implementation choice, not part of the archive format.
 
 ## Core principles
 
@@ -79,7 +92,7 @@ A portable `.cat` package is a ZIP-based container of that tree. Its purpose is 
 
 ## Current scope
 
-The next step after this documentation is a minimal prototype. Features such as images, bibliographies, tags, semantic search, synchronization, collaboration, and AI assistance are intentionally deferred until real use demonstrates a need for them.
+The next step after this documentation is a minimal Rust prototype: first the format/core and keyboard-event experiment, then a deliberately small terminal frontend. Features such as images, bibliographies, tags, semantic search, synchronization, collaboration, and AI assistance are intentionally deferred until real use demonstrates a need for them.
 
 The working rule is:
 
