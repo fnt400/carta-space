@@ -1,0 +1,654 @@
+# Carta Space Format Specification
+## Draft 0.1
+
+**Status:** Experimental / non-stable  
+**Working name:** Carta Space  
+**Date:** 2026-09-22
+
+This document defines Draft 0.1 of the Carta Space archive format.
+
+Draft 0.x versions are experimental. Backward compatibility is **not** guaranteed until a future 1.0 specification. Implementers are nevertheless encouraged to follow the compatibility rules in this document so that migration experience can inform 1.0.
+
+The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**, **SHOULD NOT**, and **MAY** are used normatively.
+
+---
+
+## 1. Scope
+
+Carta Space is a local document archive format.
+
+This specification defines:
+
+- archive identity;
+- directory layout;
+- Document storage;
+- chronological Volumes;
+- Works;
+- metadata representation;
+- Markdown representation;
+- Git history;
+- deletion requirements;
+- portable `.cat` packaging;
+- forward-extension behavior.
+
+This specification does **not** define:
+
+- a graphical user interface;
+- exact keyboard bindings;
+- synchronization;
+- collaborative editing;
+- tags;
+- bibliography;
+- images or other asset semantics;
+- AI features;
+- publication templates.
+
+---
+
+## 2. External standards
+
+Draft 0.1 depends on the following standards:
+
+- **UTF-8** for text encoding.
+- **CommonMark 0.31.2** for Document bodies.
+- **JSON**, RFC 8259, for structured metadata.
+- **UUID version 7**, RFC 9562, for persistent identities.
+- **RFC 3339** timestamps for explicit date-time values.
+- **Git** for canonical archive history.
+- **ZIP** for portable `.cat` packaging.
+
+References are listed in Section 19.
+
+---
+
+## 3. Terminology
+
+### 3.1 Archive
+
+The complete Carta Space information store.
+
+An Archive is both:
+
+1. a directory tree conforming to this specification; and
+2. a Git working tree with repository metadata in `.git/`.
+
+### 3.2 Document
+
+A persistent authored textual object.
+
+A Document has:
+
+- a stable UUIDv7 identifier;
+- an immutable creation timestamp;
+- a CommonMark body.
+
+### 3.3 Volume
+
+A chronological partition identified by calendar year and month.
+
+A Document belongs to the Volume corresponding to its creation timestamp and MUST NOT be moved to a later Volume merely because it is edited later.
+
+### 3.4 Work
+
+An ordered logical composition of Documents.
+
+A Work stores references to Document identifiers. It does not contain copies of Document bodies.
+
+### 3.5 View
+
+A frontend-generated presentation of one or more Documents.
+
+Views are not canonical stored content unless explicitly defined elsewhere.
+
+### 3.6 Current state
+
+The ordinary files present in the Archive working tree.
+
+### 3.7 History
+
+The Git history associated with the Archive.
+
+---
+
+## 4. Archive directory layout
+
+A conforming Draft 0.1 Archive MUST contain the following root entries:
+
+```text
+<archive-root>/
+├── mimetype
+├── carta.json
+├── volumes/
+├── works/
+└── .git/
+```
+
+A minimal populated Archive may resemble:
+
+```text
+<archive-root>/
+├── mimetype
+├── carta.json
+├── volumes/
+│   └── 2026/
+│       ├── 09/
+│       │   ├── 0199...a1/
+│       │   │   ├── content.md
+│       │   │   └── meta.json
+│       │   └── 0199...b7/
+│       │       ├── content.md
+│       │       └── meta.json
+│       └── 10/
+│           └── 019a...21/
+│               ├── content.md
+│               └── meta.json
+├── works/
+│   └── 019a...88/
+│       └── work.json
+└── .git/
+```
+
+Implementations MUST NOT require filenames chosen by users for Documents or Works.
+
+---
+
+## 5. The `mimetype` file
+
+The Archive root MUST contain a UTF-8/ASCII file named exactly:
+
+```text
+mimetype
+```
+
+Its complete content MUST be:
+
+```text
+application/vnd.carta-space+zip
+```
+
+with no leading or trailing whitespace.
+
+This media type is provisional in Draft 0.1 and is not asserted to be registered with IANA.
+
+When packaging as `.cat`, `mimetype` SHOULD be the first ZIP member and SHOULD be stored without compression, following a convention proven useful by other ZIP-based document formats.
+
+---
+
+## 6. `carta.json`
+
+The root `carta.json` identifies the Archive format.
+
+Draft 0.1 requires the following members:
+
+```json
+{
+  "format": "carta-space",
+  "format_version": {
+    "major": 0,
+    "minor": 1
+  },
+  "archive_id": "019...",
+  "created": "2026-09-22T19:00:00+02:00",
+  "markdown": "commonmark-0.31.2",
+  "history": "git"
+}
+```
+
+### 6.1 `format`
+
+MUST be the string:
+
+```text
+carta-space
+```
+
+### 6.2 `format_version`
+
+MUST be an object containing integer `major` and `minor` members.
+
+### 6.3 `archive_id`
+
+MUST be a UUIDv7 string.
+
+### 6.4 `created`
+
+MUST be an RFC 3339 timestamp representing Archive creation time.
+
+### 6.5 `markdown`
+
+MUST be:
+
+```text
+commonmark-0.31.2
+```
+
+for Draft 0.1.
+
+### 6.6 `history`
+
+MUST be:
+
+```text
+git
+```
+
+for Draft 0.1.
+
+Additional members MAY appear and MUST be preserved by implementations that rewrite `carta.json`, unless a future specification explicitly defines migration behavior.
+
+---
+
+## 7. Volumes
+
+Volumes are represented by directory paths:
+
+```text
+volumes/YYYY/MM/
+```
+
+where:
+
+- `YYYY` is a four-digit Gregorian calendar year;
+- `MM` is a two-digit month from `01` through `12`.
+
+A Document MUST reside in the Volume derived from the local calendar date represented by its `created` metadata at creation time.
+
+Changing a Document later MUST NOT change its Volume.
+
+Volumes are not user-defined categories.
+
+A conforming implementation MUST NOT require the user to create, name, close, fill, or manually rotate Volumes.
+
+---
+
+## 8. Documents
+
+Each Document is stored in a directory named with its UUIDv7:
+
+```text
+volumes/YYYY/MM/<document-uuid>/
+```
+
+The directory MUST contain:
+
+```text
+content.md
+meta.json
+```
+
+No other entry is required in Draft 0.1.
+
+Future specifications MAY define additional Document-local resources.
+
+### 8.1 Identity
+
+The directory name MUST equal the `id` value in `meta.json`.
+
+Document identity MUST NOT depend on title, position, pathname beyond the UUID directory, or body contents.
+
+### 8.2 Document body
+
+`content.md` MUST:
+
+- be encoded as UTF-8;
+- conform to CommonMark 0.31.2;
+- contain authored content only;
+- contain no Carta Space administrative front matter required by Draft 0.1.
+
+A Document title, when present, SHOULD be represented in the Markdown body, normally as a heading.
+
+Carta Space Draft 0.1 defines no Markdown extensions.
+
+### 8.3 Document metadata
+
+`meta.json` MUST contain:
+
+```json
+{
+  "id": "019...",
+  "created": "2026-09-22T18:24:31+02:00"
+}
+```
+
+`id` MUST be the Document UUIDv7.
+
+`created` MUST be an RFC 3339 timestamp and MUST be treated as immutable after creation.
+
+Unknown members MUST be preserved when a frontend rewrites the object.
+
+---
+
+## 9. Document boundaries
+
+Document boundaries are structural, not Markdown characters.
+
+A View that concatenates several Documents MUST generate a visible or otherwise perceivable boundary between them.
+
+In an editable multi-Document View, ordinary text editing MUST NOT be able to delete a Document boundary.
+
+A frontend MUST require an explicit structural operation to:
+
+- merge Documents;
+- split a Document;
+- reorder Documents in a Work;
+- remove a Document reference from a Work.
+
+This requirement prevents accidental corruption of the logical structure.
+
+---
+
+## 10. Works
+
+Each Work is stored in:
+
+```text
+works/<work-uuid>/work.json
+```
+
+The directory name MUST equal the Work `id`.
+
+A Draft 0.1 `work.json` MUST contain:
+
+```json
+{
+  "id": "019...",
+  "created": "2026-09-22T18:30:00+02:00",
+  "title": "War and Peace",
+  "documents": [
+    "019...A",
+    "019...B",
+    "019...C"
+  ]
+}
+```
+
+### 10.1 `id`
+
+MUST be a UUIDv7.
+
+### 10.2 `created`
+
+MUST be an RFC 3339 timestamp and SHOULD remain immutable.
+
+### 10.3 `title`
+
+MUST be a JSON string.
+
+A Work title is structural metadata and does not imply that the title is duplicated inside a component Document.
+
+### 10.4 `documents`
+
+MUST be a JSON array of Document UUID strings.
+
+Array order is the normative Work order.
+
+Each referenced UUID MUST resolve to an existing current Document.
+
+A Work MUST NOT contain copied Document bodies.
+
+A Document MAY be referenced by more than one Work.
+
+Unknown members MUST be preserved when a frontend rewrites `work.json`.
+
+---
+
+## 11. Work View
+
+A frontend MAY present a Work as a continuous editable View.
+
+The View MUST resolve Document references in `documents` order.
+
+Generated separators between component Documents MUST NOT be editable as ordinary body text.
+
+Editing text in a component region MUST edit the referenced Document itself, not a duplicate.
+
+A frontend MAY provide explicit structural commands for insertion, removal, splitting, merging, and reordering.
+
+The exact appearance of boundaries is not specified.
+
+---
+
+## 12. Chronological View
+
+A frontend SHOULD be capable of presenting the Documents of a Volume in creation order.
+
+The ordering key SHOULD be the Document `created` timestamp.
+
+UUIDv7 ordering MAY be used as an implementation aid but MUST NOT replace the explicit `created` value as the semantic creation timestamp.
+
+A frontend MAY provide larger temporal views, including ranges spanning several Volumes.
+
+---
+
+## 13. Markdown semantics
+
+Draft 0.1 uses CommonMark 0.31.2 without extensions.
+
+Carta Space treats Markdown primarily as authored semantics rather than final page layout.
+
+A frontend SHOULD allow users to express CommonMark structures without requiring them to manage typography.
+
+Draft 0.1 does not define:
+
+- fonts;
+- point sizes;
+- physical margins;
+- page dimensions;
+- print pagination;
+- stylesheet semantics.
+
+Those belong to rendering or publication layers outside the core archive format.
+
+A future specification MAY add explicitly named Markdown extensions. Such extensions MUST be versioned.
+
+---
+
+## 14. Git history
+
+A writable conforming Carta Space Draft 0.1 Archive MUST be a Git repository.
+
+The `.git/` directory contains canonical Archive history.
+
+### 14.1 User-interface independence
+
+The format requirement does not require the user interface to expose Git concepts.
+
+A frontend MAY use the Git command-line implementation, libgit2, JGit, or another conforming Git implementation.
+
+### 14.2 Current state versus history
+
+The filesystem working tree is the current state.
+
+Git commits are historical checkpoints.
+
+Autosaving the current state and committing history are distinct operations.
+
+### 14.3 Commit policy
+
+Draft 0.1 does not prescribe exact checkpoint frequency.
+
+A writable frontend SHOULD create automatic checkpoints frequently enough to make meaningful historical recovery possible without creating a commit for every keystroke.
+
+A frontend SHOULD create a checkpoint when cleanly closing an active session if the Archive has changes.
+
+### 14.4 Packaging
+
+Before exporting a portable `.cat` package, a writer MUST ensure that the packaged Git history contains a commit representing the packaged current state.
+
+### 14.5 Readers
+
+A read-only implementation MAY ignore `.git/` and still read current Documents and Works.
+
+A writable implementation claiming full Draft 0.1 support MUST preserve Git history.
+
+---
+
+## 15. Deletion and purge
+
+Carta Space distinguishes ordinary deletion from historical purge.
+
+### 15.1 Ordinary deletion
+
+Ordinary deletion removes a Document from the current working tree.
+
+Before deletion, all current Work references to that Document MUST be removed or otherwise resolved by an explicit user-visible structural operation.
+
+A current Work MUST NOT contain a dangling Document reference.
+
+Ordinarily deleted content MAY remain recoverable from Git history.
+
+### 15.2 Permanent purge
+
+A conforming writable implementation MUST provide, either directly or through an administrative tool, a means to purge a Document from the Archive's reachable history.
+
+A purge MUST:
+
+1. remove the current Document if present;
+2. remove all current Work references to it;
+3. rewrite or filter Git history so that the purged Document content is no longer reachable from retained Archive references;
+4. remove unreachable Git objects as required to complete the purge within the Archive.
+
+A frontend MUST clearly distinguish purge from ordinary deletion because purge is destructive.
+
+A purge applies only to the Archive on which it is performed. It cannot guarantee removal from:
+
+- external backups;
+- previously exported `.cat` packages;
+- cloned repositories;
+- copied files;
+- storage-level remnants outside the application's control.
+
+---
+
+## 16. Extensibility and preservation
+
+Draft 0.1 intentionally defines a small core.
+
+Future versions MAY add:
+
+- JSON members;
+- files;
+- directories;
+- optional derived indexes;
+- additional resource types;
+- Markdown extensions.
+
+A Draft 0.1 implementation encountering unknown JSON members SHOULD preserve them when rewriting the containing object.
+
+A Draft 0.1 implementation encountering unknown files or directories SHOULD preserve them unless the user explicitly requests destructive cleanup.
+
+Canonical authored data MUST NOT depend solely on an optional derived index or cache.
+
+Future extensions SHOULD be additive where practical.
+
+---
+
+## 17. Portable `.cat` package
+
+A `.cat` file is a ZIP archive containing the Carta Space Archive root.
+
+The extension is:
+
+```text
+.cat
+```
+
+The package MUST include:
+
+- `mimetype`;
+- `carta.json`;
+- `volumes/`;
+- `works/`;
+- `.git/`.
+
+The `mimetype` entry SHOULD be the first ZIP entry and SHOULD be uncompressed.
+
+Package creation SHOULD be atomic from the user's perspective: an implementation SHOULD write and validate a temporary package before replacing an existing destination package.
+
+The ZIP container is an interchange representation. Implementations SHOULD edit the unpacked working Archive rather than rewriting the ZIP for each text modification.
+
+---
+
+## 18. Conformance classes
+
+Draft 0.1 defines three useful conformance descriptions.
+
+### 18.1 Reader
+
+A Reader can:
+
+- read `carta.json`;
+- enumerate Documents;
+- read `meta.json`;
+- parse CommonMark bodies;
+- resolve Works.
+
+A Reader MAY ignore Git history.
+
+### 18.2 Writer
+
+A Writer satisfies Reader requirements and additionally:
+
+- preserves stable identities;
+- creates valid UUIDv7 values;
+- preserves required metadata;
+- respects Volume assignment;
+- prevents dangling Work references;
+- preserves unknown supported data according to Section 16;
+- maintains Git history.
+
+### 18.3 Full interactive frontend
+
+A full frontend is a Writer that additionally provides an interactive editing environment.
+
+Keyboard bindings, LEAP interaction design, rendering behavior, and publication tools are outside storage-format conformance.
+
+---
+
+## 19. References
+
+### CommonMark
+
+CommonMark Specification 0.31.2  
+https://spec.commonmark.org/0.31.2/
+
+### JSON
+
+RFC 8259 — The JavaScript Object Notation (JSON) Data Interchange Format  
+https://www.rfc-editor.org/rfc/rfc8259
+
+### UUID
+
+RFC 9562 — Universally Unique IDentifiers (UUIDs), including UUIDv7  
+https://www.rfc-editor.org/rfc/rfc9562
+
+### Date and time
+
+RFC 3339 — Date and Time on the Internet: Timestamps  
+https://www.rfc-editor.org/rfc/rfc3339
+
+### Git
+
+Git documentation  
+https://git-scm.com/docs
+
+### EPUB
+
+EPUB 3.3 — Package Document and Spine concepts  
+https://www.w3.org/TR/epub-33/
+
+---
+
+## 20. Open questions for Draft 0.2
+
+The following questions are intentionally not resolved by Draft 0.1:
+
+1. Exact automatic Git checkpoint policy.
+2. Whether a deleted Document requires an explicit tombstone in addition to Git history.
+3. Exact rules for displaying and editing multi-Document Views.
+4. LEAP scope-selection interaction.
+5. Publication-profile representation.
+6. Whether Draft 1.0 should define a reserved namespace for extensions.
+7. Whether portable packages should include a Git bundle instead of raw `.git/` metadata in a future revision.
+
+These questions MUST NOT be silently resolved by embedding incompatible assumptions into the core format during the first prototype.
