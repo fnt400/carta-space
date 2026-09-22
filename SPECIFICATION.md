@@ -57,6 +57,12 @@ Draft 0.1 depends on the following standards:
 - **Git** for canonical archive history.
 - **ZIP** for portable `.cat` packaging.
 
+In Draft 0.1, every textual UUID representation MUST use the canonical lowercase hyphenated form:
+
+```text
+xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
 References are listed in Section 19.
 
 ---

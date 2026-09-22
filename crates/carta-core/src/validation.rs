@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::fs::{self, DirEntry, File};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::str::FromStr;
 
 use carta_format::{ArchiveMetadata, DocumentId, DocumentMetadata, WorkId, WorkMetadata, MIMETYPE};
@@ -29,7 +30,9 @@ pub(crate) fn scan_archive(root: &Path) -> Result<ScannedArchive, ValidationErro
     let git = root.join(".git");
     let volumes_exists = scanner.require_directory(&volumes);
     let works_exists = scanner.require_directory(&works_path);
-    scanner.require_directory(&git);
+    if scanner.require_directory(&git) {
+        scanner.validate_git_working_tree(root, &git);
+    }
 
     let documents = if volumes_exists {
         scanner.scan_volumes(&volumes)
@@ -108,6 +111,37 @@ impl Scanner {
             Ok(content) if content == MIMETYPE => {}
             Ok(_) => self.issue(path, ValidationIssueKind::InvalidMimetype),
             Err(error) => self.issue(path, ValidationIssueKind::Io(error.to_string())),
+        }
+    }
+
+    fn validate_git_working_tree(&mut self, root: &Path, git_directory: &Path) {
+        let output = Command::new("git")
+            .current_dir(root)
+            .args(["--git-dir=.git", "--work-tree=."])
+            .args(["rev-parse", "--is-inside-work-tree"])
+            .output();
+
+        match output {
+            Ok(output)
+                if output.status.success()
+                    && String::from_utf8_lossy(&output.stdout).trim() == "true" => {}
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let detail = stderr.trim();
+                let detail = if detail.is_empty() {
+                    format!("git rev-parse exited with {}", output.status)
+                } else {
+                    detail.to_owned()
+                };
+                self.issue(
+                    git_directory,
+                    ValidationIssueKind::InvalidGitWorkingTree(detail),
+                );
+            }
+            Err(error) => self.issue(
+                git_directory,
+                ValidationIssueKind::InvalidGitWorkingTree(format!("could not run Git: {error}")),
+            ),
         }
     }
 

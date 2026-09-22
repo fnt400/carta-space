@@ -23,7 +23,7 @@ The initial implementation is planned as a small set of separable Rust component
 
 The TUI is the reference interactive environment, not the definition of Carta Space. Future GTK, Emacs, web, or other frontends should use the same core model rather than reimplementing archive semantics.
 
-The reference TUI will experimentally map the two momentary LEAP controls to the physical left and right Control keys. A modern terminal keyboard protocol capable of distinguishing physical modifier keys and key press/release events is therefore preferred. The key mapping is an implementation choice, not part of the archive format.
+The reference terminal environment successfully distinguished physical left and right Control and reported separate press/release events through Crossterm enhanced keyboard reporting. The future reference TUI will use them as the initial experimental bindings for the two momentary LEAP controls. The key mapping is an implementation choice, not part of the archive format.
 
 ## Core principles
 
@@ -92,7 +92,7 @@ A portable `.cat` package is a ZIP-based container of that tree. Its purpose is 
 
 ## Current scope
 
-The current Rust workspace contains `carta-format` and `carta-core`. It can create, read, and validate the current filesystem state of a Draft 0.1 archive, including Documents, monthly Volumes, Works, UTF-8 content, UUIDv7 identities, unknown JSON members, and a minimally initialized Git repository. It does not yet claim complete Reader or Writer conformance.
+The current Rust workspace contains `carta-format` and `carta-core`. It can create, read, and validate the current filesystem state of a Draft 0.1 archive, including Documents, monthly Volumes, Works, UTF-8 content, canonical UUIDv7 identities, unknown JSON members, and a Git working tree verified through the Git command-line implementation. It does not yet claim complete Reader or Writer conformance.
 
 The enhanced-keyboard-reporting experiment remains separate under `experiments/keyboard-events`. The CLI, TUI, LEAP behavior, Git history management, purge, and portable `.cat` packaging have not been implemented.
 

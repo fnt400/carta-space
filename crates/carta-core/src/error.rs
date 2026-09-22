@@ -136,6 +136,9 @@ pub enum ValidationIssueKind {
     #[error("mimetype content is not exactly application/vnd.carta-space+zip")]
     InvalidMimetype,
 
+    #[error("archive root is not a Git working tree: {0}")]
+    InvalidGitWorkingTree(String),
+
     #[error("invalid format data: {0}")]
     InvalidFormat(String),
 

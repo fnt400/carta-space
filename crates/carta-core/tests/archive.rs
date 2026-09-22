@@ -39,6 +39,20 @@ fn creates_opens_and_validates_a_minimal_archive() {
 }
 
 #[test]
+fn rejects_a_fake_git_directory() {
+    let (_temporary, archive) = create_archive();
+    let git_directory = archive.root().join(".git");
+    fs::remove_dir_all(&git_directory).unwrap();
+    fs::create_dir(&git_directory).unwrap();
+
+    let errors = Archive::validate(archive.root()).unwrap_err();
+    assert!(errors
+        .issues()
+        .iter()
+        .any(|issue| matches!(issue.kind(), ValidationIssueKind::InvalidGitWorkingTree(_))));
+}
+
+#[test]
 fn creates_and_reads_documents_without_changing_content() {
     let (_temporary, mut archive) = create_archive();
     let content = "# Titolo\n\nAccenti: à è é ì ò ù.\n\n```\nraw <text>\n```\n";

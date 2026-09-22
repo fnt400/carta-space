@@ -302,4 +302,6 @@ A graphical frontend remains a possible future frontend, not a competing core im
 
 **Why Control:** The two keys are physically distinct, convenient to hold, and available on standard keyboards.
 
+**Experiment result:** In the reference terminal environment, Crossterm with enhanced keyboard reporting distinguished `LeftControl` from `RightControl` and delivered separate `Press` and `Release` events. This confirms the technical feasibility of the initial reference-TUI binding in that environment. The binding remains a frontend decision and is not part of the archive format or core domain model.
+
 This remains an experiment. Real use may justify a different default. Carta Space itself defines two LEAP controls, not two specific keyboard scancodes.
