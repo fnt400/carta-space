@@ -102,9 +102,13 @@ A Work stores references to Document identifiers. It does not contain copies of 
 
 ### 3.5 View
 
-A frontend-generated presentation of one or more Documents.
+A frontend- or core-generated projection derived from Archive state.
+
+A View may select, order, combine, or otherwise present Documents, Works, history, relationships, or search results. A View does not own a canonical copy of authored Document content merely because that content is displayed through the View.
 
 Views are not canonical stored content unless explicitly defined elsewhere.
+
+Draft 0.1 defines no persistent View resource and no `views/` directory.
 
 ### 3.6 Current state
 
@@ -424,6 +428,12 @@ UUIDv7 ordering MAY be used as an implementation aid but MUST NOT replace the ex
 
 A frontend MAY provide larger temporal views, including ranges spanning several Volumes.
 
+A frontend MAY provide other derived Views, including search-result Views, relationship or backlink Views, history-oriented Views, and Views selected by creation or modification time.
+
+A derived View MUST NOT require duplication of canonical Document bodies. Loss of a View-specific cache or index MUST NOT cause loss of authored or structural Archive data.
+
+Draft 0.1 does not define persistence or interchange semantics for user-saved Views.
+
 ---
 
 ## 13. Markdown semantics
@@ -446,6 +456,27 @@ Draft 0.1 does not define:
 Those belong to rendering or publication layers outside the core archive format.
 
 A future specification MAY add explicitly named Markdown extensions. Such extensions MUST be versioned.
+
+### 13.1 Internal Carta links
+
+Draft 0.1 MAY represent internal references using ordinary CommonMark links. No additional Markdown syntax is introduced.
+
+The following link destinations are reserved:
+
+```text
+carta:doc:<DocumentId>
+carta:work:<WorkId>
+```
+
+`<DocumentId>` and `<WorkId>` use the canonical textual UUID representation of the corresponding Carta identifier.
+
+The visible CommonMark link label is authored content and MUST NOT be used as the target identity. Changing a Document heading or Work title therefore does not change an internal link target.
+
+An implementation MAY resolve these links for navigation when the target exists.
+
+An unresolved internal Carta link MUST NOT by itself make an Archive structurally invalid. This differs from a Document reference in a Work's `documents` array, which MUST resolve according to Section 10.
+
+Backlinks MUST NOT be required as canonical metadata in Draft 0.1. An implementation MAY derive backlink relationships by scanning canonical Document bodies or by maintaining a disposable derived index.
 
 ---
 
@@ -544,6 +575,10 @@ A Draft 0.1 implementation encountering unknown JSON members SHOULD preserve the
 A Draft 0.1 implementation encountering unknown files or directories SHOULD preserve them unless the user explicitly requests destructive cleanup.
 
 Canonical authored data MUST NOT depend solely on an optional derived index or cache.
+
+Optional derived indexes MAY include full-text indexes, internal-link/backlink indexes, vector or semantic-search indexes, and other acceleration structures.
+
+Loss or deletion of a derived index MUST NOT cause loss of authored text, identities, Work structure, or Git history. Implementations MAY rebuild functionally equivalent derived indexes from canonical Archive data. Model-dependent derived data, including embeddings, is not part of Draft 0.1 conformance.
 
 Future extensions SHOULD be additive where practical.
 

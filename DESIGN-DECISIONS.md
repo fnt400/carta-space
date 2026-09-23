@@ -228,9 +228,9 @@ No empty `assets`, `tags`, `bibliography`, `ai`, or similar directories are crea
 
 ## DD-019 — Canonical authored data must not depend on an index
 
-**Decision:** Search indexes, databases, caches, embeddings, or other acceleration structures are always derived data unless a future specification explicitly changes this rule.
+**Decision:** Search indexes, databases, caches, embeddings, or other acceleration structures are always derived data unless a future specification explicitly changes this rule. This includes lexical full-text indexes, link/backlink indexes, and semantic vector indexes.
 
-**Why:** The archive must remain reconstructable from human-readable canonical files.
+**Why:** The archive must remain reconstructable from human-readable canonical files. Losing an index may temporarily reduce speed or optional retrieval capabilities, but must not lose authored text, identities, Work structure, or history.
 
 ---
 
@@ -305,3 +305,42 @@ A graphical frontend remains a possible future frontend, not a competing core im
 **Experiment result:** In the reference terminal environment, Crossterm with enhanced keyboard reporting distinguished `LeftControl` from `RightControl` and delivered separate `Press` and `Release` events. This confirms the technical feasibility of the initial reference-TUI binding in that environment. The binding remains a frontend decision and is not part of the archive format or core domain model.
 
 This remains an experiment. Real use may justify a different default. Carta Space itself defines two LEAP controls, not two specific keyboard scancodes.
+
+---
+
+## DD-025 — Views are derived projections
+
+**Decision:** A View is a runtime projection over canonical Archive state. Draft 0.1 does not introduce a persistent View object or a `views/` directory.
+
+**Why:** Chronological View and Work View already demonstrate that the same Documents can be presented through different intellectual or temporal organizations without copying them. Generalizing this principle permits future search-result, backlink, history, and semantic-search Views without adding another canonical storage hierarchy.
+
+**Constraint:** A View must not become the only owner of authored Document content. Persistence of user-defined Views, if later required, needs an explicit format decision rather than an accidental frontend convention.
+
+---
+
+## DD-026 — Internal links reuse CommonMark and stable Carta identities
+
+**Decision:** Internal references use ordinary CommonMark link syntax with reserved destinations of the form `carta:doc:<DocumentId>` and `carta:work:<WorkId>`.
+
+**Why:** This requires no custom Markdown dialect, keeps the authored body readable in generic tools, and separates human-visible labels from stable object identity. A title or heading may change without breaking the reference.
+
+**Constraint:** An unresolved internal prose link does not make the Archive structurally invalid. This is deliberately different from a Work's ordered Document references, which are structural and must resolve.
+
+---
+
+## DD-027 — Backlinks are derived, not authored metadata
+
+**Decision:** Backlinks are computed as the inverse of canonical internal links. Draft 0.1 does not store a canonical backlink list in Document or Work metadata.
+
+**Why:** Storing both outgoing links and backlinks would create two sources of truth that could diverge after external Markdown edits. A direct scan is sufficient for small Archives; a disposable index may accelerate large Archives.
+
+---
+
+## DD-028 — Semantic retrieval is optional derived infrastructure
+
+**Decision:** Carta Space may later maintain semantic or vector indexes, but they are optional, model-dependent derived data and are not part of the initial core.
+
+**Why:** Semantic retrieval can solve cases where remembered meaning does not share literal vocabulary with the original text, especially in large Archives. It should complement rather than replace exact content navigation, and the Archive must remain usable if the model, embeddings, or index disappear.
+
+**Implementation rule:** Do not implement semantic indexing merely to anticipate scale. Introduce it only when real Archive use demonstrates a retrieval problem that exact search, temporal context, Works, and simpler derived indexes do not solve.
+

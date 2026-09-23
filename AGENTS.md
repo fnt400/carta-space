@@ -43,7 +43,12 @@ Do not encode those physical key bindings into the archive format or core domain
 - Do not add speculative features.
 - Do not add tags, AI features, synchronization, collaboration, bibliography, or asset systems unless explicitly requested.
 - Canonical authored data must remain recoverable from ordinary Markdown and JSON files.
+- Treat Views as derived projections over canonical Archive state; Draft 0.1 has no persistent View object or `views/` directory.
 - Never duplicate Document content to implement a View or Work.
+- Internal Document/Work links, when implemented, use ordinary CommonMark links with the reserved `carta:doc:<id>` and `carta:work:<id>` destinations defined by the specification.
+- Treat backlinks as derived relationships, never as a second canonical list that must be synchronized with outgoing links.
+- Full-text, link/backlink, semantic/vector, and similar indexes must remain disposable derived state whose loss cannot destroy authored or structural Archive data.
+- Do not introduce semantic indexing or LLM-dependent retrieval merely in anticipation of future scale; require a demonstrated retrieval problem.
 - Document and Work identities are stable.
 - Document boundaries in composite views are structural and non-editable.
 - Preserve unknown future metadata wherever possible.

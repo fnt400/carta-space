@@ -109,9 +109,19 @@ The distinction is fundamental.
 
 ---
 
-## 4. Two principal views
+## 4. Views as projections
 
-Carta Space is intended to present the same information through different views rather than by duplicating it.
+Carta Space is intended to present the same canonical information through different **Views** rather than by duplicating or relocating content.
+
+A View is a derived projection over Archive state. It may select Documents, order them, combine them into a continuous presentation, or expose relationships and search results. The underlying Documents and Works remain canonical; the View does not own copies of their authored content.
+
+Conceptually:
+
+```text
+Archive state -> selection -> ordering/projection -> View
+```
+
+Draft 0.1 does not define a persistent View object or a `views/` directory. Views are runtime concepts unless a future specification explicitly introduces saved Views.
 
 ### 4.1 Chronological View
 
@@ -134,6 +144,31 @@ Document boundaries are structural and protected. The user can edit text on eith
 Operations such as splitting, merging, inserting, removing, or reordering component Documents are explicit structural commands.
 
 A Work therefore behaves like a continuous book without pretending that all of its content is physically one large file.
+
+### 4.3 Other derived Views
+
+The same model can support additional Views without introducing new canonical copies of content. Examples include:
+
+- search-result Views;
+- Documents created or modified in a selected period;
+- Documents that refer to a selected Document or Work;
+- history-oriented Views;
+- future semantic-search result Views.
+
+These Views may be generated directly from canonical Archive data or accelerated by disposable derived indexes.
+
+### 4.4 Internal links and backlinks
+
+Documents may refer to other Documents or Works through ordinary CommonMark links whose destinations use stable Carta identities, for example:
+
+```markdown
+[Bernanos notes](carta:doc:019...)
+[My book](carta:work:019...)
+```
+
+The visible label is authored text; identity belongs to the target UUID. Renaming a title therefore does not change the target.
+
+Backlinks are the inverse relationship derived from these authored links. They are not separate authored metadata. An implementation may scan Documents directly or maintain a disposable index to answer questions such as "what refers to this Document?".
 
 ---
 
@@ -237,7 +272,9 @@ The current text of every Document is an ordinary Markdown file. Administrative 
 
 This rejects an opaque database as the canonical representation.
 
-Databases, search indexes, embeddings, or caches may later exist as derived acceleration layers. They must not become the sole authoritative copy of authored content.
+Databases, full-text indexes, link/backlink indexes, vector embeddings, or caches may later exist as derived acceleration layers. They must not become the sole authoritative copy of authored or structural content.
+
+Derived state must be disposable: losing an index may reduce speed or capabilities temporarily, but it must not lose authored text, Work structure, identity, history, or other canonical Archive data. An implementation should be able to rebuild an equivalent index from the canonical Archive.
 
 The preferred failure mode is graceful degradation:
 
@@ -260,9 +297,9 @@ Possible future capabilities include:
 - tags;
 - footnotes beyond the CommonMark core;
 - richer Work structures;
-- cross-document relationships;
-- derived full-text indexes;
-- semantic search;
+- richer cross-document relationship and query mechanisms;
+- derived full-text and link/backlink indexes;
+- semantic vector indexes and semantic search;
 - synchronization;
 - collaboration;
 - AI-assisted operations.
