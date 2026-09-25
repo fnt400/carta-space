@@ -422,3 +422,34 @@ A dedicated writing device with a keyboard and simple display is therefore a nat
 
 **Implementation note:** The mechanism (temporary files, journaling, atomic rename, transactional layer, or equivalent) is intentionally left to the implementation.
 
+---
+
+## DD-037 — Work title equivalence is Unicode-defined
+
+**Decision:** Active Work title uniqueness uses a comparison key produced by trimming leading and trailing Unicode whitespace, normalizing to NFC, and applying Unicode full case folding. NFKC is not used. The authored title is stored unchanged.
+
+**Why:** Work title uniqueness affects archive validity and must be deterministic across implementations without replacing the user's spelling with a normalized display value.
+
+---
+
+## DD-038 — LEAP has a palette compatibility mode
+
+**Decision:** Physical Left and Right Control remain the normal momentary LEAP controls when terminal event fidelity is sufficient. On terminals that cannot distinguish them and report press/release events, the TUI exposes directional incremental LEAP and Leap Again through the command palette instead of inventing Alt-based shortcuts.
+
+**Why:** Carta must remain usable on conventional terminal paths without compromising AltGr or international text entry. The fallback is deliberately degraded and does not redefine normal LEAP semantics.
+
+---
+
+## DD-039 — Divergent variants require explicit choice
+
+**Decision:** Carta does not automatically merge externally divergent or ambiguously recovered Document content or Work structure. It preserves all recoverable variants until the user chooses the current variant. A non-selected Document variant may be preserved as a new Document; a second Work is not created automatically.
+
+**Why:** Silent overwrite or speculative merge would risk authored content and structural intent. Document duplication has defined identity semantics, while automatic Work duplication would invent a new structural object without user intent.
+
+---
+
+## DD-040 — Work version restore is integral
+
+**Decision:** Restoring a historical Work version is atomic and all-or-nothing. Required trashed Documents may be restored only with explicit consent in the same operation. If any required Document is unrecoverable, including after Wipe, restore fails without changing current state. v0.1 has no partial Work restore.
+
+**Why:** A partial restore would silently change the historical Work being requested and introduce new semantics for omissions, ordering, and user intent.

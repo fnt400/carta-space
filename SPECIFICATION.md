@@ -385,7 +385,13 @@ MUST be a JSON string.
 
 A Work title is structural metadata and does not imply that the title is duplicated inside a component Document.
 
-Among active Works, titles MUST be unique after trimming leading/trailing Unicode whitespace and comparing case-insensitively. Trashed historical Works do not reserve their former titles.
+Among active Works, titles MUST be unique according to the following comparison key:
+
+1. remove leading and trailing Unicode whitespace;
+2. normalize the result to Unicode NFC;
+3. apply Unicode full case folding.
+
+The resulting value is used only for uniqueness comparison. The original authored title MUST be stored unchanged. Implementations MUST NOT use NFKC for this comparison. Trashed historical Works do not reserve their former titles.
 
 ### 10.4 `documents`
 

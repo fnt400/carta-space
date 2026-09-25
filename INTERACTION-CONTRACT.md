@@ -207,6 +207,15 @@ The reference TUI initially uses:
 
 These are frontend bindings, not archive semantics.
 
+If the terminal cannot distinguish the two physical Control keys and their press/release events, the TUI remains usable in a degraded compatibility mode. It MUST NOT substitute Alt-based bindings or other bindings that interfere with AltGr or international text entry. The command palette instead exposes:
+
+- `LEAP Forward…`;
+- `LEAP Backward…`;
+- `Leap Again Forward`;
+- `Leap Again Backward`.
+
+`LEAP Forward…` and `LEAP Backward…` provide a transient incremental query using the normal LEAP matching semantics and end on explicit confirmation or cancellation. This compatibility mode does not change normal momentary LEAP semantics on capable terminals.
+
 ### 4.2 Scope
 
 Normal LEAP searches the current View.
@@ -342,7 +351,7 @@ Carta does not insert literal TAB characters for indentation in v0.1.
 
 It does not automatically add the current Document.
 
-Active Work names are unique after trimming leading/trailing whitespace and comparing case-insensitively.
+Active Work names are unique using the comparison key defined by `SPECIFICATION.md`: trim leading/trailing Unicode whitespace, normalize to NFC, then apply Unicode full case folding. The authored name is preserved exactly, and NFKC is not used.
 
 A Work in Trash does not reserve its former name.
 
@@ -517,7 +526,7 @@ Documents currently in the Work but absent from the historical state are removed
 
 If the restore changes Documents also used by other Works, Carta warns about those effects before confirmation.
 
-If required historical Documents are in Trash, Carta may offer to restore them explicitly. If a required Document was Wiped, integral restoration is impossible and Carta must report that fact.
+`Restore Work Version` is integral and atomic. If required historical Documents are in Trash, Carta may restore them only with explicit user consent as part of the same operation. If a required Document was Wiped or is otherwise unrecoverable, the operation fails without changing current state and identifies the Document that prevents complete restoration. v0.1 does not provide partial Work restore.
 
 ---
 
@@ -662,11 +671,15 @@ If Carta has no local unsaved/divergent edit for the affected Document, it may r
 
 If both Carta's loaded state and the external file changed, Carta MUST NOT silently overwrite either version. Both must be preserved until explicit resolution.
 
+Resolution does not merge automatically. The user explicitly chooses which variant continues as the current content of the original Document UUID. The user may also preserve the other variant as a new Document with a new UUID. No recoverable variant may be overwritten before that decision.
+
 ### 14.2 Work structure changed externally
 
 If `work.json` changes externally and Carta has no concurrent local structural change, Carta may reload it.
 
 If both external and internal Work structure changed, v0.1 does not perform an automatic structural merge. Both versions must be preserved for explicit resolution.
+
+The user explicitly chooses which preserved structure becomes current for the existing Work identity. Carta does not automatically create a second Work.
 
 ---
 
@@ -687,6 +700,8 @@ After an unexpected termination, Carta attempts to reopen the previous session u
 If the Archive is coherent, recovery should be effectively invisible apart from optional subtle notice.
 
 If ambiguity or corruption exists, Carta preserves recoverable alternatives and asks for explicit resolution rather than silently choosing one.
+
+When ambiguous recovery presents competing Document contents or Work structures, it follows the same explicit-resolution rules as external-edit conflicts. No automatic merge is performed and no recoverable alternative is overwritten before the decision.
 
 ### 15.3 Structural atomicity
 
