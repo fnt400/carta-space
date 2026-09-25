@@ -5,11 +5,12 @@ Carta Space is a content-first document environment inspired by Jef Raskin's Can
 Before making architectural or implementation changes, read:
 
 1. `SPECIFICATION.md` — normative definition of the Carta Space format.
-2. `DESIGN-DECISIONS.md` — accepted architectural decisions and rationale.
-3. `WHITEPAPER.md` — project philosophy and conceptual model.
-4. `README.md` — current project overview.
+2. `INTERACTION-CONTRACT.md` — accepted v0.1 user-visible behavior for the reference interaction model.
+3. `DESIGN-DECISIONS.md` — accepted architectural decisions and rationale.
+4. `WHITEPAPER.md` — project philosophy and conceptual model.
+5. `README.md` — current project overview.
 
-If these documents appear to conflict, `SPECIFICATION.md` is authoritative for the archive format.
+If these documents appear to conflict, `SPECIFICATION.md` is authoritative for the archive format and `INTERACTION-CONTRACT.md` is authoritative for accepted v0.1 interaction behavior. Do not resolve a conflict by inventing new semantics.
 
 Do not silently change the format or accepted design decisions merely to simplify an implementation. If implementation experience exposes a flaw in the specification or an accepted design decision, stop and report the conflict explicitly.
 
@@ -18,7 +19,7 @@ Do not silently change the format or accepted design decisions merely to simplif
 The reference implementation is written in Rust and should remain divided into independent layers:
 
 - `carta-format`: format types, parsing, serialization, validation, and compatibility rules.
-- `carta-core`: Documents, Volumes, Works, LEAP, Git history, purge, import/export, and archive operations.
+- `carta-core`: Documents, Volumes, Works, LEAP, Git history, Trash/Wipe, import/export, and archive operations.
 - `carta-cli`: Unix-style command-line interface.
 - `carta-tui`: interactive terminal frontend using Ratatui and Crossterm.
 
@@ -60,6 +61,9 @@ The guiding interaction rule is:
 - Prefer simple, standard technology over custom mechanisms.
 - Preserve the writing-first interaction model: organization should normally follow content rather than precede it.
 - Do not add speculative features.
+- Do not invent v0.1 interaction behavior that is already decided in `INTERACTION-CONTRACT.md`; report contradictions or missing cases instead.
+- Do not implement Document split/merge in v0.1.
+- Treat Trash and Wipe as distinct operations with the semantics defined by the interaction contract and specification.
 - Do not add tags, AI features, synchronization, collaboration, bibliography, or asset systems unless explicitly requested.
 - Canonical authored data must remain recoverable from ordinary Markdown and JSON files.
 - Treat Views as derived projections over canonical Archive state; Draft 0.1 has no persistent View object or `views/` directory.
@@ -160,4 +164,4 @@ Do not broaden the task beyond what was requested.
 
 If a small implementation decision is reversible and does not affect the format or architecture, choose the simplest reasonable option and proceed.
 
-If a decision changes the format, archive semantics, LEAP interaction model, deletion/history guarantees, or crate boundaries, surface it explicitly before making the change.
+If a decision changes the format, archive semantics, LEAP interaction model, Trash/Wipe or history guarantees, or crate boundaries, surface it explicitly before making the change.

@@ -152,13 +152,13 @@ Exact checkpoint policy is intentionally deferred until prototype use provides e
 
 ---
 
-## DD-012 — Ordinary deletion and permanent purge are separate
+## DD-012 — Recoverable Trash and permanent Wipe are separate
 
-**Decision:** Normal deletion may remain recoverable from Git. Permanent purge rewrites history.
+**Decision:** Trash removes an object from the active Archive while preserving historical recoverability. Wipe permanently removes a trashed Document from Carta-managed history and derived state on the current device.
 
-**Why:** Version history is valuable only if accidental deletion remains recoverable, but users also need a way to remove sensitive or unwanted content from the archive itself.
+**Why:** Version history is valuable only if ordinary removal remains recoverable, but users also need an explicit way to remove sensitive or unwanted Document content from Carta Space itself.
 
-Purge cannot promise deletion from independent external copies or backups.
+Wipe cannot promise deletion from independent external copies, backups, clones, other devices, filesystem snapshots, or physical storage remnants outside Carta Space's control.
 
 ---
 
@@ -272,7 +272,7 @@ This is an implementation decision, not a format requirement. Independent implem
 
 **Why:** Archive semantics must not become entangled with one user interface.
 
-The core should be testable without a terminal or GUI. The CLI should make administrative and scripted operations available in a conventional Unix form. Interactive frontends should use the same core operations rather than maintaining a second implementation of Documents, Works, history, or purge.
+The core should be testable without a terminal or GUI. The CLI should make administrative and scripted operations available in a conventional Unix form. Interactive frontends should use the same core operations rather than maintaining a second implementation of Documents, Works, history, or Trash/Wipe.
 
 This separation is also the foundation for possible future GTK, Emacs, web, or other frontends.
 
@@ -375,4 +375,50 @@ This remains an experiment. Real use may justify a different default. Carta Spac
 A dedicated writing device with a keyboard and simple display is therefore a natural Carta Space frontend, but the project does not depend on any specific hardware, display technology, or retro-computing aesthetic.
 
 **Consequence:** Different frontends may expose different amounts of functionality while sharing the same Archive and core semantics. A focused writer, richer desktop environment, or lightweight capture client should be considered specialized entrances to the same information space, not separate product models.
+
+---
+
+## DD-032 — v0.1 has stable Document boundaries and no split/merge
+
+**Decision:** The first usable version does not expose Document split or merge operations. Document boundaries are stable once a Document becomes persistent.
+
+**Why:** Split/merge immediately creates difficult questions about chronology, Volume assignment, shared Work membership, history, backlinks, and undo semantics. No demonstrated v0.1 use case justifies that complexity.
+
+**Alternative provided:** `Duplicate as New` creates an independent current Document from an existing one. `New Linked Document` creates a current Document and inserts an ordinary link from the source.
+
+---
+
+## DD-033 — Trash and Wipe are distinct user concepts
+
+**Decision:** Recoverable removal is called `Trash`. Permanent removal from Carta-managed history on the current device is called `Wipe`.
+
+**Why:** Calling both operations "delete" obscures a material distinction. Trash preserves historical recoverability; Wipe intentionally rewrites/cleans history and derived state.
+
+**Constraint:** Wipe guarantees removal only from copies under Carta Space's control on the current device. It does not claim forensic erasure from arbitrary storage remnants, backups, clones, exports, or other devices.
+
+---
+
+## DD-034 — Interaction semantics are specified independently of storage format
+
+**Decision:** `INTERACTION-CONTRACT.md` is the accepted behavioral contract for the v0.1 reference interaction model. `SPECIFICATION.md` remains authoritative for on-disk format and conformance.
+
+**Why:** The project needs precise behavior so implementation agents do not invent UX semantics, but keyboard/UI choices must not unnecessarily contaminate the durable archive format.
+
+---
+
+## DD-035 — Session/UI state is local and disposable
+
+**Decision:** Cursor/scroll positions, last View, per-Work resume positions, MRU Work ordering, and similar UI state are device-local, non-canonical, and excluded from Git history.
+
+**Why:** Such state improves continuity but is not authored content and should not create merge/synchronization pressure or affect archive recoverability.
+
+---
+
+## DD-036 — Multi-object structural operations are atomic
+
+**Decision:** Any user operation that changes multiple canonical objects must either complete fully or leave the previous valid Archive state intact.
+
+**Why:** Partial Trash, restore, Work edits, or linked-document creation could otherwise leave dangling references or incoherent history after crashes or I/O failures.
+
+**Implementation note:** The mechanism (temporary files, journaling, atomic rename, transactional layer, or equivalent) is intentionally left to the implementation.
 

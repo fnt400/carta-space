@@ -298,7 +298,7 @@ The distinction is:
 
 A user may later ask to see a Document as it existed on a particular date without having created a named version manually.
 
-A destructive purge operation must also exist. Ordinary deletion may remain historically recoverable. Purge removes the Document from the current archive, from structural references, and from reachable Git history. Such a purge cannot affect external backups, exported packages, or other copies.
+A destructive Wipe operation must also exist. Trash remains historically recoverable; Wipe removes a trashed Document from retained Carta-managed history and derived state on the current device. Wipe cannot affect external backups, exported packages, clones, other devices, or storage remnants outside Carta Space's control.
 
 ---
 
@@ -438,7 +438,7 @@ Carta Space deliberately separates the information model from its interactive pr
 The planned reference implementation uses Rust and is divided into layers:
 
 - **carta-format** defines the format-facing data model, serialization, validation, and compatibility behavior;
-- **carta-core** implements archive semantics such as Document creation, monthly Volumes, Works, search, LEAP logic, Git-backed history, purge, and portable-package operations;
+- **carta-core** implements archive semantics such as Document creation, monthly Volumes, Works, search, LEAP logic, Git-backed history, Trash/Wipe, and portable-package operations;
 - **carta-cli** exposes scriptable and administrative operations in a conventional Unix command-line form;
 - **carta-tui** provides the first full-screen interactive writing environment using Ratatui and Crossterm.
 

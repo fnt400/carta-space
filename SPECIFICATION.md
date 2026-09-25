@@ -27,7 +27,7 @@ This specification defines:
 - metadata representation;
 - Markdown representation;
 - Git history;
-- deletion requirements;
+- Trash/Wipe requirements;
 - portable `.cat` packaging;
 - forward-extension behavior.
 
@@ -305,7 +305,9 @@ Document identity MUST NOT depend on title, position, pathname beyond the UUID d
 - contain authored content only;
 - contain no Carta Space administrative front matter required by Draft 0.1.
 
-A Document title, when present, SHOULD be represented in the Markdown body, normally as a heading.
+A Document title, when present, SHOULD be represented in the Markdown body, normally as a heading. Draft 0.1 defines no separate Document title metadata field.
+
+Canonical Document text MUST use LF (`U+000A`) line endings. Writers importing text with CRLF SHOULD normalize it to LF.
 
 Carta Space Draft 0.1 defines no Markdown extensions.
 
@@ -336,12 +338,9 @@ A View that concatenates several Documents MUST generate a visible or otherwise 
 
 In an editable multi-Document View, ordinary text editing MUST NOT be able to delete a Document boundary.
 
-A frontend MUST require an explicit structural operation to:
+A frontend MUST require an explicit structural operation to reorder Documents in a Work or remove a Document reference from a Work.
 
-- merge Documents;
-- split a Document;
-- reorder Documents in a Work;
-- remove a Document reference from a Work.
+Draft 0.1 interaction semantics do not define Document split or merge operations. A frontend claiming v0.1 interaction conformance SHOULD NOT invent split/merge semantics without a later accepted design decision.
 
 This requirement prevents accidental corruption of the logical structure.
 
@@ -386,6 +385,8 @@ MUST be a JSON string.
 
 A Work title is structural metadata and does not imply that the title is duplicated inside a component Document.
 
+Among active Works, titles MUST be unique after trimming leading/trailing Unicode whitespace and comparing case-insensitively. Trashed historical Works do not reserve their former titles.
+
 ### 10.4 `documents`
 
 MUST be a JSON array of Document UUID strings.
@@ -393,6 +394,10 @@ MUST be a JSON array of Document UUID strings.
 Array order is the normative Work order.
 
 Each referenced UUID MUST resolve to an existing current Document.
+
+The same Document UUID MUST NOT occur more than once in a single Work.
+
+The array MAY be empty.
 
 A Work MUST NOT contain copied Document bodies.
 
@@ -412,9 +417,11 @@ Generated separators between component Documents MUST NOT be editable as ordinar
 
 Editing text in a component region MUST edit the referenced Document itself, not a duplicate.
 
-A frontend MAY provide explicit structural commands for insertion, removal, splitting, merging, and reordering.
+A frontend MAY provide explicit structural commands for insertion, removal, and reordering.
 
-The exact appearance of boundaries is not specified.
+Draft 0.1 does not define split or merge interaction semantics.
+
+The exact appearance of boundaries is not specified by the archive format.
 
 ---
 
@@ -520,40 +527,47 @@ A writable implementation claiming full Draft 0.1 support MUST preserve Git hist
 
 ---
 
-## 15. Deletion and purge
+## 15. Trash and Wipe
 
-Carta Space distinguishes ordinary deletion from historical purge.
+Carta Space distinguishes recoverable removal from permanent history erasure. The v0.1 user-facing terms are **Trash** and **Wipe**.
 
-### 15.1 Ordinary deletion
+### 15.1 Trash
 
-Ordinary deletion removes a Document from the current working tree.
+Trashing removes a Document from the current working tree while leaving it recoverable from Git history.
 
-Before deletion, all current Work references to that Document MUST be removed or otherwise resolved by an explicit user-visible structural operation.
+Before Trash completes, all current Work references to that Document MUST be removed by an explicit user-visible structural operation. A current Work MUST NOT contain a dangling structural Document reference.
 
-A current Work MUST NOT contain a dangling Document reference.
+Authored Markdown links to the Document MUST NOT be silently rewritten merely because the target was trashed. Such links may remain unresolved until the target is restored or the authored text is changed.
 
-Ordinarily deleted content MAY remain recoverable from Git history.
+A frontend MAY maintain a disposable derived Trash index. Draft 0.1 defines no canonical `trash/` hierarchy.
 
-### 15.2 Permanent purge
+### 15.2 Restore
 
-A conforming writable implementation MUST provide, either directly or through an administrative tool, a means to purge a Document from the Archive's reachable history.
+Restoring a trashed Document restores the same Document identity, immutable `created` timestamp, original Volume assignment, and selected historical content. Former Work memberships MUST NOT be restored silently.
 
-A purge MUST:
+### 15.3 Wipe
 
-1. remove the current Document if present;
-2. remove all current Work references to it;
-3. rewrite or filter Git history so that the purged Document content is no longer reachable from retained Archive references;
-4. remove unreachable Git objects as required to complete the purge within the Archive.
+A conforming writable implementation MUST provide, either directly or through an administrative tool, a means to Wipe a trashed Document from the Archive's retained history.
 
-A frontend MUST clearly distinguish purge from ordinary deletion because purge is destructive.
+A Wipe MUST:
 
-A purge applies only to the Archive on which it is performed. It cannot guarantee removal from:
+1. require the Document to be absent from the active working tree;
+2. remove retained Git references/history containing the Document;
+3. remove relevant unreachable Git objects and reflog reachability as required to complete removal under Carta's control;
+4. remove Carta-managed derived indexes, caches, autosave state, and temporary/session copies that contain the wiped content.
+
+After successful Wipe on the current device, Carta Space itself MUST NOT be able to recover the Document from that device.
+
+A Wipe applies only to data under Carta Space's control on the device where it is performed. It cannot guarantee removal from:
 
 - external backups;
 - previously exported `.cat` packages;
-- cloned repositories;
+- cloned repositories or other devices;
 - copied files;
-- storage-level remnants outside the application's control.
+- filesystem/storage snapshots;
+- physical storage remnants outside the application's control.
+
+A frontend MUST clearly distinguish Wipe from Trash because Wipe is destructive.
 
 ---
 
@@ -642,7 +656,7 @@ A Writer satisfies Reader requirements and additionally:
 
 A full frontend is a Writer that additionally provides an interactive editing environment.
 
-Keyboard bindings, LEAP interaction design, rendering behavior, and publication tools are outside storage-format conformance.
+Keyboard bindings, LEAP interaction design, rendering behavior, and publication tools are outside storage-format conformance. The accepted v0.1 reference interaction semantics are defined separately in `INTERACTION-CONTRACT.md`.
 
 ---
 

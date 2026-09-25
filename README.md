@@ -21,7 +21,7 @@ The reference implementation is planned in Rust and is explicitly split into a f
 The initial implementation is planned as a small set of separable Rust components:
 
 - `carta-format` — format types, validation, serialization, and compatibility rules;
-- `carta-core` — archive operations, Documents, Volumes, Works, LEAP search, history, purge, import/export;
+- `carta-core` — archive operations, Documents, Volumes, Works, LEAP search, history, Trash/Wipe, import/export;
 - `carta-cli` — scriptable Unix-style administrative commands;
 - `carta-tui` — the first interactive frontend, built with Ratatui and Crossterm.
 
@@ -110,6 +110,7 @@ A portable `.cat` package is a ZIP-based container of that tree. Its purpose is 
 
 - `WHITEPAPER.md` — why Carta Space exists and the design philosophy.
 - `SPECIFICATION.md` — normative draft of Carta Space Format 0.1.
+- `INTERACTION-CONTRACT.md` — accepted behavior of the first usable v0.1 interaction model.
 - `DESIGN-DECISIONS.md` — important architectural decisions and their rationale.
 - `LICENSES.md` — proposed licensing model.
 
@@ -117,7 +118,7 @@ A portable `.cat` package is a ZIP-based container of that tree. Its purpose is 
 
 The current Rust workspace contains `carta-format` and `carta-core`. It can create, read, and validate the current filesystem state of a Draft 0.1 archive, including Documents, monthly Volumes, Works, UTF-8 content, canonical UUIDv7 identities, unknown JSON members, and a Git working tree verified through the Git command-line implementation. It does not yet claim complete Reader or Writer conformance.
 
-The enhanced-keyboard-reporting experiment remains separate under `experiments/keyboard-events`. The CLI, TUI, LEAP behavior, Git history management, purge, and portable `.cat` packaging have not been implemented.
+The enhanced-keyboard-reporting experiment remains separate under `experiments/keyboard-events`. The CLI, TUI, LEAP behavior, Git history management, Trash/Wipe, and portable `.cat` packaging have not been implemented.
 
 Development commands run in the Debian Distrobox described in `AGENTS.md`. The container requires Rust, Cargo, rustfmt, Clippy, and Git. From the repository root, validate the workspace with:
 
@@ -127,6 +128,8 @@ cargo fmt --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace
 ```
+
+The v0.1 interaction contract now fixes startup/resume behavior, LEAP semantics, the contextual dmenu-like command palette, editing and clipboard behavior, Chronological/Work/Search Views, Work operations, links/backlinks, History, Trash/Wipe, import/export, autosave/checkpoints, recovery, and structural atomicity. Implementation work should follow `INTERACTION-CONTRACT.md` rather than inventing missing UI semantics.
 
 Features such as images, bibliographies, tags, semantic search, synchronization, collaboration, and AI assistance remain intentionally deferred until real use demonstrates a need for them.
 
