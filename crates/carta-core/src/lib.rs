@@ -4,6 +4,7 @@ mod document;
 mod error;
 mod history;
 mod retrieval;
+mod trash;
 mod validation;
 mod work;
 
@@ -19,6 +20,10 @@ pub use history::{
 pub use retrieval::{
     Backlink, DocumentTextRegion, LeapDirection, LeapMatch, LeapPosition, LeapRuntime, LeapSession,
     SearchResult,
+};
+pub use trash::{
+    DocumentTrashImpact, TrashInventory, TrashedDocument, TrashedWork, WipePlan, WipeReport,
+    WorkMembership,
 };
 pub use work::{Work, WorkProjection, WorkProjectionItem};
 

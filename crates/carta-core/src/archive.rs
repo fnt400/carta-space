@@ -546,7 +546,7 @@ impl Archive {
         Ok(WorkProjection::new(id, work.documents()))
     }
 
-    fn replace_work(&mut self, id: WorkId, metadata: WorkMetadata) -> Result<(), Error> {
+    pub(crate) fn replace_work(&mut self, id: WorkId, metadata: WorkMetadata) -> Result<(), Error> {
         let work = self.works.get(&id).ok_or(Error::MissingWork(id))?;
         self.ensure_work_current(work)?;
         let path = work.path.join("work.json");
@@ -602,7 +602,10 @@ fn ensure_unchanged(path: &Path, expected: &[u8]) -> Result<(), Error> {
     Ok(())
 }
 
-fn serialize_work_metadata(path: &Path, metadata: &WorkMetadata) -> Result<Vec<u8>, Error> {
+pub(crate) fn serialize_work_metadata(
+    path: &Path,
+    metadata: &WorkMetadata,
+) -> Result<Vec<u8>, Error> {
     let mut bytes = Vec::new();
     metadata
         .write_to(&mut bytes)

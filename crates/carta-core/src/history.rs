@@ -371,7 +371,7 @@ pub(crate) fn create_initial_checkpoint(root: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-fn is_dirty_at(root: &Path) -> Result<bool, Error> {
+pub(crate) fn is_dirty_at(root: &Path) -> Result<bool, Error> {
     let output = git_output(
         root,
         "inspect current changes",
@@ -422,7 +422,7 @@ fn create_checkpoint(
     Ok(Some(current_checkpoint(root)?))
 }
 
-fn require_checkpoint(
+pub(crate) fn require_checkpoint(
     root: &Path,
     kind: CheckpointKind,
     note: Option<&str>,
@@ -517,7 +517,7 @@ fn text_field<'a>(bytes: &'a [u8], name: &str) -> Result<&'a str, Error> {
         .map_err(|error| Error::MalformedHistory(format!("{name} is not UTF-8: {error}")))
 }
 
-fn read_document_at(
+pub(crate) fn read_document_at(
     root: &Path,
     id: DocumentId,
     checkpoint: &CheckpointId,
@@ -600,7 +600,7 @@ fn historical_document_directory(
     Ok(found)
 }
 
-fn read_work_snapshot(
+pub(crate) fn read_work_snapshot(
     root: &Path,
     id: WorkId,
     checkpoint: &CheckpointId,
@@ -655,7 +655,11 @@ fn checkpoint_by_id(root: &Path, checkpoint: &CheckpointId) -> Result<Checkpoint
         .ok_or_else(|| Error::MalformedHistory("checkpoint is missing".to_owned()))
 }
 
-fn read_blob(root: &Path, checkpoint: &CheckpointId, path: &str) -> Result<Vec<u8>, Error> {
+pub(crate) fn read_blob(
+    root: &Path,
+    checkpoint: &CheckpointId,
+    path: &str,
+) -> Result<Vec<u8>, Error> {
     let object = format!("{}:{path}", checkpoint.as_str());
     Ok(git_output(
         root,
@@ -665,7 +669,10 @@ fn read_blob(root: &Path, checkpoint: &CheckpointId, path: &str) -> Result<Vec<u
     .stdout)
 }
 
-fn write_restored_document(destination: &Path, document: &Document) -> Result<(), Error> {
+pub(crate) fn write_restored_document(
+    destination: &Path,
+    document: &Document,
+) -> Result<(), Error> {
     let parent = destination
         .parent()
         .expect("Document destinations always have a parent");
@@ -730,7 +737,11 @@ fn relative_path(root: &Path, path: &Path) -> Result<String, Error> {
         .ok_or_else(|| Error::NonUtf8CanonicalPath(relative.to_path_buf()))
 }
 
-fn git_output(root: &Path, operation: &'static str, args: &[&str]) -> Result<Output, Error> {
+pub(crate) fn git_output(
+    root: &Path,
+    operation: &'static str,
+    args: &[&str],
+) -> Result<Output, Error> {
     let output = git_command(root)
         .args(args)
         .output()
@@ -749,7 +760,7 @@ fn git_output(root: &Path, operation: &'static str, args: &[&str]) -> Result<Out
     }
 }
 
-fn git_with_input(
+pub(crate) fn git_with_input(
     root: &Path,
     operation: &'static str,
     args: &[&str],
@@ -791,7 +802,7 @@ fn git_with_input(
     }
 }
 
-fn git_command(root: &Path) -> Command {
+pub(crate) fn git_command(root: &Path) -> Command {
     let mut command = Command::new("git");
     command
         .current_dir(root)

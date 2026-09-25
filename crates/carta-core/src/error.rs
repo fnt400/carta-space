@@ -127,6 +127,52 @@ pub enum Error {
         operation: Box<Error>,
         rollback: Box<Error>,
     },
+
+    #[error("structural operation requires no tracked working-tree changes")]
+    StructuralOperationRequiresCleanArchive,
+
+    #[error("document is active and cannot be restored or wiped: {0}")]
+    DocumentIsActive(DocumentId),
+
+    #[error("work is active and cannot be restored: {0}")]
+    WorkIsActive(WorkId),
+
+    #[error("document has no recoverable trashed state: {0}")]
+    DocumentNotRecoverable(DocumentId),
+
+    #[error("work has no recoverable trashed state: {0}")]
+    WorkNotRecoverable(WorkId),
+
+    #[error("wipe confirmation did not match the planned token")]
+    WipeConfirmationMismatch,
+
+    #[error("wipe plan is stale because retained refs or current state changed")]
+    StaleWipePlan,
+
+    #[error("cannot strictly wipe document {document}: content object {object} is also retained at {path}")]
+    WipeContentShared {
+        document: DocumentId,
+        object: String,
+        path: String,
+    },
+
+    #[error("wipe cannot rewrite retained ref {reference} whose target is a {object_type} object")]
+    UnsupportedWipeRef {
+        reference: String,
+        object_type: String,
+    },
+
+    #[error("wipe requires the Archive repository to have only its primary working tree")]
+    WipeAdditionalWorktrees,
+
+    #[error("wipe verification failed: {0}")]
+    WipeVerificationFailed(String),
+
+    #[error("structural operation failed ({operation}) and rollback also failed ({rollback})")]
+    StructuralRollbackFailed {
+        operation: Box<Error>,
+        rollback: Box<Error>,
+    },
 }
 
 impl Error {

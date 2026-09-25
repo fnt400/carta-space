@@ -100,6 +100,14 @@ A Carta Space archive is also a Git repository. Git is an implementation-indepen
 
 Current content remains readable without Git. Git provides automatic historical reconstruction.
 
+## Trash, Restore, and Wipe
+
+`carta-core` implements recoverable Trash without a canonical `trash/` directory. The Trash view is derived from current state and retained Git history. Trashing a Document reports every current Work membership and inbound Carta link, removes the structural Work references and active Document together, leaves authored Markdown links unchanged, and creates an immediate structural checkpoint. Documents restore with their original identity, creation time, Volume, and content immediately before Trash, but without former Work memberships. Works restore with their original identity, title, and order; restoring required trashed Documents needs explicit consent, and active title conflicts are rejected.
+
+Permanent Wipe is Document-only and uses a two-step core plan plus exact confirmation token. Execution refuses active Documents, stale plans, tracked working changes, and repositories with additional Git worktrees. It rewrites every retained local Git ref containing the Document's canonical paths, expires reflogs, prunes unreachable objects, removes Carta-reserved `.carta-*`/`carta-*` staging, cache, session, and temporary artifacts, and verifies the paths and exclusively owned content objects are no longer reachable or present. If an identical content object is also retained outside the target Document, Wipe refuses rather than damage unrelated data or claim a false guarantee.
+
+The guarantee is deliberately scoped to Carta-controlled data in the current Archive on the current device. It does not cover external backups, exported packages, clones, filesystem snapshots, copied files, or physical storage remnants.
+
 ## Portability
 
 The working form of a Carta Space archive is an ordinary directory tree containing Markdown and JSON plus `.git`.
@@ -116,9 +124,9 @@ A portable `.cat` package is a ZIP-based container of that tree. Its purpose is 
 
 ## Current scope
 
-The current Rust workspace contains `carta-format` and `carta-core`. It can create, read, and validate the current filesystem state of a Draft 0.1 archive, including Documents, monthly Volumes, Works, UTF-8 content, canonical UUIDv7 identities, unknown JSON members, and Git-backed historical checkpoints. Core operations also include derived labels, CommonMark links and backlinks, literal archive search, LEAP matching, text import, Markdown export, dirty detection, checkpoint creation/listing, historical Document and Work reads, and integral restore behavior. It does not yet claim complete Reader or Writer conformance.
+The current Rust workspace contains `carta-format` and `carta-core`. It can create, read, and validate the current filesystem state of a Draft 0.1 archive, including Documents, monthly Volumes, Works, UTF-8 content, canonical UUIDv7 identities, unknown JSON members, and Git-backed historical checkpoints. Core operations also include derived labels, CommonMark links and backlinks, literal archive search, LEAP matching, text import, Markdown export, dirty detection, checkpoint creation/listing, historical Document and Work reads, integral history restore behavior, and complete core Trash/Restore/Document-Wipe semantics. It does not yet claim complete Reader or Writer conformance.
 
-The enhanced-keyboard-reporting experiment remains separate under `experiments/keyboard-events`. The CLI, TUI and its LEAP bindings, Trash/Wipe, and portable `.cat` packaging have not been implemented.
+The enhanced-keyboard-reporting experiment remains separate under `experiments/keyboard-events`. The CLI, TUI and its LEAP bindings, frontend exposure of Trash/Wipe, and portable `.cat` packaging have not been implemented.
 
 Development commands run in the Debian Distrobox described in `AGENTS.md`. The container requires Rust, Cargo, rustfmt, Clippy, and Git. From the repository root, validate the workspace with:
 
