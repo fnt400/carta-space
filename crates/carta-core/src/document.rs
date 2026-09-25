@@ -84,4 +84,9 @@ impl Document {
     pub fn content(&self) -> &str {
         &self.content
     }
+
+    /// Returns the human-facing label defined by the v0.1 interaction contract.
+    pub fn derived_label(&self) -> String {
+        crate::content::document_label(&self.content, self.metadata.created())
+    }
 }

@@ -11,7 +11,10 @@ use carta_format::{
 };
 
 use crate::validation::scan_archive;
-use crate::{Document, DocumentInfo, Error, ValidationErrors, Volume, Work, WorkProjection};
+use crate::{
+    extract_markdown_links, Backlink, CartaLinkTarget, Document, DocumentInfo, Error,
+    LinkResolution, MarkdownLink, SearchResult, ValidationErrors, Volume, Work, WorkProjection,
+};
 
 #[derive(Debug)]
 pub struct Archive {
@@ -182,6 +185,87 @@ impl Archive {
     pub fn duplicate_document(&mut self, source: DocumentId) -> Result<DocumentId, Error> {
         let content = self.read_document(source)?.content().to_owned();
         self.create_document(&content)
+    }
+
+    pub fn import_document_bytes(&mut self, bytes: &[u8]) -> Result<DocumentId, Error> {
+        let bytes = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(bytes);
+        self.create_document(std::str::from_utf8(bytes)?)
+    }
+
+    pub fn export_document_markdown(&self, id: DocumentId) -> Result<String, Error> {
+        Ok(self.read_document(id)?.content().to_owned())
+    }
+
+    pub fn export_work_markdown(&self, id: WorkId) -> Result<String, Error> {
+        let work = self.works.get(&id).ok_or(Error::MissingWork(id))?;
+        self.ensure_work_current(work)?;
+        let mut output = String::new();
+        for document in work.documents() {
+            output.push_str(self.read_document(*document)?.content());
+        }
+        Ok(output)
+    }
+
+    pub fn document_links(&self, id: DocumentId) -> Result<Vec<MarkdownLink>, Error> {
+        Ok(extract_markdown_links(self.read_document(id)?.content()))
+    }
+
+    pub fn document_link_at(
+        &self,
+        id: DocumentId,
+        byte_offset: usize,
+    ) -> Result<Option<MarkdownLink>, Error> {
+        let document = self.read_document(id)?;
+        Ok(crate::link_at_byte_offset(document.content(), byte_offset))
+    }
+
+    pub fn resolve_link(&self, link: &MarkdownLink) -> Option<LinkResolution> {
+        match link.carta_target()? {
+            CartaLinkTarget::Document(id) if self.documents.contains_key(&id) => {
+                Some(LinkResolution::Document(id))
+            }
+            CartaLinkTarget::Work(id) if self.works.contains_key(&id) => {
+                Some(LinkResolution::Work(id))
+            }
+            target => Some(LinkResolution::Unresolved(target)),
+        }
+    }
+
+    pub fn backlinks(&self, target: CartaLinkTarget) -> Result<Vec<Backlink>, Error> {
+        let mut backlinks = Vec::new();
+        for info in self.documents.values() {
+            for link in self.document_links(info.id())? {
+                if link.carta_target() == Some(target) {
+                    backlinks.push(Backlink::new(info.id(), link));
+                }
+            }
+        }
+        Ok(backlinks)
+    }
+
+    pub fn search(&self, query: &str) -> Result<Vec<SearchResult>, Error> {
+        let query = query.trim();
+        if query.is_empty() {
+            return Ok(Vec::new());
+        }
+        if query.contains(['\r', '\n']) {
+            return Err(Error::MultilineSearchQuery);
+        }
+        let mut results = Vec::new();
+        for info in self.documents.values() {
+            let document = self.read_document(info.id())?;
+            if let Some(occurrence) = crate::retrieval::literal_match(document.content(), query) {
+                results.push(SearchResult::new(
+                    info.id(),
+                    info.created(),
+                    document.derived_label(),
+                    occurrence,
+                    document.content(),
+                ));
+            }
+        }
+        results.sort_by_key(|result| std::cmp::Reverse((result.created(), result.document())));
+        Ok(results)
     }
 
     pub fn new_linked_document(

@@ -41,6 +41,12 @@ pub enum Error {
     #[error("byte offset {offset} is not a UTF-8 character boundary in document {document}")]
     InvalidByteBoundary { document: DocumentId, offset: usize },
 
+    #[error("import content is not valid UTF-8: {0}")]
+    InvalidImportUtf8(#[from] std::str::Utf8Error),
+
+    #[error("whole-archive search queries must be single-line")]
+    MultilineSearchQuery,
+
     #[error("document {document} is not a member of work {work}")]
     DocumentNotInWork { work: WorkId, document: DocumentId },
 
