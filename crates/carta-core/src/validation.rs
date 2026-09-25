@@ -304,6 +304,8 @@ impl Scanner {
                 metadata,
                 volume,
                 path: path.clone(),
+                metadata_bytes: self.read_canonical_bytes(&metadata_path),
+                content_bytes: self.read_canonical_bytes(&content_path),
             };
             if documents.insert(directory_id, info).is_some() {
                 self.issue(path, ValidationIssueKind::DuplicateDocument(directory_id));
@@ -417,6 +419,7 @@ impl Scanner {
             let work = Work {
                 metadata,
                 path: path.clone(),
+                metadata_bytes: self.read_canonical_bytes(&metadata_path),
             };
             if works.insert(directory_id, work).is_some() {
                 self.issue(path, ValidationIssueKind::DuplicateWork(directory_id));
@@ -460,6 +463,16 @@ impl Scanner {
         }
         result.sort_by_key(DirEntry::file_name);
         result
+    }
+
+    fn read_canonical_bytes(&mut self, path: &Path) -> Vec<u8> {
+        match fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                self.issue(path, ValidationIssueKind::Io(error.to_string()));
+                Vec::new()
+            }
+        }
     }
 }
 

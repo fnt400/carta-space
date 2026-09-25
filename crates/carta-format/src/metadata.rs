@@ -236,6 +236,19 @@ impl WorkMetadata {
         &self.extensions
     }
 
+    pub fn with_title(&self, title: String) -> Self {
+        let mut metadata = self.clone();
+        metadata.title = title;
+        metadata
+    }
+
+    pub fn with_documents(&self, documents: Vec<DocumentId>) -> Result<Self, FormatError> {
+        let mut metadata = self.clone();
+        metadata.documents = documents;
+        metadata.validate()?;
+        Ok(metadata)
+    }
+
     fn validate(&self) -> Result<(), FormatError> {
         let mut documents = HashSet::new();
         for document in &self.documents {

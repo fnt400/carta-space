@@ -2,7 +2,7 @@ use std::fs;
 use std::process::Command;
 use std::str::FromStr;
 
-use carta_core::{Archive, DocumentId, Error, ValidationIssueKind};
+use carta_core::{Archive, DocumentId, Error, ValidationIssueKind, Volume, WorkProjectionItem};
 use tempfile::TempDir;
 
 fn create_archive() -> (TempDir, Archive) {
@@ -348,4 +348,281 @@ fn refuses_to_replace_an_existing_destination() {
         Err(Error::AlreadyExists(path)) if path == destination
     ));
     assert_eq!(fs::read(destination.join("keep")).unwrap(), b"unchanged");
+}
+
+#[test]
+fn detects_external_document_edits_and_refreshes_explicitly() {
+    let (_temporary, mut archive) = create_archive();
+    let document = archive.create_document("loaded").unwrap();
+    let content_path = archive
+        .documents()
+        .find(|info| info.id() == document)
+        .unwrap()
+        .path()
+        .join("content.md");
+    fs::write(&content_path, "external").unwrap();
+
+    assert!(matches!(
+        archive.edit_document(document, "local"),
+        Err(Error::ExternalChange(path)) if path == content_path
+    ));
+    assert_eq!(fs::read_to_string(&content_path).unwrap(), "external");
+
+    archive.refresh().unwrap();
+    archive.edit_document(document, "accepted").unwrap();
+    assert_eq!(
+        archive.read_document(document).unwrap().content(),
+        "accepted"
+    );
+}
+
+#[test]
+fn detects_external_work_edits_without_overwriting_them() {
+    let (_temporary, mut archive) = create_archive();
+    let work = archive.create_empty_work("Loaded".to_owned()).unwrap();
+    let work_path = archive.work(work).unwrap().path().join("work.json");
+    let mut json: serde_json::Value =
+        serde_json::from_slice(&fs::read(&work_path).unwrap()).unwrap();
+    json["title"] = serde_json::json!("External");
+    fs::write(&work_path, serde_json::to_vec_pretty(&json).unwrap()).unwrap();
+
+    assert!(matches!(
+        archive.rename_work(work, "Local".to_owned()),
+        Err(Error::ExternalChange(path)) if path == work_path
+    ));
+    let persisted: serde_json::Value =
+        serde_json::from_slice(&fs::read(&work_path).unwrap()).unwrap();
+    assert_eq!(persisted["title"], "External");
+
+    archive.reload().unwrap();
+    archive.rename_work(work, "Accepted".to_owned()).unwrap();
+    assert_eq!(archive.work(work).unwrap().title(), "Accepted");
+}
+
+#[test]
+fn editing_preserves_document_identity_volume_metadata_and_unknown_resources() {
+    let (_temporary, mut archive) = create_archive();
+    let document = archive.create_document("before").unwrap();
+    let info = archive
+        .documents()
+        .find(|info| info.id() == document)
+        .unwrap();
+    let created = info.created();
+    let volume = info.volume();
+    let document_path = info.path().to_path_buf();
+    let metadata_path = document_path.join("meta.json");
+    let mut metadata: serde_json::Value =
+        serde_json::from_slice(&fs::read(&metadata_path).unwrap()).unwrap();
+    metadata["future"] = serde_json::json!({"kept": true});
+    fs::write(
+        &metadata_path,
+        serde_json::to_vec_pretty(&metadata).unwrap(),
+    )
+    .unwrap();
+    fs::write(document_path.join("agent-resource"), "keep").unwrap();
+    archive.refresh().unwrap();
+
+    archive.edit_document(document, "after").unwrap();
+    let info = archive
+        .documents()
+        .find(|info| info.id() == document)
+        .unwrap();
+    assert_eq!(info.created(), created);
+    assert_eq!(info.volume(), volume);
+    assert_eq!(info.metadata().extensions()["future"]["kept"], true);
+    assert_eq!(
+        fs::read_to_string(document_path.join("agent-resource")).unwrap(),
+        "keep"
+    );
+}
+
+#[test]
+fn duplicates_as_a_neutral_document_with_new_identity() {
+    let (_temporary, mut archive) = create_archive();
+    let source = archive.create_document("same body").unwrap();
+    let work = archive
+        .create_work("Work".to_owned(), vec![source])
+        .unwrap();
+    let duplicate = archive.duplicate_document(source).unwrap();
+
+    assert_ne!(duplicate, source);
+    assert_eq!(
+        archive.read_document(duplicate).unwrap().content(),
+        "same body"
+    );
+    assert!(archive.memberships(duplicate).unwrap().is_empty());
+    assert_eq!(archive.memberships(source).unwrap(), vec![work]);
+}
+
+#[test]
+fn creates_linked_document_at_a_utf8_byte_boundary() {
+    let (_temporary, mut archive) = create_archive();
+    let source = archive.create_document("caffè fine").unwrap();
+    let target = archive
+        .new_linked_document(source, "caffè".len(), "Continue [here]")
+        .unwrap();
+
+    assert_eq!(archive.read_document(target).unwrap().content(), "");
+    assert_eq!(
+        archive.read_document(source).unwrap().content(),
+        format!("caffè[Continue \\[here\\]](carta:doc:{target}) fine")
+    );
+    assert!(archive.memberships(target).unwrap().is_empty());
+}
+
+#[test]
+fn rejects_invalid_link_boundary_without_creating_a_document() {
+    let (_temporary, mut archive) = create_archive();
+    let source = archive.create_document("è").unwrap();
+    let before = archive.documents().count();
+
+    assert!(matches!(
+        archive.new_linked_document(source, 1, "Continue"),
+        Err(Error::InvalidByteBoundary { document, offset: 1 }) if document == source
+    ));
+    assert_eq!(archive.documents().count(), before);
+}
+
+#[test]
+fn mutates_work_membership_order_and_title_without_losing_extensions() {
+    let (_temporary, mut archive) = create_archive();
+    let first = archive.create_document("first").unwrap();
+    let second = archive.create_document("second").unwrap();
+    let third = archive.create_document("third").unwrap();
+    let work = archive.create_empty_work("Draft".to_owned()).unwrap();
+    let work_path = archive.work(work).unwrap().path().join("work.json");
+    let mut json: serde_json::Value =
+        serde_json::from_slice(&fs::read(&work_path).unwrap()).unwrap();
+    json["future"] = serde_json::json!([1, 2, 3]);
+    fs::write(&work_path, serde_json::to_vec_pretty(&json).unwrap()).unwrap();
+    archive.refresh().unwrap();
+
+    archive.add_document_to_work(work, first).unwrap();
+    archive.add_document_to_work(work, second).unwrap();
+    archive.add_document_to_work(work, third).unwrap();
+    assert!(archive.move_document_earlier(work, third).unwrap());
+    assert!(archive.move_document_later(work, first).unwrap());
+    archive.move_document_after(work, first, None).unwrap();
+    archive.rename_work(work, "Final".to_owned()).unwrap();
+    archive.remove_document_from_work(work, second).unwrap();
+
+    let stored = archive.work(work).unwrap();
+    assert_eq!(stored.title(), "Final");
+    assert_eq!(stored.documents(), &[first, third]);
+    assert_eq!(
+        stored.metadata().extensions()["future"],
+        serde_json::json!([1, 2, 3])
+    );
+    assert_eq!(archive.memberships(first).unwrap(), vec![work]);
+    Archive::validate(archive.root()).unwrap();
+}
+
+#[test]
+fn exposes_chronological_and_work_projections_without_content_copies() {
+    let (_temporary, mut archive) = create_archive();
+    let first = archive.create_document("first").unwrap();
+    let second = archive.create_document("second").unwrap();
+    let volume = archive
+        .documents()
+        .find(|info| info.id() == first)
+        .unwrap()
+        .volume();
+    assert_eq!(archive.chronological_month(volume), vec![first, second]);
+    assert!(archive
+        .chronological_month(Volume::new(1900, 1).unwrap())
+        .is_empty());
+
+    let work = archive
+        .create_work("Projection".to_owned(), vec![second, first])
+        .unwrap();
+    let projection = archive.work_projection(work).unwrap();
+    assert_eq!(projection.work(), work);
+    assert_eq!(
+        projection.items(),
+        &[
+            WorkProjectionItem::Document(second),
+            WorkProjectionItem::Boundary {
+                before: second,
+                after: first,
+            },
+            WorkProjectionItem::Document(first),
+        ]
+    );
+}
+
+#[test]
+fn recovers_complete_unambiguous_document_staging_and_preserves_resources() {
+    let (_temporary, mut archive) = create_archive();
+    let document = archive.create_document("body").unwrap();
+    let destination = archive
+        .documents()
+        .find(|info| info.id() == document)
+        .unwrap()
+        .path()
+        .to_path_buf();
+    fs::write(destination.join("future-resource"), "keep").unwrap();
+    let staging = destination
+        .parent()
+        .unwrap()
+        .join(format!(".carta-document-{document}"));
+    fs::rename(&destination, &staging).unwrap();
+
+    let recovered = Archive::open(archive.root()).unwrap();
+    assert_eq!(recovered.read_document(document).unwrap().content(), "body");
+    assert_eq!(
+        fs::read_to_string(destination.join("future-resource")).unwrap(),
+        "keep"
+    );
+    assert!(!staging.exists());
+}
+
+#[test]
+fn rolls_forward_linked_staging_when_the_source_link_was_saved() {
+    let (_temporary, mut archive) = create_archive();
+    let source = archive.create_document("source").unwrap();
+    let target = archive.create_document("").unwrap();
+    let destination = archive
+        .documents()
+        .find(|info| info.id() == target)
+        .unwrap()
+        .path()
+        .to_path_buf();
+    let staging = destination
+        .parent()
+        .unwrap()
+        .join(format!(".carta-linked-{target}"));
+    fs::rename(&destination, &staging).unwrap();
+    archive
+        .edit_document(source, &format!("source[Continue](carta:doc:{target})"))
+        .unwrap();
+
+    let recovered = Archive::open(archive.root()).unwrap();
+    assert_eq!(recovered.read_document(target).unwrap().content(), "");
+    assert!(destination.is_dir());
+    assert!(!staging.exists());
+}
+
+#[test]
+fn rolls_back_abandoned_linked_staging_without_unknown_resources() {
+    let (_temporary, mut archive) = create_archive();
+    let target = archive.create_document("").unwrap();
+    let destination = archive
+        .documents()
+        .find(|info| info.id() == target)
+        .unwrap()
+        .path()
+        .to_path_buf();
+    let staging = destination
+        .parent()
+        .unwrap()
+        .join(format!(".carta-linked-{target}"));
+    fs::rename(&destination, &staging).unwrap();
+
+    let recovered = Archive::open(archive.root()).unwrap();
+    assert!(matches!(
+        recovered.read_document(target),
+        Err(Error::MissingDocument(id)) if id == target
+    ));
+    assert!(!destination.exists());
+    assert!(!staging.exists());
 }

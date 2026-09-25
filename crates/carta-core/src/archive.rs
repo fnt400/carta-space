@@ -1,8 +1,9 @@
 use std::collections::{BTreeMap, HashSet};
 use std::fs::{self, File};
-use std::io::{BufWriter, Write};
+use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::str::FromStr;
 
 use carta_format::{
     work_title_key, ArchiveMetadata, DocumentId, DocumentMetadata, Timestamp, WorkId, WorkMetadata,
@@ -10,7 +11,7 @@ use carta_format::{
 };
 
 use crate::validation::scan_archive;
-use crate::{Document, DocumentInfo, Error, ValidationErrors, Volume, Work};
+use crate::{Document, DocumentInfo, Error, ValidationErrors, Volume, Work, WorkProjection};
 
 #[derive(Debug)]
 pub struct Archive {
@@ -72,6 +73,7 @@ impl Archive {
 
     pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
         let root = path.as_ref().to_path_buf();
+        recover_creation_staging(&root)?;
         let scanned = scan_archive(&root)?;
         Ok(Self {
             root,
@@ -103,6 +105,7 @@ impl Archive {
 
     pub fn read_document(&self, id: DocumentId) -> Result<Document, Error> {
         let info = self.documents.get(&id).ok_or(Error::MissingDocument(id))?;
+        self.ensure_document_current(info)?;
         let content_path = info.path.join("content.md");
         let content =
             fs::read_to_string(&content_path).map_err(|error| Error::io(&content_path, error))?;
@@ -130,6 +133,8 @@ impl Archive {
         let content = normalize_line_endings(content);
         fs::write(staging.join("content.md"), content.as_bytes())
             .map_err(|error| Error::io(staging.join("content.md"), error))?;
+        let metadata_bytes = fs::read(staging.join("meta.json"))
+            .map_err(|error| Error::io(staging.join("meta.json"), error))?;
         fs::rename(&staging, &destination).map_err(|error| Error::io(&destination, error))?;
         guard.disarm();
 
@@ -138,10 +143,116 @@ impl Archive {
             DocumentInfo {
                 metadata,
                 volume,
+                metadata_bytes,
+                content_bytes: content.into_bytes(),
                 path: destination,
             },
         );
         Ok(id)
+    }
+
+    pub fn refresh(&mut self) -> Result<(), Error> {
+        recover_creation_staging(&self.root)?;
+        let scanned = scan_archive(&self.root)?;
+        self.metadata = scanned.metadata;
+        self.documents = scanned.documents;
+        self.works = scanned.works;
+        Ok(())
+    }
+
+    pub fn reload(&mut self) -> Result<(), Error> {
+        self.refresh()
+    }
+
+    pub fn edit_document(&mut self, id: DocumentId, content: &str) -> Result<(), Error> {
+        let info = self.documents.get(&id).ok_or(Error::MissingDocument(id))?;
+        self.ensure_document_current(info)?;
+        let path = info.path.join("content.md");
+        let content = normalize_line_endings(content).into_bytes();
+        atomic_replace(&path, &content)?;
+        self.documents
+            .get_mut(&id)
+            .expect("document was checked above")
+            .content_bytes = content;
+        Ok(())
+    }
+
+    pub fn duplicate_document(&mut self, source: DocumentId) -> Result<DocumentId, Error> {
+        let content = self.read_document(source)?.content().to_owned();
+        self.create_document(&content)
+    }
+
+    pub fn new_linked_document(
+        &mut self,
+        source: DocumentId,
+        byte_offset: usize,
+        label: &str,
+    ) -> Result<DocumentId, Error> {
+        self.new_linked_document_with(source, byte_offset, label, |_, _| Ok(()))
+    }
+
+    fn new_linked_document_with(
+        &mut self,
+        source: DocumentId,
+        byte_offset: usize,
+        label: &str,
+        before_publish: impl FnOnce(&mut Self, &Path) -> Result<(), Error>,
+    ) -> Result<DocumentId, Error> {
+        let original = self.read_document(source)?.content().to_owned();
+        let mut content = original.clone();
+        if !content.is_char_boundary(byte_offset) {
+            return Err(Error::InvalidByteBoundary {
+                document: source,
+                offset: byte_offset,
+            });
+        }
+
+        let created = Timestamp::now_local();
+        let volume = Volume::from_timestamp(created).ok_or(Error::InvalidVolumeDate(created))?;
+        let month_path = self
+            .root
+            .join("volumes")
+            .join(format!("{:04}", volume.year()))
+            .join(format!("{:02}", volume.month()));
+        fs::create_dir_all(&month_path).map_err(|error| Error::io(&month_path, error))?;
+        let target = DocumentId::new_v7();
+        let destination = month_path.join(target.to_string());
+        let staging = month_path.join(format!(".carta-linked-{target}"));
+        fs::create_dir(&staging).map_err(|error| Error::io(&staging, error))?;
+        let mut guard = CleanupLinkedStaging::new(staging.clone());
+        let metadata = DocumentMetadata::new(target, created);
+        write_document_metadata(&staging.join("meta.json"), &metadata)?;
+        fs::write(staging.join("content.md"), b"")
+            .map_err(|error| Error::io(staging.join("content.md"), error))?;
+        let metadata_bytes = fs::read(staging.join("meta.json"))
+            .map_err(|error| Error::io(staging.join("meta.json"), error))?;
+        let link = format!(
+            "[{}](carta:doc:{target})",
+            label
+                .replace('\\', "\\\\")
+                .replace('[', "\\[")
+                .replace(']', "\\]")
+        );
+        content.insert_str(byte_offset, &link);
+        self.edit_document(source, &content)?;
+        if let Err(error) = before_publish(self, &destination).and_then(|()| {
+            fs::rename(&staging, &destination).map_err(|error| Error::io(&destination, error))
+        }) {
+            self.edit_document(source, &original)?;
+            return Err(error);
+        }
+        guard.disarm();
+        self.documents.insert(
+            target,
+            DocumentInfo {
+                metadata,
+                volume,
+                path: destination,
+                metadata_bytes,
+                content_bytes: Vec::new(),
+            },
+        );
+        Ok(target)
     }
 
     pub fn work(&self, id: WorkId) -> Option<&Work> {
@@ -187,6 +298,8 @@ impl Archive {
         let metadata = WorkMetadata::new(id, Timestamp::now_local(), title, documents)
             .map_err(|error| Error::format(staging.join("work.json"), error))?;
         write_work_metadata(&staging.join("work.json"), &metadata)?;
+        let metadata_bytes = fs::read(staging.join("work.json"))
+            .map_err(|error| Error::io(staging.join("work.json"), error))?;
         fs::rename(&staging, &destination).map_err(|error| Error::io(&destination, error))?;
         guard.disarm();
 
@@ -194,11 +307,449 @@ impl Archive {
             id,
             Work {
                 metadata,
+                metadata_bytes,
                 path: destination,
             },
         );
         Ok(id)
     }
+
+    pub fn create_empty_work(&mut self, title: String) -> Result<WorkId, Error> {
+        self.create_work(title, Vec::new())
+    }
+
+    pub fn rename_work(&mut self, id: WorkId, title: String) -> Result<(), Error> {
+        let title_key = work_title_key(&title);
+        if let Some(existing) = self
+            .works
+            .values()
+            .find(|work| work.id() != id && work_title_key(work.title()) == title_key)
+        {
+            return Err(Error::WorkTitleConflict {
+                title,
+                existing: existing.id(),
+            });
+        }
+        let metadata = self
+            .works
+            .get(&id)
+            .ok_or(Error::MissingWork(id))?
+            .metadata
+            .with_title(title);
+        self.replace_work(id, metadata)
+    }
+
+    pub fn add_document_to_work(
+        &mut self,
+        work: WorkId,
+        document: DocumentId,
+    ) -> Result<(), Error> {
+        if !self.documents.contains_key(&document) {
+            return Err(Error::MissingDocument(document));
+        }
+        let current = self.works.get(&work).ok_or(Error::MissingWork(work))?;
+        if current.documents().contains(&document) {
+            return Err(Error::DuplicateWorkDocument(document));
+        }
+        let mut documents = current.documents().to_vec();
+        documents.push(document);
+        let metadata = current
+            .metadata
+            .with_documents(documents)
+            .map_err(|error| Error::format(current.path.join("work.json"), error))?;
+        self.replace_work(work, metadata)
+    }
+
+    pub fn remove_document_from_work(
+        &mut self,
+        work: WorkId,
+        document: DocumentId,
+    ) -> Result<(), Error> {
+        let current = self.works.get(&work).ok_or(Error::MissingWork(work))?;
+        let mut documents = current.documents().to_vec();
+        let Some(index) = documents
+            .iter()
+            .position(|candidate| *candidate == document)
+        else {
+            return Err(Error::DocumentNotInWork { work, document });
+        };
+        documents.remove(index);
+        let metadata = current
+            .metadata
+            .with_documents(documents)
+            .map_err(|error| Error::format(current.path.join("work.json"), error))?;
+        self.replace_work(work, metadata)
+    }
+
+    pub fn move_document_earlier(
+        &mut self,
+        work: WorkId,
+        document: DocumentId,
+    ) -> Result<bool, Error> {
+        self.move_document_by(work, document, |index, _| index.checked_sub(1))
+    }
+
+    pub fn move_document_later(
+        &mut self,
+        work: WorkId,
+        document: DocumentId,
+    ) -> Result<bool, Error> {
+        self.move_document_by(work, document, |index, len| {
+            (index + 1 < len).then_some(index + 1)
+        })
+    }
+
+    pub fn move_document_after(
+        &mut self,
+        work: WorkId,
+        document: DocumentId,
+        after: Option<DocumentId>,
+    ) -> Result<(), Error> {
+        let current = self.works.get(&work).ok_or(Error::MissingWork(work))?;
+        let mut documents = current.documents().to_vec();
+        let Some(index) = documents
+            .iter()
+            .position(|candidate| *candidate == document)
+        else {
+            return Err(Error::DocumentNotInWork { work, document });
+        };
+        documents.remove(index);
+        let destination = match after {
+            None => 0,
+            Some(after) => documents
+                .iter()
+                .position(|candidate| *candidate == after)
+                .map(|index| index + 1)
+                .ok_or(Error::DocumentNotInWork {
+                    work,
+                    document: after,
+                })?,
+        };
+        documents.insert(destination, document);
+        let metadata = current
+            .metadata
+            .with_documents(documents)
+            .map_err(|error| Error::format(current.path.join("work.json"), error))?;
+        self.replace_work(work, metadata)
+    }
+
+    pub fn memberships(&self, document: DocumentId) -> Result<Vec<WorkId>, Error> {
+        if !self.documents.contains_key(&document) {
+            return Err(Error::MissingDocument(document));
+        }
+        Ok(self
+            .works
+            .values()
+            .filter(|work| work.documents().contains(&document))
+            .map(Work::id)
+            .collect())
+    }
+
+    pub fn chronological_month(&self, volume: Volume) -> Vec<DocumentId> {
+        let mut documents: Vec<_> = self
+            .documents
+            .values()
+            .filter(|document| document.volume() == volume)
+            .collect();
+        documents.sort_by_key(|document| (document.created(), document.id()));
+        documents.into_iter().map(DocumentInfo::id).collect()
+    }
+
+    pub fn work_projection(&self, id: WorkId) -> Result<WorkProjection, Error> {
+        let work = self.works.get(&id).ok_or(Error::MissingWork(id))?;
+        Ok(WorkProjection::new(id, work.documents()))
+    }
+
+    fn replace_work(&mut self, id: WorkId, metadata: WorkMetadata) -> Result<(), Error> {
+        let work = self.works.get(&id).ok_or(Error::MissingWork(id))?;
+        self.ensure_work_current(work)?;
+        let path = work.path.join("work.json");
+        let bytes = serialize_work_metadata(&path, &metadata)?;
+        atomic_replace(&path, &bytes)?;
+        let work = self.works.get_mut(&id).expect("work was checked above");
+        work.metadata = metadata;
+        work.metadata_bytes = bytes;
+        Ok(())
+    }
+
+    fn move_document_by(
+        &mut self,
+        work: WorkId,
+        document: DocumentId,
+        destination: impl FnOnce(usize, usize) -> Option<usize>,
+    ) -> Result<bool, Error> {
+        let current = self.works.get(&work).ok_or(Error::MissingWork(work))?;
+        let mut documents = current.documents().to_vec();
+        let Some(index) = documents
+            .iter()
+            .position(|candidate| *candidate == document)
+        else {
+            return Err(Error::DocumentNotInWork { work, document });
+        };
+        let Some(destination) = destination(index, documents.len()) else {
+            return Ok(false);
+        };
+        documents.swap(index, destination);
+        let metadata = current
+            .metadata
+            .with_documents(documents)
+            .map_err(|error| Error::format(current.path.join("work.json"), error))?;
+        self.replace_work(work, metadata)?;
+        Ok(true)
+    }
+
+    fn ensure_document_current(&self, info: &DocumentInfo) -> Result<(), Error> {
+        ensure_unchanged(&info.path.join("meta.json"), &info.metadata_bytes)?;
+        ensure_unchanged(&info.path.join("content.md"), &info.content_bytes)
+    }
+
+    fn ensure_work_current(&self, work: &Work) -> Result<(), Error> {
+        ensure_unchanged(&work.path.join("work.json"), &work.metadata_bytes)
+    }
+}
+
+fn ensure_unchanged(path: &Path, expected: &[u8]) -> Result<(), Error> {
+    let current = fs::read(path).map_err(|error| Error::io(path, error))?;
+    if current != expected {
+        return Err(Error::ExternalChange(path.to_path_buf()));
+    }
+    Ok(())
+}
+
+fn serialize_work_metadata(path: &Path, metadata: &WorkMetadata) -> Result<Vec<u8>, Error> {
+    let mut bytes = Vec::new();
+    metadata
+        .write_to(&mut bytes)
+        .map_err(|error| Error::format(path, error))?;
+    Ok(bytes)
+}
+
+fn atomic_replace(path: &Path, content: &[u8]) -> Result<(), Error> {
+    let parent = path
+        .parent()
+        .expect("canonical files always have a parent directory");
+    let name = path
+        .file_name()
+        .expect("canonical files always have a file name")
+        .to_string_lossy();
+    let temporary = parent.join(format!(".carta-tmp-{name}-{}", DocumentId::new_v7()));
+    let mut guard = CleanupFile::new(temporary.clone());
+    let mut file = File::options()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)
+        .map_err(|error| Error::io(&temporary, error))?;
+    file.write_all(content)
+        .map_err(|error| Error::io(&temporary, error))?;
+    file.sync_all()
+        .map_err(|error| Error::io(&temporary, error))?;
+    fs::rename(&temporary, path).map_err(|error| Error::io(path, error))?;
+    guard.disarm();
+    File::open(parent)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|error| Error::io(parent, error))
+}
+
+fn recover_creation_staging(root: &Path) -> Result<(), Error> {
+    let volumes = root.join("volumes");
+    if volumes.is_dir() {
+        for year in directory_paths(&volumes)? {
+            if !year.is_dir() {
+                continue;
+            }
+            for month in directory_paths(&year)? {
+                if !month.is_dir() {
+                    continue;
+                }
+                let volume = month
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .and_then(|month| month.parse::<u8>().ok())
+                    .and_then(|month| {
+                        year.file_name()
+                            .and_then(|name| name.to_str())
+                            .and_then(|year| year.parse::<u16>().ok())
+                            .and_then(|year| Volume::new(year, month))
+                    });
+                let Some(volume) = volume else { continue };
+                for staging in directory_paths(&month)? {
+                    if let Some(id) = staging_id::<DocumentId>(&staging, ".carta-linked-") {
+                        let destination = month.join(id.to_string());
+                        if !destination.exists() && recoverable_document(&staging, id, volume) {
+                            if archive_contains_link(&volumes, id)? {
+                                fs::rename(&staging, &destination)
+                                    .map_err(|error| Error::io(&destination, error))?;
+                            } else {
+                                remove_abandoned_linked_staging(&staging)?;
+                            }
+                        }
+                        continue;
+                    }
+                    let Some(id) = staging_id::<DocumentId>(&staging, ".carta-document-") else {
+                        continue;
+                    };
+                    let destination = month.join(id.to_string());
+                    if destination.exists() || !recoverable_document(&staging, id, volume) {
+                        continue;
+                    }
+                    fs::rename(&staging, &destination)
+                        .map_err(|error| Error::io(&destination, error))?;
+                }
+            }
+        }
+    }
+
+    let works = root.join("works");
+    if works.is_dir() {
+        let documents = current_document_ids(&volumes)?;
+        let mut titles = current_work_titles(&works)?;
+        for staging in directory_paths(&works)? {
+            let Some(id) = staging_id::<WorkId>(&staging, ".carta-work-") else {
+                continue;
+            };
+            let destination = works.join(id.to_string());
+            let Some(metadata) = recoverable_work(&staging, id) else {
+                continue;
+            };
+            let title = work_title_key(metadata.title());
+            if destination.exists()
+                || metadata
+                    .documents()
+                    .iter()
+                    .any(|document| !documents.contains(document))
+                || titles.contains(&title)
+            {
+                continue;
+            }
+            fs::rename(&staging, &destination).map_err(|error| Error::io(&destination, error))?;
+            titles.insert(title);
+        }
+    }
+    Ok(())
+}
+
+fn directory_paths(path: &Path) -> Result<Vec<PathBuf>, Error> {
+    let entries = fs::read_dir(path).map_err(|error| Error::io(path, error))?;
+    let mut paths = Vec::new();
+    for entry in entries {
+        paths.push(entry.map_err(|error| Error::io(path, error))?.path());
+    }
+    Ok(paths)
+}
+
+fn staging_id<T: FromStr>(path: &Path, prefix: &str) -> Option<T> {
+    path.file_name()?
+        .to_str()?
+        .strip_prefix(prefix)?
+        .parse()
+        .ok()
+}
+
+fn recoverable_document(path: &Path, id: DocumentId, volume: Volume) -> bool {
+    if !path.is_dir() {
+        return false;
+    }
+    let metadata = File::open(path.join("meta.json"))
+        .map(BufReader::new)
+        .map_err(carta_format::FormatError::from)
+        .and_then(DocumentMetadata::read_from);
+    let content = fs::read_to_string(path.join("content.md"));
+    matches!(metadata, Ok(metadata) if metadata.id() == id && Volume::from_timestamp(metadata.created()) == Some(volume))
+        && matches!(content, Ok(content) if !content.contains('\r'))
+}
+
+fn recoverable_work(path: &Path, id: WorkId) -> Option<WorkMetadata> {
+    if !path.is_dir() {
+        return None;
+    }
+    File::open(path.join("work.json"))
+        .map(BufReader::new)
+        .map_err(carta_format::FormatError::from)
+        .and_then(WorkMetadata::read_from)
+        .ok()
+        .filter(|metadata| metadata.id() == id)
+}
+
+fn current_document_ids(volumes: &Path) -> Result<HashSet<DocumentId>, Error> {
+    let mut ids = HashSet::new();
+    for year in directory_paths(volumes)? {
+        if !year.is_dir() {
+            continue;
+        }
+        for month in directory_paths(&year)? {
+            if !month.is_dir() {
+                continue;
+            }
+            for document in directory_paths(&month)? {
+                if document.is_dir() {
+                    if let Some(id) = staging_id(&document, "") {
+                        ids.insert(id);
+                    }
+                }
+            }
+        }
+    }
+    Ok(ids)
+}
+
+fn archive_contains_link(volumes: &Path, target: DocumentId) -> Result<bool, Error> {
+    let destination = format!("carta:doc:{target}");
+    for year in directory_paths(volumes)? {
+        if !year.is_dir() {
+            continue;
+        }
+        for month in directory_paths(&year)? {
+            if !month.is_dir() {
+                continue;
+            }
+            for document in directory_paths(&month)? {
+                if staging_id::<DocumentId>(&document, "").is_some()
+                    && fs::read_to_string(document.join("content.md"))
+                        .is_ok_and(|content| content.contains(&destination))
+                {
+                    return Ok(true);
+                }
+            }
+        }
+    }
+    Ok(false)
+}
+
+fn remove_abandoned_linked_staging(path: &Path) -> Result<(), Error> {
+    let entries = directory_paths(path)?;
+    if entries.len() != 2
+        || !entries.iter().all(|entry| {
+            matches!(
+                entry.file_name().and_then(|name| name.to_str()),
+                Some("content.md" | "meta.json")
+            )
+        })
+        || !fs::read(path.join("content.md")).is_ok_and(|content| content.is_empty())
+    {
+        return Ok(());
+    }
+    fs::remove_file(path.join("content.md"))
+        .map_err(|error| Error::io(path.join("content.md"), error))?;
+    fs::remove_file(path.join("meta.json"))
+        .map_err(|error| Error::io(path.join("meta.json"), error))?;
+    fs::remove_dir(path).map_err(|error| Error::io(path, error))
+}
+
+fn current_work_titles(works: &Path) -> Result<HashSet<String>, Error> {
+    let mut titles = HashSet::new();
+    for path in directory_paths(works)? {
+        if staging_id::<WorkId>(&path, "").is_none() {
+            continue;
+        }
+        if let Ok(metadata) = File::open(path.join("work.json"))
+            .map(BufReader::new)
+            .map_err(carta_format::FormatError::from)
+            .and_then(WorkMetadata::read_from)
+        {
+            titles.insert(work_title_key(metadata.title()));
+        }
+    }
+    Ok(titles)
 }
 
 fn normalize_line_endings(content: &str) -> String {
@@ -240,6 +791,52 @@ struct CleanupDirectory {
     armed: bool,
 }
 
+struct CleanupFile {
+    path: PathBuf,
+    armed: bool,
+}
+
+struct CleanupLinkedStaging {
+    path: PathBuf,
+    armed: bool,
+}
+
+impl CleanupLinkedStaging {
+    fn new(path: PathBuf) -> Self {
+        Self { path, armed: true }
+    }
+
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for CleanupLinkedStaging {
+    fn drop(&mut self) {
+        if self.armed {
+            let _ = remove_abandoned_linked_staging(&self.path);
+        }
+    }
+}
+
+impl CleanupFile {
+    fn new(path: PathBuf) -> Self {
+        Self { path, armed: true }
+    }
+
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for CleanupFile {
+    fn drop(&mut self) {
+        if self.armed {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+}
+
 impl CleanupDirectory {
     fn new(path: PathBuf) -> Self {
         Self { path, armed: true }
@@ -255,5 +852,40 @@ impl Drop for CleanupDirectory {
         if self.armed {
             let _ = fs::remove_dir_all(&self.path);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn linked_document_rolls_back_source_if_target_publication_fails() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let source = archive.create_document("source").unwrap();
+
+        let error = archive
+            .new_linked_document_with(source, 0, "Continue", |_archive, destination| {
+                fs::create_dir(destination).map_err(|error| Error::io(destination, error))?;
+                fs::write(destination.join("block"), b"block")
+                    .map_err(|error| Error::io(destination.join("block"), error))
+            })
+            .unwrap_err();
+
+        assert!(matches!(error, Error::Io { .. }));
+        assert_eq!(archive.documents.len(), 1);
+        assert_eq!(
+            fs::read_to_string(
+                archive
+                    .documents
+                    .get(&source)
+                    .unwrap()
+                    .path
+                    .join("content.md")
+            )
+            .unwrap(),
+            "source"
+        );
     }
 }

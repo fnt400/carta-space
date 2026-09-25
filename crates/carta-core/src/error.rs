@@ -32,6 +32,18 @@ pub enum Error {
     #[error("document does not exist: {0}")]
     MissingDocument(DocumentId),
 
+    #[error("work does not exist: {0}")]
+    MissingWork(WorkId),
+
+    #[error("canonical file changed outside this loaded Archive: {0}")]
+    ExternalChange(PathBuf),
+
+    #[error("byte offset {offset} is not a UTF-8 character boundary in document {document}")]
+    InvalidByteBoundary { document: DocumentId, offset: usize },
+
+    #[error("document {document} is not a member of work {work}")]
+    DocumentNotInWork { work: WorkId, document: DocumentId },
+
     #[error("work {work} references missing document {document}")]
     DanglingDocumentReference { work: WorkId, document: DocumentId },
 

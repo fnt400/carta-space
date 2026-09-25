@@ -9,6 +9,10 @@ pub struct Volume {
 }
 
 impl Volume {
+    pub fn new(year: u16, month: u8) -> Option<Self> {
+        (year <= 9999 && (1..=12).contains(&month)).then_some(Self { year, month })
+    }
+
     pub(crate) fn from_timestamp(timestamp: Timestamp) -> Option<Self> {
         let year = u16::try_from(timestamp.year()).ok()?;
         let month = u8::try_from(timestamp.month()).ok()?;
@@ -36,6 +40,8 @@ pub struct DocumentInfo {
     pub(crate) metadata: DocumentMetadata,
     pub(crate) volume: Volume,
     pub(crate) path: PathBuf,
+    pub(crate) metadata_bytes: Vec<u8>,
+    pub(crate) content_bytes: Vec<u8>,
 }
 
 impl DocumentInfo {
