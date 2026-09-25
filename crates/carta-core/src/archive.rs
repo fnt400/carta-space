@@ -171,9 +171,14 @@ impl Archive {
 
     pub fn edit_document(&mut self, id: DocumentId, content: &str) -> Result<(), Error> {
         let info = self.documents.get(&id).ok_or(Error::MissingDocument(id))?;
-        self.ensure_document_current(info)?;
+        ensure_unchanged(&info.path.join("meta.json"), &info.metadata_bytes)?;
         let path = info.path.join("content.md");
         let content = normalize_line_endings(content).into_bytes();
+        let external = fs::read(&path).map_err(|error| Error::io(&path, error))?;
+        if external != info.content_bytes {
+            let conflict = self.preserve_document_conflict(id, &content, &external)?;
+            return Err(Error::ConflictPreserved(conflict));
+        }
         atomic_replace(&path, &content)?;
         self.documents
             .get_mut(&id)
@@ -548,9 +553,13 @@ impl Archive {
 
     pub(crate) fn replace_work(&mut self, id: WorkId, metadata: WorkMetadata) -> Result<(), Error> {
         let work = self.works.get(&id).ok_or(Error::MissingWork(id))?;
-        self.ensure_work_current(work)?;
         let path = work.path.join("work.json");
         let bytes = serialize_work_metadata(&path, &metadata)?;
+        let external = fs::read(&path).map_err(|error| Error::io(&path, error))?;
+        if external != work.metadata_bytes {
+            let conflict = self.preserve_work_conflict(id, &bytes, &external)?;
+            return Err(Error::ConflictPreserved(conflict));
+        }
         atomic_replace(&path, &bytes)?;
         let work = self.works.get_mut(&id).expect("work was checked above");
         work.metadata = metadata;

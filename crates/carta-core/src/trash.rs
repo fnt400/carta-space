@@ -554,7 +554,9 @@ impl Archive {
 
         let rewrite = rewrite_history(self.root(), plan.document, &refs, &commits)?;
         verify_rewritten_refs(self.root(), plan.document, &objects)?;
-        let removed_artifacts = remove_carta_artifacts(self.root())?;
+        let mut removed_artifacts =
+            crate::conflict::scrub_document_conflicts(self.root(), plan.document)?;
+        removed_artifacts += remove_carta_artifacts(self.root())?;
         git_output(
             self.root(),
             "expire reflogs after Wipe",
@@ -1319,7 +1321,7 @@ fn remove_reserved_children(
             .and_then(|name| name.to_str())
             .is_some_and(|name| {
                 if git_directory {
-                    name.starts_with("carta-")
+                    name.starts_with("carta-") && name != "carta-conflicts"
                 } else {
                     name.starts_with(".carta-")
                 }

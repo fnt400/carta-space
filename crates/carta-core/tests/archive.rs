@@ -367,9 +367,10 @@ fn detects_external_document_edits_and_refreshes_explicitly() {
 
     assert!(matches!(
         archive.edit_document(document, "local"),
-        Err(Error::ExternalChange(path)) if path == content_path
+        Err(Error::ConflictPreserved(_))
     ));
     assert_eq!(fs::read_to_string(&content_path).unwrap(), "external");
+    assert_eq!(archive.conflicts().unwrap().len(), 1);
 
     archive.refresh().unwrap();
     archive.edit_document(document, "accepted").unwrap();
@@ -391,11 +392,12 @@ fn detects_external_work_edits_without_overwriting_them() {
 
     assert!(matches!(
         archive.rename_work(work, "Local".to_owned()),
-        Err(Error::ExternalChange(path)) if path == work_path
+        Err(Error::ConflictPreserved(_))
     ));
     let persisted: serde_json::Value =
         serde_json::from_slice(&fs::read(&work_path).unwrap()).unwrap();
     assert_eq!(persisted["title"], "External");
+    assert_eq!(archive.conflicts().unwrap().len(), 1);
 
     archive.reload().unwrap();
     archive.rename_work(work, "Accepted".to_owned()).unwrap();

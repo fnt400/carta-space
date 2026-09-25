@@ -248,7 +248,9 @@ fn is_transient(path: &Path, root: &Path) -> bool {
         };
         name.to_str().is_some_and(|name| {
             if in_git {
-                name.starts_with("carta-transaction-") || name.starts_with("carta-wipe-index-")
+                name.starts_with("carta-transaction-")
+                    || name.starts_with("carta-wipe-index-")
+                    || name == "carta-conflicts"
             } else {
                 name.starts_with(".carta-")
             }

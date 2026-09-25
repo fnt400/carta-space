@@ -1,0 +1,1832 @@
+use crate::editor::{CompositeEditor, Cursor, Region};
+use crate::palette;
+use crate::session::{Position, SavedView, Session};
+use carta_core::{
+    Archive, CartaLinkTarget, CheckpointKind, Conflict, ConflictChoice, DocumentId,
+    DocumentTextRegion, LeapDirection, LeapPosition, LeapRuntime, LeapSession, PdfExportOptions,
+    Volume, WorkId, WorkRestoreOptions,
+};
+use chrono::{Datelike, Local};
+use std::collections::BTreeMap;
+use std::error::Error;
+use std::fs;
+use std::time::{Duration, Instant};
+
+pub type AppResult<T = ()> = Result<T, Box<dyn Error>>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum View {
+    Chronological(Volume),
+    Work(WorkId),
+    Search {
+        query: String,
+        selected: usize,
+    },
+    History {
+        document: DocumentId,
+        selected: usize,
+    },
+    WorkHistory {
+        work: WorkId,
+        selected: usize,
+    },
+    Trash {
+        selected: usize,
+    },
+    Conflicts {
+        selected: usize,
+    },
+}
+
+#[derive(Debug, Clone)]
+struct Location {
+    view: View,
+    cursor: Cursor,
+    scroll: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PromptAction {
+    Search,
+    GoToMonth,
+    CreateWork,
+    RenameWork,
+    Import,
+    ExportDocumentMarkdown,
+    ExportDocumentPdf,
+    ExportWorkMarkdown,
+    ExportWorkPdf,
+    Package,
+    Checkpoint,
+    ConfirmTrashDocument,
+    ConfirmTrashWork,
+    ConfirmRestoreDocument,
+    ConfirmRestoreWork,
+    ConfirmRestoreWorkVersion,
+    ConfirmWipe,
+    ResolveLocal,
+    ResolveExternal,
+    ResolveLocalPreserve,
+    ResolveExternalPreserve,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SelectAction {
+    OpenWork,
+    AddToWork,
+    MoveAfter,
+    InsertLink,
+    OpenSearchResult,
+    RestoreHistory,
+    RestoreHistoryAsNew,
+    TrashItem,
+}
+
+#[derive(Debug, Clone)]
+pub struct Choice {
+    pub label: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ResultRow {
+    pub document: DocumentId,
+    pub label: String,
+    pub context: String,
+    pub byte: usize,
+}
+
+#[derive(Debug, Clone)]
+pub enum AppMode {
+    Editing,
+    Palette {
+        query: String,
+        selected: usize,
+    },
+    Prompt {
+        title: String,
+        input: String,
+        details: Vec<String>,
+        action: PromptAction,
+    },
+    Selector {
+        title: String,
+        query: String,
+        selected: usize,
+        choices: Vec<Choice>,
+        action: SelectAction,
+    },
+    Leap {
+        session: LeapSession,
+        palette: bool,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Command {
+    NewDocument,
+    DuplicateAsNew,
+    NewLinkedDocument,
+    PreviousMonth,
+    NextMonth,
+    GoToMonth,
+    CreateWork,
+    RenameWork,
+    OpenWork,
+    ShowMemberships,
+    AddToWork,
+    RemoveFromWork,
+    MoveEarlier,
+    MoveLater,
+    MoveAfter,
+    SearchArchive,
+    InsertLink,
+    OpenLink,
+    ShowBacklinks,
+    Back,
+    Forward,
+    History,
+    WorkHistory,
+    RestoreThisVersion,
+    RestoreAsNew,
+    RestoreWorkVersion,
+    Trash,
+    ShowTrash,
+    TrashWork,
+    RestoreTrash,
+    Wipe,
+    Import,
+    ExportDocumentMarkdown,
+    ExportDocumentPdf,
+    ExportWorkMarkdown,
+    ExportWorkPdf,
+    Package,
+    CreateCheckpoint,
+    LeapForward,
+    LeapBackward,
+    LeapAgainForward,
+    LeapAgainBackward,
+    Quit,
+    ShowConflicts,
+    UseLocal,
+    UseExternal,
+    UseLocalPreserveOther,
+    UseExternalPreserveOther,
+}
+
+impl Command {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::NewDocument => "New Document",
+            Self::DuplicateAsNew => "Duplicate as New",
+            Self::NewLinkedDocument => "New Linked Document",
+            Self::PreviousMonth => "Previous Month",
+            Self::NextMonth => "Next Month",
+            Self::GoToMonth => "Go to Month…",
+            Self::CreateWork => "Create Work…",
+            Self::RenameWork => "Rename Work…",
+            Self::OpenWork => "Open Work…",
+            Self::ShowMemberships => "Show Memberships",
+            Self::AddToWork => "Add to Work…",
+            Self::RemoveFromWork => "Remove from Work",
+            Self::MoveEarlier => "Move Document Earlier",
+            Self::MoveLater => "Move Document Later",
+            Self::MoveAfter => "Move This Document After…",
+            Self::SearchArchive => "Search Archive…",
+            Self::InsertLink => "Insert Link…",
+            Self::OpenLink => "Open Link",
+            Self::ShowBacklinks => "Show Backlinks",
+            Self::Back => "Back",
+            Self::Forward => "Forward",
+            Self::History => "Document History",
+            Self::WorkHistory => "Work History",
+            Self::RestoreThisVersion => "Restore This Version",
+            Self::RestoreAsNew => "Restore as New Document",
+            Self::RestoreWorkVersion => "Restore Work Version",
+            Self::Trash => "Trash",
+            Self::TrashWork => "Trash Work",
+            Self::ShowTrash => "Show Trash",
+            Self::RestoreTrash => "Restore from Trash",
+            Self::Wipe => "Wipe permanently",
+            Self::Import => "Import…",
+            Self::ExportDocumentMarkdown => "Export Document as Markdown…",
+            Self::ExportDocumentPdf => "Export Document as PDF…",
+            Self::ExportWorkMarkdown => "Export Work as Markdown…",
+            Self::ExportWorkPdf => "Export Work as PDF…",
+            Self::Package => "Package Archive…",
+            Self::CreateCheckpoint => "Create Checkpoint…",
+            Self::LeapForward => "LEAP Forward…",
+            Self::LeapBackward => "LEAP Backward…",
+            Self::LeapAgainForward => "Leap Again Forward",
+            Self::LeapAgainBackward => "Leap Again Backward",
+            Self::Quit => "Quit",
+            Self::ShowConflicts => "Show Conflicts",
+            Self::UseLocal => "Use Local Variant",
+            Self::UseExternal => "Use External Variant",
+            Self::UseLocalPreserveOther => "Use Local; Preserve External as New Document",
+            Self::UseExternalPreserveOther => "Use External; Preserve Local as New Document",
+        }
+    }
+}
+
+pub struct Scheduler {
+    last_edit: Option<Instant>,
+    last_checkpoint: Instant,
+    autosave_after: Duration,
+    checkpoint_after: Duration,
+}
+
+impl Scheduler {
+    pub fn new(now: Instant) -> Self {
+        Self {
+            last_edit: None,
+            last_checkpoint: now,
+            autosave_after: Duration::from_secs(1),
+            checkpoint_after: Duration::from_secs(600),
+        }
+    }
+    pub fn edited(&mut self, now: Instant) {
+        self.last_edit = Some(now);
+    }
+    pub fn autosave_due(&self, now: Instant, dirty: bool) -> bool {
+        dirty
+            && self
+                .last_edit
+                .is_some_and(|last| now.duration_since(last) >= self.autosave_after)
+    }
+    pub fn checkpoint_due(&self, now: Instant) -> bool {
+        now.duration_since(self.last_checkpoint) >= self.checkpoint_after
+    }
+    pub fn saved(&mut self) {
+        self.last_edit = None;
+    }
+    pub fn checkpointed(&mut self, now: Instant) {
+        self.last_checkpoint = now;
+    }
+}
+
+pub struct App {
+    pub archive: Archive,
+    pub view: View,
+    pub editor: CompositeEditor,
+    pub mode: AppMode,
+    pub status: String,
+    pub scroll: usize,
+    pub search_results: Vec<ResultRow>,
+    pub history: Vec<carta_core::DocumentRevision>,
+    pub work_history: Vec<carta_core::WorkSnapshot>,
+    pub trash: Option<carta_core::TrashInventory>,
+    pub conflicts: Vec<Conflict>,
+    pub scheduler: Scheduler,
+    pub leap: LeapRuntime,
+    pub quit: bool,
+    back: Vec<Location>,
+    forward: Vec<Location>,
+    provisional: Option<DocumentId>,
+    pending_wipe: Option<carta_core::WipePlan>,
+    work_positions: BTreeMap<WorkId, Position>,
+    work_mru: Vec<WorkId>,
+}
+
+impl App {
+    pub fn open(mut archive: Archive, session: Option<&Session>, now: Instant) -> AppResult<Self> {
+        let current = current_volume();
+        let mut provisional = None;
+        let view = match session.map(|s| &s.view) {
+            Some(SavedView::Work { id }) if archive.work(*id).is_some() => View::Work(*id),
+            Some(SavedView::Search { query, selected }) => View::Search {
+                query: query.clone(),
+                selected: *selected,
+            },
+            Some(SavedView::Chronological { year, month }) => {
+                View::Chronological(Volume::new(*year, *month).unwrap_or(current))
+            }
+            _ => {
+                let id = archive.create_document("")?;
+                provisional = Some(id);
+                View::Chronological(current)
+            }
+        };
+        let position = session.and_then(|s| s.position.as_ref());
+        let (editor, scroll) = load_editor(&archive, &view, position)?;
+        let search_results = if let View::Search { query, .. } = &view {
+            archive
+                .search(query)?
+                .into_iter()
+                .map(|result| ResultRow {
+                    document: result.document(),
+                    label: result.label().to_owned(),
+                    context: result.context().to_owned(),
+                    byte: result.occurrence().start,
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let conflicts = archive.conflicts()?;
+        let view = if conflicts.is_empty() {
+            view
+        } else {
+            View::Conflicts { selected: 0 }
+        };
+        Ok(Self {
+            archive,
+            view,
+            editor,
+            mode: AppMode::Editing,
+            status: String::new(),
+            scroll,
+            search_results,
+            history: Vec::new(),
+            work_history: Vec::new(),
+            trash: None,
+            conflicts,
+            scheduler: Scheduler::new(now),
+            leap: LeapRuntime::default(),
+            quit: false,
+            back: Vec::new(),
+            forward: Vec::new(),
+            provisional,
+            pending_wipe: None,
+            work_positions: session.map_or_else(BTreeMap::new, |s| s.work_positions.clone()),
+            work_mru: session.map_or_else(Vec::new, |s| s.work_mru.clone()),
+        })
+    }
+
+    pub fn session(&self) -> Session {
+        let position = self.editor.current_document().map(|document| Position {
+            document,
+            byte: self.editor.cursor().byte,
+            scroll: self.scroll,
+        });
+        let view = match self.view {
+            View::Work(id) => SavedView::Work { id },
+            View::Chronological(v) => SavedView::Chronological {
+                year: v.year(),
+                month: v.month(),
+            },
+            View::Search {
+                ref query,
+                selected,
+            } => SavedView::Search {
+                query: query.clone(),
+                selected,
+            },
+            _ => SavedView::Chronological {
+                year: current_volume().year(),
+                month: current_volume().month(),
+            },
+        };
+        Session {
+            view,
+            position,
+            work_positions: self.work_positions.clone(),
+            work_mru: self.work_mru.clone(),
+        }
+    }
+
+    pub fn commands(&self) -> Vec<Command> {
+        use Command::*;
+        let editable = matches!(self.view, View::Chronological(_) | View::Work(_));
+        let has_doc = self.editor.current_document().is_some();
+        let mut commands = vec![
+            NewDocument,
+            CreateWork,
+            OpenWork,
+            SearchArchive,
+            ShowTrash,
+            Import,
+            Package,
+            CreateCheckpoint,
+            LeapForward,
+            LeapBackward,
+            LeapAgainForward,
+            LeapAgainBackward,
+            Back,
+            Forward,
+            Quit,
+            ShowConflicts,
+        ];
+        if editable && has_doc {
+            commands.extend([
+                DuplicateAsNew,
+                NewLinkedDocument,
+                ShowMemberships,
+                AddToWork,
+                InsertLink,
+                ShowBacklinks,
+                History,
+                Trash,
+                ExportDocumentMarkdown,
+                ExportDocumentPdf,
+            ]);
+        }
+        if matches!(self.view, View::Chronological(_)) {
+            commands.extend([PreviousMonth, NextMonth, GoToMonth]);
+        }
+        if matches!(self.view, View::Work(_)) {
+            commands.extend([
+                RenameWork,
+                TrashWork,
+                WorkHistory,
+                RemoveFromWork,
+                MoveEarlier,
+                MoveLater,
+                MoveAfter,
+                ExportWorkMarkdown,
+                ExportWorkPdf,
+            ]);
+        }
+        if has_doc && self.link_under_cursor().is_some() {
+            commands.push(OpenLink);
+        }
+        if matches!(self.view, View::History { .. }) {
+            commands.extend([RestoreThisVersion, RestoreAsNew]);
+        }
+        if matches!(self.view, View::WorkHistory { .. }) {
+            commands.push(RestoreWorkVersion);
+        }
+        if matches!(self.view, View::Trash { .. }) {
+            commands.extend([RestoreTrash, Wipe]);
+        }
+        if let View::Conflicts { selected } = self.view {
+            if let Some(conflict) = self.conflicts.get(selected) {
+                commands.extend([UseLocal, UseExternal]);
+                if matches!(conflict, Conflict::Document(_)) {
+                    commands.extend([UseLocalPreserveOther, UseExternalPreserveOther]);
+                }
+            }
+        }
+        commands
+    }
+
+    pub fn palette_commands(&self, query: &str) -> Vec<Command> {
+        self.commands()
+            .into_iter()
+            .filter(|c| palette::matches(query, c.label()))
+            .collect()
+    }
+    pub fn open_palette(&mut self) {
+        self.mode = AppMode::Palette {
+            query: String::new(),
+            selected: 0,
+        };
+    }
+    pub fn cancel_mode(&mut self) {
+        self.mode = AppMode::Editing;
+        self.status.clear();
+    }
+
+    pub fn execute(&mut self, command: Command) -> AppResult {
+        use Command::*;
+        match command {
+            NewDocument => self.new_document()?,
+            DuplicateAsNew => {
+                let id = self.archive.duplicate_document(self.current_document()?)?;
+                self.structural("Duplicated Document")?;
+                self.open_document(id, true)?;
+            }
+            NewLinkedDocument => {
+                self.autosave()?;
+                let source = self.current_document()?;
+                let id = self.archive.new_linked_document(
+                    source,
+                    self.editor.cursor().byte,
+                    "Continue in…",
+                )?;
+                self.structural("Created linked Document")?;
+                self.open_document(id, true)?;
+            }
+            PreviousMonth => self.change_month(-1)?,
+            NextMonth => self.change_month(1)?,
+            GoToMonth => self.prompt("Go to month (YYYY-MM)", PromptAction::GoToMonth),
+            CreateWork => self.prompt("Work name", PromptAction::CreateWork),
+            RenameWork => self.prompt("New Work name", PromptAction::RenameWork),
+            OpenWork => self.select_works(SelectAction::OpenWork, false),
+            ShowMemberships => self.show_memberships()?,
+            AddToWork => self.select_works(SelectAction::AddToWork, true),
+            RemoveFromWork => {
+                let work = self.current_work()?;
+                let doc = self.current_document()?;
+                self.archive.remove_document_from_work(work, doc)?;
+                self.structural("Removed Document from Work")?;
+                self.reload_view(None)?;
+            }
+            MoveEarlier => self.move_work(true)?,
+            MoveLater => self.move_work(false)?,
+            MoveAfter => self.select_move_after()?,
+            SearchArchive => self.prompt("Search Archive", PromptAction::Search),
+            InsertLink => self.select_links()?,
+            OpenLink => self.open_link()?,
+            ShowBacklinks => self.show_backlinks()?,
+            Back => self.navigate(false)?,
+            Forward => self.navigate(true)?,
+            History => self.show_history()?,
+            WorkHistory => self.show_work_history()?,
+            RestoreThisVersion => self.restore_history(false)?,
+            RestoreAsNew => self.restore_history(true)?,
+            RestoreWorkVersion => self.prompt(
+                "Type RESTORE WORK, or RESTORE WORK WITH DOCUMENTS if required",
+                PromptAction::ConfirmRestoreWorkVersion,
+            ),
+            Trash => self.prepare_trash()?,
+            TrashWork => self.prompt("Type TRASH WORK to confirm", PromptAction::ConfirmTrashWork),
+            ShowTrash => self.show_trash()?,
+            RestoreTrash => self.restore_trash()?,
+            Wipe => self.prepare_wipe()?,
+            Import => self.prompt("Import .md or .txt path", PromptAction::Import),
+            ExportDocumentMarkdown => {
+                self.prompt("Export Markdown path", PromptAction::ExportDocumentMarkdown)
+            }
+            ExportDocumentPdf => self.prompt("Export PDF path", PromptAction::ExportDocumentPdf),
+            ExportWorkMarkdown => self.prompt(
+                "Export Work Markdown path",
+                PromptAction::ExportWorkMarkdown,
+            ),
+            ExportWorkPdf => self.prompt("Export Work PDF path", PromptAction::ExportWorkPdf),
+            Package => self.prompt("Package .cat path", PromptAction::Package),
+            CreateCheckpoint => self.prompt("Checkpoint note (optional)", PromptAction::Checkpoint),
+            LeapForward => self.start_leap(LeapDirection::Forward, true),
+            LeapBackward => self.start_leap(LeapDirection::Backward, true),
+            LeapAgainForward => self.leap_again(LeapDirection::Forward),
+            LeapAgainBackward => self.leap_again(LeapDirection::Backward),
+            Quit => self.finish_quit()?,
+            ShowConflicts => self.show_conflicts()?,
+            UseLocal => self.prompt("Type USE LOCAL to resolve", PromptAction::ResolveLocal),
+            UseExternal => self.prompt(
+                "Type USE EXTERNAL to resolve",
+                PromptAction::ResolveExternal,
+            ),
+            UseLocalPreserveOther => self.prompt(
+                "Type USE LOCAL AND PRESERVE EXTERNAL",
+                PromptAction::ResolveLocalPreserve,
+            ),
+            UseExternalPreserveOther => self.prompt(
+                "Type USE EXTERNAL AND PRESERVE LOCAL",
+                PromptAction::ResolveExternalPreserve,
+            ),
+        }
+        Ok(())
+    }
+
+    pub fn submit_prompt(&mut self) -> AppResult {
+        let AppMode::Prompt { input, action, .. } = &self.mode else {
+            return Ok(());
+        };
+        let input = input.clone();
+        let action = *action;
+        self.mode = AppMode::Editing;
+        match action {
+            PromptAction::Search => self.search(&input)?,
+            PromptAction::GoToMonth => {
+                let volume = parse_month(&input).ok_or("month must be YYYY-MM")?;
+                self.switch_view(View::Chronological(volume), None, false)?;
+            }
+            PromptAction::CreateWork => {
+                let id = self.archive.create_empty_work(input)?;
+                self.structural("Created Work")?;
+                self.switch_view(View::Work(id), None, false)?;
+            }
+            PromptAction::RenameWork => {
+                self.archive.rename_work(self.current_work()?, input)?;
+                self.structural("Renamed Work")?;
+            }
+            PromptAction::Import => {
+                let bytes = fs::read(&input)?;
+                let id = self.archive.import_document_bytes(&bytes)?;
+                self.structural("Imported Document")?;
+                self.open_document(id, true)?;
+            }
+            PromptAction::ExportDocumentMarkdown => fs::write(
+                input,
+                self.archive
+                    .export_document_markdown(self.current_document()?)?,
+            )?,
+            PromptAction::ExportDocumentPdf => self.archive.export_document_pdf_with(
+                self.current_document()?,
+                input,
+                &PdfExportOptions::default(),
+            )?,
+            PromptAction::ExportWorkMarkdown => fs::write(
+                input,
+                self.archive.export_work_markdown(self.current_work()?)?,
+            )?,
+            PromptAction::ExportWorkPdf => self.archive.export_work_pdf_with(
+                self.current_work()?,
+                input,
+                &PdfExportOptions::default(),
+            )?,
+            PromptAction::Package => {
+                self.autosave()?;
+                self.archive.package(input)?;
+            }
+            PromptAction::Checkpoint => {
+                self.autosave()?;
+                self.archive
+                    .checkpoint(CheckpointKind::Manual, Some(&input))?;
+            }
+            PromptAction::ConfirmTrashDocument => {
+                if input == "TRASH" {
+                    self.archive.trash_document(self.current_document()?)?;
+                    self.reload_after_removal()?;
+                }
+            }
+            PromptAction::ConfirmTrashWork => {
+                if input == "TRASH WORK" {
+                    self.archive.trash_work(self.current_work()?)?;
+                    self.switch_view(View::Chronological(current_volume()), None, false)?;
+                }
+            }
+            PromptAction::ConfirmRestoreDocument => {
+                if input == "RESTORE" {
+                    if let Some(id) = self.selected_trashed_document() {
+                        self.archive.restore_trashed_document(id)?;
+                        self.open_document(id, false)?;
+                    }
+                }
+            }
+            PromptAction::ConfirmRestoreWork => {
+                if input == "RESTORE" || input == "RESTORE WITH DOCUMENTS" {
+                    if let Some(id) = self.selected_trashed_work() {
+                        self.archive
+                            .restore_trashed_work(id, input == "RESTORE WITH DOCUMENTS")?;
+                        self.switch_view(View::Work(id), None, false)?;
+                    }
+                }
+            }
+            PromptAction::ConfirmRestoreWorkVersion => {
+                if input == "RESTORE WORK" || input == "RESTORE WORK WITH DOCUMENTS" {
+                    let View::WorkHistory { work, selected } = self.view else {
+                        return Ok(());
+                    };
+                    let checkpoint = self
+                        .work_history
+                        .get(selected)
+                        .ok_or("no historical Work revision")?
+                        .checkpoint()
+                        .id()
+                        .clone();
+                    self.archive.checkpoint(
+                        CheckpointKind::Automatic,
+                        Some("Saved current state before Work History restore"),
+                    )?;
+                    self.archive.restore_work_version(
+                        work,
+                        &checkpoint,
+                        WorkRestoreOptions {
+                            restore_required_trashed_documents: input
+                                == "RESTORE WORK WITH DOCUMENTS",
+                        },
+                    )?;
+                    self.switch_view(View::Work(work), None, false)?;
+                }
+            }
+            PromptAction::ConfirmWipe => {
+                if let Some(plan) = self.pending_wipe.take() {
+                    if input == plan.confirmation_token() {
+                        self.archive.execute_wipe_document(&plan, &input)?;
+                        self.show_trash()?;
+                    } else {
+                        self.status = "Wipe confirmation did not match".into();
+                    }
+                }
+            }
+            PromptAction::ResolveLocal => {
+                if input == "USE LOCAL" {
+                    self.resolve_selected_conflict(ConflictChoice::Local, false)?;
+                }
+            }
+            PromptAction::ResolveExternal => {
+                if input == "USE EXTERNAL" {
+                    self.resolve_selected_conflict(ConflictChoice::External, false)?;
+                }
+            }
+            PromptAction::ResolveLocalPreserve => {
+                if input == "USE LOCAL AND PRESERVE EXTERNAL" {
+                    self.resolve_selected_conflict(ConflictChoice::Local, true)?;
+                }
+            }
+            PromptAction::ResolveExternalPreserve => {
+                if input == "USE EXTERNAL AND PRESERVE LOCAL" {
+                    self.resolve_selected_conflict(ConflictChoice::External, true)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn submit_selector(&mut self) -> AppResult {
+        let AppMode::Selector {
+            query,
+            selected,
+            choices,
+            action,
+            ..
+        } = &self.mode
+        else {
+            return Ok(());
+        };
+        let filtered: Vec<_> = choices
+            .iter()
+            .filter(|c| palette::matches(query, &c.label))
+            .collect();
+        let Some(choice) = filtered.get((*selected).min(filtered.len().saturating_sub(1))) else {
+            return Ok(());
+        };
+        let value = choice.value.clone();
+        let label = choice.label.clone();
+        let action = action.clone();
+        self.mode = AppMode::Editing;
+        match action {
+            SelectAction::OpenWork => self.switch_view(View::Work(value.parse()?), None, false)?,
+            SelectAction::AddToWork => {
+                self.archive
+                    .add_document_to_work(value.parse()?, self.current_document()?)?;
+                self.structural("Added Document to Work")?;
+            }
+            SelectAction::MoveAfter => {
+                let after = if value.is_empty() {
+                    None
+                } else {
+                    Some(value.parse()?)
+                };
+                self.archive.move_document_after(
+                    self.current_work()?,
+                    self.current_document()?,
+                    after,
+                )?;
+                self.structural("Reordered Work")?;
+                self.reload_view(None)?;
+            }
+            SelectAction::InsertLink => self.insert_link_choice(&value, &label)?,
+            _ => {}
+        }
+        Ok(())
+    }
+
+    pub fn move_list_selection(&mut self, down: bool) {
+        match &mut self.view {
+            View::Search { selected, .. } => move_index(selected, self.search_results.len(), down),
+            View::History { selected, .. } => move_index(selected, self.history.len(), down),
+            View::WorkHistory { selected, .. } => {
+                move_index(selected, self.work_history.len(), down)
+            }
+            View::Trash { selected } => {
+                let len = self
+                    .trash
+                    .as_ref()
+                    .map_or(0, |t| t.documents().len() + t.works().len());
+                move_index(selected, len, down);
+            }
+            View::Conflicts { selected } => move_index(selected, self.conflicts.len(), down),
+            _ => {}
+        }
+    }
+
+    pub fn open_selected(&mut self) -> AppResult {
+        if let View::Search { selected, .. } = self.view {
+            if let Some(result) = self.search_results.get(selected) {
+                let target = (result.document, result.byte);
+                self.open_document(target.0, true)?;
+                if let Some(region) = self
+                    .editor
+                    .regions()
+                    .iter()
+                    .position(|r| r.document == target.0)
+                {
+                    self.editor.set_cursor(
+                        Cursor {
+                            region,
+                            byte: target.1,
+                        },
+                        false,
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn tick(&mut self, now: Instant) -> AppResult {
+        if self.scheduler.autosave_due(now, self.editor.is_dirty()) {
+            self.autosave()?;
+        }
+        if self.scheduler.checkpoint_due(now) {
+            self.autosave()?;
+            self.archive.checkpoint(CheckpointKind::Automatic, None)?;
+            self.scheduler.checkpointed(now);
+        }
+        Ok(())
+    }
+
+    pub fn edited(&mut self, now: Instant) {
+        self.scheduler.edited(now);
+    }
+
+    pub fn autosave(&mut self) -> AppResult {
+        if !self.editor.is_dirty() {
+            return Ok(());
+        }
+        let regions = self.editor.regions().to_vec();
+        for region in regions {
+            match self.archive.edit_document(region.document, &region.text) {
+                Ok(()) => {}
+                Err(carta_core::Error::ConflictPreserved(id)) => {
+                    self.editor.mark_saved();
+                    self.scheduler.saved();
+                    self.conflicts = self.archive.conflicts()?;
+                    let selected = self
+                        .conflicts
+                        .iter()
+                        .position(|conflict| conflict.id() == id)
+                        .unwrap_or(0);
+                    self.view = View::Conflicts { selected };
+                    self.status = format!("External divergence preserved as conflict {id}");
+                    return Ok(());
+                }
+                Err(error) => return Err(error.into()),
+            }
+        }
+        self.editor.mark_saved();
+        self.scheduler.saved();
+        if self.provisional.is_some_and(|id| {
+            self.editor
+                .regions()
+                .iter()
+                .find(|region| region.document == id)
+                .is_some_and(|region| !region.text.trim().is_empty())
+        }) {
+            self.archive.checkpoint(
+                CheckpointKind::Structural,
+                Some("Document became persistent"),
+            )?;
+            self.provisional = None;
+        }
+        Ok(())
+    }
+
+    pub fn start_leap(&mut self, direction: LeapDirection, palette_mode: bool) {
+        self.editor.cancel_selection();
+        self.mode = AppMode::Leap {
+            session: LeapSession::new(
+                direction,
+                LeapPosition::new(self.editor.cursor().region, self.editor.cursor().byte),
+            ),
+            palette: palette_mode,
+        };
+    }
+
+    pub fn leap_input(&mut self, value: &str) {
+        let regions: Vec<_> = self
+            .editor
+            .regions()
+            .iter()
+            .map(|r| DocumentTextRegion::new(r.document, &r.text))
+            .collect();
+        if let AppMode::Leap { session, .. } = &mut self.mode {
+            session.push_str(value, &regions);
+            let p = session.cursor();
+            self.editor.set_cursor(
+                Cursor {
+                    region: p.region(),
+                    byte: p.byte_offset(),
+                },
+                false,
+            );
+        }
+    }
+    pub fn leap_backspace(&mut self) {
+        let regions: Vec<_> = self
+            .editor
+            .regions()
+            .iter()
+            .map(|r| DocumentTextRegion::new(r.document, &r.text))
+            .collect();
+        if let AppMode::Leap { session, .. } = &mut self.mode {
+            session.backspace(&regions);
+            let p = session.cursor();
+            self.editor.set_cursor(
+                Cursor {
+                    region: p.region(),
+                    byte: p.byte_offset(),
+                },
+                false,
+            );
+        }
+    }
+    pub fn end_leap(&mut self) {
+        if let AppMode::Leap { session, palette } = &self.mode {
+            if session.query().is_empty() && !palette {
+                self.leap_again(session.direction());
+            } else {
+                self.leap.remember(session);
+            }
+        }
+        self.mode = AppMode::Editing;
+    }
+
+    pub fn cancel_leap(&mut self) {
+        if let AppMode::Leap { session, .. } = &self.mode {
+            let origin = session.origin();
+            self.editor.set_cursor(
+                Cursor {
+                    region: origin.region(),
+                    byte: origin.byte_offset(),
+                },
+                false,
+            );
+        }
+        self.mode = AppMode::Editing;
+    }
+
+    fn leap_again(&mut self, direction: LeapDirection) {
+        let regions: Vec<_> = self
+            .editor
+            .regions()
+            .iter()
+            .map(|r| DocumentTextRegion::new(r.document, &r.text))
+            .collect();
+        if let Some(found) = self.leap.leap_again(
+            direction,
+            LeapPosition::new(self.editor.cursor().region, self.editor.cursor().byte),
+            &regions,
+        ) {
+            let p = found.position();
+            self.editor.set_cursor(
+                Cursor {
+                    region: p.region(),
+                    byte: p.byte_offset(),
+                },
+                false,
+            );
+        }
+    }
+
+    fn new_document(&mut self) -> AppResult {
+        self.autosave()?;
+        let id = self.archive.create_document("")?;
+        self.provisional = Some(id);
+        if let View::Work(work) = self.view {
+            let current = self.editor.current_document();
+            self.archive.add_document_to_work(work, id)?;
+            self.archive.move_document_after(work, id, current)?;
+            self.structural("Created Document in Work")?;
+            self.provisional = None;
+            self.reload_view(Some((id, 0)))?;
+        } else {
+            self.switch_view(View::Chronological(current_volume()), Some((id, 0)), false)?;
+        }
+        Ok(())
+    }
+    fn move_work(&mut self, earlier: bool) -> AppResult {
+        let work = self.current_work()?;
+        let doc = self.current_document()?;
+        if if earlier {
+            self.archive.move_document_earlier(work, doc)?
+        } else {
+            self.archive.move_document_later(work, doc)?
+        } {
+            self.structural("Reordered Work")?;
+            self.reload_view(Some((doc, self.editor.cursor().byte)))?;
+        }
+        Ok(())
+    }
+    fn structural(&mut self, note: &str) -> AppResult {
+        self.autosave()?;
+        self.archive
+            .checkpoint(CheckpointKind::Structural, Some(note))?;
+        Ok(())
+    }
+    fn change_month(&mut self, delta: i32) -> AppResult {
+        let View::Chronological(v) = self.view else {
+            return Ok(());
+        };
+        let total = i32::from(v.year()) * 12 + i32::from(v.month()) - 1 + delta;
+        let volume = Volume::new((total / 12) as u16, (total % 12 + 1) as u8)
+            .ok_or("month is outside supported range")?;
+        self.switch_view(View::Chronological(volume), None, false)
+    }
+    fn prompt(&mut self, title: &str, action: PromptAction) {
+        self.mode = AppMode::Prompt {
+            title: title.into(),
+            input: String::new(),
+            details: Vec::new(),
+            action,
+        };
+    }
+
+    fn prompt_with_details(&mut self, title: &str, details: Vec<String>, action: PromptAction) {
+        self.mode = AppMode::Prompt {
+            title: title.into(),
+            input: String::new(),
+            details,
+            action,
+        };
+    }
+    fn select_works(&mut self, action: SelectAction, omit_member: bool) {
+        let current = self.editor.current_document();
+        let mut choices: Vec<_> = self
+            .archive
+            .works()
+            .filter(|w| !omit_member || current.is_none_or(|d| !w.documents().contains(&d)))
+            .map(|w| Choice {
+                label: w.title().into(),
+                value: w.id().to_string(),
+            })
+            .collect();
+        choices.sort_by_key(|choice| {
+            choice
+                .value
+                .parse::<WorkId>()
+                .ok()
+                .and_then(|id| self.work_mru.iter().position(|candidate| *candidate == id))
+                .unwrap_or(usize::MAX)
+        });
+        self.mode = AppMode::Selector {
+            title: if action == SelectAction::OpenWork {
+                "Open Work"
+            } else {
+                "Add to Work"
+            }
+            .into(),
+            query: String::new(),
+            selected: 0,
+            choices,
+            action,
+        };
+    }
+    fn select_move_after(&mut self) -> AppResult {
+        let work = self
+            .archive
+            .work(self.current_work()?)
+            .ok_or("missing Work")?;
+        let current = self.current_document()?;
+        let mut choices = vec![Choice {
+            label: "[Beginning of Work]".into(),
+            value: String::new(),
+        }];
+        for id in work.documents().iter().filter(|id| **id != current) {
+            choices.push(Choice {
+                label: self.archive.read_document(*id)?.derived_label(),
+                value: id.to_string(),
+            });
+        }
+        self.mode = AppMode::Selector {
+            title: "Move after".into(),
+            query: String::new(),
+            selected: 0,
+            choices,
+            action: SelectAction::MoveAfter,
+        };
+        Ok(())
+    }
+    fn select_links(&mut self) -> AppResult {
+        let mut choices = Vec::new();
+        for info in self.archive.documents() {
+            choices.push(Choice {
+                label: self.archive.read_document(info.id())?.derived_label(),
+                value: format!("doc:{}", info.id()),
+            });
+        }
+        for work in self.archive.works() {
+            choices.push(Choice {
+                label: work.title().into(),
+                value: format!("work:{}", work.id()),
+            });
+        }
+        self.mode = AppMode::Selector {
+            title: "Insert Link".into(),
+            query: String::new(),
+            selected: 0,
+            choices,
+            action: SelectAction::InsertLink,
+        };
+        Ok(())
+    }
+    fn insert_link_choice(&mut self, value: &str, target_label: &str) -> AppResult {
+        let (kind, id) = value.split_once(':').ok_or("invalid link choice")?;
+        let selected = self.editor.selected_text();
+        let label = selected.unwrap_or_else(|| target_label.to_owned());
+        let link = format!(
+            "[{}](carta:{kind}:{id})",
+            escape_markdown_link_label(&label)
+        );
+        if !self.editor.insert(&link) {
+            self.status = "Cannot replace a selection across Document boundaries".into();
+        }
+        Ok(())
+    }
+    fn show_memberships(&mut self) -> AppResult {
+        let names: Vec<_> = self
+            .archive
+            .memberships(self.current_document()?)?
+            .into_iter()
+            .filter_map(|id| self.archive.work(id).map(|w| w.title().to_owned()))
+            .collect();
+        self.status = if names.is_empty() {
+            "No Work memberships".into()
+        } else {
+            names.join(", ")
+        };
+        Ok(())
+    }
+    fn search(&mut self, query: &str) -> AppResult {
+        self.push_navigation();
+        self.search_results = self
+            .archive
+            .search(query)?
+            .into_iter()
+            .map(|result| ResultRow {
+                document: result.document(),
+                label: result.label().to_owned(),
+                context: result.context().to_owned(),
+                byte: result.occurrence().start,
+            })
+            .collect();
+        self.view = View::Search {
+            query: query.trim().into(),
+            selected: 0,
+        };
+        self.mode = AppMode::Editing;
+        Ok(())
+    }
+    fn show_backlinks(&mut self) -> AppResult {
+        let id = self.current_document()?;
+        let backlinks = self.archive.backlinks(CartaLinkTarget::Document(id))?;
+        let mut rows = Vec::new();
+        for backlink in backlinks {
+            let doc = self.archive.read_document(backlink.source())?;
+            let range = backlink.link().source_range();
+            let line_start = doc.content()[..range.start]
+                .rfind('\n')
+                .map_or(0, |i| i + 1);
+            let line_end = doc.content()[range.end..]
+                .find('\n')
+                .map_or(doc.content().len(), |i| range.end + i);
+            rows.push(ResultRow {
+                document: backlink.source(),
+                label: doc.derived_label(),
+                context: doc.content()[line_start..line_end].to_owned(),
+                byte: range.start,
+            });
+        }
+        self.push_navigation();
+        self.search_results = rows;
+        self.view = View::Search {
+            query: "Backlinks".into(),
+            selected: 0,
+        };
+        Ok(())
+    }
+    fn open_link(&mut self) -> AppResult {
+        let Some(link) = self.link_under_cursor() else {
+            return Ok(());
+        };
+        match self.archive.resolve_link(&link) {
+            Some(carta_core::LinkResolution::Document(id)) => self.open_document(id, true)?,
+            Some(carta_core::LinkResolution::Work(id)) => {
+                self.switch_view(View::Work(id), None, true)?
+            }
+            Some(carta_core::LinkResolution::Unresolved(_)) => {
+                self.status = "Unresolved Carta link".into()
+            }
+            None => self.status = "External links are not executed by this build".into(),
+        }
+        Ok(())
+    }
+    fn link_under_cursor(&self) -> Option<carta_core::MarkdownLink> {
+        self.editor.current_document().and_then(|id| {
+            self.archive
+                .document_link_at(id, self.editor.cursor().byte)
+                .ok()
+                .flatten()
+        })
+    }
+    fn show_history(&mut self) -> AppResult {
+        let id = self.current_document()?;
+        self.push_navigation();
+        self.autosave()?;
+        self.history = self.archive.document_revisions(id)?;
+        self.view = View::History {
+            document: id,
+            selected: 0,
+        };
+        Ok(())
+    }
+    fn show_work_history(&mut self) -> AppResult {
+        let work = self.current_work()?;
+        self.push_navigation();
+        self.autosave()?;
+        let mut snapshots = Vec::new();
+        for checkpoint in self.archive.history()? {
+            match self.archive.work_snapshot(work, checkpoint.id()) {
+                Ok(snapshot) => snapshots.push(snapshot),
+                Err(carta_core::Error::MissingWorkRevision { .. }) => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
+        self.work_history = snapshots;
+        self.view = View::WorkHistory { work, selected: 0 };
+        Ok(())
+    }
+    fn restore_history(&mut self, as_new: bool) -> AppResult {
+        let View::History { document, selected } = self.view else {
+            return Ok(());
+        };
+        let revision = self.history.get(selected).ok_or("no historical revision")?;
+        let checkpoint = revision.checkpoint().id().clone();
+        self.archive.checkpoint(
+            CheckpointKind::Automatic,
+            Some("Saved current state before History restore"),
+        )?;
+        if as_new {
+            let (id, _) = self
+                .archive
+                .restore_document_version_as_new(document, &checkpoint)?;
+            self.open_document(id, false)?;
+        } else {
+            if self.archive.memberships(document)?.len() > 1 {
+                self.status = "Restoring this shared Document changes every containing Work".into();
+            }
+            self.archive
+                .restore_document_version(document, &checkpoint)?;
+            self.open_document(document, false)?;
+        }
+        Ok(())
+    }
+    fn prepare_trash(&mut self) -> AppResult {
+        if matches!(self.view, View::Work(_)) && self.editor.current_document().is_none() {
+            self.prompt("Type TRASH WORK to confirm", PromptAction::ConfirmTrashWork);
+            return Ok(());
+        }
+        let impact = self
+            .archive
+            .document_trash_impact(self.current_document()?)?;
+        let mut details = vec!["Work references to remove:".to_owned()];
+        if impact.memberships().is_empty() {
+            details.push("  (none)".to_owned());
+        } else {
+            details.extend(
+                impact
+                    .memberships()
+                    .iter()
+                    .map(|membership| format!("  {}", membership.title())),
+            );
+        }
+        details.push("Inbound links that will become unresolved:".to_owned());
+        if impact.inbound_links().is_empty() {
+            details.push("  (none)".to_owned());
+        } else {
+            for backlink in impact.inbound_links() {
+                let source = self.archive.read_document(backlink.source())?;
+                let range = backlink.link().source_range();
+                let line_start = source.content()[..range.start]
+                    .rfind('\n')
+                    .map_or(0, |index| index + 1);
+                let line_end = source.content()[range.end..]
+                    .find('\n')
+                    .map_or(source.content().len(), |index| range.end + index);
+                details.push(format!(
+                    "  {}: {}",
+                    source.derived_label(),
+                    source.content()[line_start..line_end].trim()
+                ));
+            }
+        }
+        self.prompt_with_details(
+            "Type TRASH to remove Work references and trash",
+            details,
+            PromptAction::ConfirmTrashDocument,
+        );
+        Ok(())
+    }
+    fn show_trash(&mut self) -> AppResult {
+        self.push_navigation();
+        self.trash = Some(self.archive.trash_inventory()?);
+        self.view = View::Trash { selected: 0 };
+        self.mode = AppMode::Editing;
+        Ok(())
+    }
+    pub fn show_conflicts(&mut self) -> AppResult {
+        self.conflicts = self.archive.conflicts()?;
+        self.push_navigation();
+        self.view = View::Conflicts { selected: 0 };
+        self.mode = AppMode::Editing;
+        Ok(())
+    }
+
+    pub fn reveal_conflicts(&mut self) -> AppResult<bool> {
+        let conflicts = self.archive.conflicts()?;
+        if conflicts.is_empty() {
+            return Ok(false);
+        }
+        self.conflicts = conflicts;
+        self.view = View::Conflicts { selected: 0 };
+        self.mode = AppMode::Editing;
+        Ok(true)
+    }
+
+    fn resolve_selected_conflict(
+        &mut self,
+        choice: ConflictChoice,
+        preserve_other: bool,
+    ) -> AppResult {
+        let View::Conflicts { selected } = self.view else {
+            return Ok(());
+        };
+        let conflict = self
+            .conflicts
+            .get(selected)
+            .cloned()
+            .ok_or("no selected conflict")?;
+        match conflict {
+            Conflict::Document(conflict) => {
+                self.archive
+                    .resolve_document_conflict(conflict.id(), choice, preserve_other)?;
+            }
+            Conflict::Work(conflict) => {
+                if preserve_other {
+                    return Err("Work conflicts cannot create a second Work automatically".into());
+                }
+                self.archive.resolve_work_conflict(conflict.id(), choice)?;
+            }
+        }
+        self.archive.checkpoint(
+            CheckpointKind::Structural,
+            Some("Resolved external divergence"),
+        )?;
+        self.conflicts = self.archive.conflicts()?;
+        if self.conflicts.is_empty() {
+            self.switch_view(View::Chronological(current_volume()), None, false)?;
+        } else {
+            self.view = View::Conflicts {
+                selected: selected.min(self.conflicts.len() - 1),
+            };
+        }
+        Ok(())
+    }
+    fn restore_trash(&mut self) -> AppResult {
+        if self.selected_trashed_document().is_some() {
+            self.prompt(
+                "Type RESTORE to restore Document without memberships",
+                PromptAction::ConfirmRestoreDocument,
+            );
+        } else if self.selected_trashed_work().is_some() {
+            self.prompt(
+                "Type RESTORE, or RESTORE WITH DOCUMENTS if required",
+                PromptAction::ConfirmRestoreWork,
+            );
+        }
+        Ok(())
+    }
+    fn prepare_wipe(&mut self) -> AppResult {
+        let id = self
+            .selected_trashed_document()
+            .ok_or("select a trashed Document; Works cannot be wiped")?;
+        self.autosave()?;
+        self.archive
+            .checkpoint(CheckpointKind::Structural, Some("Prepared Wipe"))?;
+        let plan = self.archive.plan_wipe_document(id)?;
+        let token = plan.confirmation_token().to_owned();
+        let guarantee = plan.guarantee().to_owned();
+        self.status = guarantee.clone();
+        self.pending_wipe = Some(plan);
+        self.mode = AppMode::Prompt {
+            title: format!("Type exactly: {token}"),
+            input: String::new(),
+            details: vec![guarantee],
+            action: PromptAction::ConfirmWipe,
+        };
+        Ok(())
+    }
+    fn selected_trashed_document(&self) -> Option<DocumentId> {
+        let View::Trash { selected } = self.view else {
+            return None;
+        };
+        self.trash
+            .as_ref()?
+            .documents()
+            .get(selected)
+            .map(|d| d.id())
+    }
+    fn selected_trashed_work(&self) -> Option<WorkId> {
+        let View::Trash { selected } = self.view else {
+            return None;
+        };
+        let trash = self.trash.as_ref()?;
+        selected
+            .checked_sub(trash.documents().len())
+            .and_then(|i| trash.works().get(i))
+            .map(|w| w.id())
+    }
+    fn reload_after_removal(&mut self) -> AppResult {
+        self.archive.refresh()?;
+        self.switch_view(View::Chronological(current_volume()), None, false)
+    }
+    fn finish_quit(&mut self) -> AppResult {
+        self.autosave()?;
+        self.archive.checkpoint(CheckpointKind::Quit, None)?;
+        self.quit = true;
+        Ok(())
+    }
+    fn current_document(&self) -> AppResult<DocumentId> {
+        self.editor
+            .current_document()
+            .ok_or_else(|| "no current Document".into())
+    }
+    fn current_work(&self) -> AppResult<WorkId> {
+        match self.view {
+            View::Work(id) => Ok(id),
+            _ => Err("not in a Work".into()),
+        }
+    }
+    fn open_document(&mut self, id: DocumentId, navigation: bool) -> AppResult {
+        if matches!(self.view, View::Chronological(_) | View::Work(_)) {
+            if let Some(index) = self.editor.regions().iter().position(|r| r.document == id) {
+                if navigation {
+                    self.push_navigation();
+                }
+                self.editor.set_cursor(
+                    Cursor {
+                        region: index,
+                        byte: 0,
+                    },
+                    false,
+                );
+                return Ok(());
+            }
+        }
+        let volume = self
+            .archive
+            .documents()
+            .find(|d| d.id() == id)
+            .ok_or("missing Document")?
+            .volume();
+        self.switch_view(View::Chronological(volume), Some((id, 0)), navigation)
+    }
+    fn switch_view(
+        &mut self,
+        view: View,
+        target: Option<(DocumentId, usize)>,
+        navigation: bool,
+    ) -> AppResult {
+        self.autosave()?;
+        if let View::Work(work) = self.view {
+            if let Some(document) = self.editor.current_document() {
+                self.work_positions.insert(
+                    work,
+                    Position {
+                        document,
+                        byte: self.editor.cursor().byte,
+                        scroll: self.scroll,
+                    },
+                );
+            }
+        }
+        if navigation {
+            self.push_navigation();
+        }
+        self.view = view;
+        let remembered = match (&self.view, target) {
+            (View::Work(work), None) => self.work_positions.get(work).cloned(),
+            (_, Some((document, byte))) => Some(Position {
+                document,
+                byte,
+                scroll: 0,
+            }),
+            _ => None,
+        };
+        let target = remembered
+            .as_ref()
+            .map(|position| (position.document, position.byte));
+        if let View::Work(work) = self.view {
+            self.work_mru.retain(|candidate| *candidate != work);
+            self.work_mru.insert(0, work);
+        }
+        self.reload_view(target)?;
+        if let Some(position) = remembered {
+            self.scroll = position.scroll;
+        }
+        self.forward.clear();
+        Ok(())
+    }
+    fn reload_view(&mut self, target: Option<(DocumentId, usize)>) -> AppResult {
+        let position = target.map(|(document, byte)| Position {
+            document,
+            byte,
+            scroll: 0,
+        });
+        let (editor, scroll) = load_editor(&self.archive, &self.view, position.as_ref())?;
+        self.editor = editor;
+        self.scroll = scroll;
+        Ok(())
+    }
+    fn push_navigation(&mut self) {
+        self.back.push(Location {
+            view: self.view.clone(),
+            cursor: self.editor.cursor(),
+            scroll: self.scroll,
+        });
+        self.forward.clear();
+    }
+    fn navigate(&mut self, forward: bool) -> AppResult {
+        let source = if forward {
+            &mut self.forward
+        } else {
+            &mut self.back
+        };
+        let Some(location) = source.pop() else {
+            return Ok(());
+        };
+        let current = Location {
+            view: self.view.clone(),
+            cursor: self.editor.cursor(),
+            scroll: self.scroll,
+        };
+        if forward {
+            self.back.push(current);
+        } else {
+            self.forward.push(current);
+        }
+        self.view = location.view;
+        self.reload_view(None)?;
+        self.editor.set_cursor(location.cursor, false);
+        self.scroll = location.scroll;
+        Ok(())
+    }
+}
+
+fn load_editor(
+    archive: &Archive,
+    view: &View,
+    position: Option<&Position>,
+) -> AppResult<(CompositeEditor, usize)> {
+    let ids = match view {
+        View::Chronological(v) => archive.chronological_month(*v),
+        View::Work(id) => archive
+            .work(*id)
+            .map(|w| w.documents().to_vec())
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    };
+    let mut regions = Vec::new();
+    for id in ids {
+        regions.push(Region {
+            document: id,
+            text: archive.read_document(id)?.content().to_owned(),
+        });
+    }
+    let mut cursor = Cursor { region: 0, byte: 0 };
+    let mut scroll = 0;
+    if let Some(position) = position {
+        if let Some(region) = regions.iter().position(|r| r.document == position.document) {
+            cursor = Cursor {
+                region,
+                byte: position.byte,
+            };
+            scroll = position.scroll;
+        }
+    }
+    Ok((CompositeEditor::new(regions, cursor), scroll))
+}
+fn current_volume() -> Volume {
+    let now = Local::now();
+    Volume::new(now.year() as u16, now.month() as u8).unwrap()
+}
+fn parse_month(value: &str) -> Option<Volume> {
+    let (year, month) = value.trim().split_once('-')?;
+    Volume::new(year.parse().ok()?, month.parse().ok()?)
+}
+fn move_index(index: &mut usize, len: usize, down: bool) {
+    if len == 0 {
+        *index = 0;
+    } else if down {
+        *index = (*index + 1).min(len - 1);
+    } else {
+        *index = index.saturating_sub(1);
+    }
+}
+
+fn escape_markdown_link_label(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('[', "\\[")
+        .replace(']', "\\]")
+        .replace('\n', " ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn scheduler_waits_for_idle_and_checkpoint_interval() {
+        let now = Instant::now();
+        let mut s = Scheduler::new(now);
+        s.edited(now);
+        assert!(!s.autosave_due(now + Duration::from_millis(999), true));
+        assert!(s.autosave_due(now + Duration::from_secs(1), true));
+        assert!(s.checkpoint_due(now + Duration::from_secs(600)));
+    }
+
+    #[test]
+    fn app_resumes_saved_view_cursor_without_creating_another_document() {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().join("archive");
+        let archive = Archive::create(&root).unwrap();
+        let now = Instant::now();
+        let mut app = App::open(archive, None, now).unwrap();
+        assert!(app.editor.insert("résumé"));
+        app.autosave().unwrap();
+        let session = app.session();
+        let count = app.archive.documents().count();
+        drop(app);
+
+        let reopened = Archive::open(&root).unwrap();
+        let resumed = App::open(reopened, Some(&session), now).unwrap();
+        assert_eq!(resumed.archive.documents().count(), count);
+        assert_eq!(resumed.editor.cursor().byte, "résumé".len());
+    }
+
+    #[test]
+    fn leap_dispatch_is_incremental_and_remembers_query() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        assert!(app.editor.insert("alpha beta alpha"));
+        app.editor.end(false);
+        app.start_leap(LeapDirection::Backward, false);
+        app.leap_input("alpha");
+        assert_eq!(app.editor.cursor().byte, 11);
+        app.end_leap();
+        assert_eq!(app.leap.remembered_query(), Some("alpha"));
+    }
+
+    #[test]
+    fn palette_leap_updates_incrementally_and_escape_restores_origin() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        assert!(app.editor.insert("alpha beta alpha"));
+        app.editor.end(false);
+        let origin = app.editor.cursor();
+
+        app.start_leap(LeapDirection::Backward, true);
+        assert!(matches!(app.mode, AppMode::Leap { palette: true, .. }));
+        app.leap_input("alpha");
+        assert_eq!(app.editor.cursor().byte, 11);
+        for _ in 0..5 {
+            app.leap_backspace();
+        }
+        assert_eq!(app.editor.cursor(), origin);
+        app.leap_input("beta");
+        assert_eq!(app.editor.cursor().byte, 6);
+        app.cancel_leap();
+        assert_eq!(app.editor.cursor(), origin);
+    }
+
+    #[test]
+    fn insert_link_uses_and_escapes_target_or_selected_label() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let target = DocumentId::new_v7();
+        app.insert_link_choice(&format!("doc:{target}"), "A [label] \\ ok")
+            .unwrap();
+        assert_eq!(
+            app.editor.current_text().unwrap(),
+            format!("[A \\[label\\] \\\\ ok](carta:doc:{target})")
+        );
+
+        let length = app.editor.current_text().unwrap().len();
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        app.editor.set_cursor(
+            Cursor {
+                region: 0,
+                byte: length,
+            },
+            true,
+        );
+        let work = WorkId::new_v7();
+        app.insert_link_choice(&format!("work:{work}"), "ignored")
+            .unwrap();
+        assert!(app.editor.current_text().unwrap().starts_with("[\\[A"));
+    }
+
+    #[test]
+    fn provisional_document_checkpoints_only_after_non_whitespace_autosave() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        assert_eq!(app.archive.history().unwrap().len(), 1);
+        assert!(app.editor.insert("   "));
+        app.autosave().unwrap();
+        assert_eq!(app.archive.history().unwrap().len(), 1);
+        assert!(app.editor.insert("x"));
+        app.autosave().unwrap();
+        let history = app.archive.history().unwrap();
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].kind(), Some(CheckpointKind::Structural));
+    }
+
+    #[test]
+    fn new_document_in_work_keeps_immediate_structural_checkpoint() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let first = app.current_document().unwrap();
+        assert!(app.editor.insert("persistent"));
+        app.autosave().unwrap();
+        let work = app.archive.create_work("Work".into(), vec![first]).unwrap();
+        app.structural("Created test Work").unwrap();
+        app.switch_view(View::Work(work), None, false).unwrap();
+        let before = app.archive.history().unwrap().len();
+
+        app.new_document().unwrap();
+        assert_eq!(app.archive.history().unwrap().len(), before + 1);
+        assert_eq!(app.archive.work(work).unwrap().documents().len(), 2);
+        assert_eq!(
+            app.archive.history().unwrap()[0].kind(),
+            Some(CheckpointKind::Structural)
+        );
+    }
+
+    #[test]
+    fn trash_confirmation_describes_each_work_and_inbound_link() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let target = app.current_document().unwrap();
+        assert!(app.editor.insert("# Target"));
+        app.autosave().unwrap();
+        app.archive
+            .create_work("My Work".into(), vec![target])
+            .unwrap();
+        app.archive
+            .create_document(&format!("Source context [Target](carta:doc:{target}) end"))
+            .unwrap();
+
+        app.prepare_trash().unwrap();
+        let AppMode::Prompt { details, .. } = &app.mode else {
+            panic!("expected confirmation prompt")
+        };
+        let text = details.join("\n");
+        assert!(text.contains("My Work"));
+        assert!(text.contains("Source context"));
+        assert!(text.contains("[Target](carta:doc:"));
+    }
+
+    #[test]
+    fn autosave_exposes_durable_conflict_and_resolution() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let document = app.current_document().unwrap();
+        assert!(app.editor.insert("base"));
+        app.autosave().unwrap();
+        let path = app
+            .archive
+            .documents()
+            .find(|info| info.id() == document)
+            .unwrap()
+            .path()
+            .join("content.md");
+        fs::write(&path, "external").unwrap();
+        assert!(app.editor.insert(" local"));
+
+        app.autosave().unwrap();
+        assert!(matches!(app.view, View::Conflicts { .. }));
+        assert_eq!(app.conflicts.len(), 1);
+        app.resolve_selected_conflict(ConflictChoice::Local, false)
+            .unwrap();
+        assert_eq!(
+            app.archive.read_document(document).unwrap().content(),
+            "base local"
+        );
+        assert!(app.archive.conflicts().unwrap().is_empty());
+    }
+
+    #[test]
+    fn search_session_resume_and_back_navigation_remain_stable() {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().join("archive");
+        let mut archive = Archive::create(&root).unwrap();
+        archive.create_document("needle here").unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        app.search("needle").unwrap();
+        let session = app.session();
+        drop(app);
+
+        let archive = Archive::open(&root).unwrap();
+        let mut resumed = App::open(archive, Some(&session), Instant::now()).unwrap();
+        assert!(
+            matches!(resumed.view, View::Search { ref query, selected: 0 } if query == "needle")
+        );
+        assert_eq!(resumed.search_results.len(), 1);
+        resumed.open_selected().unwrap();
+        resumed.execute(Command::Back).unwrap();
+        assert!(
+            matches!(resumed.view, View::Search { ref query, selected: 0 } if query == "needle")
+        );
+        assert_eq!(resumed.search_results.len(), 1);
+    }
+}

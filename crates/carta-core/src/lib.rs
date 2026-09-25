@@ -1,4 +1,5 @@
 mod archive;
+mod conflict;
 mod content;
 mod document;
 mod error;
@@ -11,6 +12,7 @@ mod validation;
 mod work;
 
 pub use archive::Archive;
+pub use conflict::{Conflict, ConflictChoice, DocumentConflict, WorkConflict};
 pub use content::{
     extract_markdown_links, link_at_byte_offset, CartaLinkTarget, LinkResolution, MarkdownLink,
 };

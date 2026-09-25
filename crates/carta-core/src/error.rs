@@ -79,6 +79,18 @@ pub enum Error {
     #[error("canonical file changed outside this loaded Archive: {0}")]
     ExternalChange(PathBuf),
 
+    #[error("external divergence was preserved as conflict {0}")]
+    ConflictPreserved(String),
+
+    #[error("conflict record is missing: {0}")]
+    MissingConflict(String),
+
+    #[error("conflict record is malformed at {path}: {message}")]
+    MalformedConflict { path: PathBuf, message: String },
+
+    #[error("conflict {0} is stale because the external variant changed again")]
+    StaleConflict(String),
+
     #[error("byte offset {offset} is not a UTF-8 character boundary in document {document}")]
     InvalidByteBoundary { document: DocumentId, offset: usize },
 

@@ -8,11 +8,10 @@ publish = false
 [dependencies]
 carta-format = { path = "../carta-format" }
 pulldown-cmark.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 tempfile.workspace = true
 unicode-casefold.workspace = true
 uuid.workspace = true
 zip.workspace = true
-
-[dev-dependencies]
-serde_json.workspace = true
