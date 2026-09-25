@@ -2,7 +2,10 @@ use std::fs;
 use std::process::Command;
 use std::str::FromStr;
 
-use carta_core::{Archive, DocumentId, Error, ValidationIssueKind, Volume, WorkProjectionItem};
+use carta_core::{
+    Archive, CheckpointKind, DocumentId, Error, ValidationIssueKind, Volume, WorkProjectionItem,
+    WorkRestoreOptions,
+};
 use tempfile::TempDir;
 
 fn create_archive() -> (TempDir, Archive) {
@@ -625,4 +628,271 @@ fn rolls_back_abandoned_linked_staging_without_unknown_resources() {
     ));
     assert!(!destination.exists());
     assert!(!staging.exists());
+}
+
+#[test]
+fn creation_makes_an_initial_checkpoint_with_carta_identity() {
+    let (_temporary, archive) = create_archive();
+
+    let history = archive.history().unwrap();
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].kind(), Some(CheckpointKind::Structural));
+    assert_eq!(history[0].note(), Some("Created Archive"));
+    assert!(!archive.is_dirty().unwrap());
+
+    let author = Command::new("git")
+        .current_dir(archive.root())
+        .args([
+            "--git-dir=.git",
+            "--work-tree=.",
+            "show",
+            "-s",
+            "--format=%an <%ae>",
+            "HEAD",
+        ])
+        .output()
+        .unwrap();
+    assert!(author.status.success());
+    assert_eq!(
+        String::from_utf8(author.stdout).unwrap().trim(),
+        "Carta Space <history@carta.space>"
+    );
+}
+
+#[test]
+fn detects_dirty_state_and_records_typed_checkpoint_notes() {
+    let (_temporary, mut archive) = create_archive();
+    assert!(!archive.is_dirty().unwrap());
+
+    let document = archive.create_document("first").unwrap();
+    assert!(archive.is_dirty().unwrap());
+    let first = archive
+        .checkpoint(CheckpointKind::Automatic, None)
+        .unwrap()
+        .unwrap();
+    assert_eq!(first.kind(), Some(CheckpointKind::Automatic));
+    assert!(!archive.is_dirty().unwrap());
+    assert!(archive
+        .checkpoint(CheckpointKind::Manual, Some("unused"))
+        .unwrap()
+        .is_none());
+
+    archive.edit_document(document, "second").unwrap();
+    let second = archive
+        .checkpoint(CheckpointKind::Manual, Some("Useful point"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(second.note(), Some("Useful point"));
+    let history = archive.history().unwrap();
+    assert_eq!(history[0].id(), second.id());
+    assert_eq!(history[1].id(), first.id());
+
+    fs::write(archive.root().join("untracked resource"), "dirty").unwrap();
+    assert!(archive.is_dirty().unwrap());
+}
+
+#[test]
+fn lists_reads_and_restores_document_revisions_without_rewriting_history() {
+    let (_temporary, mut archive) = create_archive();
+    let document = archive.create_document("version one").unwrap();
+    let first = archive
+        .checkpoint(CheckpointKind::Manual, Some("First"))
+        .unwrap()
+        .unwrap();
+    archive.edit_document(document, "version two").unwrap();
+    let second = archive
+        .checkpoint(CheckpointKind::Quit, None)
+        .unwrap()
+        .unwrap();
+
+    let revisions = archive.document_revisions(document).unwrap();
+    assert_eq!(revisions.len(), 2);
+    assert_eq!(revisions[0].document().content(), "version two");
+    assert_eq!(revisions[1].document().content(), "version one");
+    assert_eq!(
+        archive
+            .read_document_revision(document, first.id())
+            .unwrap()
+            .content(),
+        "version one"
+    );
+
+    let restored = archive
+        .restore_document_version(document, first.id())
+        .unwrap();
+    assert_eq!(restored.kind(), Some(CheckpointKind::Structural));
+    assert_eq!(
+        archive.read_document(document).unwrap().content(),
+        "version one"
+    );
+    assert!(archive
+        .history()
+        .unwrap()
+        .iter()
+        .any(|checkpoint| checkpoint.id() == second.id()));
+
+    let (new_document, _) = archive
+        .restore_document_version_as_new(document, second.id())
+        .unwrap();
+    assert_ne!(new_document, document);
+    assert_eq!(
+        archive.read_document(new_document).unwrap().content(),
+        "version two"
+    );
+    assert!(archive.memberships(new_document).unwrap().is_empty());
+}
+
+#[test]
+fn historical_work_snapshot_and_restore_are_integral() {
+    let (_temporary, mut archive) = create_archive();
+    let first = archive.create_document("first old").unwrap();
+    let second = archive.create_document("second old").unwrap();
+    let work = archive
+        .create_work("Old title".to_owned(), vec![second, first])
+        .unwrap();
+    let historical = archive
+        .checkpoint(CheckpointKind::Structural, Some("Old Work"))
+        .unwrap()
+        .unwrap();
+
+    archive.edit_document(first, "first new").unwrap();
+    archive.edit_document(second, "second new").unwrap();
+    archive.rename_work(work, "New title".to_owned()).unwrap();
+    archive
+        .move_document_after(work, second, Some(first))
+        .unwrap();
+    let later = archive
+        .checkpoint(CheckpointKind::Manual, Some("Later Work"))
+        .unwrap()
+        .unwrap();
+
+    let snapshot = archive.work_snapshot(work, historical.id()).unwrap();
+    assert_eq!(snapshot.title(), "Old title");
+    assert_eq!(snapshot.document_ids(), &[second, first]);
+    assert_eq!(snapshot.documents()[0].content(), "second old");
+    assert_eq!(snapshot.documents()[1].content(), "first old");
+
+    archive
+        .restore_work_version(work, historical.id(), WorkRestoreOptions::default())
+        .unwrap();
+    assert_eq!(archive.work(work).unwrap().title(), "Old title");
+    assert_eq!(archive.work(work).unwrap().documents(), &[second, first]);
+    assert_eq!(archive.read_document(first).unwrap().content(), "first old");
+    assert_eq!(
+        archive.read_document(second).unwrap().content(),
+        "second old"
+    );
+    assert!(archive
+        .history()
+        .unwrap()
+        .iter()
+        .any(|checkpoint| checkpoint.id() == later.id()));
+}
+
+#[test]
+fn work_restore_requires_consent_before_restoring_required_trashed_documents() {
+    let (_temporary, mut archive) = create_archive();
+    let kept = archive.create_document("kept").unwrap();
+    let trashed = archive.create_document("restore me").unwrap();
+    let work = archive
+        .create_work("Work".to_owned(), vec![kept, trashed])
+        .unwrap();
+    let historical = archive
+        .checkpoint(CheckpointKind::Structural, None)
+        .unwrap()
+        .unwrap();
+    let trashed_path = archive
+        .documents()
+        .find(|document| document.id() == trashed)
+        .unwrap()
+        .path()
+        .to_path_buf();
+
+    archive.remove_document_from_work(work, trashed).unwrap();
+    fs::remove_dir_all(&trashed_path).unwrap();
+    archive.refresh().unwrap();
+    archive
+        .checkpoint(CheckpointKind::Structural, Some("Simulated later Trash"))
+        .unwrap()
+        .unwrap();
+
+    let error = archive
+        .restore_work_version(work, historical.id(), WorkRestoreOptions::default())
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        Error::TrashedDocumentConsentRequired { documents, .. }
+            if documents == vec![trashed]
+    ));
+    assert!(!trashed_path.exists());
+    assert_eq!(archive.work(work).unwrap().documents(), &[kept]);
+
+    archive
+        .restore_work_version(
+            work,
+            historical.id(),
+            WorkRestoreOptions {
+                restore_required_trashed_documents: true,
+            },
+        )
+        .unwrap();
+    assert_eq!(archive.work(work).unwrap().documents(), &[kept, trashed]);
+    assert_eq!(
+        archive.read_document(trashed).unwrap().content(),
+        "restore me"
+    );
+}
+
+#[test]
+fn work_restore_reports_an_unrecoverable_required_document_without_changes() {
+    let (_temporary, mut archive) = create_archive();
+    let document = archive.create_document("body").unwrap();
+    let work = archive
+        .create_work("Work".to_owned(), vec![document])
+        .unwrap();
+    archive
+        .checkpoint(CheckpointKind::Structural, None)
+        .unwrap()
+        .unwrap();
+    let content_path = archive
+        .documents()
+        .find(|info| info.id() == document)
+        .unwrap()
+        .path()
+        .join("content.md");
+    fs::remove_file(&content_path).unwrap();
+    let broken = archive
+        .checkpoint(CheckpointKind::Structural, Some("Broken external state"))
+        .unwrap()
+        .unwrap();
+
+    let error = archive
+        .restore_work_version(work, broken.id(), WorkRestoreOptions::default())
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        Error::UnrecoverableWorkDocument { document: missing, .. } if missing == document
+    ));
+    assert!(!content_path.exists());
+    assert!(!archive.is_dirty().unwrap());
+}
+
+#[test]
+fn restore_refuses_to_mix_with_uncheckpointed_changes() {
+    let (_temporary, mut archive) = create_archive();
+    let document = archive.create_document("old").unwrap();
+    let checkpoint = archive
+        .checkpoint(CheckpointKind::Manual, None)
+        .unwrap()
+        .unwrap();
+    archive.edit_document(document, "uncheckpointed").unwrap();
+
+    assert!(matches!(
+        archive.restore_document_version(document, checkpoint.id()),
+        Err(Error::RestoreRequiresCleanArchive)
+    ));
+    assert_eq!(
+        archive.read_document(document).unwrap().content(),
+        "uncheckpointed"
+    );
 }

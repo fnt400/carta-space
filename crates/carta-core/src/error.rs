@@ -65,6 +65,62 @@ pub enum Error {
         path: PathBuf,
         status: std::process::ExitStatus,
     },
+
+    #[error("Git failed while attempting to {operation} with status {status}: {stderr}")]
+    GitCommandFailed {
+        operation: &'static str,
+        status: std::process::ExitStatus,
+        stderr: String,
+    },
+
+    #[error("invalid checkpoint identifier: {0}")]
+    InvalidCheckpointId(String),
+
+    #[error("checkpoint note contains a NUL character")]
+    InvalidCheckpointNote,
+
+    #[error("history data is malformed: {0}")]
+    MalformedHistory(String),
+
+    #[error("there are no current changes to checkpoint")]
+    NoChangesToCheckpoint,
+
+    #[error("restore requires an Archive with no uncheckpointed changes")]
+    RestoreRequiresCleanArchive,
+
+    #[error("Document {document} has no recoverable version at checkpoint {checkpoint}")]
+    MissingDocumentRevision {
+        document: DocumentId,
+        checkpoint: String,
+    },
+
+    #[error("Work {work} has no recoverable version at checkpoint {checkpoint}")]
+    MissingWorkRevision { work: WorkId, checkpoint: String },
+
+    #[error("Work {work} cannot be restored because Document {document} is unrecoverable at checkpoint {checkpoint}")]
+    UnrecoverableWorkDocument {
+        work: WorkId,
+        document: DocumentId,
+        checkpoint: String,
+    },
+
+    #[error("restoring Work {work} requires explicit consent to restore trashed Documents {documents:?}")]
+    TrashedDocumentConsentRequired {
+        work: WorkId,
+        documents: Vec<DocumentId>,
+    },
+
+    #[error("canonical path is outside the Archive: {0}")]
+    PathOutsideArchive(PathBuf),
+
+    #[error("canonical path is not UTF-8: {0}")]
+    NonUtf8CanonicalPath(PathBuf),
+
+    #[error("restore failed ({operation}) and rollback also failed ({rollback})")]
+    RestoreRollbackFailed {
+        operation: Box<Error>,
+        rollback: Box<Error>,
+    },
 }
 
 impl Error {

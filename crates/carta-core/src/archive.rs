@@ -15,10 +15,10 @@ use crate::{Document, DocumentInfo, Error, ValidationErrors, Volume, Work, WorkP
 
 #[derive(Debug)]
 pub struct Archive {
-    root: PathBuf,
+    pub(crate) root: PathBuf,
     metadata: ArchiveMetadata,
-    documents: BTreeMap<DocumentId, DocumentInfo>,
-    works: BTreeMap<WorkId, Work>,
+    pub(crate) documents: BTreeMap<DocumentId, DocumentInfo>,
+    pub(crate) works: BTreeMap<WorkId, Work>,
 }
 
 impl Archive {
@@ -64,6 +64,8 @@ impl Archive {
                 status,
             });
         }
+
+        crate::history::create_initial_checkpoint(&staging)?;
 
         scan_archive(&guard.path)?;
         fs::rename(&guard.path, destination).map_err(|error| Error::io(destination, error))?;
@@ -498,12 +500,12 @@ impl Archive {
         Ok(true)
     }
 
-    fn ensure_document_current(&self, info: &DocumentInfo) -> Result<(), Error> {
+    pub(crate) fn ensure_document_current(&self, info: &DocumentInfo) -> Result<(), Error> {
         ensure_unchanged(&info.path.join("meta.json"), &info.metadata_bytes)?;
         ensure_unchanged(&info.path.join("content.md"), &info.content_bytes)
     }
 
-    fn ensure_work_current(&self, work: &Work) -> Result<(), Error> {
+    pub(crate) fn ensure_work_current(&self, work: &Work) -> Result<(), Error> {
         ensure_unchanged(&work.path.join("work.json"), &work.metadata_bytes)
     }
 }
@@ -524,7 +526,7 @@ fn serialize_work_metadata(path: &Path, metadata: &WorkMetadata) -> Result<Vec<u
     Ok(bytes)
 }
 
-fn atomic_replace(path: &Path, content: &[u8]) -> Result<(), Error> {
+pub(crate) fn atomic_replace(path: &Path, content: &[u8]) -> Result<(), Error> {
     let parent = path
         .parent()
         .expect("canonical files always have a parent directory");

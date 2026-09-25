@@ -116,9 +116,9 @@ A portable `.cat` package is a ZIP-based container of that tree. Its purpose is 
 
 ## Current scope
 
-The current Rust workspace contains `carta-format` and `carta-core`. It can create, read, and validate the current filesystem state of a Draft 0.1 archive, including Documents, monthly Volumes, Works, UTF-8 content, canonical UUIDv7 identities, unknown JSON members, and a Git working tree verified through the Git command-line implementation. It does not yet claim complete Reader or Writer conformance.
+The current Rust workspace contains `carta-format` and `carta-core`. It can create, read, and validate the current filesystem state of a Draft 0.1 archive, including Documents, monthly Volumes, Works, UTF-8 content, canonical UUIDv7 identities, unknown JSON members, and Git-backed historical checkpoints. Core history operations include dirty detection, checkpoint creation/listing, historical Document and Work reads, and integral restore behavior. It does not yet claim complete Reader or Writer conformance.
 
-The enhanced-keyboard-reporting experiment remains separate under `experiments/keyboard-events`. The CLI, TUI, LEAP behavior, Git history management, Trash/Wipe, and portable `.cat` packaging have not been implemented.
+The enhanced-keyboard-reporting experiment remains separate under `experiments/keyboard-events`. The CLI, TUI, LEAP behavior, Trash/Wipe, and portable `.cat` packaging have not been implemented.
 
 Development commands run in the Debian Distrobox described in `AGENTS.md`. The container requires Rust, Cargo, rustfmt, Clippy, and Git. From the repository root, validate the workspace with:
 
