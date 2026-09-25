@@ -344,3 +344,35 @@ This remains an experiment. Real use may justify a different default. Carta Spac
 
 **Implementation rule:** Do not implement semantic indexing merely to anticipate scale. Introduce it only when real Archive use demonstrates a retrieval problem that exact search, temporal context, Works, and simpler derived indexes do not solve.
 
+---
+
+## DD-029 — Writing precedes organization
+
+**Decision:** The normal Carta Space workflow must allow useful writing to begin without prior classification, naming, tagging, templating, or presentation decisions.
+
+**Why:** Carta Space is intended to reduce the administrative work that conventional filesystems and knowledge-management applications place before content production. Requiring users to design where a thought belongs before they can record it would contradict the project's central content-first model.
+
+**Consequence:** Organizational mechanisms may be introduced when they solve demonstrated retrieval or composition problems, but they should normally operate on content that already exists rather than becoming mandatory preconditions for capture.
+
+---
+
+## DD-030 — Power is available on demand, not presented by default
+
+**Decision:** Interactive frontends should prefer a quiet default writing surface and reveal secondary capabilities transiently or when explicitly requested.
+
+**Why:** A feature can impose cognitive cost even when the user is not actively using it if it occupies persistent interface space or demands continual maintenance. Backlinks, Views, history, publishing, and future retrieval tools remain compatible with distraction-free writing when they disappear after use.
+
+**Consequence:** Persistent panels, dashboards, properties, toolbars, status elements, and similar interface chrome require justification. Discoverability alone is not sufficient reason to keep a feature permanently visible if a transient command, palette, View, or quasimode can serve the same need.
+
+---
+
+## DD-031 — Distraction-free is architectural, not cosmetic
+
+**Decision:** Carta Space treats distraction-free use as a system-level objective rather than a visual theme or a deliberate restriction to obsolete capabilities.
+
+**Why:** The project should use modern storage, indexing, history, rendering, and retrieval mechanisms when they reduce user administration. Internal sophistication is desirable when it produces a simpler writing experience.
+
+A dedicated writing device with a keyboard and simple display is therefore a natural Carta Space frontend, but the project does not depend on any specific hardware, display technology, or retro-computing aesthetic.
+
+**Consequence:** Different frontends may expose different amounts of functionality while sharing the same Archive and core semantics. A focused writer, richer desktop environment, or lightweight capture client should be considered specialized entrances to the same information space, not separate product models.
+

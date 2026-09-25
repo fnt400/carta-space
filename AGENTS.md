@@ -37,9 +37,28 @@ The reference TUI currently maps them experimentally to the physical left Contro
 
 Do not encode those physical key bindings into the archive format or core domain model.
 
+## Interaction philosophy
+
+Carta Space is writing-first. The default interactive experience should optimize for producing and continuing text, not for managing the software.
+
+When designing frontend behavior:
+
+- do not require filenames, directories, tags, templates, properties, or other classification before a user can begin writing;
+- prefer a quiet text surface over permanently visible organizational chrome;
+- make secondary capabilities available on demand and let them disappear when the operation is complete;
+- prefer transient commands, Views, palettes, or quasimodes over persistent panels when they solve the same problem adequately;
+- keep authorship separate from publication and final visual formatting;
+- remember that a dedicated distraction-free writer, richer desktop frontend, and lightweight capture frontend may legitimately expose different subsets of the same core capabilities;
+- do not reduce backend capability merely to preserve a superficial minimalist aesthetic if automation can remove work from the user.
+
+The guiding interaction rule is:
+
+> Power should be available on demand, not presented by default.
+
 ## Design rules
 
 - Prefer simple, standard technology over custom mechanisms.
+- Preserve the writing-first interaction model: organization should normally follow content rather than precede it.
 - Do not add speculative features.
 - Do not add tags, AI features, synchronization, collaboration, bibliography, or asset systems unless explicitly requested.
 - Canonical authored data must remain recoverable from ordinary Markdown and JSON files.

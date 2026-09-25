@@ -8,6 +8,10 @@ Carta Space is an experimental document environment inspired by Jef Raskin's wor
 
 Its central idea is simple: the user should primarily deal with **content**, not with filenames, directories, save dialogs, or application boundaries.
 
+Carta Space is deliberately **writing-first**. Organization, retrieval, history, and publication should support writing without becoming prerequisites for it. Creating text should not require the user to choose a filename, directory, tag, template, knowledge-management method, or presentation style first.
+
+This is a form of **distraction-free architecture**, not merely a visually minimal interface. Carta Space may eventually provide powerful Views, backlinks, history, publishing tools, and optional semantic retrieval, but such capabilities should appear when requested rather than permanently compete with the text for attention.
+
 Carta Space stores documents as ordinary UTF-8 Markdown, gives every document a stable identity, arranges newly created documents in automatic monthly volumes, and allows documents to be assembled into larger **Works** without copying or moving them. A Work can therefore span months or years while remaining editable as a single continuous view.
 
 The reference implementation is planned in Rust and is explicitly split into a frontend-independent core, a Unix-style command-line interface, and a terminal user interface. The format remains independent of Rust and of any particular frontend.
@@ -25,10 +29,27 @@ The TUI is the reference interactive environment, not the definition of Carta Sp
 
 The reference terminal environment successfully distinguished physical left and right Control and reported separate press/release events through Crossterm enhanced keyboard reporting. The future reference TUI will use them as the initial experimental bindings for the two momentary LEAP controls. The key mapping is an implementation choice, not part of the archive format.
 
+## Interaction philosophy
+
+Carta Space gives priority to **writing and content production** over organization and presentation.
+
+The intended default interaction is therefore deliberately quiet:
+
+- starting a new Document should require as little administrative input as possible;
+- organizational and retrieval tools should be available on demand rather than permanently displayed;
+- commands should prefer transient or quasimodal interaction when that makes returning to the text immediate;
+- publishing and visual formatting belong after authorship, not inside the normal writing loop;
+- a simple dedicated distraction-free writer, a richer desktop frontend, and a lightweight capture frontend may all expose the same Archive through different interfaces.
+
+The goal is not to make the system weak. The goal is to keep its power out of the user's way until that power is needed.
+
 ## Core principles
 
 Carta Space 0.x is deliberately small.
 
+- Writing takes precedence over organization and presentation.
+- Power should be available on demand, not presented continuously.
+- Capture should not require prior classification.
 - Documents are persistent objects with stable UUIDv7 identities.
 - Document bodies are UTF-8 CommonMark 0.31.2.
 - Administrative metadata is stored separately as JSON.
@@ -52,6 +73,8 @@ Carta Space is not intended to be:
 - a tag-management system;
 - a collaborative editor;
 - a note-taking database;
+- an organization-first personal knowledge-management system;
+- an "everything app" for tasks, CRM, calendars, and project management;
 - an AI-first application.
 
 Some of those capabilities might later be implemented as extensions, but none belongs to the initial core.

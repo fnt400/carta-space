@@ -9,6 +9,8 @@
 
 Carta Space is an experimental document environment based on a simple premise: personal computing has traditionally made the user manage too much of the computer's internal organization.
 
+Its primary activity is writing. Organization, retrieval, history, and publication are supporting mechanisms that should remain largely invisible until they are needed. Carta Space therefore treats distraction-free use as an architectural concern rather than merely a visual style: the system may be sophisticated internally while exposing a deliberately small writing surface.
+
 Files, directories, applications, save operations, document locations, and presentation settings are often implementation concerns exposed as user responsibilities. Jef Raskin's work on the Canon Cat offered a radically different model: persistent information, direct navigation by content, and an interface intended to disappear as the user developed muscle memory.
 
 Carta Space does not attempt to reproduce the Canon Cat as a historical object. It asks what the same line of thought could produce with modern storage, Unicode text, version control, open document formats, and extensible software.
@@ -54,6 +56,42 @@ Carta Space adopts several principles from this tradition:
 5. structural concepts should correspond to meaningful properties of the information rather than to arbitrary storage locations.
 
 Carta Space does **not** attempt to preserve the technical limitations of the 1987 machine. In particular, a modern system can search across many years of data, retain complete history, generate multiple publication formats, and represent a long intellectual work independently of physical storage units.
+
+### 2.1 Writing before organization
+
+Carta Space is not intended to make the user design a personal knowledge-management system before useful writing can begin.
+
+A new piece of text should not normally require prior decisions about:
+
+- filenames;
+- directories;
+- tags or taxonomies;
+- templates;
+- database properties;
+- graph structure;
+- publication layout.
+
+Those decisions may be useful later, and some may eventually be represented by optional features or derived Views. They should not be the admission price for writing.
+
+This distinguishes Carta Space from systems whose central activity is organizing knowledge. Carta Space can support retrieval and relationships, but its primary activity remains producing text.
+
+The principle can be summarized as:
+
+> **During writing, only writing decisions should normally be visible.**
+
+### 2.2 Distraction-free architecture
+
+Distraction-free design does not mean that Carta Space must remain permanently feature-poor. It means that capabilities should not demand continuous attention merely because they exist.
+
+A writing frontend may therefore present almost nothing except the current text. LEAP, Work operations, history, backlinks, Views, publishing, and future semantic retrieval can appear transiently or on demand and then disappear again.
+
+The preferred relation between capability and attention is:
+
+> **Power should be available on demand, not presented by default.**
+
+This permits a superficially simple system to rely on sophisticated infrastructure underneath it. Automatic persistence, Git history, indexing, multiple Views, and future retrieval mechanisms are compatible with distraction-free writing precisely when they reduce the amount of administration performed by the writer.
+
+Carta Space should also avoid confusing distraction-free design with retro computing as an end in itself. A dedicated keyboard-and-display device is a natural frontend, but its value comes from removing cognitive and administrative interruptions, not from artificially reproducing old technical limitations.
 
 ---
 
@@ -378,14 +416,18 @@ Internally the reference implementation may use Rust libraries, Git, Markdown pa
 The desired mental model is approximately:
 
 1. write;
-2. search;
-3. move through time;
-4. open a Work;
-5. publish when necessary.
+2. continue writing;
+3. retrieve or navigate when necessary;
+4. compose related Documents into a Work when useful;
+5. publish only when necessary.
 
-If the user routinely needs to think about UUIDs, paths, Git commits, JSON, ZIP files, or renderer configuration, the implementation has exposed too much of itself.
+Organization should normally follow content rather than precede it.
+
+If the user routinely needs to think about UUIDs, paths, Git commits, JSON, ZIP files, renderer configuration, knowledge-management methodology, or the maintenance of a classification system, the implementation has exposed too much of itself.
 
 Carta Space succeeds only if its internal sophistication produces external simplicity.
+
+This principle also supports specialized frontends. A dedicated distraction-free writer may expose only writing, navigation, and a small number of structural operations. A desktop frontend may expose richer history, Views, import/export, and publishing. A lightweight capture frontend may exist primarily to add text to the Archive quickly. These frontends should differ in surface area without creating incompatible models of the underlying information space.
 
 ---
 
