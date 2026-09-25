@@ -82,6 +82,40 @@ fn package_replaces_regular_destination_but_rejects_archive_destinations() {
     ));
 }
 
+#[test]
+fn markdown_file_exports_are_atomic_and_reject_archive_destinations() {
+    let (temporary, mut archive) = create_archive();
+    let first = archive.create_document("first\n").unwrap();
+    let second = archive.create_document("second").unwrap();
+    let work = archive
+        .create_work("Ordered".to_owned(), vec![second, first])
+        .unwrap();
+    let document_destination = temporary.path().join("document.md");
+    fs::write(&document_destination, "old").unwrap();
+
+    archive
+        .export_document_markdown_file(first, &document_destination)
+        .unwrap();
+    assert_eq!(
+        fs::read_to_string(&document_destination).unwrap(),
+        "first\n"
+    );
+    let work_destination = temporary.path().join("work.md");
+    archive
+        .export_work_markdown_file(work, &work_destination)
+        .unwrap();
+    assert_eq!(
+        fs::read_to_string(&work_destination).unwrap(),
+        "secondfirst\n"
+    );
+
+    let inside = archive.root().join("unsafe.md");
+    assert!(matches!(
+        archive.export_document_markdown_file(first, &inside),
+        Err(Error::DestinationInsideArchive(path)) if path == inside
+    ));
+}
+
 #[cfg(unix)]
 #[test]
 fn pdf_exports_exact_document_and_ordered_work_markdown_atomically() {
@@ -200,4 +234,26 @@ fn package_contains_readable_exact_mimetype() {
         .output()
         .unwrap();
     assert!(output.status.success());
+}
+
+#[test]
+fn startup_removes_durably_registered_external_temporary() {
+    let (temporary, mut archive) = create_archive();
+    let document = archive.create_document("sensitive temporary").unwrap();
+    let destination = temporary.path().join("crashed.md");
+    std::env::set_var("CARTA_TEST_EXPORT_CRASH_AFTER_TEMP_WRITE", archive.root());
+    let result = archive.export_document_markdown_file(document, &destination);
+    std::env::remove_var("CARTA_TEST_EXPORT_CRASH_AFTER_TEMP_WRITE");
+    assert!(matches!(result, Err(Error::InvalidPackage(_))));
+    let registry = archive.root().join(".git/carta-external-temporaries.json");
+    let registered: Vec<String> = serde_json::from_slice(&fs::read(&registry).unwrap()).unwrap();
+    assert_eq!(registered.len(), 1);
+    let external_temporary = std::path::PathBuf::from(&registered[0]);
+    assert!(external_temporary.exists());
+    let root = archive.root().to_path_buf();
+    drop(archive);
+
+    Archive::open(root).unwrap();
+    assert!(!external_temporary.exists());
+    assert!(!registry.exists());
 }

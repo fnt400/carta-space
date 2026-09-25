@@ -18,6 +18,13 @@ pub(crate) struct ScannedArchive {
 }
 
 pub(crate) fn scan_archive(root: &Path) -> Result<ScannedArchive, ValidationErrors> {
+    scan_archive_with_recovery_documents(root, BTreeMap::new())
+}
+
+pub(crate) fn scan_archive_with_recovery_documents(
+    root: &Path,
+    recovery_documents: BTreeMap<DocumentId, DocumentInfo>,
+) -> Result<ScannedArchive, ValidationErrors> {
     let mut scanner = Scanner::default();
 
     if !scanner.require_directory(root) {
@@ -36,11 +43,14 @@ pub(crate) fn scan_archive(root: &Path) -> Result<ScannedArchive, ValidationErro
         scanner.validate_git_working_tree(root, &git);
     }
 
-    let documents = if volumes_exists {
+    let mut documents = if volumes_exists {
         scanner.scan_volumes(&volumes)
     } else {
         BTreeMap::new()
     };
+    for (id, document) in recovery_documents {
+        documents.entry(id).or_insert(document);
+    }
     let works = if works_exists {
         scanner.scan_works(&works_path, &documents)
     } else {

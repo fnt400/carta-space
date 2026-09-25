@@ -2,7 +2,7 @@
 
 > **Status:** Working name; early design draft.  
 > **Current format draft:** 0.1  
-> **Reference implementation:** Rust core, command-line tools, and terminal frontend in progress.
+> **Reference implementation:** first usable Rust v0.1.
 
 Carta Space is an experimental document environment inspired by Jef Raskin's work on the Canon Cat and later humane-interface research.
 
@@ -102,9 +102,9 @@ Current content remains readable without Git. Git provides automatic historical 
 
 ## Trash, Restore, and Wipe
 
-`carta-core` implements recoverable Trash without a canonical `trash/` directory. The Trash view is derived from current state and retained Git history. Trashing a Document reports every current Work membership and inbound Carta link, removes the structural Work references and active Document together, leaves authored Markdown links unchanged, and creates an immediate structural checkpoint. Documents restore with their original identity, creation time, Volume, and content immediately before Trash, but without former Work memberships. Works restore with their original identity, title, and order; restoring required trashed Documents needs explicit consent, and active title conflicts are rejected.
+`carta-core` implements recoverable Trash without a canonical `trash/` directory. The Trash view is derived from current state and retained Git history. Trashing a Document reports every current Work membership and inbound Carta link, removes the structural Work references and active Document together, leaves authored Markdown links unchanged, and creates an immediate structural checkpoint. Documents restore with their original identity, creation time, Volume, and content immediately before Trash, but without former Work memberships. Works restore with their original identity and order; restoring required trashed Documents needs explicit consent, and an active title conflict requires an explicit unique replacement title.
 
-Permanent Wipe is Document-only and uses a two-step core plan plus exact confirmation token. Execution refuses active Documents, stale plans, tracked working changes, and repositories with additional Git worktrees. It rewrites every retained local Git ref containing the Document's canonical paths, expires reflogs, prunes unreachable objects, removes Carta-reserved `.carta-*`/`carta-*` staging, cache, session, and temporary artifacts, and verifies the paths and exclusively owned content objects are no longer reachable or present. If an identical content object is also retained outside the target Document, Wipe refuses rather than damage unrelated data or claim a false guarantee.
+Permanent Wipe is Document-only and requires exact strong confirmation. Execution performs a fresh preflight and refuses active Documents, tracked working changes, additional Git worktrees, unhandled pseudorefs, and in-progress Git operations. It rewrites retained local Git refs containing the Document's canonical paths, expires reflogs, prunes unreachable exclusively owned objects, removes Carta-reserved `.carta-*`/`carta-*` staging, cache, session, and temporary artifacts, and verifies that the target identity and paths are gone. If identical content remains independently reachable through another Document, that shared blob is preserved and Carta does not claim byte erasure of the independent content.
 
 The guarantee is deliberately scoped to Carta-controlled data in the current Archive on the current device. It does not cover external backups, exported packages, clones, filesystem snapshots, copied files, or physical storage remnants.
 
@@ -135,10 +135,10 @@ carta --archive <path> export pdf-work <work-id> <output.pdf>
 carta --archive <path> package <output.cat>
 carta --archive <path> trash inventory|impact|document|work ...
 carta --archive <path> restore document|work ...
-carta --archive <path> wipe plan|execute ...
+carta --archive <path> wipe execute <document-id> --confirm "WIPE <document-id> PERMANENTLY"
 ```
 
-Markdown exports are written exactly to standard output. PDF and package destinations must be outside the Archive. Trash mutations require `--confirm`; Wipe planning prints its scope and exact strong confirmation phrase, which `wipe execute --confirm` requires without an interactive prompt. Run `carta <command> --help` for complete arguments.
+Markdown exports are written exactly to standard output. PDF and package destinations must be outside the Archive. Trash mutations require `--confirm`; `wipe execute --confirm` performs a fresh preflight and requires the exact strong confirmation phrase without an interactive prompt. Run `carta <command> --help` for complete arguments.
 
 ## Terminal interface
 
@@ -166,7 +166,7 @@ If canonical Document content or Work structure changes externally while the TUI
 
 ## Current scope
 
-The current Rust workspace contains `carta-format`, `carta-core`, `carta-cli`, and `carta-tui`. It can create, read, validate, inspect, search, import, export, package, edit, navigate, and administer the current filesystem state of a Draft 0.1 Archive, including Documents, monthly Volumes, Works, UTF-8 content, canonical UUIDv7 identities, unknown resources and JSON members, Git-backed historical checkpoints, portable `.cat` packages, and Pandoc PDF publishing. Core operations also include derived labels, CommonMark links and backlinks, LEAP matching, dirty detection, historical Document and Work reads, integral history restore behavior, and complete core Trash/Restore/Document-Wipe semantics. It does not yet claim complete Reader or Writer conformance.
+The current Rust workspace contains `carta-format`, `carta-core`, `carta-cli`, and `carta-tui`. The first usable v0.1 can create, read, validate, inspect, search, import, export, package, edit, navigate, recover, and administer Draft 0.1 Archives. It implements the Reader and Writer responsibilities, the accepted v0.1 interaction contract, and the explicitly scoped on-device Wipe guarantee. Draft 0.1 remains experimental and is not a stable 1.0 format.
 
 The enhanced-keyboard-reporting experiment remains separate under `experiments/keyboard-events` as a diagnostic for terminal compatibility.
 

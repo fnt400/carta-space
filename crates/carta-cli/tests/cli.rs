@@ -56,3 +56,19 @@ fn missing_required_trash_confirmation_is_a_usage_error() {
         .code(2)
         .stderr(predicate::str::contains("--confirm"));
 }
+
+#[test]
+fn wipe_exposes_only_fresh_preflight_execute_interface() {
+    let id = carta_core::DocumentId::new_v7();
+    Command::cargo_bin("carta")
+        .unwrap()
+        .args(["wipe", "plan", &id.to_string()])
+        .assert()
+        .code(2);
+    Command::cargo_bin("carta")
+        .unwrap()
+        .args(["wipe", "execute", &id.to_string()])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("--confirm"));
+}

@@ -757,6 +757,14 @@ fn historical_work_snapshot_and_restore_are_integral() {
         .unwrap()
         .unwrap();
 
+    let work_path = archive.work(work).unwrap().path().join("work.json");
+    let mut metadata: serde_json::Value =
+        serde_json::from_slice(&fs::read(&work_path).unwrap()).unwrap();
+    metadata["future"] = serde_json::json!({"generation": "current"});
+    fs::write(&work_path, serde_json::to_vec_pretty(&metadata).unwrap()).unwrap();
+    archive.refresh().unwrap();
+    let current_created = archive.work(work).unwrap().created();
+
     archive.edit_document(first, "first new").unwrap();
     archive.edit_document(second, "second new").unwrap();
     archive.rename_work(work, "New title".to_owned()).unwrap();
@@ -779,6 +787,12 @@ fn historical_work_snapshot_and_restore_are_integral() {
         .unwrap();
     assert_eq!(archive.work(work).unwrap().title(), "Old title");
     assert_eq!(archive.work(work).unwrap().documents(), &[second, first]);
+    assert_eq!(archive.work(work).unwrap().id(), work);
+    assert_eq!(archive.work(work).unwrap().created(), current_created);
+    assert_eq!(
+        archive.work(work).unwrap().metadata().extensions()["future"],
+        serde_json::json!({"generation": "current"})
+    );
     assert_eq!(archive.read_document(first).unwrap().content(), "first old");
     assert_eq!(
         archive.read_document(second).unwrap().content(),
@@ -897,4 +911,307 @@ fn restore_refuses_to_mix_with_uncheckpointed_changes() {
         archive.read_document(document).unwrap().content(),
         "uncheckpointed"
     );
+}
+
+fn write_crash_manifest(archive: &Archive, cleanup: &[&str]) {
+    let head = Command::new("git")
+        .current_dir(archive.root())
+        .args(["--git-dir=.git", "--work-tree=.", "rev-parse", "HEAD"])
+        .output()
+        .unwrap();
+    assert!(head.status.success());
+    let owned = cleanup
+        .iter()
+        .map(|relative| {
+            let path = archive.root().join(relative);
+            let state = match fs::metadata(&path) {
+                Ok(metadata) if metadata.is_file() => serde_json::json!({
+                    "kind": "file",
+                    "bytes": fs::read(path).unwrap(),
+                }),
+                Ok(metadata) if metadata.is_dir() => {
+                    let mut entries = Vec::new();
+                    snapshot_test_directory(&path, &path, &mut entries);
+                    serde_json::json!({ "kind": "directory", "entries": entries })
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    serde_json::json!({ "kind": "missing" })
+                }
+                result => panic!("unexpected owned path state: {result:?}"),
+            };
+            serde_json::json!({ "path": relative, "state": state })
+        })
+        .collect::<Vec<_>>();
+    fs::write(
+        archive.root().join(".git/carta-transaction.json"),
+        serde_json::to_vec(&serde_json::json!({
+            "checkpoint": String::from_utf8(head.stdout).unwrap().trim(),
+            "owned": owned,
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+}
+
+fn snapshot_test_directory(
+    root: &std::path::Path,
+    path: &std::path::Path,
+    entries: &mut Vec<serde_json::Value>,
+) {
+    for entry in fs::read_dir(path).unwrap() {
+        let path = entry.unwrap().path();
+        let relative = path.strip_prefix(root).unwrap();
+        if path.is_dir() {
+            entries.push(serde_json::json!({ "path": relative, "directory": true }));
+            snapshot_test_directory(root, &path, entries);
+        } else {
+            entries.push(serde_json::json!({
+                "path": relative,
+                "directory": false,
+                "bytes": fs::read(path).unwrap(),
+            }));
+        }
+    }
+}
+
+#[test]
+fn reopen_rolls_back_interrupted_multi_object_trash_and_preserves_untracked_resources() {
+    let (_temporary, mut archive) = create_archive();
+    let document = archive.create_document("must survive").unwrap();
+    let work = archive
+        .create_work("Work".to_owned(), vec![document])
+        .unwrap();
+    archive
+        .checkpoint(CheckpointKind::Structural, Some("Before crash"))
+        .unwrap();
+    let document_path = archive
+        .documents()
+        .find(|info| info.id() == document)
+        .unwrap()
+        .path()
+        .to_path_buf();
+    let transaction = format!(".git/carta-transaction-trash-document-{document}");
+    let document_relative = document_path
+        .strip_prefix(archive.root())
+        .unwrap()
+        .to_str()
+        .unwrap();
+    let work_path = archive.work(work).unwrap().path().join("work.json");
+    let work_relative = work_path
+        .strip_prefix(archive.root())
+        .unwrap()
+        .to_str()
+        .unwrap();
+    write_crash_manifest(&archive, &[&transaction, document_relative, work_relative]);
+    fs::create_dir(archive.root().join(&transaction)).unwrap();
+    archive.remove_document_from_work(work, document).unwrap();
+    fs::rename(
+        &document_path,
+        archive.root().join(&transaction).join("document"),
+    )
+    .unwrap();
+    fs::write(archive.root().join("protected-untracked"), "keep").unwrap();
+    drop(archive);
+
+    let recovered = Archive::open(document_path.ancestors().nth(4).unwrap()).unwrap();
+    assert_eq!(
+        recovered.read_document(document).unwrap().content(),
+        "must survive"
+    );
+    assert_eq!(recovered.work(work).unwrap().documents(), &[document]);
+    assert!(!recovered.root().join(transaction).exists());
+    assert_eq!(
+        fs::read_to_string(recovered.root().join("protected-untracked")).unwrap(),
+        "keep"
+    );
+}
+
+#[test]
+fn reopen_rolls_back_interrupted_new_linked_document() {
+    let (_temporary, mut archive) = create_archive();
+    let source = archive.create_document("source").unwrap();
+    archive
+        .checkpoint(CheckpointKind::Structural, Some("Before linked crash"))
+        .unwrap();
+    let source_path = archive
+        .documents()
+        .find(|info| info.id() == source)
+        .unwrap()
+        .path()
+        .join("content.md");
+    let target = DocumentId::new_v7();
+    let info = archive
+        .documents()
+        .find(|info| info.id() == source)
+        .unwrap();
+    let relative = format!(
+        "volumes/{:04}/{:02}/{target}",
+        info.volume().year(),
+        info.volume().month()
+    );
+    let created = info.created();
+    let source_relative = source_path
+        .strip_prefix(archive.root())
+        .unwrap()
+        .to_str()
+        .unwrap();
+    write_crash_manifest(&archive, &[&relative, source_relative]);
+    let target_path = archive.root().join(&relative);
+    fs::create_dir(&target_path).unwrap();
+    fs::write(
+        target_path.join("meta.json"),
+        serde_json::to_vec_pretty(&serde_json::json!({"id": target, "created": created})).unwrap(),
+    )
+    .unwrap();
+    fs::write(target_path.join("content.md"), "").unwrap();
+    fs::write(
+        &source_path,
+        format!("source[Continue](carta:doc:{target})"),
+    )
+    .unwrap();
+    let root = archive.root().to_path_buf();
+    drop(archive);
+
+    let recovered = Archive::open(&root).unwrap();
+    assert_eq!(recovered.read_document(source).unwrap().content(), "source");
+    assert!(!target_path.exists());
+}
+
+#[test]
+fn interrupted_recovery_preserves_post_crash_external_tracked_edits() {
+    let (_temporary, mut archive) = create_archive();
+    let owned = archive.create_document("owned before").unwrap();
+    let external = archive.create_document("external before").unwrap();
+    archive
+        .checkpoint(CheckpointKind::Structural, Some("Before simulated crash"))
+        .unwrap();
+    let owned_path = archive
+        .documents()
+        .find(|info| info.id() == owned)
+        .unwrap()
+        .path()
+        .join("content.md");
+    let external_path = archive
+        .documents()
+        .find(|info| info.id() == external)
+        .unwrap()
+        .path()
+        .join("content.md");
+    let owned_relative = owned_path
+        .strip_prefix(archive.root())
+        .unwrap()
+        .to_str()
+        .unwrap();
+    write_crash_manifest(&archive, &[owned_relative]);
+    fs::write(&owned_path, "transaction partial").unwrap();
+    fs::write(&external_path, "external after crash").unwrap();
+    let root = archive.root().to_path_buf();
+    drop(archive);
+
+    assert!(matches!(
+        Archive::open(&root),
+        Err(Error::AmbiguousTransactionRecovery(paths))
+            if paths.iter().any(|path| root.join(path) == external_path)
+    ));
+    assert_eq!(
+        fs::read_to_string(&owned_path).unwrap(),
+        "transaction partial"
+    );
+    assert_eq!(
+        fs::read_to_string(&external_path).unwrap(),
+        "external after crash"
+    );
+    assert!(root.join(".git/carta-transaction.json").exists());
+}
+
+#[test]
+fn interrupted_recovery_preserves_changed_owned_path_as_conflict() {
+    let (_temporary, mut archive) = create_archive();
+    let document = archive.create_document("before crash").unwrap();
+    archive
+        .checkpoint(CheckpointKind::Structural, Some("Before simulated crash"))
+        .unwrap();
+    let content_path = archive
+        .documents()
+        .find(|info| info.id() == document)
+        .unwrap()
+        .path()
+        .join("content.md");
+    let relative = content_path
+        .strip_prefix(archive.root())
+        .unwrap()
+        .to_str()
+        .unwrap();
+    write_crash_manifest(&archive, &[relative]);
+    fs::write(&content_path, "changed after crash").unwrap();
+    let root = archive.root().to_path_buf();
+    drop(archive);
+
+    let recovered = Archive::open(&root).unwrap();
+    assert_eq!(
+        recovered.read_document(document).unwrap().content(),
+        "before crash"
+    );
+    let conflicts = recovered.conflicts().unwrap();
+    assert_eq!(conflicts.len(), 1);
+    let carta_core::Conflict::Document(conflict) = &conflicts[0] else {
+        panic!("expected a Document conflict");
+    };
+    assert_eq!(conflict.document(), document);
+    assert_eq!(conflict.local(), b"changed after crash");
+    assert_eq!(conflict.external(), b"before crash");
+}
+
+#[test]
+fn reopen_removes_partial_restore_or_new_work_document_owned_paths() {
+    let (_temporary, mut archive) = create_archive();
+    let member = archive.create_document("member").unwrap();
+    let work = archive
+        .create_work("Work".to_owned(), vec![member])
+        .unwrap();
+    archive
+        .checkpoint(CheckpointKind::Structural, Some("Before provisional crash"))
+        .unwrap();
+    let target = DocumentId::new_v7();
+    let info = archive
+        .documents()
+        .find(|info| info.id() == member)
+        .unwrap();
+    let relative = format!(
+        "volumes/{:04}/{:02}/{target}",
+        info.volume().year(),
+        info.volume().month()
+    );
+    let restore_relative = format!(
+        "volumes/{:04}/{:02}/.carta-restore-{target}",
+        info.volume().year(),
+        info.volume().month()
+    );
+    let work_path = archive.work(work).unwrap().path().join("work.json");
+    let work_relative = work_path
+        .strip_prefix(archive.root())
+        .unwrap()
+        .to_str()
+        .unwrap();
+    write_crash_manifest(&archive, &[&relative, &restore_relative, work_relative]);
+    let target_path = archive.root().join(&relative);
+    fs::create_dir(&target_path).unwrap();
+    fs::write(target_path.join("content.md"), "partial").unwrap();
+    let restore_staging = target_path
+        .parent()
+        .unwrap()
+        .join(format!(".carta-restore-{target}"));
+    fs::create_dir(&restore_staging).unwrap();
+    fs::write(restore_staging.join("content.md"), "staged").unwrap();
+    let mut json: serde_json::Value =
+        serde_json::from_slice(&fs::read(&work_path).unwrap()).unwrap();
+    json["documents"] = serde_json::json!([member, target]);
+    fs::write(&work_path, serde_json::to_vec_pretty(&json).unwrap()).unwrap();
+    let root = archive.root().to_path_buf();
+    drop(archive);
+
+    let recovered = Archive::open(&root).unwrap();
+    assert_eq!(recovered.work(work).unwrap().documents(), &[member]);
+    assert!(!target_path.exists());
+    assert!(!restore_staging.exists());
 }

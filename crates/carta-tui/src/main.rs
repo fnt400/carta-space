@@ -107,17 +107,26 @@ fn run() -> Result<(), Box<dyn Error>> {
         app.status = "Compatibility keyboard mode: use palette LEAP commands".into();
     }
     let mut clipboard = Clipboard::default();
+    let mut dispatcher = Dispatcher::default();
     let mut last_session_save = Instant::now();
 
     while !app.quit {
         terminal.terminal.draw(|frame| draw(frame, &mut app))?;
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
-                if let Err(error) = handle_key(&mut app, &mut clipboard, key, terminal.enhancements)
-                {
+                if let Err(error) = handle_key(
+                    &mut app,
+                    &mut clipboard,
+                    &mut dispatcher,
+                    key,
+                    terminal.enhancements,
+                ) {
                     app.status = error.to_string();
                     app.mode = AppMode::Editing;
                     let _ = app.reveal_conflicts();
+                }
+                if app.take_wiped_document().is_some() {
+                    clipboard.clear_internal();
                 }
             }
         }
@@ -133,9 +142,15 @@ fn run() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[derive(Default)]
+struct Dispatcher {
+    pending_control: Option<LeapDirection>,
+}
+
 fn handle_key(
     app: &mut App,
     clipboard: &mut Clipboard,
+    dispatcher: &mut Dispatcher,
     key: KeyEvent,
     enhanced: bool,
 ) -> Result<(), Box<dyn Error>> {
@@ -143,9 +158,13 @@ fn handle_key(
         if matches!(
             key.code,
             KeyCode::Modifier(ModifierKeyCode::LeftControl | ModifierKeyCode::RightControl)
-        ) && matches!(app.mode, AppMode::Leap { .. })
-        {
-            app.end_leap();
+        ) {
+            if let Some(direction) = dispatcher.pending_control.take() {
+                app.start_leap(direction, false);
+                app.end_leap();
+            } else if matches!(app.mode, AppMode::Leap { .. }) {
+                app.end_leap();
+            }
         }
         return Ok(());
     }
@@ -159,12 +178,14 @@ fn handle_key(
     {
         match key.code {
             KeyCode::Char('c' | 'C') => {
+                dispatcher.pending_control = None;
                 if let Some(text) = app.editor.selected_text() {
                     clipboard.copy(text);
                 }
                 return Ok(());
             }
             KeyCode::Char('x' | 'X') => {
+                dispatcher.pending_control = None;
                 if let Some(text) = app.editor.selected_text() {
                     if app.editor.delete_selection() {
                         clipboard.copy(text);
@@ -176,6 +197,7 @@ fn handle_key(
                 return Ok(());
             }
             KeyCode::Char('v' | 'V') => {
+                dispatcher.pending_control = None;
                 if !app.editor.insert(&clipboard.paste()) {
                     app.status = "Paste cannot replace a cross-boundary selection".into();
                 } else {
@@ -184,12 +206,14 @@ fn handle_key(
                 return Ok(());
             }
             KeyCode::Char('z' | 'Z') => {
+                dispatcher.pending_control = None;
                 if app.editor.undo() {
                     app.edited(Instant::now());
                 }
                 return Ok(());
             }
             KeyCode::Char('y' | 'Y') => {
+                dispatcher.pending_control = None;
                 if app.editor.redo() {
                     app.edited(Instant::now());
                 }
@@ -202,15 +226,22 @@ fn handle_key(
     if enhanced && key.kind == KeyEventKind::Press {
         match key.code {
             KeyCode::Modifier(ModifierKeyCode::LeftControl) => {
-                app.start_leap(LeapDirection::Backward, false);
+                dispatcher.pending_control = Some(LeapDirection::Backward);
                 return Ok(());
             }
             KeyCode::Modifier(ModifierKeyCode::RightControl) => {
-                app.start_leap(LeapDirection::Forward, false);
+                dispatcher.pending_control = Some(LeapDirection::Forward);
                 return Ok(());
             }
             _ => {}
         }
+    }
+
+    if dispatcher.pending_control.is_some() && matches!(key.code, KeyCode::Modifier(_)) {
+        return Ok(());
+    }
+    if let Some(direction) = dispatcher.pending_control.take() {
+        app.start_leap(direction, false);
     }
 
     if let AppMode::Palette { query, selected } = &app.mode {
@@ -244,9 +275,7 @@ fn handle_key(
 
     match &mut app.mode {
         AppMode::Leap { .. } => match key.code {
-            KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                app.leap_input(&c.to_string())
-            }
+            KeyCode::Char(c) => app.leap_input(&c.to_string()),
             KeyCode::Backspace => app.leap_backspace(),
             KeyCode::Enter => {
                 if matches!(app.mode, AppMode::Leap { palette: true, .. }) {
@@ -385,6 +414,7 @@ fn draw(frame: &mut ratatui::Frame<'_>, app: &mut App) {
                 .map(|r| {
                     ListItem::new(vec![
                         Line::from(r.label.clone()),
+                        Line::styled(date_only(r.created), Style::default().fg(Color::DarkGray)),
                         Line::styled(r.context.clone(), Style::default().fg(Color::DarkGray)),
                     ])
                 })
@@ -476,14 +506,24 @@ fn draw(frame: &mut ratatui::Frame<'_>, app: &mut App) {
                 .iter()
                 .map(|conflict| match conflict {
                     carta_core::Conflict::Document(conflict) => ListItem::new(format!(
-                        "Document · {} · {}",
+                        "Document · {} · {}{}",
                         conflict.detected(),
-                        conflict.document()
+                        conflict.document(),
+                        if conflict.external_missing() {
+                            " · external file missing"
+                        } else {
+                            ""
+                        }
                     )),
                     carta_core::Conflict::Work(conflict) => ListItem::new(format!(
-                        "Work · {} · {}",
+                        "Work · {} · {}{}",
                         conflict.detected(),
-                        conflict.work()
+                        conflict.work(),
+                        if conflict.external_missing() {
+                            " · external file missing"
+                        } else {
+                            ""
+                        }
                     )),
                 })
                 .collect();
@@ -499,13 +539,15 @@ fn draw(frame: &mut ratatui::Frame<'_>, app: &mut App) {
             let preview = app.conflicts.get(*selected).map_or_else(String::new, |conflict| {
                 match conflict {
                     carta_core::Conflict::Document(conflict) => format!(
-                        "LOCAL\n-----\n{}\n\nEXTERNAL\n--------\n{}",
+                        "LOCAL\n-----\n{}\n\n{}\n--------\n{}",
                         String::from_utf8_lossy(conflict.local()),
+                        if conflict.external_missing() { "LAST LOADED (EXTERNAL FILE MISSING)" } else { "EXTERNAL" },
                         String::from_utf8_lossy(conflict.external())
                     ),
                     carta_core::Conflict::Work(conflict) => format!(
-                        "LOCAL WORK STRUCTURE\n--------------------\n{}\n\nEXTERNAL WORK STRUCTURE\n-----------------------\n{}",
+                        "LOCAL WORK STRUCTURE\n--------------------\n{}\n\n{}\n-----------------------\n{}",
                         String::from_utf8_lossy(conflict.local()),
+                        if conflict.external_missing() { "LAST LOADED STRUCTURE (EXTERNAL FILE MISSING)" } else { "EXTERNAL WORK STRUCTURE" },
                         String::from_utf8_lossy(conflict.external())
                     ),
                 }
@@ -791,21 +833,87 @@ fn status_line(app: &App) -> String {
     }
     match &app.view {
         View::Chronological(v) => {
-            format!("{:04}-{:02} · {}", v.year(), v.month(), current_label(app))
+            format!(
+                "{} · {} · {:04}-{:02} · {}",
+                current_document_date(app),
+                current_label(app),
+                v.year(),
+                v.month(),
+                current_position(app)
+            )
         }
         View::Work(id) => format!(
-            "{} · {}",
+            "{} · {} · {} · {}",
+            current_document_date(app),
+            current_label(app),
             app.archive.work(*id).map_or("Work", |w| w.title()),
-            current_label(app)
+            current_position(app)
         ),
-        View::Search { query, .. } => {
-            format!("Search: {query} · {} results", app.search_results.len())
+        View::Search { query, selected } => {
+            let date = app
+                .search_results
+                .get(*selected)
+                .map_or_else(|| "No date".to_owned(), |row| date_only(row.created));
+            format!(
+                "{} · Search: {} · {}/{}",
+                date,
+                query,
+                if app.search_results.is_empty() {
+                    0
+                } else {
+                    selected + 1
+                },
+                app.search_results.len()
+            )
         }
-        View::History { .. } => format!("History · {} revisions", app.history.len()),
-        View::WorkHistory { .. } => {
-            format!("Work History · {} revisions", app.work_history.len())
+        View::History { selected, .. } => app.history.get(*selected).map_or_else(
+            || "History · 0/0".to_owned(),
+            |revision| {
+                format!(
+                    "{} · History · {} · {}",
+                    date_only(revision.checkpoint().created()),
+                    revision.document().derived_label(),
+                    list_position(*selected, app.history.len())
+                )
+            },
+        ),
+        View::WorkHistory { selected, .. } => app.work_history.get(*selected).map_or_else(
+            || "Work History · 0/0".to_owned(),
+            |snapshot| {
+                format!(
+                    "{} · Work History · {} · {}",
+                    date_only(snapshot.checkpoint().created()),
+                    snapshot.title(),
+                    list_position(*selected, app.work_history.len())
+                )
+            },
+        ),
+        View::Trash { selected } => {
+            let Some(trash) = &app.trash else {
+                return "Trash · 0/0".to_owned();
+            };
+            let total = trash.documents().len() + trash.works().len();
+            if let Some(document) = trash.documents().get(*selected) {
+                format!(
+                    "{} · Trash · Document: {} · {}",
+                    date_only(document.created()),
+                    document.label(),
+                    list_position(*selected, total)
+                )
+            } else if let Some(work) = selected
+                .checked_sub(trash.documents().len())
+                .and_then(|index| trash.works().get(index))
+            {
+                format!(
+                    "{} · Trash · Work: {} · {}",
+                    date_only(work.created()),
+                    work.title(),
+                    list_position(*selected, total)
+                )
+            } else {
+                "Trash · 0/0".to_owned()
+            }
         }
-        View::Trash { .. } => "Trash".into(),
         View::Conflicts { .. } => format!("Conflicts · {} preserved", app.conflicts.len()),
     }
 }
@@ -814,6 +922,36 @@ fn current_label(app: &App) -> String {
         .current_document()
         .and_then(|id| app.archive.read_document(id).ok())
         .map_or_else(|| "Empty View".into(), |d| d.derived_label())
+}
+fn current_document_date(app: &App) -> String {
+    app.editor
+        .current_document()
+        .and_then(|id| app.archive.documents().find(|document| document.id() == id))
+        .map_or_else(
+            || "No date".to_owned(),
+            |document| date_only(document.created()),
+        )
+}
+fn current_position(app: &App) -> String {
+    if app.editor.regions().is_empty() {
+        "0/0".to_owned()
+    } else {
+        format!(
+            "{}/{}",
+            app.editor.cursor().region + 1,
+            app.editor.regions().len()
+        )
+    }
+}
+fn date_only(timestamp: carta_core::Timestamp) -> String {
+    timestamp.to_string().chars().take(10).collect()
+}
+fn list_position(selected: usize, total: usize) -> String {
+    if total == 0 {
+        "0/0".to_owned()
+    } else {
+        format!("{}/{}", selected + 1, total)
+    }
 }
 fn centered(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
     let vertical = Layout::vertical([
@@ -828,4 +966,94 @@ fn centered(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
         Constraint::Percentage((100 - percent_x) / 2),
     ])
     .split(vertical[1])[1]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use carta_tui::editor::Cursor;
+
+    #[test]
+    fn ctrl_shift_chord_does_not_start_leap_or_cancel_selection() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        assert!(app.editor.insert("selected"));
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        app.editor.set_cursor(
+            Cursor {
+                region: 0,
+                byte: "selected".len(),
+            },
+            true,
+        );
+        let selection = app.editor.selection();
+        let mut clipboard = Clipboard::default();
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut clipboard,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut clipboard,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftShift),
+                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut clipboard,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Char('c'),
+                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+            ),
+            true,
+        )
+        .unwrap();
+
+        assert!(matches!(app.mode, AppMode::Editing));
+        assert_eq!(app.editor.selection(), selection);
+        assert!(dispatcher.pending_control.is_none());
+    }
+
+    #[test]
+    fn specialized_status_lines_include_date_context_and_position() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let document = app.editor.current_document().unwrap();
+        assert!(app.editor.insert("# Label"));
+        app.autosave().unwrap();
+        app.history = app.archive.document_revisions(document).unwrap();
+        app.view = View::History {
+            document,
+            selected: 0,
+        };
+        let history = status_line(&app);
+        assert!(history.contains("History · Label · 1/1"));
+        assert!(history.starts_with(&date_only(app.history[0].checkpoint().created())));
+
+        app.archive.trash_document(document).unwrap();
+        app.trash = Some(app.archive.trash_inventory().unwrap());
+        app.view = View::Trash { selected: 0 };
+        let trash = status_line(&app);
+        assert!(trash.contains("Trash · Document: Label · 1/1"));
+        assert!(trash.starts_with(&date_only(
+            app.trash.as_ref().unwrap().documents()[0].created()
+        )));
+    }
 }

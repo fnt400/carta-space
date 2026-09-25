@@ -61,7 +61,9 @@ pub enum PromptAction {
     ConfirmTrashDocument,
     ConfirmTrashWork,
     ConfirmRestoreDocument,
+    ConfirmRestoreDocumentVersion,
     ConfirmRestoreWork,
+    ConfirmRestoreWorkWithTitle,
     ConfirmRestoreWorkVersion,
     ConfirmWipe,
     ResolveLocal,
@@ -91,6 +93,7 @@ pub struct Choice {
 #[derive(Debug, Clone)]
 pub struct ResultRow {
     pub document: DocumentId,
+    pub created: carta_core::Timestamp,
     pub label: String,
     pub context: String,
     pub byte: usize,
@@ -284,6 +287,7 @@ pub struct App {
     forward: Vec<Location>,
     provisional: Option<DocumentId>,
     pending_wipe: Option<carta_core::WipePlan>,
+    wiped_document: Option<DocumentId>,
     work_positions: BTreeMap<WorkId, Position>,
     work_mru: Vec<WorkId>,
 }
@@ -308,13 +312,23 @@ impl App {
             }
         };
         let position = session.and_then(|s| s.position.as_ref());
-        let (editor, scroll) = load_editor(&archive, &view, position)?;
+        let (mut editor, scroll) = load_editor(&archive, &view, position)?;
+        if let View::Search { selected, .. } = &view {
+            editor.set_cursor(
+                Cursor {
+                    region: *selected,
+                    byte: 0,
+                },
+                false,
+            );
+        }
         let search_results = if let View::Search { query, .. } = &view {
             archive
                 .search(query)?
                 .into_iter()
                 .map(|result| ResultRow {
                     document: result.document(),
+                    created: result.created(),
                     label: result.label().to_owned(),
                     context: result.context().to_owned(),
                     byte: result.occurrence().start,
@@ -348,6 +362,7 @@ impl App {
             forward: Vec::new(),
             provisional,
             pending_wipe: None,
+            wiped_document: None,
             work_positions: session.map_or_else(BTreeMap::new, |s| s.work_positions.clone()),
             work_mru: session.map_or_else(Vec::new, |s| s.work_mru.clone()),
         })
@@ -398,15 +413,23 @@ impl App {
             Import,
             Package,
             CreateCheckpoint,
-            LeapForward,
-            LeapBackward,
-            LeapAgainForward,
-            LeapAgainBackward,
             Back,
             Forward,
             Quit,
             ShowConflicts,
         ];
+        if matches!(
+            self.view,
+            View::Chronological(_) | View::Work(_) | View::Search { .. }
+        ) && !self.editor.regions().is_empty()
+        {
+            commands.extend([
+                LeapForward,
+                LeapBackward,
+                LeapAgainForward,
+                LeapAgainBackward,
+            ]);
+        }
         if editable && has_doc {
             commands.extend([
                 DuplicateAsNew,
@@ -482,12 +505,13 @@ impl App {
         match command {
             NewDocument => self.new_document()?,
             DuplicateAsNew => {
+                self.autosave_for_destructive()?;
                 let id = self.archive.duplicate_document(self.current_document()?)?;
                 self.structural("Duplicated Document")?;
                 self.open_document(id, true)?;
             }
             NewLinkedDocument => {
-                self.autosave()?;
+                self.autosave_for_destructive()?;
                 let source = self.current_document()?;
                 let id = self.archive.new_linked_document(
                     source,
@@ -515,35 +539,76 @@ impl App {
             MoveEarlier => self.move_work(true)?,
             MoveLater => self.move_work(false)?,
             MoveAfter => self.select_move_after()?,
-            SearchArchive => self.prompt("Search Archive", PromptAction::Search),
+            SearchArchive => {
+                self.autosave_for_destructive()?;
+                self.prompt("Search Archive", PromptAction::Search)
+            }
             InsertLink => self.select_links()?,
             OpenLink => self.open_link()?,
-            ShowBacklinks => self.show_backlinks()?,
+            ShowBacklinks => {
+                self.autosave_for_destructive()?;
+                self.show_backlinks()?
+            }
             Back => self.navigate(false)?,
             Forward => self.navigate(true)?,
             History => self.show_history()?,
             WorkHistory => self.show_work_history()?,
-            RestoreThisVersion => self.restore_history(false)?,
+            RestoreThisVersion => self.prepare_history_restore()?,
             RestoreAsNew => self.restore_history(true)?,
-            RestoreWorkVersion => self.prompt(
-                "Type RESTORE WORK, or RESTORE WORK WITH DOCUMENTS if required",
-                PromptAction::ConfirmRestoreWorkVersion,
-            ),
+            RestoreWorkVersion => self.prepare_work_history_restore()?,
             Trash => self.prepare_trash()?,
-            TrashWork => self.prompt("Type TRASH WORK to confirm", PromptAction::ConfirmTrashWork),
+            TrashWork => {
+                self.autosave_for_destructive()?;
+                self.prompt("Type TRASH WORK to confirm", PromptAction::ConfirmTrashWork)
+            }
             ShowTrash => self.show_trash()?,
             RestoreTrash => self.restore_trash()?,
             Wipe => self.prepare_wipe()?,
             Import => self.prompt("Import .md or .txt path", PromptAction::Import),
             ExportDocumentMarkdown => {
-                self.prompt("Export Markdown path", PromptAction::ExportDocumentMarkdown)
+                self.autosave_for_destructive()?;
+                let label = self
+                    .editor
+                    .current_text()
+                    .map(derived_label_from_text)
+                    .unwrap_or_else(|| "document".to_owned());
+                self.prompt_prefilled(
+                    "Export Markdown path",
+                    format!("{}.md", sanitize_filename(&label)),
+                    PromptAction::ExportDocumentMarkdown,
+                )
             }
-            ExportDocumentPdf => self.prompt("Export PDF path", PromptAction::ExportDocumentPdf),
-            ExportWorkMarkdown => self.prompt(
-                "Export Work Markdown path",
-                PromptAction::ExportWorkMarkdown,
-            ),
-            ExportWorkPdf => self.prompt("Export Work PDF path", PromptAction::ExportWorkPdf),
+            ExportDocumentPdf => {
+                self.autosave_for_destructive()?;
+                let label = self
+                    .editor
+                    .current_text()
+                    .map(derived_label_from_text)
+                    .unwrap_or_else(|| "document".to_owned());
+                self.prompt_prefilled(
+                    "Export PDF path",
+                    format!("{}.pdf", sanitize_filename(&label)),
+                    PromptAction::ExportDocumentPdf,
+                )
+            }
+            ExportWorkMarkdown => {
+                self.autosave_for_destructive()?;
+                let title = self.archive.work(self.current_work()?).unwrap().title();
+                self.prompt_prefilled(
+                    "Export Work Markdown path",
+                    format!("{}.md", sanitize_filename(title)),
+                    PromptAction::ExportWorkMarkdown,
+                )
+            }
+            ExportWorkPdf => {
+                self.autosave_for_destructive()?;
+                let title = self.archive.work(self.current_work()?).unwrap().title();
+                self.prompt_prefilled(
+                    "Export Work PDF path",
+                    format!("{}.pdf", sanitize_filename(title)),
+                    PromptAction::ExportWorkPdf,
+                )
+            }
             Package => self.prompt("Package .cat path", PromptAction::Package),
             CreateCheckpoint => self.prompt("Checkpoint note (optional)", PromptAction::Checkpoint),
             LeapForward => self.start_leap(LeapDirection::Forward, true),
@@ -592,25 +657,29 @@ impl App {
                 self.structural("Renamed Work")?;
             }
             PromptAction::Import => {
+                let extension = std::path::Path::new(&input)
+                    .extension()
+                    .and_then(|extension| extension.to_str())
+                    .map(str::to_ascii_lowercase);
+                if !matches!(extension.as_deref(), Some("md" | "txt")) {
+                    return Err("Import supports only .md and .txt files".into());
+                }
                 let bytes = fs::read(&input)?;
                 let id = self.archive.import_document_bytes(&bytes)?;
                 self.structural("Imported Document")?;
                 self.open_document(id, true)?;
             }
-            PromptAction::ExportDocumentMarkdown => fs::write(
-                input,
-                self.archive
-                    .export_document_markdown(self.current_document()?)?,
-            )?,
+            PromptAction::ExportDocumentMarkdown => self
+                .archive
+                .export_document_markdown_file(self.current_document()?, input)?,
             PromptAction::ExportDocumentPdf => self.archive.export_document_pdf_with(
                 self.current_document()?,
                 input,
                 &PdfExportOptions::default(),
             )?,
-            PromptAction::ExportWorkMarkdown => fs::write(
-                input,
-                self.archive.export_work_markdown(self.current_work()?)?,
-            )?,
+            PromptAction::ExportWorkMarkdown => self
+                .archive
+                .export_work_markdown_file(self.current_work()?, input)?,
             PromptAction::ExportWorkPdf => self.archive.export_work_pdf_with(
                 self.current_work()?,
                 input,
@@ -627,12 +696,14 @@ impl App {
             }
             PromptAction::ConfirmTrashDocument => {
                 if input == "TRASH" {
+                    self.autosave_for_destructive()?;
                     self.archive.trash_document(self.current_document()?)?;
                     self.reload_after_removal()?;
                 }
             }
             PromptAction::ConfirmTrashWork => {
                 if input == "TRASH WORK" {
+                    self.autosave_for_destructive()?;
                     self.archive.trash_work(self.current_work()?)?;
                     self.switch_view(View::Chronological(current_volume()), None, false)?;
                 }
@@ -645,13 +716,37 @@ impl App {
                     }
                 }
             }
+            PromptAction::ConfirmRestoreDocumentVersion => {
+                if input == "RESTORE" {
+                    self.restore_history(false)?;
+                }
+            }
             PromptAction::ConfirmRestoreWork => {
                 if input == "RESTORE" || input == "RESTORE WITH DOCUMENTS" {
                     if let Some(id) = self.selected_trashed_work() {
-                        self.archive
-                            .restore_trashed_work(id, input == "RESTORE WITH DOCUMENTS")?;
+                        self.archive.restore_trashed_work(
+                            id,
+                            input == "RESTORE WITH DOCUMENTS",
+                            None,
+                        )?;
                         self.switch_view(View::Work(id), None, false)?;
                     }
+                }
+            }
+            PromptAction::ConfirmRestoreWorkWithTitle => {
+                if let Some(id) = self.selected_trashed_work() {
+                    let (title, restore_documents) = input
+                        .strip_suffix(" | WITH DOCUMENTS")
+                        .map_or((input.as_str(), false), |title| (title, true));
+                    if title.trim().is_empty() {
+                        return Err("a unique replacement Work title is required".into());
+                    }
+                    self.archive.restore_trashed_work(
+                        id,
+                        restore_documents,
+                        Some(title.to_owned()),
+                    )?;
+                    self.switch_view(View::Work(id), None, false)?;
                 }
             }
             PromptAction::ConfirmRestoreWorkVersion => {
@@ -684,8 +779,9 @@ impl App {
             PromptAction::ConfirmWipe => {
                 if let Some(plan) = self.pending_wipe.take() {
                     if input == plan.confirmation_token() {
+                        let document = plan.document();
                         self.archive.execute_wipe_document(&plan, &input)?;
-                        self.show_trash()?;
+                        self.finish_wipe(document)?;
                     } else {
                         self.status = "Wipe confirmation did not match".into();
                     }
@@ -781,6 +877,15 @@ impl App {
             View::Conflicts { selected } => move_index(selected, self.conflicts.len(), down),
             _ => {}
         }
+        if let View::Search { selected, .. } = self.view {
+            self.editor.set_cursor(
+                Cursor {
+                    region: selected,
+                    byte: 0,
+                },
+                false,
+            );
+        }
     }
 
     pub fn open_selected(&mut self) -> AppResult {
@@ -824,44 +929,101 @@ impl App {
     }
 
     pub fn autosave(&mut self) -> AppResult {
+        self.autosave_with(|archive, document, text| archive.edit_document(document, text))
+    }
+
+    fn autosave_with(
+        &mut self,
+        mut save: impl FnMut(&mut Archive, DocumentId, &str) -> Result<(), carta_core::Error>,
+    ) -> AppResult {
         if !self.editor.is_dirty() {
             return Ok(());
         }
         let regions = self.editor.regions().to_vec();
+        let mut preserved = Vec::new();
+        let mut first_error = None;
         for region in regions {
-            match self.archive.edit_document(region.document, &region.text) {
+            match save(&mut self.archive, region.document, &region.text) {
                 Ok(()) => {}
                 Err(carta_core::Error::ConflictPreserved(id)) => {
-                    self.editor.mark_saved();
-                    self.scheduler.saved();
-                    self.conflicts = self.archive.conflicts()?;
-                    let selected = self
-                        .conflicts
-                        .iter()
-                        .position(|conflict| conflict.id() == id)
-                        .unwrap_or(0);
-                    self.view = View::Conflicts { selected };
-                    self.status = format!("External divergence preserved as conflict {id}");
-                    return Ok(());
+                    preserved.push(id);
                 }
-                Err(error) => return Err(error.into()),
+                Err(error) => {
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                }
             }
         }
-        self.editor.mark_saved();
-        self.scheduler.saved();
-        if self.provisional.is_some_and(|id| {
-            self.editor
-                .regions()
-                .iter()
-                .find(|region| region.document == id)
-                .is_some_and(|region| !region.text.trim().is_empty())
-        }) {
-            self.archive.checkpoint(
-                CheckpointKind::Structural,
-                Some("Document became persistent"),
-            )?;
-            self.provisional = None;
+        if first_error.is_none() {
+            self.editor.mark_saved();
+            self.scheduler.saved();
+            if self.provisional.is_some_and(|id| {
+                self.editor
+                    .regions()
+                    .iter()
+                    .find(|region| region.document == id)
+                    .is_some_and(|region| !region.text.trim().is_empty())
+            }) {
+                self.archive.checkpoint(
+                    CheckpointKind::Structural,
+                    Some("Document became persistent"),
+                )?;
+                self.provisional = None;
+            }
         }
+        if let Some(id) = preserved.first() {
+            self.conflicts = self.archive.conflicts()?;
+            let selected = self
+                .conflicts
+                .iter()
+                .position(|conflict| conflict.id() == id)
+                .unwrap_or(0);
+            self.view = View::Conflicts { selected };
+            self.status = format!(
+                "External divergence preserved in {} conflict(s)",
+                preserved.len()
+            );
+        }
+        match first_error {
+            Some(error) => Err(error.into()),
+            None => Ok(()),
+        }
+    }
+
+    fn autosave_for_destructive(&mut self) -> AppResult {
+        let before = self.archive.conflicts()?.len();
+        self.autosave()?;
+        let after = self.archive.conflicts()?.len();
+        if after > before || matches!(self.view, View::Conflicts { .. }) {
+            return Err("operation aborted because autosave preserved a conflict".into());
+        }
+        Ok(())
+    }
+
+    pub fn take_wiped_document(&mut self) -> Option<DocumentId> {
+        self.wiped_document.take()
+    }
+
+    fn finish_wipe(&mut self, document: DocumentId) -> AppResult {
+        // Signal clipboard cleanup before any fallible refresh: core Wipe has
+        // already completed and no Carta-managed in-memory copy may survive.
+        self.wiped_document = Some(document);
+        self.editor = CompositeEditor::new(Vec::new(), Cursor { region: 0, byte: 0 });
+        self.search_results.clear();
+        self.history.clear();
+        self.work_history.clear();
+        self.conflicts.clear();
+        self.trash = None;
+        self.back.clear();
+        self.forward.clear();
+        self.leap = LeapRuntime::default();
+        self.pending_wipe = None;
+        self.provisional = self.provisional.filter(|id| *id != document);
+        self.trash = Some(self.archive.trash_inventory()?);
+        self.view = View::Trash { selected: 0 };
+        self.mode = AppMode::Editing;
+        self.scroll = 0;
         Ok(())
     }
 
@@ -893,6 +1055,9 @@ impl App {
                 },
                 false,
             );
+            if let View::Search { selected, .. } = &mut self.view {
+                *selected = p.region();
+            }
         }
     }
     pub fn leap_backspace(&mut self) {
@@ -912,6 +1077,9 @@ impl App {
                 },
                 false,
             );
+            if let View::Search { selected, .. } = &mut self.view {
+                *selected = p.region();
+            }
         }
     }
     pub fn end_leap(&mut self) {
@@ -959,21 +1127,22 @@ impl App {
                 },
                 false,
             );
+            if let View::Search { selected, .. } = &mut self.view {
+                *selected = p.region();
+            }
         }
     }
 
     fn new_document(&mut self) -> AppResult {
         self.autosave()?;
-        let id = self.archive.create_document("")?;
-        self.provisional = Some(id);
         if let View::Work(work) = self.view {
             let current = self.editor.current_document();
-            self.archive.add_document_to_work(work, id)?;
-            self.archive.move_document_after(work, id, current)?;
-            self.structural("Created Document in Work")?;
-            self.provisional = None;
+            let id = self.archive.create_document_in_work_after(work, current)?;
+            self.provisional = Some(id);
             self.reload_view(Some((id, 0)))?;
         } else {
+            let id = self.archive.create_document("")?;
+            self.provisional = Some(id);
             self.switch_view(View::Chronological(current_volume()), Some((id, 0)), false)?;
         }
         Ok(())
@@ -1010,6 +1179,15 @@ impl App {
         self.mode = AppMode::Prompt {
             title: title.into(),
             input: String::new(),
+            details: Vec::new(),
+            action,
+        };
+    }
+
+    fn prompt_prefilled(&mut self, title: &str, input: String, action: PromptAction) {
+        self.mode = AppMode::Prompt {
+            title: title.into(),
+            input,
             details: Vec::new(),
             action,
         };
@@ -1113,6 +1291,8 @@ impl App {
         );
         if !self.editor.insert(&link) {
             self.status = "Cannot replace a selection across Document boundaries".into();
+        } else {
+            self.edited(Instant::now());
         }
         Ok(())
     }
@@ -1138,6 +1318,7 @@ impl App {
             .into_iter()
             .map(|result| ResultRow {
                 document: result.document(),
+                created: result.created(),
                 label: result.label().to_owned(),
                 context: result.context().to_owned(),
                 byte: result.occurrence().start,
@@ -1147,6 +1328,7 @@ impl App {
             query: query.trim().into(),
             selected: 0,
         };
+        self.load_search_editor()?;
         self.mode = AppMode::Editing;
         Ok(())
     }
@@ -1165,6 +1347,7 @@ impl App {
                 .map_or(doc.content().len(), |i| range.end + i);
             rows.push(ResultRow {
                 document: backlink.source(),
+                created: doc.metadata().created(),
                 label: doc.derived_label(),
                 context: doc.content()[line_start..line_end].to_owned(),
                 byte: range.start,
@@ -1176,6 +1359,7 @@ impl App {
             query: "Backlinks".into(),
             selected: 0,
         };
+        self.load_search_editor()?;
         Ok(())
     }
     fn open_link(&mut self) -> AppResult {
@@ -1195,12 +1379,9 @@ impl App {
         Ok(())
     }
     fn link_under_cursor(&self) -> Option<carta_core::MarkdownLink> {
-        self.editor.current_document().and_then(|id| {
-            self.archive
-                .document_link_at(id, self.editor.cursor().byte)
-                .ok()
-                .flatten()
-        })
+        self.editor
+            .current_text()
+            .and_then(|text| carta_core::link_at_byte_offset(text, self.editor.cursor().byte))
     }
     fn show_history(&mut self) -> AppResult {
         let id = self.current_document()?;
@@ -1245,16 +1426,67 @@ impl App {
                 .restore_document_version_as_new(document, &checkpoint)?;
             self.open_document(id, false)?;
         } else {
-            if self.archive.memberships(document)?.len() > 1 {
-                self.status = "Restoring this shared Document changes every containing Work".into();
-            }
             self.archive
                 .restore_document_version(document, &checkpoint)?;
             self.open_document(document, false)?;
         }
         Ok(())
     }
+    fn prepare_history_restore(&mut self) -> AppResult {
+        let View::History { document, .. } = self.view else {
+            return Ok(());
+        };
+        let impact = self.archive.document_restore_impact(document)?;
+        let mut details = vec!["This replaces the current Document content.".to_owned()];
+        if !impact.affected_other_works().is_empty() {
+            details.push("Other Works affected through this shared Document:".to_owned());
+            details.extend(
+                impact
+                    .affected_other_works()
+                    .iter()
+                    .map(|work| format!("  {}", work.title())),
+            );
+        }
+        self.prompt_with_details(
+            "Type RESTORE to restore this historical version",
+            details,
+            PromptAction::ConfirmRestoreDocumentVersion,
+        );
+        Ok(())
+    }
+    fn prepare_work_history_restore(&mut self) -> AppResult {
+        let View::WorkHistory { work, selected } = self.view else {
+            return Ok(());
+        };
+        let checkpoint = self
+            .work_history
+            .get(selected)
+            .ok_or("no historical Work revision")?
+            .checkpoint()
+            .id();
+        let impact = self.archive.work_restore_impact(work, checkpoint)?;
+        let mut details = vec![
+            "This replaces the Work title, order, membership, and historical member content."
+                .to_owned(),
+        ];
+        if !impact.affected_other_works().is_empty() {
+            details.push("Other Works affected by shared Document content:".to_owned());
+            details.extend(
+                impact
+                    .affected_other_works()
+                    .iter()
+                    .map(|work| format!("  {}", work.title())),
+            );
+        }
+        self.prompt_with_details(
+            "Type RESTORE WORK, or RESTORE WORK WITH DOCUMENTS if required",
+            details,
+            PromptAction::ConfirmRestoreWorkVersion,
+        );
+        Ok(())
+    }
     fn prepare_trash(&mut self) -> AppResult {
+        self.autosave_for_destructive()?;
         if matches!(self.view, View::Work(_)) && self.editor.current_document().is_none() {
             self.prompt("Type TRASH WORK to confirm", PromptAction::ConfirmTrashWork);
             return Ok(());
@@ -1372,10 +1604,38 @@ impl App {
                 PromptAction::ConfirmRestoreDocument,
             );
         } else if self.selected_trashed_work().is_some() {
-            self.prompt(
-                "Type RESTORE, or RESTORE WITH DOCUMENTS if required",
-                PromptAction::ConfirmRestoreWork,
-            );
+            let work = self
+                .trash
+                .as_ref()
+                .and_then(|trash| {
+                    let View::Trash { selected } = self.view else {
+                        return None;
+                    };
+                    selected
+                        .checked_sub(trash.documents().len())
+                        .and_then(|index| trash.works().get(index))
+                })
+                .ok_or("no selected trashed Work")?;
+            if self
+                .archive
+                .work_title_conflict(work.title(), None)
+                .is_some()
+            {
+                self.prompt_with_details(
+                    "Replacement unique Work title",
+                    vec![
+                        "The historical title conflicts with an active Work.".to_owned(),
+                        "Append ` | WITH DOCUMENTS` to consent to restoring missing members."
+                            .to_owned(),
+                    ],
+                    PromptAction::ConfirmRestoreWorkWithTitle,
+                );
+            } else {
+                self.prompt(
+                    "Type RESTORE, or RESTORE WITH DOCUMENTS if required",
+                    PromptAction::ConfirmRestoreWork,
+                );
+            }
         }
         Ok(())
     }
@@ -1397,6 +1657,19 @@ impl App {
             details: vec![guarantee],
             action: PromptAction::ConfirmWipe,
         };
+        Ok(())
+    }
+
+    fn load_search_editor(&mut self) -> AppResult {
+        let regions = self
+            .search_results
+            .iter()
+            .map(|result| Region {
+                document: result.document,
+                text: search_result_view_text(result),
+            })
+            .collect();
+        self.editor = CompositeEditor::new(regions, Cursor { region: 0, byte: 0 });
         Ok(())
     }
     fn selected_trashed_document(&self) -> Option<DocumentId> {
@@ -1561,21 +1834,34 @@ fn load_editor(
     view: &View,
     position: Option<&Position>,
 ) -> AppResult<(CompositeEditor, usize)> {
-    let ids = match view {
-        View::Chronological(v) => archive.chronological_month(*v),
-        View::Work(id) => archive
-            .work(*id)
-            .map(|w| w.documents().to_vec())
-            .unwrap_or_default(),
+    let regions = match view {
+        View::Search { query, .. } => archive
+            .search(query)?
+            .into_iter()
+            .map(|result| {
+                let row = ResultRow {
+                    document: result.document(),
+                    created: result.created(),
+                    label: result.label().to_owned(),
+                    context: result.context().to_owned(),
+                    byte: result.occurrence().start,
+                };
+                Region {
+                    document: row.document,
+                    text: search_result_view_text(&row),
+                }
+            })
+            .collect(),
+        View::Chronological(v) => load_document_regions(archive, archive.chronological_month(*v))?,
+        View::Work(id) => load_document_regions(
+            archive,
+            archive
+                .work(*id)
+                .map(|work| work.documents().to_vec())
+                .unwrap_or_default(),
+        )?,
         _ => Vec::new(),
     };
-    let mut regions = Vec::new();
-    for id in ids {
-        regions.push(Region {
-            document: id,
-            text: archive.read_document(id)?.content().to_owned(),
-        });
-    }
     let mut cursor = Cursor { region: 0, byte: 0 };
     let mut scroll = 0;
     if let Some(position) = position {
@@ -1588,6 +1874,32 @@ fn load_editor(
         }
     }
     Ok((CompositeEditor::new(regions, cursor), scroll))
+}
+
+fn load_document_regions(archive: &Archive, documents: Vec<DocumentId>) -> AppResult<Vec<Region>> {
+    documents
+        .into_iter()
+        .map(|document| {
+            Ok(Region {
+                document,
+                text: archive.read_document(document)?.content().to_owned(),
+            })
+        })
+        .collect()
+}
+
+fn search_result_view_text(result: &ResultRow) -> String {
+    format!(
+        "{}\n{}\n{}",
+        result.label,
+        result
+            .created
+            .to_string()
+            .chars()
+            .take(10)
+            .collect::<String>(),
+        result.context
+    )
 }
 fn current_volume() -> Volume {
     let now = Local::now();
@@ -1613,6 +1925,34 @@ fn escape_markdown_link_label(value: &str) -> String {
         .replace('[', "\\[")
         .replace(']', "\\]")
         .replace('\n', " ")
+}
+
+fn derived_label_from_text(content: &str) -> String {
+    content
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .map(|line| line.trim_start_matches('#').trim())
+        .filter(|line| !line.is_empty())
+        .unwrap_or("document")
+        .to_owned()
+}
+
+fn sanitize_filename(value: &str) -> String {
+    let sanitized = value
+        .chars()
+        .map(|character| match character {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' | '\0' => '-',
+            character if character.is_control() => '-',
+            character => character,
+        })
+        .collect::<String>();
+    let sanitized = sanitized.trim().trim_matches('.');
+    if sanitized.is_empty() {
+        "document".to_owned()
+    } else {
+        sanitized.to_owned()
+    }
 }
 
 #[cfg(test)]
@@ -1729,7 +2069,7 @@ mod tests {
     }
 
     #[test]
-    fn new_document_in_work_keeps_immediate_structural_checkpoint() {
+    fn new_document_in_work_stays_provisional_until_non_whitespace_autosave() {
         let temporary = tempfile::tempdir().unwrap();
         let archive = Archive::create(temporary.path().join("archive")).unwrap();
         let mut app = App::open(archive, None, Instant::now()).unwrap();
@@ -1742,12 +2082,16 @@ mod tests {
         let before = app.archive.history().unwrap().len();
 
         app.new_document().unwrap();
-        assert_eq!(app.archive.history().unwrap().len(), before + 1);
+        assert_eq!(app.archive.history().unwrap().len(), before);
         assert_eq!(app.archive.work(work).unwrap().documents().len(), 2);
-        assert_eq!(
-            app.archive.history().unwrap()[0].kind(),
-            Some(CheckpointKind::Structural)
-        );
+        assert!(app.archive.is_dirty().unwrap());
+        assert!(app.editor.insert("   "));
+        app.autosave().unwrap();
+        assert_eq!(app.archive.history().unwrap().len(), before);
+        assert!(app.editor.insert("x"));
+        app.autosave().unwrap();
+        assert_eq!(app.archive.history().unwrap().len(), before + 1);
+        assert!(!app.archive.is_dirty().unwrap());
     }
 
     #[test]
@@ -1806,6 +2150,252 @@ mod tests {
     }
 
     #[test]
+    fn autosave_preserves_early_conflict_and_saves_later_dirty_region() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let first = archive.create_document("first").unwrap();
+        let second = archive.create_document("second").unwrap();
+        archive
+            .checkpoint(CheckpointKind::Structural, Some("Two Documents"))
+            .unwrap();
+        let volume = archive
+            .documents()
+            .find(|info| info.id() == first)
+            .unwrap()
+            .volume();
+        let mut app = App::open(
+            archive,
+            Some(&Session {
+                view: SavedView::Chronological {
+                    year: volume.year(),
+                    month: volume.month(),
+                },
+                position: Some(Position {
+                    document: first,
+                    byte: 5,
+                    scroll: 0,
+                }),
+                work_positions: BTreeMap::new(),
+                work_mru: Vec::new(),
+            }),
+            Instant::now(),
+        )
+        .unwrap();
+        let first_region = app
+            .editor
+            .regions()
+            .iter()
+            .position(|region| region.document == first)
+            .unwrap();
+        let second_region = app
+            .editor
+            .regions()
+            .iter()
+            .position(|region| region.document == second)
+            .unwrap();
+        app.editor.set_cursor(
+            Cursor {
+                region: first_region,
+                byte: 5,
+            },
+            false,
+        );
+        assert!(app.editor.insert(" local"));
+        app.editor.set_cursor(
+            Cursor {
+                region: second_region,
+                byte: 6,
+            },
+            false,
+        );
+        assert!(app.editor.insert(" saved"));
+        let first_path = app
+            .archive
+            .documents()
+            .find(|info| info.id() == first)
+            .unwrap()
+            .path()
+            .join("content.md");
+        fs::write(first_path, "first external").unwrap();
+
+        app.autosave().unwrap();
+
+        assert!(matches!(app.view, View::Conflicts { .. }));
+        assert_eq!(app.archive.conflicts().unwrap().len(), 1);
+        assert_eq!(
+            app.archive.read_document(second).unwrap().content(),
+            "second saved"
+        );
+        assert!(!app.editor.is_dirty());
+    }
+
+    #[test]
+    fn autosave_continues_after_ordinary_region_error_and_stays_dirty() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let first = archive.create_document("first").unwrap();
+        let second = archive.create_document("second").unwrap();
+        archive
+            .checkpoint(CheckpointKind::Structural, Some("Two Documents"))
+            .unwrap();
+        let volume = archive
+            .documents()
+            .find(|info| info.id() == first)
+            .unwrap()
+            .volume();
+        let mut app = App::open(
+            archive,
+            Some(&Session {
+                view: SavedView::Chronological {
+                    year: volume.year(),
+                    month: volume.month(),
+                },
+                position: None,
+                work_positions: BTreeMap::new(),
+                work_mru: Vec::new(),
+            }),
+            Instant::now(),
+        )
+        .unwrap();
+        let first_region = app
+            .editor
+            .regions()
+            .iter()
+            .position(|region| region.document == first)
+            .unwrap();
+        let second_region = app
+            .editor
+            .regions()
+            .iter()
+            .position(|region| region.document == second)
+            .unwrap();
+        app.editor.set_cursor(
+            Cursor {
+                region: first_region,
+                byte: 5,
+            },
+            false,
+        );
+        assert!(app.editor.insert(" local"));
+        app.editor.set_cursor(
+            Cursor {
+                region: second_region,
+                byte: 6,
+            },
+            false,
+        );
+        assert!(app.editor.insert(" durable"));
+
+        let error = app
+            .autosave_with(|archive, document, text| {
+                if document == first {
+                    Err(carta_core::Error::ExternalChange("injected".into()))
+                } else {
+                    archive.edit_document(document, text)
+                }
+            })
+            .unwrap_err();
+
+        assert!(error.to_string().contains("injected"));
+        assert_eq!(
+            app.archive.read_document(second).unwrap().content(),
+            "second durable"
+        );
+        assert_eq!(app.archive.read_document(first).unwrap().content(), "first");
+        assert!(app.editor.is_dirty());
+    }
+
+    #[test]
+    fn successful_wipe_scrubs_editor_and_undo_buffers_and_emits_completion() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let target = app.current_document().unwrap();
+        assert!(app.editor.insert("sensitive text"));
+        app.autosave().unwrap();
+        app.archive
+            .checkpoint(CheckpointKind::Manual, Some("Sensitive history"))
+            .unwrap();
+        let work = app
+            .archive
+            .create_work("Sensitive Work".into(), vec![target])
+            .unwrap();
+        let work_checkpoint = app
+            .archive
+            .checkpoint(CheckpointKind::Structural, Some("Sensitive Work state"))
+            .unwrap()
+            .unwrap();
+        app.search_results.push(ResultRow {
+            document: target,
+            created: app
+                .archive
+                .read_document(target)
+                .unwrap()
+                .metadata()
+                .created(),
+            label: "sensitive text".into(),
+            context: "sensitive text".into(),
+            byte: 0,
+        });
+        app.history = app.archive.document_revisions(target).unwrap();
+        app.work_history.push(
+            app.archive
+                .work_snapshot(work, work_checkpoint.id())
+                .unwrap(),
+        );
+        app.back.push(Location {
+            view: View::History {
+                document: target,
+                selected: 0,
+            },
+            cursor: Cursor { region: 0, byte: 0 },
+            scroll: 0,
+        });
+        app.forward.push(Location {
+            view: View::Search {
+                query: "sensitive text".into(),
+                selected: 0,
+            },
+            cursor: Cursor { region: 0, byte: 0 },
+            scroll: 0,
+        });
+        app.archive.trash_document(target).unwrap();
+        app.show_trash().unwrap();
+        app.prepare_wipe().unwrap();
+        let token = app
+            .pending_wipe
+            .as_ref()
+            .unwrap()
+            .confirmation_token()
+            .to_owned();
+        let AppMode::Prompt { input, .. } = &mut app.mode else {
+            panic!("expected Wipe confirmation")
+        };
+        *input = token;
+
+        app.submit_prompt().unwrap();
+
+        assert!(app
+            .editor
+            .regions()
+            .iter()
+            .all(|region| region.document != target));
+        assert!(!app.editor.undo());
+        assert!(app.search_results.is_empty());
+        assert!(app.history.is_empty());
+        assert!(app.work_history.is_empty());
+        assert!(app.conflicts.iter().all(|conflict| !matches!(
+            conflict,
+            Conflict::Document(value) if value.document() == target
+        )));
+        assert!(app.back.is_empty());
+        assert!(app.forward.is_empty());
+        assert!(matches!(app.view, View::Trash { selected: 0 }));
+        assert_eq!(app.take_wiped_document(), Some(target));
+        assert_eq!(app.take_wiped_document(), None);
+    }
+
+    #[test]
     fn search_session_resume_and_back_navigation_remain_stable() {
         let temporary = tempfile::tempdir().unwrap();
         let root = temporary.path().join("archive");
@@ -1828,5 +2418,41 @@ mod tests {
             matches!(resumed.view, View::Search { ref query, selected: 0 } if query == "needle")
         );
         assert_eq!(resumed.search_results.len(), 1);
+    }
+
+    #[test]
+    fn search_leap_uses_only_rendered_rows_and_updates_selection_and_again() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        archive
+            .create_document("seed target-context\nhidden-only")
+            .unwrap();
+        archive.create_document("seed newest").unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        app.search("seed").unwrap();
+        assert_eq!(app.search_results.len(), 2);
+
+        app.start_leap(LeapDirection::Forward, true);
+        app.leap_input("hidden-only");
+        let AppMode::Leap { session, .. } = &app.mode else {
+            panic!("expected LEAP mode")
+        };
+        assert!(session.current_match().is_none());
+        assert_eq!(app.editor.cursor().region, 0);
+        app.cancel_leap();
+
+        app.start_leap(LeapDirection::Forward, true);
+        app.leap_input("target-context");
+        assert_eq!(app.editor.cursor().region, 1);
+        assert!(matches!(app.view, View::Search { selected: 1, .. }));
+        app.end_leap();
+
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        if let View::Search { selected, .. } = &mut app.view {
+            *selected = 0;
+        }
+        app.leap_again(LeapDirection::Forward);
+        assert_eq!(app.editor.cursor().region, 1);
+        assert!(matches!(app.view, View::Search { selected: 1, .. }));
     }
 }

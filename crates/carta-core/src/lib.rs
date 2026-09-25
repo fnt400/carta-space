@@ -7,6 +7,7 @@ mod history;
 mod package;
 mod pdf;
 mod retrieval;
+mod transaction;
 mod trash;
 mod validation;
 mod work;
@@ -19,7 +20,8 @@ pub use content::{
 pub use document::{Document, DocumentInfo, Volume};
 pub use error::{Error, ValidationErrors, ValidationIssue, ValidationIssueKind};
 pub use history::{
-    Checkpoint, CheckpointId, CheckpointKind, DocumentRevision, WorkRestoreOptions, WorkSnapshot,
+    Checkpoint, CheckpointId, CheckpointKind, DocumentRevision, HistoryRestoreImpact,
+    WorkRestoreOptions, WorkSnapshot,
 };
 pub use package::PackageReport;
 pub use pdf::PdfExportOptions;

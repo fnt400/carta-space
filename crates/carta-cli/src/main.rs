@@ -128,6 +128,9 @@ enum RestoreCommand {
         work: WorkId,
         #[arg(long)]
         restore_documents: bool,
+        /// Explicit unique replacement title when the historical title conflicts.
+        #[arg(long)]
+        title: Option<String>,
     },
 }
 
@@ -139,9 +142,6 @@ struct WipeArgs {
 
 #[derive(Debug, Subcommand)]
 enum WipeCommand {
-    Plan {
-        document: DocumentId,
-    },
     Execute {
         document: DocumentId,
         /// Must exactly equal: WIPE <document-id> PERMANENTLY
@@ -330,24 +330,15 @@ fn run(cli: Cli) -> Result<(), Box<dyn StdError>> {
             RestoreCommand::Work {
                 work,
                 restore_documents,
+                title,
             } => println!(
                 "{}",
-                archive.restore_trashed_work(work, restore_documents)?.id()
+                archive
+                    .restore_trashed_work(work, restore_documents, title)?
+                    .id()
             ),
         },
         Command::Wipe(args) => match args.command {
-            WipeCommand::Plan { document } => {
-                let plan = archive.plan_wipe_document(document)?;
-                println!("document\t{}", plan.document());
-                for path in plan.canonical_directories() {
-                    println!("path\t{path}");
-                }
-                for reference in plan.retained_refs() {
-                    println!("ref\t{reference}");
-                }
-                println!("guarantee\t{}", plan.guarantee());
-                println!("confirmation\tWIPE {document} PERMANENTLY");
-            }
             WipeCommand::Execute { document, confirm } => {
                 let expected = format!("WIPE {document} PERMANENTLY");
                 if confirm != expected {

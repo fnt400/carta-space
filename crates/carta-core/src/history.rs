@@ -153,6 +153,17 @@ pub struct WorkRestoreOptions {
     pub restore_required_trashed_documents: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HistoryRestoreImpact {
+    affected_other_works: Vec<crate::WorkMembership>,
+}
+
+impl HistoryRestoreImpact {
+    pub fn affected_other_works(&self) -> &[crate::WorkMembership] {
+        &self.affected_other_works
+    }
+}
+
 impl Archive {
     pub fn is_dirty(&self) -> Result<bool, Error> {
         is_dirty_at(&self.root)
@@ -214,23 +225,47 @@ impl Archive {
         let info = self.documents.get(&id).ok_or(Error::MissingDocument(id))?;
         self.ensure_document_current(info)?;
         let path = info.path.join("content.md");
-        let original = fs::read(&path).map_err(|error| Error::io(&path, error))?;
-        atomic_replace(&path, historical.content().as_bytes())?;
-
-        match require_checkpoint(
+        let transaction = crate::transaction::Transaction::begin(
             &self.root,
-            CheckpointKind::Structural,
-            Some("Restored a Document version"),
-        ) {
+            "Saved state before Document History restore",
+            [relative_path(&self.root, &path)?.into()],
+        )?;
+        let operation = atomic_replace(&path, historical.content().as_bytes()).and_then(|()| {
+            require_checkpoint(
+                &self.root,
+                CheckpointKind::Structural,
+                Some("Restored a Document version"),
+            )
+        });
+        match operation {
             Ok(created) => {
+                transaction.commit()?;
                 self.refresh()?;
                 Ok(created)
             }
             Err(error) => {
-                rollback_files(&self.root, &[(path, original)], &[], error)?;
-                unreachable!("rollback_files returns the original error")
+                let error = transaction.rollback_error(error);
+                self.refresh()?;
+                Err(error)
             }
         }
+    }
+
+    pub fn document_restore_impact(&self, id: DocumentId) -> Result<HistoryRestoreImpact, Error> {
+        if !self.documents.contains_key(&id) {
+            return Err(Error::MissingDocument(id));
+        }
+        Ok(HistoryRestoreImpact {
+            affected_other_works: self
+                .works
+                .values()
+                .filter(|work| work.documents().contains(&id))
+                .map(|work| crate::WorkMembership {
+                    id: work.id(),
+                    title: work.title().to_owned(),
+                })
+                .collect(),
+        })
     }
 
     pub fn restore_document_version_as_new(
@@ -306,11 +341,31 @@ impl Archive {
         }
 
         let work_path = current_work.path.join("work.json");
-        let mut originals = vec![(
-            work_path.clone(),
-            fs::read(&work_path).map_err(|error| Error::io(&work_path, error))?,
-        )];
-        let mut created_directories = Vec::new();
+        let restored_metadata = current_work
+            .metadata
+            .with_title(snapshot.title().to_owned())
+            .with_documents(snapshot.document_ids().to_vec())
+            .map_err(|error| Error::format(&work_path, error))?;
+        let mut cleanup = vec![relative_path(&self.root, &work_path)?.into()];
+        for document in &snapshot.documents {
+            if let Some(current) = self.documents.get(&document.metadata().id()) {
+                cleanup.push(relative_path(&self.root, &current.path.join("content.md"))?.into());
+            } else {
+                let volume = crate::Volume::from_timestamp(document.metadata().created())
+                    .ok_or(Error::InvalidVolumeDate(document.metadata().created()))?;
+                cleanup.push(
+                    PathBuf::from("volumes")
+                        .join(format!("{:04}", volume.year()))
+                        .join(format!("{:02}", volume.month()))
+                        .join(document.metadata().id().to_string()),
+                );
+            }
+        }
+        let transaction = crate::transaction::Transaction::begin(
+            &self.root,
+            "Saved state before Work History restore",
+            cleanup,
+        )?;
 
         let restore = (|| {
             for document in &snapshot.documents {
@@ -318,10 +373,6 @@ impl Archive {
                 if let Some(current) = self.documents.get(&document_id) {
                     self.ensure_document_current(current)?;
                     let path = current.path.join("content.md");
-                    originals.push((
-                        path.clone(),
-                        fs::read(&path).map_err(|error| Error::io(&path, error))?,
-                    ));
                     atomic_replace(&path, document.content().as_bytes())?;
                 } else {
                     let volume = crate::Volume::from_timestamp(document.metadata().created())
@@ -333,11 +384,10 @@ impl Archive {
                         .join(format!("{:02}", volume.month()))
                         .join(document_id.to_string());
                     write_restored_document(&destination, document)?;
-                    created_directories.push(destination);
                 }
             }
 
-            let work_bytes = serialize_work_metadata(&work_path, &snapshot.metadata)?;
+            let work_bytes = serialize_work_metadata(&work_path, &restored_metadata)?;
             atomic_replace(&work_path, &work_bytes)?;
             require_checkpoint(
                 &self.root,
@@ -347,14 +397,42 @@ impl Archive {
         })();
         match restore {
             Ok(created) => {
+                transaction.commit()?;
                 self.refresh()?;
                 Ok(created)
             }
             Err(error) => {
-                rollback_files(&self.root, &originals, &created_directories, error)?;
-                unreachable!("rollback_files returns the original error")
+                let error = transaction.rollback_error(error);
+                self.refresh()?;
+                Err(error)
             }
         }
+    }
+
+    pub fn work_restore_impact(
+        &self,
+        id: WorkId,
+        checkpoint: &CheckpointId,
+    ) -> Result<HistoryRestoreImpact, Error> {
+        let snapshot = read_work_snapshot(&self.root, id, checkpoint)?;
+        let mut affected = Vec::new();
+        for work in self.works.values().filter(|work| work.id() != id) {
+            let changes_shared_content = snapshot.documents.iter().any(|historical| {
+                work.documents().contains(&historical.metadata().id())
+                    && self
+                        .read_document(historical.metadata().id())
+                        .is_ok_and(|current| current.content() != historical.content())
+            });
+            if changes_shared_content {
+                affected.push(crate::WorkMembership {
+                    id: work.id(),
+                    title: work.title().to_owned(),
+                });
+            }
+        }
+        Ok(HistoryRestoreImpact {
+            affected_other_works: affected,
+        })
     }
 
     fn require_clean_restore(&self) -> Result<(), Error> {

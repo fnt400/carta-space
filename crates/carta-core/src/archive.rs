@@ -10,7 +10,7 @@ use carta_format::{
     MIMETYPE,
 };
 
-use crate::validation::scan_archive;
+use crate::validation::{scan_archive, scan_archive_with_recovery_documents};
 use crate::{
     extract_markdown_links, Backlink, CartaLinkTarget, Document, DocumentInfo, Error,
     LinkResolution, MarkdownLink, SearchResult, ValidationErrors, Volume, Work, WorkProjection,
@@ -78,8 +78,13 @@ impl Archive {
 
     pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
         let root = path.as_ref().to_path_buf();
+        crate::package::cleanup_registered_temporaries(&root)?;
+        crate::transaction::recover(&root)?;
         recover_creation_staging(&root)?;
-        let scanned = scan_archive(&root)?;
+        let scanned = scan_archive_with_recovery_documents(
+            &root,
+            crate::conflict::missing_document_infos(&root)?,
+        )?;
         Ok(Self {
             root,
             metadata: scanned.metadata,
@@ -119,6 +124,17 @@ impl Archive {
 
     pub fn create_document(&mut self, content: &str) -> Result<DocumentId, Error> {
         let created = Timestamp::now_local();
+        let id = DocumentId::new_v7();
+        self.create_document_with(id, created, content)?;
+        Ok(id)
+    }
+
+    pub(crate) fn create_document_with(
+        &mut self,
+        id: DocumentId,
+        created: Timestamp,
+        content: &str,
+    ) -> Result<PathBuf, Error> {
         let volume = Volume::from_timestamp(created).ok_or(Error::InvalidVolumeDate(created))?;
         let month_path = self
             .root
@@ -127,7 +143,6 @@ impl Archive {
             .join(format!("{:02}", volume.month()));
         fs::create_dir_all(&month_path).map_err(|error| Error::io(&month_path, error))?;
 
-        let id = DocumentId::new_v7();
         let destination = month_path.join(id.to_string());
         let staging = month_path.join(format!(".carta-document-{id}"));
         fs::create_dir(&staging).map_err(|error| Error::io(&staging, error))?;
@@ -150,15 +165,19 @@ impl Archive {
                 volume,
                 metadata_bytes,
                 content_bytes: content.into_bytes(),
-                path: destination,
+                path: destination.clone(),
             },
         );
-        Ok(id)
+        Ok(destination)
     }
 
     pub fn refresh(&mut self) -> Result<(), Error> {
+        crate::transaction::recover(&self.root)?;
         recover_creation_staging(&self.root)?;
-        let scanned = scan_archive(&self.root)?;
+        let scanned = scan_archive_with_recovery_documents(
+            &self.root,
+            crate::conflict::missing_document_infos(&self.root)?,
+        )?;
         self.metadata = scanned.metadata;
         self.documents = scanned.documents;
         self.works = scanned.works;
@@ -171,12 +190,25 @@ impl Archive {
 
     pub fn edit_document(&mut self, id: DocumentId, content: &str) -> Result<(), Error> {
         let info = self.documents.get(&id).ok_or(Error::MissingDocument(id))?;
-        ensure_unchanged(&info.path.join("meta.json"), &info.metadata_bytes)?;
         let path = info.path.join("content.md");
         let content = normalize_line_endings(content).into_bytes();
-        let external = fs::read(&path).map_err(|error| Error::io(&path, error))?;
+        if !info.path.join("meta.json").is_file() {
+            let conflict =
+                self.preserve_document_conflict(id, &content, &info.content_bytes, true)?;
+            return Err(Error::ConflictPreserved(conflict));
+        }
+        ensure_unchanged(&info.path.join("meta.json"), &info.metadata_bytes)?;
+        let external = match fs::read(&path) {
+            Ok(external) => external,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                let conflict =
+                    self.preserve_document_conflict(id, &content, &info.content_bytes, true)?;
+                return Err(Error::ConflictPreserved(conflict));
+            }
+            Err(error) => return Err(Error::io(&path, error)),
+        };
         if external != info.content_bytes {
-            let conflict = self.preserve_document_conflict(id, &content, &external)?;
+            let conflict = self.preserve_document_conflict(id, &content, &external, false)?;
             return Err(Error::ConflictPreserved(conflict));
         }
         atomic_replace(&path, &content)?;
@@ -209,6 +241,52 @@ impl Archive {
             output.push_str(self.read_document(*document)?.content());
         }
         Ok(output)
+    }
+
+    pub fn export_document_markdown_file(
+        &self,
+        id: DocumentId,
+        destination: impl AsRef<Path>,
+    ) -> Result<(), Error> {
+        self.export_markdown_file(&self.export_document_markdown(id)?, destination.as_ref())
+    }
+
+    pub fn export_work_markdown_file(
+        &self,
+        id: WorkId,
+        destination: impl AsRef<Path>,
+    ) -> Result<(), Error> {
+        self.export_markdown_file(&self.export_work_markdown(id)?, destination.as_ref())
+    }
+
+    fn export_markdown_file(&self, markdown: &str, destination: &Path) -> Result<(), Error> {
+        use crate::package::{
+            replace_destination, safe_export_destination, sync_parent, temporary_sibling,
+            TemporaryFile,
+        };
+        let destination = safe_export_destination(&self.root, destination)?;
+        let temporary = temporary_sibling(&destination, "markdown")?;
+        let mut guard = TemporaryFile::register(&self.root, temporary.clone())?;
+        let mut file = File::options()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)
+            .map_err(|error| Error::io(&temporary, error))?;
+        file.write_all(markdown.as_bytes())
+            .map_err(|error| Error::io(&temporary, error))?;
+        file.sync_all()
+            .map_err(|error| Error::io(&temporary, error))?;
+        if std::env::var_os("CARTA_TEST_EXPORT_CRASH_AFTER_TEMP_WRITE")
+            .is_some_and(|path| Path::new(&path) == self.root)
+        {
+            std::mem::forget(guard);
+            return Err(Error::InvalidPackage(
+                "injected crash after external temporary write".to_owned(),
+            ));
+        }
+        replace_destination(&temporary, &destination)?;
+        guard.finish()?;
+        sync_parent(&destination)
     }
 
     pub fn document_links(&self, id: DocumentId) -> Result<Vec<MarkdownLink>, Error> {
@@ -305,49 +383,160 @@ impl Archive {
             .join("volumes")
             .join(format!("{:04}", volume.year()))
             .join(format!("{:02}", volume.month()));
-        fs::create_dir_all(&month_path).map_err(|error| Error::io(&month_path, error))?;
         let target = DocumentId::new_v7();
         let destination = month_path.join(target.to_string());
         let staging = month_path.join(format!(".carta-linked-{target}"));
-        fs::create_dir(&staging).map_err(|error| Error::io(&staging, error))?;
-        let mut guard = CleanupLinkedStaging::new(staging.clone());
+        let destination_relative = destination
+            .strip_prefix(&self.root)
+            .expect("Document destination is inside Archive")
+            .to_path_buf();
+        let staging_relative = staging
+            .strip_prefix(&self.root)
+            .expect("Document staging is inside Archive")
+            .to_path_buf();
+        let transaction = crate::transaction::Transaction::begin(
+            &self.root,
+            "Saved state before New Linked Document",
+            [
+                destination_relative,
+                staging_relative,
+                info_relative(&self.root, &self.documents[&source].path.join("content.md"))?,
+            ],
+        )?;
         let metadata = DocumentMetadata::new(target, created);
-        write_document_metadata(&staging.join("meta.json"), &metadata)?;
-        fs::write(staging.join("content.md"), b"")
-            .map_err(|error| Error::io(staging.join("content.md"), error))?;
-        let metadata_bytes = fs::read(staging.join("meta.json"))
-            .map_err(|error| Error::io(staging.join("meta.json"), error))?;
-        let link = format!(
-            "[{}](carta:doc:{target})",
-            label
-                .replace('\\', "\\\\")
-                .replace('[', "\\[")
-                .replace(']', "\\]")
-        );
-        content.insert_str(byte_offset, &link);
-        self.edit_document(source, &content)?;
-        if let Err(error) = before_publish(self, &destination).and_then(|()| {
-            fs::rename(&staging, &destination).map_err(|error| Error::io(&destination, error))
-        }) {
-            self.edit_document(source, &original)?;
-            return Err(error);
+        let operation = (|| {
+            fs::create_dir_all(&month_path).map_err(|error| Error::io(&month_path, error))?;
+            fs::create_dir(&staging).map_err(|error| Error::io(&staging, error))?;
+            let mut guard = CleanupLinkedStaging::new(staging.clone());
+            write_document_metadata(&staging.join("meta.json"), &metadata)?;
+            fs::write(staging.join("content.md"), b"")
+                .map_err(|error| Error::io(staging.join("content.md"), error))?;
+            let metadata_bytes = fs::read(staging.join("meta.json"))
+                .map_err(|error| Error::io(staging.join("meta.json"), error))?;
+            let link = format!(
+                "[{}](carta:doc:{target})",
+                label
+                    .replace('\\', "\\\\")
+                    .replace('[', "\\[")
+                    .replace(']', "\\]")
+            );
+            content.insert_str(byte_offset, &link);
+            self.edit_document(source, &content)?;
+            before_publish(self, &destination)?;
+            fs::rename(&staging, &destination).map_err(|error| Error::io(&destination, error))?;
+            guard.disarm();
+            sync_created_directory(&destination)?;
+            Ok(metadata_bytes)
+        })();
+        match operation {
+            Ok(metadata_bytes) => {
+                self.documents.insert(
+                    target,
+                    DocumentInfo {
+                        metadata,
+                        volume,
+                        path: destination,
+                        metadata_bytes,
+                        content_bytes: Vec::new(),
+                    },
+                );
+                transaction.commit()?;
+                Ok(target)
+            }
+            Err(error) => {
+                let error = transaction.rollback_error(error);
+                self.refresh()?;
+                Err(error)
+            }
         }
-        guard.disarm();
-        self.documents.insert(
-            target,
-            DocumentInfo {
-                metadata,
-                volume,
-                path: destination,
-                metadata_bytes,
-                content_bytes: Vec::new(),
-            },
-        );
-        Ok(target)
+    }
+
+    pub fn create_document_in_work_after(
+        &mut self,
+        work: WorkId,
+        after: Option<DocumentId>,
+    ) -> Result<DocumentId, Error> {
+        let id = DocumentId::new_v7();
+        let created = Timestamp::now_local();
+        let volume = Volume::from_timestamp(created).ok_or(Error::InvalidVolumeDate(created))?;
+        let relative = PathBuf::from("volumes")
+            .join(format!("{:04}", volume.year()))
+            .join(format!("{:02}", volume.month()))
+            .join(id.to_string());
+        let transaction = crate::transaction::Transaction::begin(
+            &self.root,
+            "Saved state before provisional Work Document",
+            [
+                relative.clone(),
+                info_relative(
+                    &self.root,
+                    &self
+                        .works
+                        .get(&work)
+                        .ok_or(Error::MissingWork(work))?
+                        .path
+                        .join("work.json"),
+                )?,
+            ],
+        )?;
+        let result = (|| {
+            let current = self.works.get(&work).ok_or(Error::MissingWork(work))?;
+            self.ensure_work_current(current)?;
+            let mut documents = current.documents().to_vec();
+            let index = match after {
+                Some(after) => documents
+                    .iter()
+                    .position(|candidate| *candidate == after)
+                    .map(|index| index + 1)
+                    .ok_or(Error::DocumentNotInWork {
+                        work,
+                        document: after,
+                    })?,
+                None => 0,
+            };
+            let destination = self.root.join(&relative);
+            fs::create_dir_all(destination.parent().expect("destination has parent"))
+                .map_err(|error| Error::io(destination.parent().unwrap(), error))?;
+            fs::create_dir(&destination).map_err(|error| Error::io(&destination, error))?;
+            write_document_metadata(
+                &destination.join("meta.json"),
+                &DocumentMetadata::new(id, created),
+            )?;
+            fs::write(destination.join("content.md"), b"")
+                .map_err(|error| Error::io(destination.join("content.md"), error))?;
+            documents.insert(index, id);
+            let metadata = current
+                .metadata
+                .with_documents(documents)
+                .map_err(|error| Error::format(current.path.join("work.json"), error))?;
+            self.replace_work(work, metadata)?;
+            sync_created_directory(&destination)?;
+            Ok(id)
+        })();
+        match result {
+            Ok(id) => {
+                transaction.commit()?;
+                self.refresh()?;
+                Ok(id)
+            }
+            Err(error) => {
+                let error = transaction.rollback_error(error);
+                self.refresh()?;
+                Err(error)
+            }
+        }
     }
 
     pub fn work(&self, id: WorkId) -> Option<&Work> {
         self.works.get(&id)
+    }
+
+    pub fn work_title_conflict(&self, title: &str, except: Option<WorkId>) -> Option<WorkId> {
+        let key = work_title_key(title);
+        self.works
+            .values()
+            .find(|work| Some(work.id()) != except && work_title_key(work.title()) == key)
+            .map(Work::id)
     }
 
     pub fn create_work(
@@ -555,9 +744,17 @@ impl Archive {
         let work = self.works.get(&id).ok_or(Error::MissingWork(id))?;
         let path = work.path.join("work.json");
         let bytes = serialize_work_metadata(&path, &metadata)?;
-        let external = fs::read(&path).map_err(|error| Error::io(&path, error))?;
+        let external = match fs::read(&path) {
+            Ok(external) => external,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                let conflict =
+                    self.preserve_work_conflict(id, &bytes, &work.metadata_bytes, true)?;
+                return Err(Error::ConflictPreserved(conflict));
+            }
+            Err(error) => return Err(Error::io(&path, error)),
+        };
         if external != work.metadata_bytes {
-            let conflict = self.preserve_work_conflict(id, &bytes, &external)?;
+            let conflict = self.preserve_work_conflict(id, &bytes, &external, false)?;
             return Err(Error::ConflictPreserved(conflict));
         }
         atomic_replace(&path, &bytes)?;
@@ -609,6 +806,12 @@ fn ensure_unchanged(path: &Path, expected: &[u8]) -> Result<(), Error> {
         return Err(Error::ExternalChange(path.to_path_buf()));
     }
     Ok(())
+}
+
+fn info_relative(root: &Path, path: &Path) -> Result<PathBuf, Error> {
+    path.strip_prefix(root)
+        .map(Path::to_path_buf)
+        .map_err(|_| Error::PathOutsideArchive(path.to_path_buf()))
 }
 
 pub(crate) fn serialize_work_metadata(
@@ -884,6 +1087,22 @@ fn create_writer(path: &Path) -> Result<BufWriter<File>, Error> {
         .map_err(|error| Error::io(path, error))
 }
 
+fn sync_created_directory(path: &Path) -> Result<(), Error> {
+    for name in ["meta.json", "content.md"] {
+        let file = path.join(name);
+        File::open(&file)
+            .and_then(|file| file.sync_all())
+            .map_err(|error| Error::io(&file, error))?;
+    }
+    File::open(path)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|error| Error::io(path, error))?;
+    let parent = path.parent().expect("created directory has a parent");
+    File::open(parent)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|error| Error::io(parent, error))
+}
+
 struct CleanupDirectory {
     path: PathBuf,
     armed: bool,
@@ -985,5 +1204,7 @@ mod tests {
             .unwrap(),
             "source"
         );
+        assert!(!archive.root().join(".git/carta-transaction.json").exists());
+        Archive::validate(archive.root()).unwrap();
     }
 }

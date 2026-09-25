@@ -38,6 +38,12 @@ pub enum Error {
     #[error("archive resource path is not UTF-8 and cannot be packaged: {0}")]
     NonUtf8PackagePath(PathBuf),
 
+    #[error("external temporary path is not UTF-8: {0}")]
+    NonUtf8TemporaryPath(PathBuf),
+
+    #[error("external temporary registry is malformed: {0}")]
+    MalformedTemporaryRegistry(String),
+
     #[error("symbolic links cannot be represented safely in a portable package: {0}")]
     UnsupportedPackageSymlink(PathBuf),
 
@@ -218,14 +224,38 @@ pub enum Error {
     #[error("wipe requires the Archive repository to have only its primary working tree")]
     WipeAdditionalWorktrees,
 
+    #[error("wipe refuses Git pseudoref or operation state: {0}")]
+    WipeRepositoryState(String),
+
     #[error("wipe verification failed: {0}")]
     WipeVerificationFailed(String),
+
+    #[error("wipe failed ({operation}) and restoring original refs also failed ({rollback})")]
+    WipeRollbackFailed {
+        operation: Box<Error>,
+        rollback: Box<Error>,
+    },
+
+    #[error("wipe reached irreversible cleanup and then failed during {stage}: {source}")]
+    WipeIrreversibleFailure {
+        stage: &'static str,
+        source: Box<Error>,
+    },
 
     #[error("structural operation failed ({operation}) and rollback also failed ({rollback})")]
     StructuralRollbackFailed {
         operation: Box<Error>,
         rollback: Box<Error>,
     },
+
+    #[error("structural transaction manifest is malformed: {0}")]
+    MalformedTransaction(String),
+
+    #[error("interrupted transaction recovery is ambiguous because tracked external changes exist at {0:?}")]
+    AmbiguousTransactionRecovery(Vec<PathBuf>),
+
+    #[error("structural transaction contains an unsafe or pre-existing owned path: {0}")]
+    UnsafeTransactionPath(PathBuf),
 }
 
 impl Error {

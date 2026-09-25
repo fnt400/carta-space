@@ -7,6 +7,9 @@ pub struct Clipboard {
 }
 
 impl Clipboard {
+    pub fn clear_internal(&mut self) {
+        self.internal.clear();
+    }
     pub fn copy(&mut self, text: String) {
         self.internal = text.clone();
         for (program, args) in [
@@ -56,4 +59,18 @@ fn write_command(program: &str, args: &[&str], bytes: &[u8]) -> bool {
         return false;
     }
     child.wait().is_ok_and(|status| status.success())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clearing_internal_clipboard_removes_fallback_content() {
+        let mut clipboard = Clipboard {
+            internal: "sensitive".to_owned(),
+        };
+        clipboard.clear_internal();
+        assert!(clipboard.internal.is_empty());
+    }
 }

@@ -17,12 +17,12 @@ use crate::{
 };
 
 /// Scope of the on-device Wipe guarantee.
-pub const WIPE_GUARANTEE: &str = "Removes this Document's canonical paths and exclusively owned content from all retained local Git refs, reflogs, unreachable Git objects, and Carta-reserved local artifacts. It does not cover external backups, exports, clones, snapshots, copied files, or physical storage remnants.";
+pub const WIPE_GUARANTEE: &str = "Removes this Document's canonical identity and paths from all retained local Git refs and removes exclusively owned content from reflogs, unreachable Git objects, and Carta-reserved local artifacts. Identical content independently retained by another Document remains and is not claimed as byte-erased. It does not cover external backups, exports, clones, snapshots, copied files, or physical storage remnants.";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkMembership {
-    id: WorkId,
-    title: String,
+    pub(crate) id: WorkId,
+    pub(crate) title: String,
 }
 
 impl WorkMembership {
@@ -224,21 +224,38 @@ impl Archive {
             )?;
         }
 
-        let original_head = head(self.root())?;
-        checkpoint_pending_state(self.root(), "Saved state immediately before Trash")?;
-        let transaction =
-            transaction_directory(self.root(), "trash-document", document.to_string())?;
-        let saved_document = transaction.join("document");
-        let mut originals = Vec::new();
+        let transaction_path = self
+            .root()
+            .join(".git")
+            .join(format!("carta-transaction-trash-document-{document}"));
+        let mut owned = vec![
+            transaction_path
+                .strip_prefix(self.root())
+                .unwrap()
+                .to_path_buf(),
+            info.path.strip_prefix(self.root()).unwrap().to_path_buf(),
+        ];
+        owned.extend(impact.memberships().iter().map(|membership| {
+            self.works[&membership.id()]
+                .path
+                .join("work.json")
+                .strip_prefix(self.root())
+                .unwrap()
+                .to_path_buf()
+        }));
+        let transaction = crate::transaction::Transaction::begin(
+            self.root(),
+            "Saved state immediately before Trash",
+            owned,
+        )?;
+        let saved_document = transaction_path.join("document");
 
         let operation = (|| {
+            fs::create_dir(&transaction_path)
+                .map_err(|error| Error::io(&transaction_path, error))?;
             for membership in impact.memberships() {
                 let work = self.works.get(&membership.id()).expect("active membership");
                 let path = work.path.join("work.json");
-                originals.push((
-                    path.clone(),
-                    fs::read(&path).map_err(|error| Error::io(&path, error))?,
-                ));
                 let documents = work
                     .documents()
                     .iter()
@@ -263,22 +280,16 @@ impl Archive {
 
         match operation {
             Ok(checkpoint) => {
-                let _ = fs::remove_dir_all(&transaction);
+                fs::remove_dir_all(&transaction_path)
+                    .map_err(|error| Error::io(&transaction_path, error))?;
+                transaction.commit()?;
                 self.refresh()?;
                 Ok(checkpoint)
             }
             Err(error) => {
-                let result = rollback_structural(
-                    self.root(),
-                    &original_head,
-                    &originals,
-                    &[(saved_document, info.path)],
-                    &[],
-                    error,
-                );
-                let _ = fs::remove_dir_all(&transaction);
-                result?;
-                unreachable!("rollback returns the operation error")
+                let error = transaction.rollback_error(error);
+                self.refresh()?;
+                Err(error)
             }
         }
     }
@@ -287,12 +298,25 @@ impl Archive {
         let current = self.works.get(&work).ok_or(Error::MissingWork(work))?;
         self.ensure_work_current(current)?;
         let path = current.path.clone();
-        let original_head = head(self.root())?;
-        checkpoint_pending_state(self.root(), "Saved state immediately before Trash")?;
-        let transaction = transaction_directory(self.root(), "trash-work", work.to_string())?;
-        let saved = transaction.join("work");
-        let operation = fs::rename(&path, &saved)
-            .map_err(|error| Error::io(&path, error))
+        let transaction_path = self
+            .root()
+            .join(".git")
+            .join(format!("carta-transaction-trash-work-{work}"));
+        let transaction = crate::transaction::Transaction::begin(
+            self.root(),
+            "Saved state immediately before Trash",
+            [
+                transaction_path
+                    .strip_prefix(self.root())
+                    .unwrap()
+                    .to_path_buf(),
+                path.strip_prefix(self.root()).unwrap().to_path_buf(),
+            ],
+        )?;
+        let saved = transaction_path.join("work");
+        let operation = fs::create_dir(&transaction_path)
+            .map_err(|error| Error::io(&transaction_path, error))
+            .and_then(|()| fs::rename(&path, &saved).map_err(|error| Error::io(&path, error)))
             .and_then(|()| {
                 require_checkpoint(
                     self.root(),
@@ -302,22 +326,16 @@ impl Archive {
             });
         match operation {
             Ok(checkpoint) => {
-                let _ = fs::remove_dir_all(&transaction);
+                fs::remove_dir_all(&transaction_path)
+                    .map_err(|error| Error::io(&transaction_path, error))?;
+                transaction.commit()?;
                 self.refresh()?;
                 Ok(checkpoint)
             }
             Err(error) => {
-                let result = rollback_structural(
-                    self.root(),
-                    &original_head,
-                    &[],
-                    &[(saved, path)],
-                    &[],
-                    error,
-                );
-                let _ = fs::remove_dir_all(&transaction);
-                result?;
-                unreachable!("rollback returns the operation error")
+                let error = transaction.rollback_error(error);
+                self.refresh()?;
+                Err(error)
             }
         }
     }
@@ -368,8 +386,12 @@ impl Archive {
         let volume = Volume::from_timestamp(historical.metadata().created())
             .ok_or(Error::InvalidVolumeDate(historical.metadata().created()))?;
         let destination = document_destination(self.root(), volume, document);
-        let original_head = head(self.root())?;
-        checkpoint_pending_state(self.root(), "Saved state immediately before Restore")?;
+        let relative = destination.strip_prefix(self.root()).unwrap().to_path_buf();
+        let transaction = crate::transaction::Transaction::begin(
+            self.root(),
+            "Saved state immediately before Restore",
+            [relative],
+        )?;
         let operation = write_restored_document(&destination, &historical).and_then(|()| {
             require_checkpoint(
                 self.root(),
@@ -379,12 +401,14 @@ impl Archive {
         });
         match operation {
             Ok(checkpoint) => {
+                transaction.commit()?;
                 self.refresh()?;
                 Ok(checkpoint)
             }
             Err(error) => {
-                rollback_structural(self.root(), &original_head, &[], &[], &[destination], error)?;
-                unreachable!("rollback returns the operation error")
+                let error = transaction.rollback_error(error);
+                self.refresh()?;
+                Err(error)
             }
         }
     }
@@ -393,6 +417,7 @@ impl Archive {
         &mut self,
         work: WorkId,
         restore_required_trashed_documents: bool,
+        replacement_title: Option<String>,
     ) -> Result<Checkpoint, Error> {
         if self.works.contains_key(&work) {
             return Err(Error::WorkIsActive(work));
@@ -400,6 +425,9 @@ impl Archive {
         let commits = commits_from_head(self.root())?;
         let metadata =
             latest_work(self.root(), work, &commits)?.ok_or(Error::WorkNotRecoverable(work))?;
+        let metadata = replacement_title
+            .map(|title| metadata.with_title(title))
+            .unwrap_or(metadata);
         let key = work_title_key(metadata.title());
         if let Some(existing) = self
             .works
@@ -435,10 +463,26 @@ impl Archive {
             });
         }
 
-        let original_head = head(self.root())?;
-        checkpoint_pending_state(self.root(), "Saved state immediately before Restore")?;
         let work_destination = self.root().join("works").join(work.to_string());
-        let mut created = Vec::new();
+        let mut cleanup = vec![work_destination
+            .strip_prefix(self.root())
+            .unwrap()
+            .to_path_buf()];
+        for document in &restored_documents {
+            let volume = Volume::from_timestamp(document.metadata().created())
+                .ok_or(Error::InvalidVolumeDate(document.metadata().created()))?;
+            cleanup.push(
+                document_destination(self.root(), volume, document.metadata().id())
+                    .strip_prefix(self.root())
+                    .unwrap()
+                    .to_path_buf(),
+            );
+        }
+        let transaction = crate::transaction::Transaction::begin(
+            self.root(),
+            "Saved state immediately before Restore",
+            cleanup,
+        )?;
         let operation = (|| {
             for document in &restored_documents {
                 let volume = Volume::from_timestamp(document.metadata().created())
@@ -446,10 +490,8 @@ impl Archive {
                 let destination =
                     document_destination(self.root(), volume, document.metadata().id());
                 write_restored_document(&destination, document)?;
-                created.push(destination);
             }
             write_restored_work(&work_destination, &metadata)?;
-            created.push(work_destination.clone());
             require_checkpoint(
                 self.root(),
                 CheckpointKind::Structural,
@@ -458,12 +500,14 @@ impl Archive {
         })();
         match operation {
             Ok(checkpoint) => {
+                transaction.commit()?;
                 self.refresh()?;
                 Ok(checkpoint)
             }
             Err(error) => {
-                rollback_structural(self.root(), &original_head, &[], &[], &created, error)?;
-                unreachable!("rollback returns the operation error")
+                let error = transaction.rollback_error(error);
+                self.refresh()?;
+                Err(error)
             }
         }
     }
@@ -477,13 +521,14 @@ impl Archive {
         }
         require_clean_tracked_state(self.root())?;
         require_single_worktree(self.root())?;
+        require_safe_git_state(self.root())?;
         let refs = retained_refs(self.root())?;
         let commits = commits_from_refs(self.root(), &refs)?;
         let (directories, objects) = wipe_targets(self.root(), document, &commits)?;
         if directories.is_empty() {
             return Err(Error::DocumentNotRecoverable(document));
         }
-        verify_objects_are_exclusive(self.root(), document, &commits, &objects)?;
+        let objects = exclusively_owned_objects(self.root(), document, &commits, &objects)?;
         let planned_head = head(self.root())?;
         let nonce = DocumentId::new_v7();
         let retained_refs = refs
@@ -518,6 +563,7 @@ impl Archive {
         }
         require_clean_tracked_state(self.root())?;
         require_single_worktree(self.root())?;
+        require_safe_git_state(self.root())?;
         if head(self.root())? != plan.planned_head {
             return Err(Error::StaleWipePlan);
         }
@@ -544,20 +590,37 @@ impl Archive {
             return Err(Error::StaleWipePlan);
         }
         let commits = commits_from_refs(self.root(), &refs)?;
-        let (directories, objects) = wipe_targets(self.root(), plan.document, &commits)?;
+        let (directories, all_objects) = wipe_targets(self.root(), plan.document, &commits)?;
+        let objects =
+            exclusively_owned_objects(self.root(), plan.document, &commits, &all_objects)?;
         if directories.iter().cloned().collect::<Vec<_>>() != plan.canonical_directories
             || objects.iter().cloned().collect::<Vec<_>>() != plan.content_objects
         {
             return Err(Error::StaleWipePlan);
         }
-        verify_objects_are_exclusive(self.root(), plan.document, &commits, &objects)?;
-
         let rewrite = rewrite_history(self.root(), plan.document, &refs, &commits)?;
-        verify_rewritten_refs(self.root(), plan.document, &objects)?;
-        let mut removed_artifacts =
-            crate::conflict::scrub_document_conflicts(self.root(), plan.document)?;
-        removed_artifacts += remove_carta_artifacts(self.root())?;
-        git_output(
+        let reversible = (|| {
+            if std::env::var_os("CARTA_TEST_WIPE_FAIL_AFTER_REF_UPDATE")
+                .is_some_and(|path| Path::new(&path) == self.root())
+            {
+                return Err(Error::WipeVerificationFailed(
+                    "injected failure after ref update".to_owned(),
+                ));
+            }
+            verify_rewritten_refs(self.root(), plan.document, &objects)?;
+            let mut removed_artifacts =
+                crate::conflict::scrub_document_conflicts(self.root(), plan.document)?;
+            removed_artifacts += crate::package::cleanup_registered_temporaries(self.root())?;
+            removed_artifacts += remove_carta_artifacts(self.root())?;
+            Ok(removed_artifacts)
+        })();
+        let removed_artifacts = match reversible {
+            Ok(removed) => removed,
+            Err(error) => {
+                return Err(rollback_wipe_refs(self.root(), &rewrite.updates, error));
+            }
+        };
+        if let Err(source) = git_output(
             self.root(),
             "expire reflogs after Wipe",
             &[
@@ -567,27 +630,40 @@ impl Archive {
                 "--expire-unreachable=now",
                 "--all",
             ],
-        )?;
-        git_output(
+        ) {
+            return Err(Error::WipeIrreversibleFailure {
+                stage: "reflog expiration",
+                source: Box::new(source),
+            });
+        }
+        if let Err(source) = git_output(
             self.root(),
             "prune unreachable Wipe objects",
             &["gc", "--prune=now", "--quiet"],
-        )?;
-        verify_pruned_objects(self.root(), &objects)?;
-        self.refresh()?;
+        ) {
+            return Err(Error::WipeIrreversibleFailure {
+                stage: "Git garbage collection",
+                source: Box::new(source),
+            });
+        }
+        if let Err(source) = verify_pruned_objects(self.root(), &objects) {
+            return Err(Error::WipeIrreversibleFailure {
+                stage: "post-GC verification",
+                source: Box::new(source),
+            });
+        }
+        if let Err(source) = self.refresh() {
+            return Err(Error::WipeIrreversibleFailure {
+                stage: "Archive refresh",
+                source: Box::new(source),
+            });
+        }
         Ok(WipeReport {
             rewritten_refs: rewrite.rewritten_refs,
             rewritten_commits: rewrite.rewritten_commits,
             removed_artifacts,
         })
     }
-}
-
-fn checkpoint_pending_state(root: &Path, note: &str) -> Result<(), Error> {
-    if crate::history::is_dirty_at(root)? {
-        require_checkpoint(root, CheckpointKind::Structural, Some(note))?;
-    }
-    Ok(())
 }
 
 fn head(root: &Path) -> Result<String, Error> {
@@ -722,52 +798,6 @@ fn write_restored_work(destination: &Path, metadata: &WorkMetadata) -> Result<()
     result
 }
 
-fn transaction_directory(root: &Path, operation: &str, id: String) -> Result<PathBuf, Error> {
-    let path = root
-        .join(".git")
-        .join(format!("carta-transaction-{operation}-{id}"));
-    fs::create_dir(&path).map_err(|error| Error::io(&path, error))?;
-    Ok(path)
-}
-
-fn rollback_structural(
-    root: &Path,
-    original_head: &str,
-    files: &[(PathBuf, Vec<u8>)],
-    renames: &[(PathBuf, PathBuf)],
-    created: &[PathBuf],
-    operation: Error,
-) -> Result<(), Error> {
-    let rollback = (|| {
-        for path in created.iter().rev() {
-            if path.exists() {
-                fs::remove_dir_all(path).map_err(|error| Error::io(path, error))?;
-            }
-        }
-        for (from, to) in renames.iter().rev() {
-            if from.exists() {
-                fs::rename(from, to).map_err(|error| Error::io(to, error))?;
-            }
-        }
-        for (path, bytes) in files.iter().rev() {
-            crate::archive::atomic_replace(path, bytes)?;
-        }
-        git_output(
-            root,
-            "restore failed structural history",
-            &["reset", "--mixed", "--quiet", original_head],
-        )?;
-        Ok(())
-    })();
-    match rollback {
-        Ok(()) => Err(operation),
-        Err(rollback) => Err(Error::StructuralRollbackFailed {
-            operation: Box::new(operation),
-            rollback: Box::new(rollback),
-        }),
-    }
-}
-
 #[derive(Debug, Clone)]
 struct RetainedRef {
     name: String,
@@ -858,26 +888,23 @@ fn wipe_targets(
     Ok((directories, objects))
 }
 
-fn verify_objects_are_exclusive(
+fn exclusively_owned_objects(
     root: &Path,
     document: DocumentId,
     commits: &[String],
     objects: &BTreeSet<String>,
-) -> Result<(), Error> {
+) -> Result<BTreeSet<String>, Error> {
+    let mut exclusive = objects.clone();
     for commit in commits {
         for entry in tree_entries(root, commit)? {
             if objects.contains(&entry.object)
                 && !matches!(canonical_document_path(&entry.path), Some((id, _)) if id == document)
             {
-                return Err(Error::WipeContentShared {
-                    document,
-                    object: entry.object,
-                    path: entry.path,
-                });
+                exclusive.remove(&entry.object);
             }
         }
     }
-    Ok(())
+    Ok(exclusive)
 }
 
 #[derive(Debug)]
@@ -924,6 +951,7 @@ fn tree_entries(root: &Path, object: &str) -> Result<Vec<TreeEntry>, Error> {
 struct RewriteResult {
     rewritten_refs: usize,
     rewritten_commits: usize,
+    updates: Vec<(String, String, String)>,
 }
 
 fn rewrite_history(
@@ -953,7 +981,10 @@ fn rewrite_history(
                     .unwrap_or_else(|| parent.clone())
             })
             .collect();
-        if tree == parsed.tree && parents == parsed.parents {
+        let mentions_document = raw
+            .windows(document.to_string().len())
+            .any(|window| window == document.to_string().as_bytes());
+        if tree == parsed.tree && parents == parsed.parents && !mentions_document {
             rewritten.insert(commit.clone(), commit.clone());
             continue;
         }
@@ -970,7 +1001,13 @@ fn rewrite_history(
                 .get(&reference.object)
                 .cloned()
                 .unwrap_or_else(|| reference.object.clone()),
-            "tag" => rewrite_tag(root, &reference.object, &rewritten, &mut HashMap::new())?,
+            "tag" => rewrite_tag(
+                root,
+                &reference.object,
+                document,
+                &rewritten,
+                &mut HashMap::new(),
+            )?,
             other => {
                 return Err(Error::UnsupportedWipeRef {
                     reference: reference.name.clone(),
@@ -983,15 +1020,46 @@ fn rewrite_history(
         }
     }
     update_refs_transaction(root, &updates)?;
-    git_output(
+    if let Err(error) = git_output(
         root,
         "refresh index after Wipe",
         &["reset", "--mixed", "--quiet"],
-    )?;
+    ) {
+        return Err(rollback_wipe_refs(root, &updates, error));
+    }
     Ok(RewriteResult {
         rewritten_refs: updates.len(),
         rewritten_commits: changed_commits,
+        updates,
     })
+}
+
+fn rollback_wipe_refs(
+    root: &Path,
+    updates: &[(String, String, String)],
+    operation: Error,
+) -> Error {
+    match restore_rewritten_refs(root, updates) {
+        Ok(()) => operation,
+        Err(rollback) => Error::WipeRollbackFailed {
+            operation: Box::new(operation),
+            rollback: Box::new(rollback),
+        },
+    }
+}
+
+fn restore_rewritten_refs(root: &Path, updates: &[(String, String, String)]) -> Result<(), Error> {
+    let inverse: Vec<_> = updates
+        .iter()
+        .map(|(name, new, old)| (name.clone(), old.clone(), new.clone()))
+        .collect();
+    update_refs_transaction(root, &inverse)?;
+    git_output(
+        root,
+        "restore index after failed Wipe",
+        &["reset", "--mixed", "--quiet"],
+    )?;
+    Ok(())
 }
 
 struct ParsedCommit {
@@ -1051,7 +1119,7 @@ fn rewrite_commit_bytes(raw: &[u8], tree: &str, parents: &[String]) -> Result<Ve
         writeln!(output, "{line}").expect("Vec writes cannot fail");
     }
     output.push(b'\n');
-    output.extend_from_slice(&raw[separator + 2..]);
+    output.extend_from_slice(b"Carta Space Wipe\n");
     Ok(output)
 }
 
@@ -1128,6 +1196,7 @@ fn hash_object(root: &Path, object_type: &str, bytes: &[u8]) -> Result<String, E
 fn rewrite_tag(
     root: &Path,
     tag: &str,
+    document: DocumentId,
     commits: &HashMap<String, String>,
     tags: &mut HashMap<String, String>,
 ) -> Result<String, Error> {
@@ -1159,7 +1228,7 @@ fn rewrite_tag(
             .get(object)
             .cloned()
             .unwrap_or_else(|| object.to_owned()),
-        "tag" => rewrite_tag(root, object, commits, tags)?,
+        "tag" => rewrite_tag(root, object, document, commits, tags)?,
         other => {
             return Err(Error::UnsupportedWipeRef {
                 reference: tag.to_owned(),
@@ -1167,14 +1236,31 @@ fn rewrite_tag(
             })
         }
     };
-    if rewritten_object == object {
+    let mentions_document = raw
+        .windows(document.to_string().len())
+        .any(|window| window == document.to_string().as_bytes());
+    if rewritten_object == object && !mentions_document {
         tags.insert(tag.to_owned(), tag.to_owned());
         return Ok(tag.to_owned());
     }
-    let mut rewritten = raw.clone();
-    let old = format!("object {object}");
-    let new = format!("object {rewritten_object}");
-    rewritten.splice(0..old.len(), new.bytes());
+    let mut rewritten = Vec::new();
+    writeln!(rewritten, "object {rewritten_object}").expect("Vec writes cannot fail");
+    let mut skipping_signature = false;
+    for line in headers.lines() {
+        if line.starts_with("object ") {
+            continue;
+        }
+        if line.starts_with("gpgsig ") || line.starts_with("gpgsig-sha256 ") {
+            skipping_signature = true;
+            continue;
+        }
+        if skipping_signature && line.starts_with(' ') {
+            continue;
+        }
+        skipping_signature = false;
+        writeln!(rewritten, "{line}").expect("Vec writes cannot fail");
+    }
+    rewritten.extend_from_slice(b"\nCarta Space Wipe\n");
     let new_tag = hash_object(root, "tag", &rewritten)?;
     tags.insert(tag.to_owned(), new_tag.clone());
     Ok(new_tag)
@@ -1293,6 +1379,57 @@ fn require_single_worktree(root: &Path) -> Result<(), Error> {
     } else {
         Err(Error::WipeAdditionalWorktrees)
     }
+}
+
+fn require_safe_git_state(root: &Path) -> Result<(), Error> {
+    for name in [
+        "ORIG_HEAD",
+        "FETCH_HEAD",
+        "MERGE_HEAD",
+        "AUTO_MERGE",
+        "CHERRY_PICK_HEAD",
+        "REVERT_HEAD",
+        "REBASE_HEAD",
+        "BISECT_HEAD",
+        "BISECT_LOG",
+        "BISECT_START",
+        "BISECT_NAMES",
+        "rebase-apply",
+        "rebase-merge",
+        "sequencer",
+    ] {
+        let output = git_output(
+            root,
+            "resolve Git operation state path",
+            &["rev-parse", "--git-path", name],
+        )?;
+        let path = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim().to_owned());
+        let path = if path.is_absolute() {
+            path
+        } else {
+            root.join(path)
+        };
+        if path.exists() {
+            return Err(Error::WipeRepositoryState(name.to_owned()));
+        }
+    }
+    let operation_refs = git_output(
+        root,
+        "inspect Git operation refs",
+        &[
+            "for-each-ref",
+            "--format=%(refname)",
+            "refs/bisect",
+            "refs/rewritten",
+        ],
+    )?;
+    if let Some(reference) = String::from_utf8_lossy(&operation_refs.stdout)
+        .lines()
+        .find(|line| !line.is_empty())
+    {
+        return Err(Error::WipeRepositoryState(reference.to_owned()));
+    }
+    Ok(())
 }
 
 fn remove_carta_artifacts(root: &Path) -> Result<usize, Error> {

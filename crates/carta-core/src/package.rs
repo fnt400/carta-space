@@ -7,6 +7,8 @@ use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
 use crate::{Archive, Error};
 
+const TEMPORARY_REGISTRY: &str = "carta-external-temporaries.json";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackageReport {
     destination: PathBuf,
@@ -35,11 +37,11 @@ impl Archive {
         let checkpoint_created = crate::history::create_package_checkpoint(&self.root)?.is_some();
 
         let temporary = temporary_sibling(&destination, "package")?;
-        let mut guard = TemporaryFile::new(temporary.clone());
+        let mut guard = TemporaryFile::register(&self.root, temporary.clone())?;
         let entries = write_package(&self.root, &temporary)?;
         validate_package(&temporary)?;
         replace_destination(&temporary, &destination)?;
-        guard.disarm();
+        guard.finish()?;
         sync_parent(&destination)?;
         Ok(PackageReport {
             destination,
@@ -212,7 +214,8 @@ pub(crate) fn temporary_sibling(destination: &Path, kind: &str) -> Result<PathBu
     let name = destination
         .file_name()
         .expect("safe destinations have a name")
-        .to_string_lossy();
+        .to_str()
+        .ok_or_else(|| Error::NonUtf8TemporaryPath(destination.to_path_buf()))?;
     Ok(parent.join(format!(".carta-{kind}-{name}-{}.tmp", uuid::Uuid::now_v7())))
 }
 
@@ -251,6 +254,7 @@ fn is_transient(path: &Path, root: &Path) -> bool {
                 name.starts_with("carta-transaction-")
                     || name.starts_with("carta-wipe-index-")
                     || name == "carta-conflicts"
+                    || name == TEMPORARY_REGISTRY
             } else {
                 name.starts_with(".carta-")
             }
@@ -259,17 +263,25 @@ fn is_transient(path: &Path, root: &Path) -> bool {
 }
 
 pub(crate) struct TemporaryFile {
+    root: PathBuf,
     path: PathBuf,
     armed: bool,
 }
 
 impl TemporaryFile {
-    pub(crate) fn new(path: PathBuf) -> Self {
-        Self { path, armed: true }
+    pub(crate) fn register(root: &Path, path: PathBuf) -> Result<Self, Error> {
+        register_temporary(root, &path)?;
+        Ok(Self {
+            root: root.to_path_buf(),
+            path,
+            armed: true,
+        })
     }
 
-    pub(crate) fn disarm(&mut self) {
+    pub(crate) fn finish(&mut self) -> Result<(), Error> {
+        unregister_temporary(&self.root, &self.path)?;
         self.armed = false;
+        Ok(())
     }
 }
 
@@ -277,6 +289,137 @@ impl Drop for TemporaryFile {
     fn drop(&mut self) {
         if self.armed {
             let _ = fs::remove_file(&self.path);
+            let _ = unregister_temporary(&self.root, &self.path);
         }
     }
+}
+
+pub(crate) fn cleanup_registered_temporaries(root: &Path) -> Result<usize, Error> {
+    let paths = read_registry(root)?;
+    let mut removed = 0;
+    for path in &paths {
+        validate_registered_path(root, path)?;
+        match fs::symlink_metadata(path) {
+            Ok(metadata) if metadata.is_file() || metadata.file_type().is_symlink() => {
+                fs::remove_file(path).map_err(|error| Error::io(path, error))?;
+                removed += 1;
+            }
+            Ok(_) => return Err(Error::UnsafeDestination(path.clone())),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(Error::io(path, error)),
+        }
+    }
+    if !paths.is_empty() || registry_path(root).exists() {
+        write_registry(root, &[])?;
+        let path = registry_path(root);
+        match fs::remove_file(&path) {
+            Ok(()) => sync_git_directory(root)?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(Error::io(path, error)),
+        }
+    }
+    Ok(removed)
+}
+
+fn register_temporary(root: &Path, path: &Path) -> Result<(), Error> {
+    validate_registered_path(root, path)?;
+    let mut paths = read_registry(root)?;
+    if !paths.iter().any(|candidate| candidate == path) {
+        paths.push(path.to_path_buf());
+        paths.sort();
+        write_registry(root, &paths)?;
+    }
+    Ok(())
+}
+
+fn unregister_temporary(root: &Path, path: &Path) -> Result<(), Error> {
+    let mut paths = read_registry(root)?;
+    paths.retain(|candidate| candidate != path);
+    if paths.is_empty() {
+        let registry = registry_path(root);
+        match fs::remove_file(&registry) {
+            Ok(()) => sync_git_directory(root),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(Error::io(registry, error)),
+        }
+    } else {
+        write_registry(root, &paths)
+    }
+}
+
+fn read_registry(root: &Path) -> Result<Vec<PathBuf>, Error> {
+    let path = registry_path(root);
+    let bytes = match fs::read(&path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(Error::io(path, error)),
+    };
+    let strings: Vec<String> = serde_json::from_slice(&bytes)
+        .map_err(|error| Error::MalformedTemporaryRegistry(error.to_string()))?;
+    Ok(strings.into_iter().map(PathBuf::from).collect())
+}
+
+fn write_registry(root: &Path, paths: &[PathBuf]) -> Result<(), Error> {
+    let strings = paths
+        .iter()
+        .map(|path| {
+            path.to_str()
+                .map(str::to_owned)
+                .ok_or_else(|| Error::NonUtf8TemporaryPath(path.clone()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let bytes = serde_json::to_vec(&strings)
+        .map_err(|error| Error::MalformedTemporaryRegistry(error.to_string()))?;
+    let git = root.join(".git");
+    let temporary = git.join(format!(
+        ".{TEMPORARY_REGISTRY}-{}.tmp",
+        uuid::Uuid::now_v7()
+    ));
+    let destination = registry_path(root);
+    let result = (|| {
+        let mut file = File::options()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)
+            .map_err(|error| Error::io(&temporary, error))?;
+        file.write_all(&bytes)
+            .map_err(|error| Error::io(&temporary, error))?;
+        file.sync_all()
+            .map_err(|error| Error::io(&temporary, error))?;
+        fs::rename(&temporary, &destination).map_err(|error| Error::io(&destination, error))?;
+        sync_git_directory(root)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(temporary);
+    }
+    result
+}
+
+fn validate_registered_path(root: &Path, path: &Path) -> Result<(), Error> {
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| Error::NonUtf8TemporaryPath(path.to_path_buf()))?;
+    let root = root
+        .canonicalize()
+        .map_err(|error| Error::io(root, error))?;
+    if !path.is_absolute()
+        || path.starts_with(root)
+        || !name.starts_with(".carta-")
+        || !name.ends_with(".tmp")
+    {
+        return Err(Error::UnsafeDestination(path.to_path_buf()));
+    }
+    Ok(())
+}
+
+fn registry_path(root: &Path) -> PathBuf {
+    root.join(".git").join(TEMPORARY_REGISTRY)
+}
+
+fn sync_git_directory(root: &Path) -> Result<(), Error> {
+    let git = root.join(".git");
+    File::open(&git)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|error| Error::io(git, error))
 }

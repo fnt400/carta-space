@@ -86,7 +86,7 @@ impl Archive {
     ) -> Result<(), Error> {
         let destination = safe_export_destination(&self.root, destination)?;
         let temporary = temporary_sibling(&destination, "pdf")?;
-        let mut guard = TemporaryFile::new(temporary.clone());
+        let mut guard = TemporaryFile::register(&self.root, temporary.clone())?;
         let mut child = Command::new(&options.pandoc)
             .args([
                 "--from=commonmark",
@@ -130,7 +130,7 @@ impl Archive {
             .and_then(|file| file.sync_all())
             .map_err(|error| Error::io(&temporary, error))?;
         replace_destination(&temporary, &destination)?;
-        guard.disarm();
+        guard.finish()?;
         sync_parent(&destination)
     }
 }

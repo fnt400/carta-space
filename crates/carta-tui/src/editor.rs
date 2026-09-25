@@ -61,6 +61,24 @@ impl CompositeEditor {
     pub fn mark_saved(&mut self) {
         self.dirty = false;
     }
+    pub fn scrub_document(&mut self, document: DocumentId) {
+        self.regions.retain(|region| region.document != document);
+        self.undo.retain(|snapshot| {
+            !snapshot
+                .regions
+                .iter()
+                .any(|region| region.document == document)
+        });
+        self.redo.retain(|snapshot| {
+            !snapshot
+                .regions
+                .iter()
+                .any(|region| region.document == document)
+        });
+        self.anchor = None;
+        self.cursor = Cursor { region: 0, byte: 0 };
+        self.clamp_cursor();
+    }
     pub fn current_document(&self) -> Option<DocumentId> {
         self.regions.get(self.cursor.region).map(|r| r.document)
     }
