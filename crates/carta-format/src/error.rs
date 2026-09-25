@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::DocumentId;
+
 #[derive(Debug, Error)]
 pub enum IdError {
     #[error("invalid UUID {value:?}: {source}")]
@@ -54,4 +56,7 @@ pub enum FormatError {
         actual: String,
         expected: &'static str,
     },
+
+    #[error("work contains document {0} more than once")]
+    DuplicateWorkDocument(DocumentId),
 }

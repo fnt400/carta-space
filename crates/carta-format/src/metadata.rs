@@ -1,7 +1,10 @@
+use std::collections::HashSet;
 use std::io::{Read, Write};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use unicode_casefold::UnicodeCaseFold;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::{
     ArchiveId, DocumentId, FormatError, Timestamp, WorkId, FORMAT_NAME, HISTORY_FORMAT,
@@ -9,6 +12,10 @@ use crate::{
 };
 
 pub type JsonExtensions = Map<String, Value>;
+
+pub fn work_title_key(title: &str) -> String {
+    title.trim().nfc().case_fold().collect()
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FormatVersion {
@@ -179,21 +186,31 @@ pub struct WorkMetadata {
 }
 
 impl WorkMetadata {
-    pub fn new(id: WorkId, created: Timestamp, title: String, documents: Vec<DocumentId>) -> Self {
-        Self {
+    pub fn new(
+        id: WorkId,
+        created: Timestamp,
+        title: String,
+        documents: Vec<DocumentId>,
+    ) -> Result<Self, FormatError> {
+        let metadata = Self {
             id,
             created,
             title,
             documents,
             extensions: JsonExtensions::new(),
-        }
+        };
+        metadata.validate()?;
+        Ok(metadata)
     }
 
     pub fn read_from(reader: impl Read) -> Result<Self, FormatError> {
-        Ok(serde_json::from_reader(reader)?)
+        let metadata: Self = serde_json::from_reader(reader)?;
+        metadata.validate()?;
+        Ok(metadata)
     }
 
     pub fn write_to(&self, mut writer: impl Write) -> Result<(), FormatError> {
+        self.validate()?;
         serde_json::to_writer_pretty(&mut writer, self)?;
         writer.write_all(b"\n")?;
         Ok(())
@@ -217,5 +234,15 @@ impl WorkMetadata {
 
     pub fn extensions(&self) -> &JsonExtensions {
         &self.extensions
+    }
+
+    fn validate(&self) -> Result<(), FormatError> {
+        let mut documents = HashSet::new();
+        for document in &self.documents {
+            if !documents.insert(*document) {
+                return Err(FormatError::DuplicateWorkDocument(*document));
+            }
+        }
+        Ok(())
     }
 }

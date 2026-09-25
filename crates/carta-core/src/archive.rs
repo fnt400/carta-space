@@ -1,11 +1,12 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use carta_format::{
-    ArchiveMetadata, DocumentId, DocumentMetadata, Timestamp, WorkId, WorkMetadata, MIMETYPE,
+    work_title_key, ArchiveMetadata, DocumentId, DocumentMetadata, Timestamp, WorkId, WorkMetadata,
+    MIMETYPE,
 };
 
 use crate::validation::scan_archive;
@@ -126,6 +127,7 @@ impl Archive {
 
         let metadata = DocumentMetadata::new(id, created);
         write_document_metadata(&staging.join("meta.json"), &metadata)?;
+        let content = normalize_line_endings(content);
         fs::write(staging.join("content.md"), content.as_bytes())
             .map_err(|error| Error::io(staging.join("content.md"), error))?;
         fs::rename(&staging, &destination).map_err(|error| Error::io(&destination, error))?;
@@ -152,7 +154,22 @@ impl Archive {
         documents: Vec<DocumentId>,
     ) -> Result<WorkId, Error> {
         let id = WorkId::new_v7();
+        let title_key = work_title_key(&title);
+        if let Some(existing) = self
+            .works
+            .values()
+            .find(|work| work_title_key(work.title()) == title_key)
+        {
+            return Err(Error::WorkTitleConflict {
+                title,
+                existing: existing.id(),
+            });
+        }
+        let mut unique_documents = HashSet::new();
         for document in &documents {
+            if !unique_documents.insert(*document) {
+                return Err(Error::DuplicateWorkDocument(*document));
+            }
             if !self.documents.contains_key(document) {
                 return Err(Error::DanglingDocumentReference {
                     work: id,
@@ -167,7 +184,8 @@ impl Archive {
         fs::create_dir(&staging).map_err(|error| Error::io(&staging, error))?;
         let mut guard = CleanupDirectory::new(staging.clone());
 
-        let metadata = WorkMetadata::new(id, Timestamp::now_local(), title, documents);
+        let metadata = WorkMetadata::new(id, Timestamp::now_local(), title, documents)
+            .map_err(|error| Error::format(staging.join("work.json"), error))?;
         write_work_metadata(&staging.join("work.json"), &metadata)?;
         fs::rename(&staging, &destination).map_err(|error| Error::io(&destination, error))?;
         guard.disarm();
@@ -181,6 +199,10 @@ impl Archive {
         );
         Ok(id)
     }
+}
+
+fn normalize_line_endings(content: &str) -> String {
+    content.replace("\r\n", "\n").replace('\r', "\n")
 }
 
 fn write_archive_metadata(path: &Path, metadata: &ArchiveMetadata) -> Result<(), Error> {

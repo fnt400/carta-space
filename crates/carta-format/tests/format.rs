@@ -1,7 +1,8 @@
 use std::str::FromStr;
 
 use carta_format::{
-    ArchiveMetadata, DocumentId, DocumentMetadata, FormatError, Timestamp, WorkMetadata,
+    work_title_key, ArchiveMetadata, DocumentId, DocumentMetadata, FormatError, Timestamp,
+    WorkMetadata,
 };
 
 const VALID_ARCHIVE: &str = include_str!("fixtures/carta-valid.json");
@@ -101,4 +102,25 @@ fn rejects_unsupported_versions_and_fixed_values() {
 fn rejects_trailing_json_data() {
     let input = format!("{VALID_DOCUMENT} true");
     assert!(DocumentMetadata::read_from(input.as_bytes()).is_err());
+}
+
+#[test]
+fn work_title_keys_use_nfc_and_full_case_folding() {
+    assert_eq!(
+        work_title_key("  Straße é  "),
+        work_title_key("STRASSE e\u{301}")
+    );
+    assert_ne!(work_title_key("①"), work_title_key("1"));
+}
+
+#[test]
+fn rejects_duplicate_work_documents() {
+    let duplicate = VALID_WORK.replace(
+        "\n  ]",
+        ",\n    \"01890f3e-70a9-7cc3-98c4-dc0c0c073990\"\n  ]",
+    );
+    assert!(matches!(
+        WorkMetadata::read_from(duplicate.as_bytes()),
+        Err(FormatError::DuplicateWorkDocument(_))
+    ));
 }

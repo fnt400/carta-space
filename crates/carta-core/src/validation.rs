@@ -1,11 +1,13 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::{self, DirEntry, File};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str::FromStr;
 
-use carta_format::{ArchiveMetadata, DocumentId, DocumentMetadata, WorkId, WorkMetadata, MIMETYPE};
+use carta_format::{
+    work_title_key, ArchiveMetadata, DocumentId, DocumentMetadata, WorkId, WorkMetadata, MIMETYPE,
+};
 
 use crate::{DocumentInfo, ValidationErrors, ValidationIssue, ValidationIssueKind, Volume, Work};
 
@@ -331,6 +333,9 @@ impl Scanner {
             return;
         }
         match fs::read_to_string(path) {
+            Ok(content) if content.contains('\r') => {
+                self.issue(path, ValidationIssueKind::NonCanonicalLineEndings);
+            }
             Ok(_) => {}
             Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {
                 self.issue(path, ValidationIssueKind::InvalidUtf8);
@@ -345,6 +350,7 @@ impl Scanner {
         documents: &BTreeMap<DocumentId, DocumentInfo>,
     ) -> BTreeMap<WorkId, Work> {
         let mut works = BTreeMap::new();
+        let mut titles = HashMap::new();
         for entry in self.read_entries(works_path) {
             let path = entry.path();
             let Some(name) = entry_name(&entry) else {
@@ -399,6 +405,13 @@ impl Scanner {
                         },
                     );
                 }
+            }
+            let title_key = work_title_key(metadata.title());
+            if let Some(other) = titles.insert(title_key, metadata.id()) {
+                self.issue(
+                    &metadata_path,
+                    ValidationIssueKind::DuplicateWorkTitle { other },
+                );
             }
 
             let work = Work {

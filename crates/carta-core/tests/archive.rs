@@ -73,13 +73,69 @@ fn creates_works_in_normative_document_order() {
     let first = archive.create_document("first").unwrap();
     let second = archive.create_document("second").unwrap();
     let work_id = archive
-        .create_work("Ordered work".to_owned(), vec![second, first, second])
+        .create_work("Ordered work".to_owned(), vec![second, first])
         .unwrap();
     let work = archive.work(work_id).unwrap();
 
     assert_eq!(work.title(), "Ordered work");
-    assert_eq!(work.documents(), &[second, first, second]);
+    assert_eq!(work.documents(), &[second, first]);
     Archive::validate(archive.root()).unwrap();
+}
+
+#[test]
+fn rejects_duplicate_documents_in_a_work() {
+    let (_temporary, mut archive) = create_archive();
+    let document = archive.create_document("body").unwrap();
+
+    assert!(matches!(
+        archive.create_work("Duplicate".to_owned(), vec![document, document]),
+        Err(Error::DuplicateWorkDocument(duplicate)) if duplicate == document
+    ));
+}
+
+#[test]
+fn rejects_equivalent_active_work_titles_and_preserves_authored_title() {
+    let (_temporary, mut archive) = create_archive();
+    let title = "  Straße é  ";
+    let work = archive.create_work(title.to_owned(), Vec::new()).unwrap();
+    assert_eq!(archive.work(work).unwrap().title(), title);
+
+    let decomposed = "STRASSE e\u{301}";
+    assert!(matches!(
+        archive.create_work(decomposed.to_owned(), Vec::new()),
+        Err(Error::WorkTitleConflict { .. })
+    ));
+}
+
+#[test]
+fn normalizes_created_document_content_to_lf() {
+    let (_temporary, mut archive) = create_archive();
+    let document = archive.create_document("first\r\nsecond\rthird").unwrap();
+
+    assert_eq!(
+        archive.read_document(document).unwrap().content(),
+        "first\nsecond\nthird"
+    );
+    Archive::validate(archive.root()).unwrap();
+}
+
+#[test]
+fn rejects_noncanonical_external_line_endings() {
+    let (_temporary, mut archive) = create_archive();
+    let document = archive.create_document("body").unwrap();
+    let path = archive
+        .documents()
+        .find(|info| info.id() == document)
+        .unwrap()
+        .path()
+        .join("content.md");
+    fs::write(path, b"first\r\nsecond").unwrap();
+
+    let errors = Archive::validate(archive.root()).unwrap_err();
+    assert!(errors
+        .issues()
+        .iter()
+        .any(|issue| matches!(issue.kind(), ValidationIssueKind::NonCanonicalLineEndings)));
 }
 
 #[test]

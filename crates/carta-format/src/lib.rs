@@ -6,7 +6,7 @@ mod timestamp;
 pub use error::{FormatError, IdError, TimestampError};
 pub use id::{ArchiveId, DocumentId, WorkId};
 pub use metadata::{
-    ArchiveMetadata, DocumentMetadata, FormatVersion, JsonExtensions, WorkMetadata,
+    work_title_key, ArchiveMetadata, DocumentMetadata, FormatVersion, JsonExtensions, WorkMetadata,
 };
 pub use timestamp::Timestamp;
 

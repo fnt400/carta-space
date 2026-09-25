@@ -35,6 +35,12 @@ pub enum Error {
     #[error("work {work} references missing document {document}")]
     DanglingDocumentReference { work: WorkId, document: DocumentId },
 
+    #[error("work contains document {0} more than once")]
+    DuplicateWorkDocument(DocumentId),
+
+    #[error("active work title conflicts with work {existing}: {title:?}")]
+    WorkTitleConflict { title: String, existing: WorkId },
+
     #[error("could not start Git while creating {path}: {source}")]
     GitUnavailable {
         path: PathBuf,
@@ -145,6 +151,9 @@ pub enum ValidationIssueKind {
     #[error("content.md is not valid UTF-8")]
     InvalidUtf8,
 
+    #[error("content.md contains non-LF line endings")]
+    NonCanonicalLineEndings,
+
     #[error("malformed entry in reserved namespace: {0}")]
     MalformedReservedEntry(String),
 
@@ -167,6 +176,9 @@ pub enum ValidationIssueKind {
 
     #[error("duplicate work ID {0}")]
     DuplicateWork(WorkId),
+
+    #[error("duplicate active Work title shared with {other}")]
+    DuplicateWorkTitle { other: WorkId },
 
     #[error("work {work} references missing document {document}")]
     DanglingDocumentReference { work: WorkId, document: DocumentId },
