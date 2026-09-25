@@ -2,7 +2,7 @@
 
 > **Status:** Working name; early design draft.  
 > **Current format draft:** 0.1  
-> **Reference implementation:** first Rust milestone in progress.
+> **Reference implementation:** Rust core and command-line tools in progress.
 
 Carta Space is an experimental document environment inspired by Jef Raskin's work on the Canon Cat and later humane-interface research.
 
@@ -14,7 +14,7 @@ This is a form of **distraction-free architecture**, not merely a visually minim
 
 Carta Space stores documents as ordinary UTF-8 Markdown, gives every document a stable identity, arranges newly created documents in automatic monthly volumes, and allows documents to be assembled into larger **Works** without copying or moving them. A Work can therefore span months or years while remaining editable as a single continuous view.
 
-The reference implementation is planned in Rust and is explicitly split into a frontend-independent core, a Unix-style command-line interface, and a terminal user interface. The format remains independent of Rust and of any particular frontend.
+The reference implementation is written in Rust and is explicitly split into a frontend-independent core, a Unix-style command-line interface, and a planned terminal user interface. The format remains independent of Rust and of any particular frontend.
 
 ## Reference implementation architecture
 
@@ -22,7 +22,7 @@ The initial implementation is planned as a small set of separable Rust component
 
 - `carta-format` — format types, validation, serialization, and compatibility rules;
 - `carta-core` — archive operations, Documents, Volumes, Works, LEAP search, history, Trash/Wipe, import/export;
-- `carta-cli` — scriptable Unix-style administrative commands;
+- `carta-cli` — scriptable Unix-style administrative commands, producing the `carta` binary;
 - `carta-tui` — the first interactive frontend, built with Ratatui and Crossterm.
 
 The TUI is the reference interactive environment, not the definition of Carta Space. Future GTK, Emacs, web, or other frontends should use the same core model rather than reimplementing archive semantics.
@@ -114,6 +114,32 @@ The working form of a Carta Space archive is an ordinary directory tree containi
 
 A portable `.cat` package is a ZIP-based container of that tree. Its purpose is transfer, backup, and interchange; it is not the file continuously rewritten while the user types.
 
+`carta-core` creates packages through a temporary sibling of the destination, validates the ZIP and its unpacked Archive before replacement, and checkpoints current state first. The exact uncompressed `mimetype` is the first member; canonical files, unknown resources, and complete Git history are included, while reserved Carta-managed temporary artifacts are omitted.
+
+Document and Work PDF exports stream their exact Markdown export to Pandoc and an external PDF engine. LuaLaTeX is the default engine. PDF output is written to a temporary sibling and atomically replaces a regular destination only after Pandoc succeeds. Pandoc and the selected engine must be installed separately; neither is an Archive-format dependency.
+
+## Command line
+
+The `carta` binary uses `--archive <path>` (default `.`) and has a noninteractive, scriptable command surface:
+
+```text
+carta create <path>
+carta --archive <path> validate|inspect|documents|works|history
+carta --archive <path> checkpoint [--kind manual] [--note <text>]
+carta --archive <path> import <file>
+carta --archive <path> search <literal-query>
+carta --archive <path> export markdown-document <document-id>
+carta --archive <path> export markdown-work <work-id>
+carta --archive <path> export pdf-document <document-id> <output.pdf>
+carta --archive <path> export pdf-work <work-id> <output.pdf>
+carta --archive <path> package <output.cat>
+carta --archive <path> trash inventory|impact|document|work ...
+carta --archive <path> restore document|work ...
+carta --archive <path> wipe plan|execute ...
+```
+
+Markdown exports are written exactly to standard output. PDF and package destinations must be outside the Archive. Trash mutations require `--confirm`; Wipe planning prints its scope and exact strong confirmation phrase, which `wipe execute --confirm` requires without an interactive prompt. Run `carta <command> --help` for complete arguments.
+
 ## Documents in this repository
 
 - `WHITEPAPER.md` — why Carta Space exists and the design philosophy.
@@ -124,9 +150,9 @@ A portable `.cat` package is a ZIP-based container of that tree. Its purpose is 
 
 ## Current scope
 
-The current Rust workspace contains `carta-format` and `carta-core`. It can create, read, and validate the current filesystem state of a Draft 0.1 archive, including Documents, monthly Volumes, Works, UTF-8 content, canonical UUIDv7 identities, unknown JSON members, and Git-backed historical checkpoints. Core operations also include derived labels, CommonMark links and backlinks, literal archive search, LEAP matching, text import, Markdown export, dirty detection, checkpoint creation/listing, historical Document and Work reads, integral history restore behavior, and complete core Trash/Restore/Document-Wipe semantics. It does not yet claim complete Reader or Writer conformance.
+The current Rust workspace contains `carta-format`, `carta-core`, and `carta-cli`. It can create, read, validate, inspect, search, import, export, package, and administer the current filesystem state of a Draft 0.1 Archive, including Documents, monthly Volumes, Works, UTF-8 content, canonical UUIDv7 identities, unknown resources and JSON members, Git-backed historical checkpoints, portable `.cat` packages, and Pandoc PDF publishing. Core operations also include derived labels, CommonMark links and backlinks, LEAP matching, dirty detection, historical Document and Work reads, integral history restore behavior, and complete core Trash/Restore/Document-Wipe semantics. It does not yet claim complete Reader or Writer conformance.
 
-The enhanced-keyboard-reporting experiment remains separate under `experiments/keyboard-events`. The CLI, TUI and its LEAP bindings, frontend exposure of Trash/Wipe, and portable `.cat` packaging have not been implemented.
+The enhanced-keyboard-reporting experiment remains separate under `experiments/keyboard-events`. The TUI and its LEAP bindings have not been implemented.
 
 Development commands run in the Debian Distrobox described in `AGENTS.md`. The container requires Rust, Cargo, rustfmt, Clippy, and Git. From the repository root, validate the workspace with:
 

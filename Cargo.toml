@@ -2,6 +2,7 @@
 members = [
     "crates/carta-format",
     "crates/carta-core",
+    "crates/carta-cli",
 ]
 exclude = ["experiments/keyboard-events"]
 resolver = "2"
@@ -13,6 +14,7 @@ rust-version = "1.85"
 
 [workspace.dependencies]
 chrono = { version = "0.4.42", default-features = false, features = ["clock", "serde", "std"] }
+clap = { version = "4.5.48", features = ["derive"] }
 pulldown-cmark = { version = "0.13.4", default-features = false }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.145", features = ["arbitrary_precision"] }
@@ -21,3 +23,4 @@ thiserror = "2.0.17"
 unicode-casefold = "0.2.0"
 unicode-normalization = "0.1.24"
 uuid = { version = "1.18.1", features = ["serde", "v7"] }
+zip = { version = "2.2.2", default-features = false, features = ["deflate"] }

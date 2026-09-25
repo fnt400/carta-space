@@ -371,6 +371,22 @@ pub(crate) fn create_initial_checkpoint(root: &Path) -> Result<(), Error> {
     Ok(())
 }
 
+pub(crate) fn create_package_checkpoint(root: &Path) -> Result<Option<Checkpoint>, Error> {
+    create_checkpoint_with_stage_args(
+        root,
+        CheckpointKind::Automatic,
+        Some("Prepared portable package"),
+        &[
+            "add",
+            "--all",
+            "--",
+            ".",
+            ":(exclude)**/.carta-*",
+            ":(exclude).carta-*",
+        ],
+    )
+}
+
 pub(crate) fn is_dirty_at(root: &Path) -> Result<bool, Error> {
     let output = git_output(
         root,
@@ -385,17 +401,36 @@ fn create_checkpoint(
     kind: CheckpointKind,
     note: Option<&str>,
 ) -> Result<Option<Checkpoint>, Error> {
+    create_checkpoint_with_stage_args(root, kind, note, &["add", "--all", "--", "."])
+}
+
+fn create_checkpoint_with_stage_args(
+    root: &Path,
+    kind: CheckpointKind,
+    note: Option<&str>,
+    stage_args: &[&str],
+) -> Result<Option<Checkpoint>, Error> {
     if !is_dirty_at(root)? {
         return Ok(None);
     }
     let message = checkpoint_message(kind, note)?;
-    if let Err(error) = git_output(root, "prepare checkpoint", &["add", "--all", "--", "."]) {
+    if let Err(error) = git_output(root, "prepare checkpoint", stage_args) {
         let _ = git_output(
             root,
             "clear checkpoint preparation",
             &["reset", "--mixed", "--quiet"],
         );
         return Err(error);
+    }
+    if git_output(
+        root,
+        "inspect prepared checkpoint",
+        &["diff", "--cached", "--name-only", "-z"],
+    )?
+    .stdout
+    .is_empty()
+    {
+        return Ok(None);
     }
     let result = git_with_input(
         root,

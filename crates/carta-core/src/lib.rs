@@ -3,6 +3,8 @@ mod content;
 mod document;
 mod error;
 mod history;
+mod package;
+mod pdf;
 mod retrieval;
 mod trash;
 mod validation;
@@ -17,6 +19,8 @@ pub use error::{Error, ValidationErrors, ValidationIssue, ValidationIssueKind};
 pub use history::{
     Checkpoint, CheckpointId, CheckpointKind, DocumentRevision, WorkRestoreOptions, WorkSnapshot,
 };
+pub use package::PackageReport;
+pub use pdf::PdfExportOptions;
 pub use retrieval::{
     Backlink, DocumentTextRegion, LeapDirection, LeapMatch, LeapPosition, LeapRuntime, LeapSession,
     SearchResult,

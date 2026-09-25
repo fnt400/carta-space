@@ -26,6 +26,47 @@ pub enum Error {
     #[error("archive destination already exists: {0}")]
     AlreadyExists(PathBuf),
 
+    #[error("export destination must be outside the Archive: {0}")]
+    DestinationInsideArchive(PathBuf),
+
+    #[error("export destination is not a replaceable regular file: {0}")]
+    UnsafeDestination(PathBuf),
+
+    #[error("export destination parent does not exist or is not a directory: {0}")]
+    InvalidDestinationParent(PathBuf),
+
+    #[error("archive resource path is not UTF-8 and cannot be packaged: {0}")]
+    NonUtf8PackagePath(PathBuf),
+
+    #[error("symbolic links cannot be represented safely in a portable package: {0}")]
+    UnsupportedPackageSymlink(PathBuf),
+
+    #[error("ZIP error at {path}: {source}")]
+    Zip {
+        path: PathBuf,
+        #[source]
+        source: zip::result::ZipError,
+    },
+
+    #[error("portable package validation failed: {0}")]
+    InvalidPackage(String),
+
+    #[error("Pandoc is unavailable at {program}: {source}")]
+    PandocUnavailable {
+        program: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("Pandoc PDF export failed with status {status}: {stderr}")]
+    PdfExportFailed {
+        status: std::process::ExitStatus,
+        stderr: String,
+    },
+
+    #[error("Pandoc reported success but did not produce a regular PDF file")]
+    PdfOutputMissing,
+
     #[error("timestamp cannot be represented as a YYYY/MM volume: {0}")]
     InvalidVolumeDate(carta_format::Timestamp),
 
@@ -185,6 +226,13 @@ impl Error {
 
     pub(crate) fn format(path: impl AsRef<Path>, source: carta_format::FormatError) -> Self {
         Self::Format {
+            path: path.as_ref().to_path_buf(),
+            source,
+        }
+    }
+
+    pub(crate) fn zip(path: impl AsRef<Path>, source: zip::result::ZipError) -> Self {
+        Self::Zip {
             path: path.as_ref().to_path_buf(),
             source,
         }
