@@ -255,7 +255,7 @@ Pressing and releasing a physical LEAP key without entering a query performs Can
 
 After typing, the Cat cursor is conceptually wide. The first creep makes it narrow on the previously highlighted character; a subsequent creep moves one character in the requested direction.
 
-Carta remembers the last explicit LEAP query for the session. A bare tap of a physical LEAP key remains creep. The Canon Cat `LEAP AGAIN` chord is represented by Right Control as Carta's `USE FRONT` analogue: Right Control+Left Alt performs Leap Again Forward, and Right Control+Left Control performs Leap Again Backward. The same operations remain available in the command palette. The remembered query is session-global, so Leap Again may be used after changing Views.
+Carta remembers the last explicit LEAP query for the session. A bare tap of a physical LEAP key remains creep. Right Control is Carta's `USE FRONT` analogue. While a physical LEAP is still held and its pattern is active, each press of Right Control performs LEAP AGAIN in the same direction without ending the LEAP session or changing its original anchor. Repeated Right Control presses therefore advance through successive occurrences while preserving the starting point. Pressing the opposite LEAP key before releasing the original LEAP ends the search and extends the Cat highlight from that original anchor to the final target reached. Outside an active LEAP, Right Control+Left Alt performs Leap Again Forward and Right Control+Left Control performs Leap Again Backward. The same operations remain available in the command palette. The remembered query is session-global, so Leap Again may be used after changing Views.
 
 ### 4.5 Cat cursor and highlight interaction
 
@@ -282,7 +282,7 @@ With an extended highlight active:
 - tapping Left Control unhighlights backward, collapsing to the first highlighted character with the conceptual cursor narrow;
 - after ordinary forward/backward unhighlighting, pressing both LEAP keys rehighlights the remembered area until a later typing or LEAP action invalidates it.
 
-Pressing the opposite LEAP key while a LEAP query is already active is ignored for highlight extension.
+Pressing the opposite LEAP key while a physical LEAP query is active ends that LEAP and extends the highlight from the session's original anchor to its current target. This is what allows one or more in-session LEAP AGAIN operations to enlarge the eventual selection.
 
 Left Control+Enter and Left Alt+Enter are Carta line-boundary LEAP adaptations. They record the traversed line span for the same two-LEAP highlight gesture without including a Markdown newline character in the selection.
 
@@ -320,7 +320,8 @@ The v0.1 TUI keeps direct bindings deliberately small:
 - Left Alt+Enter: LEAP to the end of the current visual line;
 - Esc: command palette;
 - Left Control + Left Alt together after a LEAP, creep sequence, or run of typing: extend the pending Cat highlight and copy it to the system clipboard;
-- physical Right Control+Left Control: Leap Again backward; physical Right Control+Left Alt: Leap Again forward;
+- while a LEAP key is held with an active pattern, press Right Control repeatedly to Leap Again through further occurrences without changing the original anchor; press the opposite LEAP key while still holding the first to turn the whole traversed range into the Cat highlight;
+- outside an active LEAP, physical Right Control+Left Control: Leap Again backward; physical Right Control+Left Alt: Leap Again forward;
 - physical Right Control+C with a Cat highlight: Cat COPY;
 - physical Right Control+C without a Cat highlight: paste system-clipboard text at the cursor;
 - Backspace: modern backward deletion; with an extended Cat highlight it erases the whole highlighted block;
