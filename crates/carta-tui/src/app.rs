@@ -2636,12 +2636,14 @@ mod tests {
             sanitize_filename("# Titolo: prova / con caratteri? speciali"),
             "Titolo-prova-con-caratteri-speciali"
         );
-        assert!(sanitize_filename(
-            "Questo è un titolo estremamente lungo che deve essere accorciato senza simboli"
-        )
-        .chars()
-        .count()
-            <= 40);
+        assert!(
+            sanitize_filename(
+                "Questo è un titolo estremamente lungo che deve essere accorciato senza simboli"
+            )
+            .chars()
+            .count()
+                <= 40
+        );
         assert_eq!(sanitize_filename("***"), "document");
     }
 
