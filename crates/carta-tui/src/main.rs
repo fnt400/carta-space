@@ -323,6 +323,24 @@ fn handle_key(
 
     if dispatcher.right_control_held
         && key.modifiers.contains(KeyModifiers::CONTROL)
+        && matches!(key.code, KeyCode::Char('z' | 'Z' | 'r' | 'R'))
+    {
+        dispatcher.pending_leap = None;
+        if matches!(app.mode, AppMode::Editing)
+            && matches!(app.view, View::Chronological(_) | View::Work(_))
+        {
+            let command = if matches!(key.code, KeyCode::Char('z' | 'Z')) {
+                carta_tui::Command::Undo
+            } else {
+                carta_tui::Command::Redo
+            };
+            app.execute(command)?;
+        }
+        return Ok(());
+    }
+
+    if dispatcher.right_control_held
+        && key.modifiers.contains(KeyModifiers::CONTROL)
         && matches!(key.code, KeyCode::Char('c' | 'C'))
     {
         dispatcher.pending_leap = None;
@@ -1838,6 +1856,42 @@ mod tests {
         )
         .unwrap();
         assert_eq!(app.editor.cursor().byte, 4);
+    }
+
+    #[test]
+    fn right_control_z_and_r_dispatch_undo_and_redo() {
+        let (_temporary, mut app) = app_with_documents(&["a"], false);
+        assert!(app.cat_insert("b"));
+        assert_eq!(app.editor.current_text(), Some("ab"));
+
+        let mut dispatcher = Dispatcher::default();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('z'), KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.current_text(), Some("a"));
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.current_text(), Some("ab"));
     }
 
     #[test]
