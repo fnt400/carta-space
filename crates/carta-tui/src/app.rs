@@ -673,7 +673,7 @@ impl App {
             CreateCheckpoint => self.prompt("Checkpoint note (optional)", PromptAction::Checkpoint),
             InsertDateTime => {
                 let timestamp = Local::now().format("%Y-%m-%d %H:%M").to_string();
-                if self.editor.insert(&timestamp) {
+                if self.cat_insert(&timestamp) {
                     self.edited(Instant::now());
                 }
             }
@@ -683,11 +683,13 @@ impl App {
             LeapAgainBackward => self.leap_again(LeapDirection::Backward),
             Undo => {
                 if self.editor.undo() {
+                    self.cat_navigation();
                     self.edited(Instant::now());
                 }
             }
             Redo => {
                 if self.editor.redo() {
+                    self.cat_navigation();
                     self.edited(Instant::now());
                 }
             }
@@ -1744,14 +1746,18 @@ impl App {
             "[{}](carta:{kind}:{id})",
             escape_markdown_link_label(&label)
         );
-        let changed = if self.editor.cat_highlight().is_some() {
+        let replaced_highlight = self.editor.cat_highlight().is_some();
+        let changed = if replaced_highlight {
             self.editor.replace_cat_highlight(&link)
         } else {
-            self.editor.insert(&link)
+            self.cat_insert(&link)
         };
         if !changed {
             self.status = "Cannot replace a selection across Document boundaries".into();
         } else {
+            if replaced_highlight {
+                self.cat_navigation();
+            }
             self.edited(Instant::now());
         }
         Ok(())
