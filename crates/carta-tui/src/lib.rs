@@ -1,5 +1,6 @@
 pub mod app;
 pub mod editor;
+pub mod help;
 pub mod palette;
 pub mod session;
 
