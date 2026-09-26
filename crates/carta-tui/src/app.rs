@@ -924,6 +924,7 @@ impl App {
             let work = self.archive.create_work(query, vec![document])?;
             ensure_work_color(&mut self.archive, work)?;
             self.structural("Created Work and added Document")?;
+            self.switch_view(View::Work(work), Some((document, 0)), true)?;
             return Ok(());
         }
 
@@ -936,9 +937,12 @@ impl App {
         match action {
             SelectAction::OpenWork => self.switch_view(View::Work(value.parse()?), None, true)?,
             SelectAction::AddToWork => {
-                self.archive
-                    .add_document_to_work(value.parse()?, self.current_document()?)?;
+                let work = value.parse()?;
+                let document = self.current_document()?;
+                self.archive.add_document_to_work(work, document)?;
+                ensure_work_color(&mut self.archive, work)?;
                 self.structural("Added Document to Work")?;
+                self.switch_view(View::Work(work), Some((document, 0)), true)?;
             }
             SelectAction::MoveAfter => {
                 let after = if value.is_empty() {
@@ -2474,7 +2478,31 @@ mod tests {
             .works()
             .find(|work| work.title() == "New Dogfooding Work")
             .expect("new Work should exist");
+        let work_id = work.id();
         assert_eq!(work.documents(), &[document]);
+        assert_eq!(app.view, View::Work(work_id));
+        assert_eq!(app.editor.current_document(), Some(document));
+    }
+
+    #[test]
+    fn add_to_existing_work_opens_that_work_view() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let document = app.current_document().unwrap();
+        let work = app.archive.create_empty_work("Existing Work".into()).unwrap();
+        app.structural("Created existing test Work").unwrap();
+
+        app.select_works(SelectAction::AddToWork, true);
+        let AppMode::Selector { query, .. } = &mut app.mode else {
+            panic!("expected Work selector")
+        };
+        *query = "Existing Work".into();
+        app.submit_selector().unwrap();
+
+        assert_eq!(app.archive.work(work).unwrap().documents(), &[document]);
+        assert_eq!(app.view, View::Work(work));
+        assert_eq!(app.editor.current_document(), Some(document));
     }
 
     #[test]
