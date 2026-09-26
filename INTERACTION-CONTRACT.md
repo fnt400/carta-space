@@ -137,7 +137,7 @@ v0.1 implements these primary Views:
 - Work View;
 - Search Results View.
 
-History and Trash are specialized read-only interfaces/views.
+History, Trash, and built-in Help are specialized read-only interfaces/views. Help content belongs to the frontend and is not stored as authored Archive Documents.
 
 There is no Single Document View in v0.1. A Document is normally reached in either its chronological context or a Work context.
 
@@ -148,6 +148,7 @@ There is no Single Document View in v0.1. A Document is normally reached in eith
 - Search Results View: not directly editable.
 - History: read-only except explicit restore/duplication operations.
 - Trash: read-only except explicit restore/wipe operations.
+- Help: read-only built-in frontend content.
 
 When a target Document is already contained by the current editable View, navigation SHOULD preserve that View and jump to the target.
 
