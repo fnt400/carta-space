@@ -29,7 +29,7 @@ use std::panic::{self, AssertUnwindSafe};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use unicode_width::UnicodeWidthChar;
 
 #[derive(Parser)]
 #[command(name = "carta-tui", version, about = "Carta Space writing environment")]
@@ -654,12 +654,17 @@ struct VisualLine {
 }
 
 fn editor_width(terminal_width: u16) -> usize {
-    usize::from(terminal_width.min(80).max(1))
+    usize::from(terminal_width.clamp(1, 80))
 }
 
 fn editor_rect(area: Rect) -> Rect {
     let width = area.width.min(80);
-    Rect::new(area.x + (area.width - width) / 2, area.y, width, area.height)
+    Rect::new(
+        area.x + (area.width - width) / 2,
+        area.y,
+        width,
+        area.height,
+    )
 }
 
 fn draw_editor(frame: &mut ratatui::Frame<'_>, app: &mut App, area: Rect) {
@@ -1070,8 +1075,14 @@ mod tests {
 
     #[test]
     fn editor_rect_is_centered_and_capped_at_eighty_columns() {
-        assert_eq!(editor_rect(Rect::new(0, 0, 160, 20)), Rect::new(40, 0, 80, 20));
-        assert_eq!(editor_rect(Rect::new(0, 0, 70, 20)), Rect::new(0, 0, 70, 20));
+        assert_eq!(
+            editor_rect(Rect::new(0, 0, 160, 20)),
+            Rect::new(40, 0, 80, 20)
+        );
+        assert_eq!(
+            editor_rect(Rect::new(0, 0, 70, 20)),
+            Rect::new(0, 0, 70, 20)
+        );
         assert_eq!(editor_width(160), 80);
         assert_eq!(editor_width(70), 70);
     }
@@ -1343,28 +1354,56 @@ mod tests {
     #[test]
     fn left_control_and_left_alt_keep_leap_behavior() {
         for (key, modifiers, direction) in [
-            (ModifierKeyCode::LeftControl, KeyModifiers::CONTROL, LeapDirection::Backward),
-            (ModifierKeyCode::LeftAlt, KeyModifiers::ALT, LeapDirection::Forward),
+            (
+                ModifierKeyCode::LeftControl,
+                KeyModifiers::CONTROL,
+                LeapDirection::Backward,
+            ),
+            (
+                ModifierKeyCode::LeftAlt,
+                KeyModifiers::ALT,
+                LeapDirection::Forward,
+            ),
         ] {
             let (_temporary, mut app) = app_with_documents(&["alpha beta alpha"], false);
             app.editor.set_cursor(Cursor { region: 0, byte: 6 }, false);
             let mut dispatcher = Dispatcher::default();
-            handle_key(&mut app, &mut dispatcher, KeyEvent::new(KeyCode::Modifier(key), modifiers), true).unwrap();
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new(KeyCode::Modifier(key), modifiers),
+                true,
+            )
+            .unwrap();
             for character in "alpha".chars() {
-                handle_key(&mut app, &mut dispatcher, KeyEvent::new(KeyCode::Char(character), modifiers), true).unwrap();
+                handle_key(
+                    &mut app,
+                    &mut dispatcher,
+                    KeyEvent::new(KeyCode::Char(character), modifiers),
+                    true,
+                )
+                .unwrap();
             }
             handle_key(
                 &mut app,
                 &mut dispatcher,
-                KeyEvent::new_with_kind(KeyCode::Modifier(key), KeyModifiers::NONE, KeyEventKind::Release),
+                KeyEvent::new_with_kind(
+                    KeyCode::Modifier(key),
+                    KeyModifiers::NONE,
+                    KeyEventKind::Release,
+                ),
                 true,
-            ).unwrap();
+            )
+            .unwrap();
             assert_eq!(app.leap.remembered_query(), Some("alpha"));
             assert!(matches!(app.mode, AppMode::Editing));
-            assert_eq!(app.editor.cursor().byte, match direction {
-                LeapDirection::Backward => 0,
-                LeapDirection::Forward => 16,
-            });
+            assert_eq!(
+                app.editor.cursor().byte,
+                match direction {
+                    LeapDirection::Backward => 0,
+                    LeapDirection::Forward => 16,
+                }
+            );
         }
     }
 
@@ -1375,18 +1414,32 @@ mod tests {
         handle_key(
             &mut app,
             &mut dispatcher,
-            KeyEvent::new(KeyCode::Modifier(ModifierKeyCode::RightControl), KeyModifiers::CONTROL),
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL,
+            ),
             true,
-        ).unwrap();
+        )
+        .unwrap();
         assert!(dispatcher.pending_leap.is_none());
         handle_key(
             &mut app,
             &mut dispatcher,
-            KeyEvent::new(KeyCode::Modifier(ModifierKeyCode::RightAlt), KeyModifiers::ALT),
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightAlt),
+                KeyModifiers::ALT,
+            ),
             true,
-        ).unwrap();
+        )
+        .unwrap();
         assert!(dispatcher.pending_leap.is_none());
-        handle_key(&mut app, &mut dispatcher, KeyEvent::new(KeyCode::Char('@'), KeyModifiers::ALT), true).unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('@'), KeyModifiers::ALT),
+            true,
+        )
+        .unwrap();
         assert_eq!(app.editor.current_text(), Some("@"));
     }
 
@@ -1398,17 +1451,32 @@ mod tests {
         handle_key(
             &mut app,
             &mut dispatcher,
-            KeyEvent::new(KeyCode::Modifier(ModifierKeyCode::LeftControl), KeyModifiers::CONTROL),
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::CONTROL,
+            ),
             true,
-        ).unwrap();
-        handle_key(&mut app, &mut dispatcher, KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL), true).unwrap();
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
         assert_eq!(app.editor.cursor().byte, 0);
         handle_key(
             &mut app,
             &mut dispatcher,
-            KeyEvent::new_with_kind(KeyCode::Modifier(ModifierKeyCode::LeftControl), KeyModifiers::NONE, KeyEventKind::Release),
+            KeyEvent::new_with_kind(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
+            ),
             true,
-        ).unwrap();
+        )
+        .unwrap();
         assert!(matches!(app.mode, AppMode::Editing));
     }
 

@@ -460,8 +460,7 @@ impl CompositeEditor {
         while remaining > 0 {
             let before = self.cursor.region;
             self.move_visual(down, width, selecting);
-            remaining =
-                remaining.saturating_sub(if self.cursor.region != before { 4 } else { 1 });
+            remaining = remaining.saturating_sub(if self.cursor.region != before { 4 } else { 1 });
         }
     }
 

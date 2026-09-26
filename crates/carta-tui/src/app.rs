@@ -2661,7 +2661,13 @@ mod tests {
         app.leap_again(LeapDirection::Forward);
         assert_eq!(app.editor.cursor().byte, 11);
 
-        app.editor.set_cursor(Cursor { region: 0, byte: 11 }, false);
+        app.editor.set_cursor(
+            Cursor {
+                region: 0,
+                byte: 11,
+            },
+            false,
+        );
         app.start_leap(LeapDirection::Backward, true);
         app.leap_input("one");
         assert_eq!(app.editor.cursor().byte, 8);
