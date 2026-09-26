@@ -1528,7 +1528,7 @@ impl App {
         self.mode = AppMode::Editing;
     }
 
-    fn leap_again(&mut self, direction: LeapDirection) {
+    pub fn leap_again(&mut self, direction: LeapDirection) {
         let origin = self.editor.cursor();
         self.cat_span_fixed = Some(self.cat_fixed_boundary_for(origin, direction));
         let regions: Vec<_> = self
