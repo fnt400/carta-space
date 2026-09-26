@@ -1192,9 +1192,6 @@ impl App {
     }
 
     pub fn copy_cat_highlight(&mut self) -> bool {
-        if self.editor.cat_highlight().is_none() {
-            self.extend_last_leap_highlight();
-        }
         if self.editor.copy_cat_highlight() {
             self.edited(Instant::now());
             self.status = "Copied highlighted text".into();
