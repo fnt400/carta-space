@@ -1515,6 +1515,38 @@ mod tests {
     }
 
     #[test]
+    fn copy_after_leap_auto_extends_the_last_leap_span() {
+        let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        app.start_leap(LeapDirection::Forward, false);
+        app.leap_input("beta");
+        app.end_leap();
+
+        assert!(app.editor.cat_highlight().is_none());
+        assert!(app.copy_cat_highlight());
+        assert_eq!(app.editor.regions()[0].text, "alpha betaalpha beta");
+        assert_eq!(app.editor.selected_text().as_deref(), Some("alpha beta"));
+    }
+
+    #[test]
+    fn leap_moves_cat_highlight_to_another_document_on_release() {
+        let (_temporary, mut app) = app_with_documents(&["alpha beta", "target"], false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        assert!(app.editor.set_cat_highlight(
+            Cursor { region: 0, byte: 6 },
+            Cursor { region: 0, byte: 10 },
+        ));
+
+        app.start_leap(LeapDirection::Forward, false);
+        app.leap_input("target");
+        app.end_leap();
+
+        assert_eq!(app.editor.regions()[0].text, "alpha ");
+        assert_eq!(app.editor.regions()[1].text, "targetbeta");
+        assert_eq!(app.editor.selected_text().as_deref(), Some("beta"));
+    }
+
+    #[test]
     fn ctrl_home_and_end_stay_within_current_document() {
         let (_temporary, mut app) = app_with_documents(&["first", "second"], false);
         app.editor.set_cursor(Cursor { region: 1, byte: 3 }, false);
