@@ -1947,6 +1947,7 @@ mod tests {
     #[test]
     fn right_control_z_and_r_dispatch_undo_and_redo() {
         let (_temporary, mut app) = app_with_documents(&["a"], false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 1 }, false);
         assert!(app.cat_insert("b"));
         assert_eq!(app.editor.current_text(), Some("ab"));
 
