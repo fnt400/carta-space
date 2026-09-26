@@ -274,6 +274,8 @@ The palette is transient and dmenu-like:
 
 The palette is contextual. Commands that cannot apply in the current context SHOULD be hidden rather than shown disabled.
 
+Editable Views expose `Insert Current Date and Time`, which inserts the current local date and time at the cursor as `YYYY-MM-DD HH:MM`. History and Work History expose `Return to Previous View`, which returns to the View from which history was opened.
+
 ### 5.2 Direct shortcuts
 
 The v0.1 TUI keeps direct bindings deliberately small:
@@ -332,6 +334,8 @@ Soft wrap is visual only. Carta does not automatically hard-wrap authored lines.
 `Shift+Tab` removes up to four leading spaces where appropriate.
 
 Carta does not insert literal TAB characters for indentation in v0.1.
+
+When Enter is pressed on a Markdown list item, Carta continues the list on the new line. Unordered markers `-`, `*`, and `+` are preserved together with indentation. Ordered markers using `.` or `)` are incremented while preserving indentation. This is an editing convenience only: the canonical Document remains ordinary CommonMark text.
 
 ---
 

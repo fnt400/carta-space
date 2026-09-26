@@ -137,6 +137,24 @@ impl CompositeEditor {
         true
     }
 
+    pub fn insert_newline_with_list_continuation(&mut self) -> bool {
+        if self.regions.is_empty() {
+            return false;
+        }
+        if self.selection().is_some() {
+            return self.insert("\n");
+        }
+        let text = &self.regions[self.cursor.region].text;
+        let line_start = text[..self.cursor.byte].rfind('\n').map_or(0, |index| index + 1);
+        let before_cursor = &text[line_start..self.cursor.byte];
+        let continuation = list_continuation_prefix(before_cursor);
+        let mut insertion = String::from("\n");
+        if let Some(prefix) = continuation {
+            insertion.push_str(&prefix);
+        }
+        self.insert(&insertion)
+    }
+
     pub fn backspace(&mut self) -> bool {
         if self.regions.is_empty() {
             return false;
@@ -574,6 +592,37 @@ fn compare(a: Cursor, b: Cursor) -> Ordering {
 fn is_word_character(character: char) -> bool {
     character.is_alphanumeric() || character == '_'
 }
+
+fn list_continuation_prefix(line_before_cursor: &str) -> Option<String> {
+    let indent_len = line_before_cursor
+        .char_indices()
+        .take_while(|(_, character)| matches!(character, ' ' | '\t'))
+        .map(|(index, character)| index + character.len_utf8())
+        .last()
+        .unwrap_or(0);
+    let indent = &line_before_cursor[..indent_len];
+    let rest = &line_before_cursor[indent_len..];
+
+    for marker in ["- ", "* ", "+ "] {
+        if rest.starts_with(marker) {
+            return Some(format!("{indent}{marker}"));
+        }
+    }
+
+    let digit_len = rest.bytes().take_while(u8::is_ascii_digit).count();
+    if digit_len == 0 {
+        return None;
+    }
+    let punctuation = rest.as_bytes().get(digit_len).copied()?;
+    if !matches!(punctuation, b'.' | b')') || rest.as_bytes().get(digit_len + 1) != Some(&b' ') {
+        return None;
+    }
+    let number = rest[..digit_len].parse::<u64>().ok()?;
+    let next = number.saturating_add(1);
+    let next_number = format!("{next:0width$}", width = digit_len);
+    Some(format!("{indent}{next_number}{} ", punctuation as char))
+}
+
 fn byte_at_column(text: &str, base: usize, column: usize) -> usize {
     text.char_indices()
         .nth(column)
@@ -693,6 +742,64 @@ mod tests {
         assert_eq!(e.selected_text().as_deref(), Some("alpha, "));
         e.move_word(true, true);
         assert_eq!(e.selected_text().as_deref(), Some("alpha, beta "));
+    }
+
+
+    #[test]
+    fn enter_continues_unordered_lists_without_changing_other_lines() {
+        for marker in ["- ", "* ", "+ "] {
+            let mut e = CompositeEditor::new(
+                vec![Region {
+                    document: id(),
+                    text: format!("{marker}item"),
+                }],
+                Cursor {
+                    region: 0,
+                    byte: marker.len() + 4,
+                },
+            );
+            assert!(e.insert_newline_with_list_continuation());
+            assert_eq!(e.regions()[0].text, format!("{marker}item\n{marker}"));
+        }
+
+        let mut plain = CompositeEditor::new(
+            vec![Region {
+                document: id(),
+                text: "plain".into(),
+            }],
+            Cursor { region: 0, byte: 5 },
+        );
+        assert!(plain.insert_newline_with_list_continuation());
+        assert_eq!(plain.regions()[0].text, "plain\n");
+    }
+
+    #[test]
+    fn enter_increments_ordered_list_markers_and_preserves_indentation() {
+        let mut e = CompositeEditor::new(
+            vec![Region {
+                document: id(),
+                text: "  09. item".into(),
+            }],
+            Cursor {
+                region: 0,
+                byte: "  09. item".len(),
+            },
+        );
+        assert!(e.insert_newline_with_list_continuation());
+        assert_eq!(e.regions()[0].text, "  09. item\n  10. ");
+
+        let mut paren = CompositeEditor::new(
+            vec![Region {
+                document: id(),
+                text: "3) item".into(),
+            }],
+            Cursor {
+                region: 0,
+                byte: "3) item".len(),
+            },
+        );
+        assert!(paren.insert_newline_with_list_continuation());
+        assert_eq!(paren.regions()[0].text, "3) item\n4) ");
     }
 
     #[test]

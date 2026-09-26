@@ -151,6 +151,7 @@ pub enum Command {
     Forward,
     History,
     WorkHistory,
+    ReturnToPreviousView,
     RestoreThisVersion,
     RestoreAsNew,
     RestoreWorkVersion,
@@ -166,6 +167,7 @@ pub enum Command {
     ExportWorkPdf,
     Package,
     CreateCheckpoint,
+    InsertDateTime,
     LeapForward,
     LeapBackward,
     LeapAgainForward,
@@ -207,6 +209,7 @@ impl Command {
             Self::Forward => "Forward",
             Self::History => "Document History",
             Self::WorkHistory => "Work History",
+            Self::ReturnToPreviousView => "Return to Previous View",
             Self::RestoreThisVersion => "Restore This Version",
             Self::RestoreAsNew => "Restore as New Document",
             Self::RestoreWorkVersion => "Restore Work Version",
@@ -222,6 +225,7 @@ impl Command {
             Self::ExportWorkPdf => "Export Work as PDF…",
             Self::Package => "Package Archive…",
             Self::CreateCheckpoint => "Create Checkpoint…",
+            Self::InsertDateTime => "Insert Current Date and Time",
             Self::LeapForward => "LEAP Forward…",
             Self::LeapBackward => "LEAP Backward…",
             Self::LeapAgainForward => "Leap Again Forward",
@@ -459,6 +463,7 @@ impl App {
                 InsertLink,
                 ShowBacklinks,
                 History,
+                InsertDateTime,
                 Trash,
                 ExportDocumentMarkdown,
                 ExportDocumentPdf,
@@ -491,10 +496,10 @@ impl App {
             commands.push(OpenLink);
         }
         if matches!(self.view, View::History { .. }) {
-            commands.extend([RestoreThisVersion, RestoreAsNew]);
+            commands.extend([ReturnToPreviousView, RestoreThisVersion, RestoreAsNew]);
         }
         if matches!(self.view, View::WorkHistory { .. }) {
-            commands.push(RestoreWorkVersion);
+            commands.extend([ReturnToPreviousView, RestoreWorkVersion]);
         }
         if matches!(self.view, View::Trash { .. }) {
             commands.extend([RestoreTrash, Wipe]);
@@ -581,6 +586,7 @@ impl App {
             Forward => self.navigate(true)?,
             History => self.show_history()?,
             WorkHistory => self.show_work_history()?,
+            ReturnToPreviousView => self.navigate(false)?,
             RestoreThisVersion => self.prepare_history_restore()?,
             RestoreAsNew => self.restore_history(true)?,
             RestoreWorkVersion => self.prepare_work_history_restore()?,
@@ -639,6 +645,12 @@ impl App {
             }
             Package => self.prompt("Package .cat path", PromptAction::Package),
             CreateCheckpoint => self.prompt("Checkpoint note (optional)", PromptAction::Checkpoint),
+            InsertDateTime => {
+                let timestamp = Local::now().format("%Y-%m-%d %H:%M").to_string();
+                if self.editor.insert(&timestamp) {
+                    self.edited(Instant::now());
+                }
+            }
             LeapForward => self.start_leap(LeapDirection::Forward, true),
             LeapBackward => self.start_leap(LeapDirection::Backward, true),
             LeapAgainForward => self.leap_again(LeapDirection::Forward),
@@ -2695,6 +2707,45 @@ mod tests {
 
         assert!(matches!(app.view, View::Chronological(_)));
         assert_eq!(app.editor.current_document(), Some(document));
+    }
+
+
+    #[test]
+    fn palette_inserts_current_local_date_and_time() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+
+        assert!(app.commands().contains(&Command::InsertDateTime));
+        app.execute(Command::InsertDateTime).unwrap();
+
+        let text = app.editor.current_text().unwrap();
+        assert_eq!(text.len(), 16);
+        assert_eq!(&text[4..5], "-");
+        assert_eq!(&text[7..8], "-");
+        assert_eq!(&text[10..11], " ");
+        assert_eq!(&text[13..14], ":");
+        assert!(app.editor.is_dirty());
+    }
+
+    #[test]
+    fn history_has_explicit_return_to_previous_view() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let original_view = app.view.clone();
+        assert!(app.editor.insert("history test"));
+        app.autosave().unwrap();
+        app.archive
+            .checkpoint(CheckpointKind::Manual, Some("test"))
+            .unwrap();
+
+        app.execute(Command::History).unwrap();
+        assert!(matches!(app.view, View::History { .. }));
+        assert!(app.commands().contains(&Command::ReturnToPreviousView));
+
+        app.execute(Command::ReturnToPreviousView).unwrap();
+        assert_eq!(app.view, original_view);
     }
 
     #[test]

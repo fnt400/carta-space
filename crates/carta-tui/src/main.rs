@@ -404,7 +404,7 @@ fn handle_normal(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
         KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.editor.insert(&c.to_string())
         }
-        KeyCode::Enter => app.editor.insert("\n"),
+        KeyCode::Enter => app.editor.insert_newline_with_list_continuation(),
         KeyCode::Tab if shift => app.editor.indent_less(),
         KeyCode::Tab => app.editor.insert("    "),
         KeyCode::Backspace => app.editor.backspace(),
