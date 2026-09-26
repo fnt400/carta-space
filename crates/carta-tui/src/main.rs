@@ -392,6 +392,11 @@ fn handle_key(
         match key.code {
             KeyCode::Modifier(ModifierKeyCode::RightControl) => {
                 dispatcher.right_control_held = true;
+                if dispatcher.active_leap.is_some()
+                    && matches!(app.mode, AppMode::Leap { palette: false, .. })
+                {
+                    app.leap_again_active();
+                }
                 return Ok(());
             }
             KeyCode::Modifier(
@@ -402,7 +407,23 @@ fn handle_key(
                 return Ok(());
             }
             KeyCode::Modifier(key @ (ModifierKeyCode::LeftControl | ModifierKeyCode::LeftAlt)) => {
-                if dispatcher.active_leap.is_some() {
+                if let Some(active) = dispatcher.active_leap {
+                    if active.key != key {
+                        dispatcher.active_leap = None;
+                        dispatcher.suppressed_leap_releases = 2;
+                        if matches!(app.mode, AppMode::Leap { .. }) {
+                            app.end_leap();
+                        }
+                        if app.extend_last_leap_highlight() {
+                            if let Some(text) = app.editor.selected_text() {
+                                if let Err(error) = dispatcher.clipboard.set_text(text) {
+                                    app.status = format!(
+                                        "Cat highlight active; clipboard unavailable: {error}"
+                                    );
+                                }
+                            }
+                        }
+                    }
                     return Ok(());
                 }
                 if let Some(pending) = dispatcher.pending_leap {
@@ -2220,6 +2241,95 @@ mod tests {
 
         assert_eq!(app.editor.regions()[0].text, "palpha beta");
         assert!(matches!(app.mode, AppMode::Editing));
+    }
+
+    #[test]
+    fn active_leap_again_keeps_original_anchor_until_opposite_leap_highlights() {
+        let (_temporary, mut app) = app_with_documents(&["a x b x c x d"], false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        app.cat_navigation();
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('x'), KeyModifiers::ALT),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.cursor().byte, 2);
+
+        for expected in [6, 10] {
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new(
+                    KeyCode::Modifier(ModifierKeyCode::RightControl),
+                    KeyModifiers::CONTROL | KeyModifiers::ALT,
+                ),
+                true,
+            )
+            .unwrap();
+
+            let AppMode::Leap { session, .. } = &app.mode else {
+                panic!("expected active LEAP")
+            };
+            assert_eq!(session.origin().byte_offset(), 0);
+            assert_eq!(app.editor.cursor().byte, expected);
+
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new_with_kind(
+                    KeyCode::Modifier(ModifierKeyCode::RightControl),
+                    KeyModifiers::ALT,
+                    KeyEventKind::Release,
+                ),
+                true,
+            )
+            .unwrap();
+        }
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::CONTROL | KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+
+        assert!(matches!(app.mode, AppMode::Editing));
+        assert!(dispatcher.active_leap.is_none());
+        assert_eq!(app.editor.selected_text().as_deref(), Some("a x b x c x"));
+        assert_eq!(dispatcher.clipboard.get_text().unwrap(), "a x b x c x");
+
+        for released in [ModifierKeyCode::LeftControl, ModifierKeyCode::LeftAlt] {
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new_with_kind(
+                    KeyCode::Modifier(released),
+                    KeyModifiers::NONE,
+                    KeyEventKind::Release,
+                ),
+                true,
+            )
+            .unwrap();
+        }
+        assert!(app.editor.cat_highlight().is_some());
     }
 
     #[test]
