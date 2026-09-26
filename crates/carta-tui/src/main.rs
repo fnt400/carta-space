@@ -783,7 +783,7 @@ fn draw(frame: &mut ratatui::Frame<'_>, app: &mut App) {
                 .map(|r| {
                     ListItem::new(format!(
                         "{}  {}",
-                        r.checkpoint().created(),
+                        local_timestamp(r.checkpoint().created()),
                         r.checkpoint().note().unwrap_or("checkpoint")
                     ))
                 })
@@ -807,7 +807,7 @@ fn draw(frame: &mut ratatui::Frame<'_>, app: &mut App) {
                 .map(|snapshot| {
                     ListItem::new(format!(
                         "{}  {}  {} Documents",
-                        snapshot.checkpoint().created(),
+                        local_timestamp(snapshot.checkpoint().created()),
                         snapshot.title(),
                         snapshot.document_ids().len()
                     ))
@@ -837,14 +837,21 @@ fn draw(frame: &mut ratatui::Frame<'_>, app: &mut App) {
             if let Some(trash) = &app.trash {
                 items.extend(
                     trash.documents().iter().map(|d| {
-                        ListItem::new(format!("Document · {} · {}", d.created(), d.label()))
+                        ListItem::new(format!(
+                            "Document · {} · {}",
+                            local_timestamp(d.created()),
+                            d.label()
+                        ))
                     }),
                 );
                 items.extend(
-                    trash
-                        .works()
-                        .iter()
-                        .map(|w| ListItem::new(format!("Work · {} · {}", w.created(), w.title()))),
+                    trash.works().iter().map(|w| {
+                        ListItem::new(format!(
+                            "Work · {} · {}",
+                            local_timestamp(w.created()),
+                            w.title()
+                        ))
+                    }),
                 );
             }
             draw_list(frame, chunks[0], "Trash".into(), items, *selected);
@@ -1539,6 +1546,10 @@ fn current_position(app: &App) -> String {
         )
     }
 }
+fn local_timestamp(timestamp: carta_core::Timestamp) -> String {
+    timestamp.as_datetime().with_timezone(&Local).to_rfc3339()
+}
+
 fn date_only(timestamp: carta_core::Timestamp) -> String {
     timestamp
         .as_datetime()
