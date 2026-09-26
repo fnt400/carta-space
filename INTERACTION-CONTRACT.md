@@ -318,7 +318,7 @@ The v0.1 TUI keeps direct bindings deliberately small:
 - Left Control+Enter: LEAP to the beginning of the current visual line;
 - Left Alt+Enter: LEAP to the end of the current visual line;
 - Esc: command palette;
-- Left Control + Left Alt together after a LEAP: extend the Cat highlight over the traversed text and copy it to the system clipboard;
+- Left Control + Left Alt together after a LEAP, creep sequence, or run of typing: extend the pending Cat highlight and copy it to the system clipboard;
 - physical Right Control+C with a Cat highlight: Cat COPY;
 - physical Right Control+C without a Cat highlight: paste system-clipboard text at the cursor;
 - Backspace or Delete: Cat ERASE; with an extended highlight erase the block, after typing erase backward, after LEAP/creep erase forward;
