@@ -494,6 +494,33 @@ fn creates_linked_document_at_a_utf8_byte_boundary() {
 }
 
 #[test]
+fn splits_document_at_point_and_preserves_work_order() {
+    let (_temporary, mut archive) = create_archive();
+    let source = archive.create_document("alpha beta").unwrap();
+    let trailing = archive.create_document("trailing").unwrap();
+    let work = archive
+        .create_work("Work".to_owned(), vec![source, trailing])
+        .unwrap();
+    let source_created = archive
+        .documents()
+        .find(|info| info.id() == source)
+        .unwrap()
+        .created();
+
+    let target = archive.split_document_at(source, 6).unwrap();
+
+    assert_eq!(archive.read_document(source).unwrap().content(), "alpha ");
+    assert_eq!(archive.read_document(target).unwrap().content(), "beta");
+    let target_created = archive
+        .documents()
+        .find(|info| info.id() == target)
+        .unwrap()
+        .created();
+    assert_eq!(target_created, source_created.successor());
+    assert_eq!(archive.work(work).unwrap().documents(), &[source, target, trailing]);
+}
+
+#[test]
 fn rejects_invalid_link_boundary_without_creating_a_document() {
     let (_temporary, mut archive) = create_archive();
     let source = archive.create_document("è").unwrap();
