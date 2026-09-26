@@ -299,6 +299,24 @@ fn handle_key(
         return Ok(());
     }
 
+    if dispatcher.right_control_held && enhanced && key.kind == KeyEventKind::Press {
+        if let KeyCode::Modifier(key @ (ModifierKeyCode::LeftControl | ModifierKeyCode::LeftAlt)) =
+            key.code
+        {
+            dispatcher.pending_leap = None;
+            dispatcher.active_leap = None;
+            dispatcher.suppressed_leap_releases =
+                dispatcher.suppressed_leap_releases.saturating_add(1);
+            let direction = if key == ModifierKeyCode::LeftControl {
+                LeapDirection::Backward
+            } else {
+                LeapDirection::Forward
+            };
+            app.leap_again(direction);
+            return Ok(());
+        }
+    }
+
     if dispatcher.right_control_held
         && key.modifiers.contains(KeyModifiers::CONTROL)
         && matches!(key.code, KeyCode::Char('c' | 'C'))
@@ -1693,6 +1711,66 @@ mod tests {
         assert!(app.editor.cat_highlight().is_some());
         let selected = app.editor.selected_text().expect("Cat highlight text");
         assert_eq!(dispatcher.clipboard.get_text().unwrap(), selected);
+    }
+
+    #[test]
+    fn right_control_with_leap_keys_performs_leap_again() {
+        let (_temporary, mut app) = app_with_documents(&["one one one"], false);
+        let mut dispatcher = Dispatcher::default();
+
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        app.start_leap(LeapDirection::Forward, true);
+        app.leap_input("one");
+        app.end_leap();
+        assert_eq!(app.editor.cursor().byte, 0);
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::CONTROL | KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.cursor().byte, 4);
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new_with_kind(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::CONTROL,
+                KeyEventKind::Release,
+            ),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.cursor().byte, 4);
+
+        app.editor.set_cursor(Cursor { region: 0, byte: 8 }, false);
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.cursor().byte, 4);
     }
 
     #[test]
