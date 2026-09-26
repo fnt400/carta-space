@@ -272,7 +272,7 @@ When an extended highlight is created, the reference TUI also copies its text to
 With an extended highlight active:
 
 - starting another LEAP keeps the highlighted text in place while only the cursor moves;
-- releasing the LEAP key at a destination outside the highlight moves the highlighted text to that destination;
+- releasing the LEAP key at a destination outside the highlight moves the highlighted text to that destination; because Carta uses an insertion-point cursor while the Cat cursor rests on a character, a moved block is inserted immediately before the target character;
 - the moved text remains highlighted so it may immediately be moved again;
 - the destination may be in another Document of the same editable View;
 - a LEAP landing inside the highlight does not move the text and collapses to the target character;
