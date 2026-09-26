@@ -162,11 +162,11 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return false;
         }
-        self.cat_highlight = None;
         if self.conventional_selection().is_some_and(|(a, b)| a.region != b.region) {
             return false;
         }
         self.record();
+        self.cat_highlight = None;
         self.delete_selection_inner();
         let region = &mut self.regions[self.cursor.region];
         region.text.insert_str(self.cursor.byte, value);
@@ -249,6 +249,23 @@ impl CompositeEditor {
         self.record();
         self.delete_selection_inner();
         self.changed();
+        true
+    }
+
+    pub fn replace_cat_highlight(&mut self, value: &str) -> bool {
+        let Some((start, end)) = self.cat_highlight else {
+            return false;
+        };
+        self.record();
+        self.regions[start.region].text.replace_range(start.byte..end.byte, value);
+        self.cursor = Cursor {
+            region: start.region,
+            byte: start.byte + value.len(),
+        };
+        self.anchor = None;
+        self.cat_highlight = None;
+        self.preferred_column = None;
+        self.dirty = true;
         true
     }
 
