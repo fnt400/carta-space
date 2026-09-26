@@ -2246,34 +2246,49 @@ mod tests {
     }
 
     #[test]
-    fn assigned_control_chords_do_not_change_remembered_leap_query() {
+    fn assigned_right_control_chords_do_not_change_remembered_leap_query() {
         let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
         app.start_leap(LeapDirection::Forward, true);
         app.leap_input("alpha");
         app.end_leap();
         assert_eq!(app.leap.remembered_query(), Some("alpha"));
-        let chords = [
-            (KeyCode::PageUp, KeyModifiers::CONTROL),
-            (KeyCode::PageDown, KeyModifiers::CONTROL),
-            (KeyCode::Home, KeyModifiers::CONTROL),
-            (KeyCode::End, KeyModifiers::CONTROL),
-        ];
-        for (code, modifiers) in chords {
+
+        for code in [KeyCode::PageUp, KeyCode::PageDown, KeyCode::Home, KeyCode::End] {
             let mut dispatcher = Dispatcher {
-                pending_leap: Some(PendingLeap {
-                    direction: LeapDirection::Backward,
-                    key: ModifierKeyCode::LeftControl,
-                }),
+                right_control_held: true,
                 ..Dispatcher::default()
             };
             handle_key(
                 &mut app,
                 &mut dispatcher,
-                KeyEvent::new(code, modifiers),
+                KeyEvent::new(code, KeyModifiers::CONTROL),
                 true,
             )
             .unwrap();
+
             assert!(dispatcher.pending_leap.is_none());
+            assert!(matches!(app.mode, AppMode::Editing));
+            assert_eq!(app.leap.remembered_query(), Some("alpha"));
+        }
+    }
+
+    #[test]
+    fn degraded_control_chords_do_not_change_remembered_leap_query() {
+        let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
+        app.start_leap(LeapDirection::Forward, true);
+        app.leap_input("alpha");
+        app.end_leap();
+
+        for code in [KeyCode::PageUp, KeyCode::PageDown, KeyCode::Home, KeyCode::End] {
+            let mut dispatcher = Dispatcher::default();
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new(code, KeyModifiers::CONTROL),
+                false,
+            )
+            .unwrap();
+
             assert!(matches!(app.mode, AppMode::Editing));
             assert_eq!(app.leap.remembered_query(), Some("alpha"));
         }
