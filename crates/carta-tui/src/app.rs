@@ -1207,33 +1207,6 @@ impl App {
         self.last_leap_span = (start != end).then_some((start, end));
     }
 
-    fn cat_span_between(
-        &self,
-        origin: Cursor,
-        destination: Cursor,
-    ) -> Option<(Cursor, Cursor)> {
-        if origin.region != destination.region || origin == destination {
-            return None;
-        }
-        let origin_range = self
-            .cat_origin_range(origin)
-            .unwrap_or((origin, origin));
-        let destination_range = self
-            .cat_char_range_at(destination)
-            .unwrap_or((destination, destination));
-        let start = if origin_range.0.byte <= destination_range.0.byte {
-            origin_range.0
-        } else {
-            destination_range.0
-        };
-        let end = if origin_range.1.byte >= destination_range.1.byte {
-            origin_range.1
-        } else {
-            destination_range.1
-        };
-        (start != end).then_some((start, end))
-    }
-
     pub fn cat_render_highlight(&self) -> Option<(Cursor, Cursor)> {
         if let Some(highlight) = self.editor.cat_highlight() {
             return Some(highlight);
@@ -1447,11 +1420,23 @@ impl App {
         self.editor.set_cursor_preserving_highlight(destination);
 
         if had_highlight {
+            let previous_highlight = self.editor.cat_highlight();
             if self.editor.move_cat_highlight_to(destination) {
                 self.edited(Instant::now());
                 self.status = "Moved highlighted text".into();
+                self.cat_span_fixed = None;
+                self.rehighlight_span = None;
+            } else if let Some((start, end)) = previous_highlight {
+                if destination.region == start.region
+                    && destination.byte >= start.byte
+                    && destination.byte < end.byte
+                {
+                    self.rehighlight_span = Some((destination, end));
+                    self.cat_span_fixed = Some(end);
+                }
             }
             self.last_leap_span = None;
+            self.cat_erase_forward = true;
         } else if origin != destination {
             self.last_leap_span = Some((origin, destination));
             self.status.clear();
@@ -1492,10 +1477,6 @@ impl App {
         let palette = *palette;
         let query_empty = session.query().is_empty();
         let direction = session.direction();
-        let origin = Cursor {
-            region: session.origin().region(),
-            byte: session.origin().byte_offset(),
-        };
         let destination = self.editor.cursor();
         let had_highlight = self.editor.cat_highlight().is_some();
 
