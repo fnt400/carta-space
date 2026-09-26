@@ -1182,7 +1182,10 @@ impl App {
         let origin = self.editor.cursor();
         let Some(destination) = self
             .editor
-            .visual_boundary_cursor(width, direction == LeapDirection::Forward)
+            .visual_boundary_cursor(
+                width,
+                matches!(direction, LeapDirection::Forward),
+            )
         else {
             self.last_leap_span = None;
             return;
