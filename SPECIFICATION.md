@@ -409,6 +409,14 @@ A Work MUST NOT contain copied Document bodies.
 
 A Document MAY be referenced by more than one Work.
 
+### 10.5 `color` (optional)
+
+A Work MAY contain a `color` member as a stable presentation hint.
+
+When written by the reference implementation, it is a string in `#RRGGBB` form. Frontends MAY ignore this hint, but a frontend that rewrites `work.json` MUST preserve it unless the user explicitly changes the Work color.
+
+The color is not part of Work identity, title uniqueness, ordering, or membership semantics.
+
 Unknown members MUST be preserved when a frontend rewrites `work.json`.
 
 ---

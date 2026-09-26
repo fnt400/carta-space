@@ -236,6 +236,25 @@ impl WorkMetadata {
         &self.extensions
     }
 
+    pub fn color(&self) -> Option<&str> {
+        self.extensions.get("color").and_then(Value::as_str)
+    }
+
+    pub fn with_color(&self, color: Option<String>) -> Self {
+        let mut metadata = self.clone();
+        match color {
+            Some(color) => {
+                metadata
+                    .extensions
+                    .insert("color".to_owned(), Value::String(color));
+            }
+            None => {
+                metadata.extensions.remove("color");
+            }
+        }
+        metadata
+    }
+
     pub fn with_title(&self, title: String) -> Self {
         let mut metadata = self.clone();
         metadata.title = title;

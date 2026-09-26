@@ -61,6 +61,10 @@ impl Work {
         self.metadata.title()
     }
 
+    pub fn color(&self) -> Option<&str> {
+        self.metadata.color()
+    }
+
     pub fn documents(&self) -> &[carta_format::DocumentId] {
         self.metadata.documents()
     }

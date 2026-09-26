@@ -86,6 +86,24 @@ fn creates_works_in_normative_document_order() {
 }
 
 #[test]
+fn persists_optional_work_color_and_preserves_it_across_rename() {
+    let (_temporary, mut archive) = create_archive();
+    let work = archive.create_empty_work("Colored".to_owned()).unwrap();
+    assert_eq!(archive.work(work).unwrap().color(), None);
+
+    archive
+        .set_work_color(work, Some("#6F7F8C".to_owned()))
+        .unwrap();
+    assert_eq!(archive.work(work).unwrap().color(), Some("#6F7F8C"));
+
+    archive.rename_work(work, "Renamed".to_owned()).unwrap();
+    assert_eq!(archive.work(work).unwrap().color(), Some("#6F7F8C"));
+
+    let reopened = Archive::open(archive.root()).unwrap();
+    assert_eq!(reopened.work(work).unwrap().color(), Some("#6F7F8C"));
+}
+
+#[test]
 fn rejects_duplicate_documents_in_a_work() {
     let (_temporary, mut archive) = create_archive();
     let document = archive.create_document("body").unwrap();

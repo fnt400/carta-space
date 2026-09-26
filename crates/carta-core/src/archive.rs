@@ -598,6 +598,16 @@ impl Archive {
         self.create_work(title, Vec::new())
     }
 
+    pub fn set_work_color(&mut self, id: WorkId, color: Option<String>) -> Result<(), Error> {
+        let metadata = self
+            .works
+            .get(&id)
+            .ok_or(Error::MissingWork(id))?
+            .metadata
+            .with_color(color);
+        self.replace_work(id, metadata)
+    }
+
     pub fn rename_work(&mut self, id: WorkId, title: String) -> Result<(), Error> {
         let title_key = work_title_key(&title);
         if let Some(existing) = self

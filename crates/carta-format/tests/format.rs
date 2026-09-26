@@ -67,6 +67,26 @@ fn preserves_unknown_document_and_work_members() {
 }
 
 #[test]
+fn work_color_round_trips_as_optional_metadata_extension() {
+    let input = VALID_WORK.replace(
+        "\n}",
+        ",\n  \"color\": \"#6F7F8C\"\n}",
+    );
+    let work = WorkMetadata::read_from(input.as_bytes()).unwrap();
+    assert_eq!(work.color(), Some("#6F7F8C"));
+
+    let recolored = work.with_color(Some("#B5B9A4".into()));
+    assert_eq!(recolored.color(), Some("#B5B9A4"));
+
+    let mut output = Vec::new();
+    recolored.write_to(&mut output).unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(json["color"], "#B5B9A4");
+
+    assert!(recolored.with_color(None).color().is_none());
+}
+
+#[test]
 fn rejects_noncanonical_or_non_v7_ids() {
     let canonical = "01890f3e-70a9-7cc3-98c4-dc0c0c073990";
     assert!(DocumentId::from_str(canonical).is_ok());
