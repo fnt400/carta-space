@@ -169,7 +169,26 @@ A Work View presents its component Documents in explicit Work order as a continu
 
 Each Work remembers its last local cursor/scroll position when possible.
 
-### 3.5 Document boundaries
+### 3.5 Collapse and expand
+
+`Collapse View` is available in editable Chronological and Work Views. It is a read-only navigation mode that shows only the first three visual rows of each Document while retaining generated boundaries and metadata.
+
+While collapsed:
+
+- Up or PageUp moves to the previous Document;
+- Down or PageDown moves to the next Document;
+- Enter expands the View on the selected Document;
+- ordinary text editing is disabled.
+
+`Expand View` restores the normal continuous editable surface. Collapse state is device-local UI state and never changes canonical content.
+
+### 3.6 Writing position
+
+In normal editable Views, the TUI keeps the cursor approximately two thirds of the way down the writing area. It MAY render empty screen space above the first available line or below the last available line to preserve that writing position.
+
+This padding is presentation only. It MUST NOT insert whitespace or line breaks into authored text.
+
+### 3.7 Document boundaries
 
 In multi-Document editable Views, boundaries are generated UI rather than authored text. A Work View uses one generated blank line, a simple continuous separator line, and one generated blank line between Documents.
 
@@ -186,7 +205,7 @@ The cursor may cross boundaries.
 
 Cat highlights never cross Document boundaries. A highlighted block may nevertheless be moved to a destination in another Document of the same editable View; generated separators remain outside authored text and are never moved, copied, or erased.
 
-### 3.6 Status bar
+### 3.8 Status bar
 
 The TUI uses a minimal one-line status bar.
 
@@ -276,6 +295,7 @@ Carta models the Canon Cat cursor/highlight rule:
 - there is normally a one-character visual highlight when text is available;
 - after LEAP, creep, or ordinary navigation, the cursor is conceptually narrow and the character at the cursor is highlighted;
 - after typing, the cursor is conceptually wide and the last typed character immediately before it is highlighted;
+- the TUI renders this single-character wide Cat cursor with a darker background than an extended Cat highlight, so the two states remain visually distinct;
 - pressing physical Left Control and physical Left Alt together extends the highlight over the Cat span established by the preceding LEAP, creep, or run of newly typed text.
 
 The target character at the end of a LEAP is included in the extended highlight. The one-character normal highlight is not treated as an extended Carta selection for commands such as Right Control+C.
@@ -322,6 +342,8 @@ The palette is contextual. Commands that cannot apply in the current context SHO
 
 Editable Views expose `Insert Current Date and Time`, which inserts the current local date and time at the cursor as `YYYY-MM-DD HH:MM`. History and Work History expose `Return to Previous View`, which returns to the View from which history was opened.
 
+`Cheatsheet` and `Manual` are always available from the palette. They open built-in read-only Help Views supplied by the frontend rather than Documents stored in the Archive. The manual is divided into topic Documents; Up/Down moves between topics. Help Views participate in navigation history, so `Back` returns to the previous working context.
+
 ### 5.2 Direct shortcuts
 
 The v0.1 TUI keeps direct bindings deliberately small:
@@ -336,6 +358,8 @@ The v0.1 TUI keeps direct bindings deliberately small:
 - outside an active LEAP, physical Right Control+Left Control: Leap Again backward; physical Right Control+Left Alt: Leap Again forward;
 - physical Right Control+C with a Cat highlight: Cat COPY;
 - physical Right Control+C without a Cat highlight: paste system-clipboard text at the cursor;
+- physical Right Control+Z: Undo;
+- physical Right Control+R: Redo;
 - Backspace: modern backward deletion; with an extended Cat highlight it erases the whole highlighted block;
 - Delete: Canon Cat ERASE; with an extended highlight it erases the block, after typing it erases backward, and after LEAP/creep it erases forward;
 - Ctrl+PageUp/PageDown: move to the previous/next Document in the current View, without wrapping;
@@ -345,7 +369,7 @@ Explicitly assigned Ctrl chords take precedence over the physical Control-key LE
 
 Other direct shortcuts should be added only after real use demonstrates a need.
 
-`Undo` and `Redo` are contextual command-palette commands. They are available in editable Views when the session-local editor history can apply them.
+`Undo` and `Redo` are contextual command-palette commands and also have the direct RightCtrl+Z / RightCtrl+R bindings. They are available in editable Views when the session-local editor history can apply them.
 
 ---
 
@@ -391,6 +415,8 @@ Future frontends may render headings, emphasis, links, or other syntax more rich
 ### 6.5 Wrapping and indentation
 
 Soft wrap is visual only. Carta does not automatically hard-wrap authored lines. In editable Chronological and Work Views, the writing surface is centered and at most 80 terminal columns wide, or the available width when the terminal is narrower. Cursor movement and wrapping use that same visual width.
+
+The normal viewport keeps the active cursor near two thirds of the available writing height as described in §3.6.
 
 `Tab` inserts four spaces.
 
@@ -714,7 +740,9 @@ Work Markdown export concatenates component Documents in Work order without UI b
 
 PDF export is a derived publishing operation implemented through Pandoc and an external PDF engine; LuaLaTeX is the initial preferred default. Carta v0.1 does not implement its own layout engine.
 
-Carta proposes a filename from the Document label or Work name and allows the user to change path/name before export.
+Carta proposes a filename from the Document label or Work name and allows the user to change the filename before export.
+
+All Document and Work exports are written under `$HOME/Downloads`. Carta creates that directory if it does not exist. Any directory component typed into the filename prompt is discarded so export cannot escape the Downloads directory.
 
 Exports live outside the Archive.
 
