@@ -197,6 +197,8 @@ fn run() -> Result<(), Box<dyn Error>> {
 struct Dispatcher {
     pending_leap: Option<PendingLeap>,
     active_leap: Option<PendingLeap>,
+    suppressed_leap_releases: u8,
+    right_control_held: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -213,6 +215,18 @@ fn handle_key(
 ) -> Result<(), Box<dyn Error>> {
     if key.kind == KeyEventKind::Release {
         if let KeyCode::Modifier(released) = key.code {
+            if released == ModifierKeyCode::RightControl {
+                dispatcher.right_control_held = false;
+                return Ok(());
+            }
+            if matches!(
+                released,
+                ModifierKeyCode::LeftControl | ModifierKeyCode::LeftAlt
+            ) && dispatcher.suppressed_leap_releases > 0
+            {
+                dispatcher.suppressed_leap_releases -= 1;
+                return Ok(());
+            }
             if dispatcher
                 .pending_leap
                 .is_some_and(|pending| pending.key == released)
@@ -236,24 +250,23 @@ fn handle_key(
         return Ok(());
     }
 
+    if dispatcher.right_control_held
+        && key.modifiers.contains(KeyModifiers::CONTROL)
+        && matches!(key.code, KeyCode::Char('c' | 'C'))
+    {
+        dispatcher.pending_leap = None;
+        if matches!(app.mode, AppMode::Editing)
+            && matches!(app.view, View::Chronological(_) | View::Work(_))
+        {
+            app.copy_cat_highlight();
+        }
+        return Ok(());
+    }
+
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         let editable = matches!(app.mode, AppMode::Editing)
             && matches!(app.view, View::Chronological(_) | View::Work(_));
         match key.code {
-            KeyCode::Left if key.modifiers.contains(KeyModifiers::SHIFT) => {
-                dispatcher.pending_leap = None;
-                if editable {
-                    app.editor.move_word(false, true);
-                }
-                return Ok(());
-            }
-            KeyCode::Right if key.modifiers.contains(KeyModifiers::SHIFT) => {
-                dispatcher.pending_leap = None;
-                if editable {
-                    app.editor.move_word(true, true);
-                }
-                return Ok(());
-            }
             KeyCode::PageUp if !key.modifiers.contains(KeyModifiers::SHIFT) => {
                 dispatcher.pending_leap = None;
                 if editable {
@@ -288,18 +301,29 @@ fn handle_key(
 
     if enhanced && key.kind == KeyEventKind::Press {
         match key.code {
-            KeyCode::Modifier(ModifierKeyCode::LeftControl) => {
-                dispatcher.pending_leap = Some(PendingLeap {
-                    direction: LeapDirection::Backward,
-                    key: ModifierKeyCode::LeftControl,
-                });
+            KeyCode::Modifier(ModifierKeyCode::RightControl) => {
+                dispatcher.right_control_held = true;
                 return Ok(());
             }
-            KeyCode::Modifier(ModifierKeyCode::LeftAlt) => {
-                dispatcher.pending_leap = Some(PendingLeap {
-                    direction: LeapDirection::Forward,
-                    key: ModifierKeyCode::LeftAlt,
-                });
+            KeyCode::Modifier(key @ (ModifierKeyCode::LeftControl | ModifierKeyCode::LeftAlt)) => {
+                if dispatcher.active_leap.is_some() {
+                    return Ok(());
+                }
+                if let Some(pending) = dispatcher.pending_leap {
+                    if pending.key != key {
+                        dispatcher.pending_leap = None;
+                        dispatcher.suppressed_leap_releases = 2;
+                        app.extend_last_leap_highlight();
+                        return Ok(());
+                    }
+                    return Ok(());
+                }
+                let direction = if key == ModifierKeyCode::LeftControl {
+                    LeapDirection::Backward
+                } else {
+                    LeapDirection::Forward
+                };
+                dispatcher.pending_leap = Some(PendingLeap { direction, key });
                 return Ok(());
             }
             _ => {}
@@ -449,35 +473,35 @@ fn handle_normal(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
         KeyCode::Backspace => app.editor.backspace(),
         KeyCode::Delete => app.editor.delete(),
         KeyCode::Left => {
-            app.editor.move_horizontal(false, shift);
+            app.editor.move_horizontal(false, false);
             false
         }
         KeyCode::Right => {
-            app.editor.move_horizontal(true, shift);
+            app.editor.move_horizontal(true, false);
             false
         }
         KeyCode::Up => {
-            app.editor.move_visual(false, width, shift);
+            app.editor.move_visual(false, width, false);
             false
         }
         KeyCode::Down => {
-            app.editor.move_visual(true, width, shift);
+            app.editor.move_visual(true, width, false);
             false
         }
         KeyCode::Home => {
-            app.editor.visual_home(width, shift);
+            app.editor.visual_home(width, false);
             false
         }
         KeyCode::End => {
-            app.editor.visual_end(width, shift);
+            app.editor.visual_end(width, false);
             false
         }
         KeyCode::PageUp => {
-            app.editor.page_visual(false, page, width, shift);
+            app.editor.page_visual(false, page, width, false);
             false
         }
         KeyCode::PageDown => {
-            app.editor.page_visual(true, page, width, shift);
+            app.editor.page_visual(true, page, width, false);
             false
         }
         _ => false,
@@ -1393,85 +1417,101 @@ mod tests {
     }
 
     #[test]
-    fn shift_arrows_create_extend_and_visibly_render_selection() {
+    fn shift_arrows_move_without_creating_selection() {
         let (_temporary, mut app) = app_with_documents(&["abc\ndef\nghi"], false);
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
         dispatch(&mut app, KeyCode::Right, KeyModifiers::SHIFT);
         dispatch(&mut app, KeyCode::Right, KeyModifiers::SHIFT);
-        assert_eq!(app.editor.selected_text().as_deref(), Some("ab"));
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 2 });
+        assert!(app.editor.selection().is_none());
 
-        let lines = visual_lines(&app, 80);
-        let authored = lines
-            .iter()
-            .find(|line| line.region == Some(0))
-            .expect("authored visual line");
-        let rendered = styled_line(authored, 0, app.editor.selection());
-        assert!(rendered
-            .spans
-            .iter()
-            .any(|span| span.style.bg == Some(Color::Blue)));
-
-        app.editor.set_cursor(Cursor { region: 0, byte: 3 }, false);
-        dispatch(&mut app, KeyCode::Left, KeyModifiers::SHIFT);
-        dispatch(&mut app, KeyCode::Left, KeyModifiers::SHIFT);
-        assert_eq!(app.editor.selected_text().as_deref(), Some("bc"));
-    }
-
-    #[test]
-    fn shift_up_and_down_extend_selection_and_shift_alone_is_inert() {
-        let (_temporary, mut app) = app_with_documents(&["abc\ndef\nghi"], false);
-        app.editor.set_cursor(Cursor { region: 0, byte: 5 }, false);
-        dispatch(&mut app, KeyCode::Up, KeyModifiers::SHIFT);
-        assert_eq!(app.editor.selection().unwrap().0.byte, 1);
-
-        app.editor.set_cursor(Cursor { region: 0, byte: 5 }, false);
         dispatch(&mut app, KeyCode::Down, KeyModifiers::SHIFT);
-        assert_eq!(app.editor.selection().unwrap().1.byte, 9);
-        let before = (app.editor.cursor(), app.editor.selection());
-        dispatch(
-            &mut app,
-            KeyCode::Modifier(ModifierKeyCode::LeftShift),
-            KeyModifiers::SHIFT,
-        );
-        assert_eq!((app.editor.cursor(), app.editor.selection()), before);
+        assert!(app.editor.selection().is_none());
     }
 
     #[test]
-    fn ctrl_shift_arrows_select_by_word_without_starting_leap() {
+    fn both_leap_keys_extend_the_last_leap_into_cat_highlight() {
         let (_temporary, mut app) = app_with_documents(&["alpha beta gamma"], false);
-        let mut dispatcher = Dispatcher {
-            pending_leap: Some(PendingLeap {
-                direction: LeapDirection::Backward,
-                key: ModifierKeyCode::LeftControl,
-            }),
-            ..Dispatcher::default()
-        };
-        app.editor.set_cursor(
-            Cursor {
-                region: 0,
-                byte: 11,
-            },
-            false,
-        );
+        let mut dispatcher = Dispatcher::default();
 
         handle_key(
             &mut app,
             &mut dispatcher,
-            KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL | KeyModifiers::SHIFT),
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::ALT,
+            ),
             true,
         )
         .unwrap();
-        assert_eq!(app.editor.selected_text().as_deref(), Some("beta "));
-        assert!(matches!(app.mode, AppMode::Editing));
-        assert!(dispatcher.pending_leap.is_none());
-
-        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
-        dispatch(
+        handle_key(
             &mut app,
-            KeyCode::Right,
-            KeyModifiers::CONTROL | KeyModifiers::SHIFT,
-        );
-        assert_eq!(app.editor.selected_text().as_deref(), Some("alpha "));
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('b'), KeyModifiers::ALT),
+            true,
+        )
+        .unwrap();
+        let release = KeyEvent::new(
+            KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+            KeyModifiers::NONE,
+        )
+        .with_kind(KeyEventKind::Release);
+        handle_key(&mut app, &mut dispatcher, release, true).unwrap();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::CONTROL | KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+
+        assert!(app.editor.cat_highlight().is_some());
+        assert!(app.editor.selected_text().is_some());
+    }
+
+    #[test]
+    fn right_control_c_copies_cat_highlight() {
+        let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
+        assert!(app.editor.set_cat_highlight(
+            Cursor { region: 0, byte: 6 },
+            Cursor { region: 0, byte: 10 },
+        ));
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(app.editor.regions()[0].text, "alpha betabeta");
+        assert_eq!(app.editor.selected_text().as_deref(), Some("beta"));
     }
 
     #[test]
@@ -1525,8 +1565,6 @@ mod tests {
         app.end_leap();
         assert_eq!(app.leap.remembered_query(), Some("alpha"));
         let chords = [
-            (KeyCode::Left, KeyModifiers::CONTROL | KeyModifiers::SHIFT),
-            (KeyCode::Right, KeyModifiers::CONTROL | KeyModifiers::SHIFT),
             (KeyCode::PageUp, KeyModifiers::CONTROL),
             (KeyCode::PageDown, KeyModifiers::CONTROL),
             (KeyCode::Home, KeyModifiers::CONTROL),
@@ -1554,20 +1592,12 @@ mod tests {
     }
 
     #[test]
-    fn ctrl_shift_cancels_pending_leap_without_changing_selection() {
+    fn unrelated_modifier_cancels_pending_leap_without_starting_selection() {
         let temporary = tempfile::tempdir().unwrap();
         let archive = Archive::create(temporary.path().join("archive")).unwrap();
         let mut app = App::open(archive, None, Instant::now()).unwrap();
         assert!(app.editor.insert("selected"));
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
-        app.editor.set_cursor(
-            Cursor {
-                region: 0,
-                byte: "selected".len(),
-            },
-            true,
-        );
-        let selection = app.editor.selection();
         let mut dispatcher = Dispatcher::default();
 
         handle_key(
@@ -1591,7 +1621,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(app.mode, AppMode::Editing));
-        assert_eq!(app.editor.selection(), selection);
+        assert!(app.editor.selection().is_none());
         assert!(dispatcher.pending_leap.is_none());
     }
 
