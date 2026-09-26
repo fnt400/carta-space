@@ -1831,6 +1831,17 @@ mod tests {
         )
         .unwrap();
         assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 0 });
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new_with_kind(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
+            ),
+            true,
+        )
+        .unwrap();
 
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
         app.cat_navigation();
@@ -1888,6 +1899,17 @@ mod tests {
         .unwrap();
         assert_eq!(app.editor.current_text(), Some("twoone\n\nthree"));
         assert_eq!(app.editor.selected_text().as_deref(), Some("two"));
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new_with_kind(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
+            ),
+            true,
+        )
+        .unwrap();
 
         handle_key(
             &mut app,
@@ -1908,6 +1930,151 @@ mod tests {
         .unwrap();
         assert_eq!(app.editor.current_text(), Some("one\ntwo\nthree"));
         assert_eq!(app.editor.selected_text().as_deref(), Some("two"));
+    }
+
+    #[test]
+    fn active_logical_line_leap_again_preserves_origin_for_highlight() {
+        let (_temporary, mut app) = app_with_documents(&["a\nb\nc\nd"], false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        app.cat_navigation();
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 2 });
+
+        for expected in [4, 6] {
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new(
+                    KeyCode::Modifier(ModifierKeyCode::RightControl),
+                    KeyModifiers::CONTROL | KeyModifiers::ALT,
+                ),
+                true,
+            )
+            .unwrap();
+            assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: expected });
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new_with_kind(
+                    KeyCode::Modifier(ModifierKeyCode::RightControl),
+                    KeyModifiers::ALT,
+                    KeyEventKind::Release,
+                ),
+                true,
+            )
+            .unwrap();
+        }
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::CONTROL | KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(app.editor.selected_text().as_deref(), Some("a\nb\nc\nd"));
+        assert_eq!(dispatcher.clipboard.get_text().unwrap(), "a\nb\nc\nd");
+    }
+
+    #[test]
+    fn released_document_boundary_leap_again_repeats_document_boundary() {
+        let (_temporary, mut app) = app_with_documents(&["abc", "def", "ghi"], true);
+        app.editor.set_cursor(Cursor { region: 1, byte: 1 }, false);
+        app.cat_navigation();
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Home, KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.cursor(), Cursor { region: 1, byte: 0 });
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new_with_kind(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
+            ),
+            true,
+        )
+        .unwrap();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 0 });
+    }
+
+    #[test]
+    fn view_boundary_leap_again_does_not_fall_back_to_old_text_query() {
+        let (_temporary, mut app) = app_with_documents(&["target", "middle", "target"], true);
+        app.start_leap(LeapDirection::Forward, true);
+        app.leap_input("target");
+        app.end_leap();
+        assert_eq!(app.leap.remembered_query(), Some("target"));
+
+        app.editor.set_cursor(Cursor { region: 1, byte: 1 }, false);
+        app.cat_navigation();
+        app.leap_view_boundary(LeapDirection::Forward);
+        let at_end = app.editor.cursor();
+
+        app.leap_again(LeapDirection::Forward);
+
+        assert_eq!(app.editor.cursor(), at_end);
     }
 
     #[test]
