@@ -236,31 +236,38 @@ LEAP is momentary/quasimodal and incremental:
 
 - while a LEAP key is held, typed characters extend the query;
 - Backspace shortens the query;
-- matching is case-insensitive;
+- lowercase pattern characters match both lowercase and uppercase text;
+- uppercase pattern characters match uppercase text only;
+- an unaccented pattern character also matches the corresponding accented character; an accented pattern character requires the same accent;
 - the result updates immediately;
 - search wraps circularly within the current View;
 - wrap SHOULD receive subtle feedback;
-- releasing the LEAP key ends the operation; backward LEAP leaves the cursor at the start of the match, while forward LEAP leaves it immediately after the match;
-- if no match exists, Carta does not leave the original position;
+- releasing either LEAP key leaves the cursor on the first, or target, character of the matching pattern;
+- if no match exists, Carta rebounds to the original position;
 - the active query may be shown transiently and disappears when LEAP ends.
 
 A single match MUST be entirely within one Document. LEAP may navigate across Document boundaries, but the query cannot match text formed by concatenating the end of one Document and the beginning of another.
 
-### 4.4 Leap Again
+### 4.4 Creep and Leap Again
 
-Carta remembers the last LEAP query for the session.
+Pressing and releasing a physical LEAP key without entering a query performs Canon Cat creep rather than Leap Again: Left Control creeps backward and Left Alt creeps forward by one character.
 
-A tap of Left Control with no new query performs `Leap Again Backward`.
+After typing, the Cat cursor is conceptually wide. The first creep makes it narrow on the previously highlighted character; a subsequent creep moves one character in the requested direction.
 
-A tap of Left Alt with no new query performs `Leap Again Forward`.
+Carta remembers the last explicit LEAP query for the session. `Leap Again Forward` and `Leap Again Backward` remain explicit command-palette commands; they are not bound to a bare tap of a physical LEAP key. The remembered query is session-global, so Leap Again may be used after changing Views.
 
-The remembered query is session-global: after changing Views, Leap Again searches the new current View using the same query.
+### 4.5 Cat cursor and highlight interaction
 
-### 4.5 Cat highlight interaction
+Carta models the Canon Cat cursor/highlight rule:
 
-The reference TUI uses Canon Cat-style extended highlighting as its text-selection model.
+- there is normally a one-character visual highlight when text is available;
+- after LEAP, creep, or ordinary navigation, the cursor is conceptually narrow and the character at the cursor is highlighted;
+- after typing, the cursor is conceptually wide and the last typed character immediately before it is highlighted;
+- pressing physical Left Control and physical Left Alt together extends the highlight over the Cat span established by the preceding LEAP, creep, or run of newly typed text.
 
-After a successful LEAP within one Document, pressing physical Left Control and physical Left Alt together extends the highlight across the text traversed by that LEAP. The reference TUI also copies the newly highlighted text to the operating-system clipboard for use in other applications. If the preceding LEAP crossed a Document boundary, Carta does not create an extended highlight. A clipboard failure does not cancel the Cat highlight.
+The target character at the end of a LEAP is included in the extended highlight. The one-character normal highlight is not treated as an extended Carta selection for commands such as Right Control+C.
+
+When an extended highlight is created, the reference TUI also copies its text to the operating-system clipboard. A clipboard failure does not cancel the Cat highlight.
 
 With an extended highlight active:
 
@@ -268,14 +275,17 @@ With an extended highlight active:
 - releasing the LEAP key at a destination outside the highlight moves the highlighted text to that destination;
 - the moved text remains highlighted so it may immediately be moved again;
 - the destination may be in another Document of the same editable View;
-- a LEAP landing inside the highlight does not move the text and collapses the extended highlight;
-- tapping a LEAP key without a query collapses the highlight rather than performing Leap Again.
+- a LEAP landing inside the highlight does not move the text and collapses to the target character;
+- after such a collapse, pressing both LEAP keys rehighlights from that target to the former forward end;
+- tapping Left Alt unhighlights forward, collapsing to the last highlighted character with the conceptual cursor wide;
+- tapping Left Control unhighlights backward, collapsing to the first highlighted character with the conceptual cursor narrow;
+- after ordinary forward/backward unhighlighting, pressing both LEAP keys rehighlights the remembered area until a later typing or LEAP action invalidates it.
 
-Pressing the opposite LEAP key while a LEAP query is already active does not extend the highlight. Extension is a distinct two-LEAP gesture performed after the LEAP.
+Pressing the opposite LEAP key while a LEAP query is already active is ignored for highlight extension.
 
-Left Control+Enter and Left Alt+Enter are line-boundary LEAPs, not ordinary cursor movements. They therefore record the traversed span for the same two-LEAP highlight gesture. In particular, Left Control+Enter from the end of a visual line, or Left Alt+Enter from its beginning, followed by Left Control+Left Alt highlights the whole visual line.
+Left Control+Enter and Left Alt+Enter are Carta line-boundary LEAP adaptations. They record the traversed line span for the same two-LEAP highlight gesture without including a Markdown newline character in the selection.
 
-Ordinary typing or ordinary cursor navigation removes the extended highlight without deleting its text. Commands may explicitly operate on the highlighted text.
+Ordinary cursor navigation abandons a pending Cat span. Starting to type collapses an extended highlight and begins a new typed span; pressing both LEAP keys after a run of typing highlights that recently typed text.
 
 ---
 
@@ -303,15 +313,15 @@ Editable Views expose `Insert Current Date and Time`, which inserts the current 
 
 The v0.1 TUI keeps direct bindings deliberately small:
 
-- Left Control: LEAP backward;
-- Left Alt: LEAP forward;
+- hold Left Control + pattern: LEAP backward; tap Left Control: creep backward;
+- hold Left Alt + pattern: LEAP forward; tap Left Alt: creep forward;
 - Left Control+Enter: LEAP to the beginning of the current visual line;
 - Left Alt+Enter: LEAP to the end of the current visual line;
 - Esc: command palette;
 - Left Control + Left Alt together after a LEAP: extend the Cat highlight over the traversed text and copy it to the system clipboard;
 - physical Right Control+C with a Cat highlight: Cat COPY;
 - physical Right Control+C without a Cat highlight: paste system-clipboard text at the cursor;
-- Backspace or Delete with an extended Cat highlight: erase the highlighted text;
+- Backspace or Delete: Cat ERASE; with an extended highlight erase the block, after typing erase backward, after LEAP/creep erase forward;
 - Ctrl+PageUp/PageDown: move to the previous/next Document in the current View, without wrapping;
 - Ctrl+Home/End: move to the beginning/end of the current Document.
 
@@ -337,6 +347,8 @@ Physical Right Control+C is context-sensitive:
 
 1. with an extended Cat highlight, it performs Cat COPY: the highlighted text is duplicated immediately after the original, the original becomes unhighlighted, and the new copy remains highlighted so it may immediately be moved by LEAP;
 2. without an extended Cat highlight, it pastes textual content from the operating-system clipboard at the cursor as ordinary authored text.
+
+Item 2 is an intentional Carta deviation from the original Canon Cat. The Cat's COPY command could automatically extend the preceding Cat span; Carta reserves the no-extended-highlight form of Right Control+C for system-clipboard paste. Explicitly extend the Cat highlight first when Cat COPY is intended.
 
 Creating a Cat highlight with Left Control + Left Alt also exports that highlighted text to the operating-system clipboard. This makes Cat selection interoperable with other applications without changing the internal move/copy model.
 
@@ -771,8 +783,6 @@ The following are explicitly outside v0.1 interaction scope:
 - bibliography;
 - tags/taxonomies;
 - AI-first workflows;
-- automatic highlighting of recently typed text in the full Canon Cat sense;
-- Canon Cat directional single-character ERASE behavior;
 - WYSIWYG editing;
 - Document split/merge;
 - Work Wipe;
