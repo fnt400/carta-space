@@ -2553,7 +2553,10 @@ mod tests {
         let archive = Archive::create(temporary.path().join("archive")).unwrap();
         let mut app = App::open(archive, None, Instant::now()).unwrap();
         let document = app.current_document().unwrap();
-        let work = app.archive.create_empty_work("Existing Work".into()).unwrap();
+        let work = app
+            .archive
+            .create_empty_work("Existing Work".into())
+            .unwrap();
         app.structural("Created existing test Work").unwrap();
 
         app.select_works(SelectAction::AddToWork, true);
