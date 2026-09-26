@@ -3272,7 +3272,7 @@ mod tests {
     }
 
     #[test]
-    fn leap_and_creep_adjust_the_future_highlight_from_the_original_anchor() {
+    fn unhighlight_creep_and_rehighlight_adjust_the_active_end() {
         let temporary = tempfile::tempdir().unwrap();
         let archive = Archive::create(temporary.path().join("archive")).unwrap();
         let mut app = App::open(archive, None, Instant::now()).unwrap();
@@ -3281,17 +3281,20 @@ mod tests {
         app.cat_navigation();
 
         app.start_leap(LeapDirection::Forward, false);
-        app.leap_input("d");
-        assert_eq!(app.editor.cursor().byte, 3);
+        app.leap_input("c");
+        assert_eq!(app.editor.cursor().byte, 2);
         app.end_leap();
         assert!(app.extend_last_leap_highlight());
-        assert_eq!(app.editor.selected_text().as_deref(), Some("abcd"));
+        assert_eq!(app.editor.selected_text().as_deref(), Some("abc"));
 
-        app.cat_tap_leap(LeapDirection::Backward);
-        app.cat_tap_leap(LeapDirection::Backward);
-        assert_eq!(app.editor.cursor().byte, 0);
+        app.cat_tap_leap(LeapDirection::Forward);
+        assert_eq!(app.editor.cursor().byte, 3);
+        app.cat_tap_leap(LeapDirection::Forward);
+        assert_eq!(app.editor.cursor().byte, 2);
+        app.cat_tap_leap(LeapDirection::Forward);
+        assert_eq!(app.editor.cursor().byte, 3);
         assert!(app.extend_last_leap_highlight());
-        assert_eq!(app.editor.selected_text().as_deref(), Some("abcdef"));
+        assert_eq!(app.editor.selected_text().as_deref(), Some("abcd"));
     }
 
     #[test]
