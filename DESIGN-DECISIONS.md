@@ -240,7 +240,7 @@ No empty `assets`, `tags`, `bibliography`, `ai`, or similar directories are crea
 
 **Why:** Dogfooding showed that the left-hand pair is more useful ergonomically for the current reference interaction. The binding depends on modern terminal keyboard reporting that distinguishes physical Left Alt from Right Alt/AltGr. Right Alt/AltGr remains reserved for ordinary international text entry.
 
-Exact key bindings remain outside the storage-format specification. A frontend on a platform that cannot expose the two physical Control keys may choose a different mapping.
+Exact key bindings remain outside the storage-format specification. A frontend on a platform that cannot expose the required physical modifier keys may choose a different mapping.
 
 ---
 

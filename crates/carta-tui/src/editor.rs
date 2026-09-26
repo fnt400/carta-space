@@ -852,7 +852,7 @@ mod tests {
     #[test]
     fn visual_wrap_prefers_word_boundaries_and_covers_source_bytes() {
         let text = "alpha beta gamma";
-        let ranges = visual_ranges(text, 10);
+        let ranges = visual_ranges(text, 6);
         assert_eq!(ranges, vec![(0, 6), (6, 11), (11, 16)]);
         assert_eq!(
             ranges
