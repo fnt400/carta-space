@@ -1192,6 +1192,9 @@ impl App {
     }
 
     pub fn copy_cat_highlight(&mut self) -> bool {
+        if self.editor.cat_highlight().is_none() {
+            self.extend_last_leap_highlight();
+        }
         if self.editor.copy_cat_highlight() {
             self.edited(Instant::now());
             self.status = "Copied highlighted text".into();
@@ -1466,7 +1469,12 @@ impl App {
             "[{}](carta:{kind}:{id})",
             escape_markdown_link_label(&label)
         );
-        if !self.editor.insert(&link) {
+        let changed = if self.editor.cat_highlight().is_some() {
+            self.editor.replace_cat_highlight(&link)
+        } else {
+            self.editor.insert(&link)
+        };
+        if !changed {
             self.status = "Cannot replace a selection across Document boundaries".into();
         } else {
             self.edited(Instant::now());
