@@ -1563,7 +1563,10 @@ mod tests {
         let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
         assert!(app.editor.set_cat_highlight(
             Cursor { region: 0, byte: 6 },
-            Cursor { region: 0, byte: 10 },
+            Cursor {
+                region: 0,
+                byte: 10
+            },
         ));
 
         dispatch(&mut app, KeyCode::Backspace, KeyModifiers::NONE);
@@ -1995,7 +1998,13 @@ mod tests {
             ),
         ] {
             let (_temporary, mut app) = app_with_documents(&["a#b"], false);
-            app.editor.set_cursor(Cursor { region: 0, byte: origin }, false);
+            app.editor.set_cursor(
+                Cursor {
+                    region: 0,
+                    byte: origin,
+                },
+                false,
+            );
             app.cat_navigation();
             let mut dispatcher = Dispatcher::default();
 
@@ -2023,10 +2032,7 @@ mod tests {
             handle_key(
                 &mut app,
                 &mut dispatcher,
-                KeyEvent::new(
-                    KeyCode::Char('#'),
-                    modifiers | KeyModifiers::SHIFT,
-                ),
+                KeyEvent::new(KeyCode::Char('#'), modifiers | KeyModifiers::SHIFT),
                 true,
             )
             .unwrap();
