@@ -2602,24 +2602,21 @@ fn downloads_export_path(filename: &str) -> AppResult<std::path::PathBuf> {
 fn sanitize_filename(value: &str) -> String {
     const MAX_STEM_CHARS: usize = 40;
 
-    let mut out = String::new();
+    let mut normalized = String::new();
     let mut separator_pending = false;
     for character in value.trim().chars() {
         if character.is_alphanumeric() {
-            if separator_pending && !out.is_empty() {
-                out.push('-');
+            if separator_pending && !normalized.is_empty() {
+                normalized.push('-');
             }
-            out.push(character);
+            normalized.push(character);
             separator_pending = false;
-        } else if !out.is_empty() {
+        } else if !normalized.is_empty() {
             separator_pending = true;
-        }
-
-        if out.chars().count() >= MAX_STEM_CHARS {
-            break;
         }
     }
 
+    let mut out: String = normalized.chars().take(MAX_STEM_CHARS).collect();
     while out.ends_with('-') {
         out.pop();
     }
