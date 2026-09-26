@@ -164,7 +164,9 @@ Each Work remembers its last local cursor/scroll position when possible.
 
 ### 3.5 Document boundaries
 
-In multi-Document editable Views, boundaries are shown as one generated blank line, a simple continuous separator line, and one generated blank line. The basic Work View boundary contains no embedded metadata; the Chronological View may add derived context as specified separately.
+In multi-Document editable Views, boundaries are generated UI rather than authored text. A Work View uses one generated blank line, a simple continuous separator line, and one generated blank line between Documents.
+
+A Chronological View gives every Document a generated metadata separator. The separator includes the Document creation date and up to two Work memberships; if more memberships exist, an ellipsis indicates the remainder. The date uses a compact human-readable form such as `ven 25 set 2026`. A blank generated row separates the metadata line from authored text and from the preceding Document.
 
 The separator is generated UI:
 
@@ -190,7 +192,11 @@ Examples:
 
 The status bar follows the Document under the cursor.
 
-Different View types MAY use stable, subtle accent colors. Color MUST NOT be the only indicator of context.
+Chronological View keeps the neutral gray status bar and shows the active Document's Work memberships at the right edge, up to two names plus an ellipsis when more exist.
+
+Work View uses the Work's persistent muted accent color as the status-bar background. The frontend chooses light or dark foreground text according to contrast. Colors may repeat across Works; their purpose is rapid visual distinction, not identity.
+
+Color MUST NOT be the only indicator of context.
 
 UUIDs, filesystem paths, Git state, and similar implementation details do not belong in the normal status bar.
 
@@ -397,6 +403,12 @@ The last command opens an ordered selector containing `[Beginning of Work]` foll
 
 The initial list is ordered by most recent access/use, using disposable device-local state rather than canonical metadata.
 
+### 7.6 Work color
+
+Each Work may carry a persistent `color` presentation hint in `work.json`.
+
+The reference TUI automatically assigns a muted color when a Work has none and saves that choice so the same Work keeps the same visual accent across sessions. It prefers underused colors from a small palette but does not require global uniqueness.
+
 ---
 
 ## 8. Links and navigation
@@ -544,6 +556,8 @@ Before confirmation Carta:
 - reports inbound Carta links that will become unresolved;
 - asks the user to approve removal of the Work references.
 
+Trash uses a single danger-styled `y/N` confirmation. `y` confirms; `n`, Enter, or Esc cancels. It does not require typing a confirmation phrase.
+
 The operation removes Work references and the active Document atomically.
 
 Authored Markdown links from other Documents are never rewritten automatically. They remain as broken links until the target is restored or the links are edited by the user.
@@ -587,6 +601,8 @@ This guarantee does not extend to external backups, clones, exports, filesystem/
 ### 11.5 Trash Work
 
 `Trash Work` removes the Work from the active Archive while leaving all member Documents unchanged.
+
+It uses the same danger-styled `y/N` confirmation as Document Trash.
 
 Links to the Work are not rewritten and become temporarily broken.
 

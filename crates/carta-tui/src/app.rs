@@ -14,6 +14,17 @@ use std::time::{Duration, Instant};
 
 pub type AppResult<T = ()> = Result<T, Box<dyn Error>>;
 
+const WORK_COLOR_PALETTE: [&str; 8] = [
+    "#667A75",
+    "#6D7487",
+    "#806F6A",
+    "#756A80",
+    "#A9B39B",
+    "#B2A596",
+    "#9FAAB5",
+    "#A99EAE",
+];
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum View {
     Chronological(Volume),
@@ -312,6 +323,7 @@ pub struct App {
 
 impl App {
     pub fn open(mut archive: Archive, session: Option<&Session>, now: Instant) -> AppResult<Self> {
+        ensure_work_colors(&mut archive)?;
         let current = current_volume();
         let mut provisional = None;
         let mut position = session.and_then(|s| s.position.clone());
@@ -705,6 +717,7 @@ impl App {
             }
             PromptAction::CreateWork => {
                 let id = self.archive.create_empty_work(input)?;
+                ensure_work_color(&mut self.archive, id)?;
                 self.structural("Created Work")?;
                 self.switch_view(View::Work(id), None, true)?;
             }
@@ -910,7 +923,8 @@ impl App {
                     return Ok(());
                 }
             }
-            self.archive.create_work(query, vec![document])?;
+            let work = self.archive.create_work(query, vec![document])?;
+            ensure_work_color(&mut self.archive, work)?;
             self.structural("Created Work and added Document")?;
             return Ok(());
         }
@@ -1885,6 +1899,9 @@ impl App {
         if navigation {
             self.push_navigation();
         }
+        if let View::Work(work) = &view {
+            ensure_work_color(&mut self.archive, *work)?;
+        }
         self.view = view;
         let remembered = match (&self.view, target) {
             (View::Work(work), None) => self.work_positions.get(work).cloned(),
@@ -2031,6 +2048,39 @@ fn search_result_view_text(result: &ResultRow) -> String {
         result.context
     )
 }
+fn ensure_work_colors(archive: &mut Archive) -> AppResult {
+    let works: Vec<_> = archive.works().map(|work| work.id()).collect();
+    for work in works {
+        ensure_work_color(archive, work)?;
+    }
+    Ok(())
+}
+
+fn ensure_work_color(archive: &mut Archive, work: WorkId) -> AppResult {
+    if archive.work(work).and_then(|work| work.color()).is_some() {
+        return Ok(());
+    }
+
+    let mut usage = [0_usize; WORK_COLOR_PALETTE.len()];
+    for existing in archive.works() {
+        if let Some(color) = existing.color() {
+            if let Some(index) = WORK_COLOR_PALETTE
+                .iter()
+                .position(|candidate| candidate.eq_ignore_ascii_case(color))
+            {
+                usage[index] += 1;
+            }
+        }
+    }
+    let index = usage
+        .iter()
+        .enumerate()
+        .min_by_key(|(index, count)| (**count, *index))
+        .map_or(0, |(index, _)| index);
+    archive.set_work_color(work, Some(WORK_COLOR_PALETTE[index].to_owned()))?;
+    Ok(())
+}
+
 fn leap_cursor_position(session: &LeapSession) -> LeapPosition {
     let Some(found) = session.current_match() else {
         return session.origin();
@@ -2212,6 +2262,32 @@ mod tests {
         assert!(app.editor.regions().is_empty());
         assert_eq!(app.archive.documents().count(), 0);
         assert!(app.provisional.is_none());
+    }
+
+    #[test]
+    fn app_assigns_and_persists_stable_work_colors() {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().join("archive");
+        let mut archive = Archive::create(&root).unwrap();
+        let first = archive.create_empty_work("First".into()).unwrap();
+        let second = archive.create_empty_work("Second".into()).unwrap();
+        assert!(archive.work(first).unwrap().color().is_none());
+        assert!(archive.work(second).unwrap().color().is_none());
+
+        let app = App::open(archive, None, Instant::now()).unwrap();
+        let first_color = app.archive.work(first).unwrap().color().unwrap().to_owned();
+        let second_color = app.archive.work(second).unwrap().color().unwrap().to_owned();
+        assert_ne!(first_color, second_color);
+        assert!(first_color.starts_with('#'));
+        assert_eq!(first_color.len(), 7);
+        drop(app);
+
+        let reopened = Archive::open(&root).unwrap();
+        assert_eq!(reopened.work(first).unwrap().color(), Some(first_color.as_str()));
+        assert_eq!(
+            reopened.work(second).unwrap().color(),
+            Some(second_color.as_str())
+        );
     }
 
     #[test]

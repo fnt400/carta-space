@@ -456,3 +456,14 @@ A dedicated writing device with a keyboard and simple display is therefore a nat
 **Why:** Most Carta Space changes can be specified and implemented directly from repository state without consuming a second coding agent's context. Local execution remains valuable because the reference TUI depends on a real terminal, keyboard protocol, filesystem, Git installation, Pandoc/LaTeX toolchain, and NixOS/Distrobox environment that are not available to the design/implementation layer.
 
 **Consequence:** The default loop is user/dogfooding -> ChatGPT implementation and commit -> local fast-forward pull -> OpenCode verification without edits -> ChatGPT review and follow-up commit if needed. OpenCode may edit files only when a task explicitly grants that responsibility. This workflow does not change Carta archive semantics.
+
+
+---
+
+## DD-042 — Work color is a persistent optional presentation hint
+
+**Decision:** A Work may store an optional `color` value in `work.json` as a stable presentation hint. The reference TUI assigns a muted `#RRGGBB` color when a Work has none and reuses that stored value across sessions.
+
+**Why:** Dogfooding showed that a subtle stable color makes it easier to distinguish Works at a glance without adding persistent panels, icons, or other organizational chrome. Storing the choice avoids visually reassigning Works when archive order changes.
+
+**Constraint:** Color is not Work identity or structural semantics. Frontends may ignore it, colors may repeat, and title/order/membership behavior must not depend on it. Older implementations preserve it through the existing unknown-member rule.

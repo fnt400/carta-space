@@ -1,4 +1,5 @@
 use carta_core::{Archive, LeapDirection};
+use chrono::{DateTime, Datelike, Weekday};
 use carta_tui::app::{AppMode, View};
 use carta_tui::editor::{visual_ranges, Cursor};
 use carta_tui::session::{
@@ -646,8 +647,8 @@ fn draw(frame: &mut ratatui::Frame<'_>, app: &mut App) {
         }
     }
     frame.render_widget(
-        Paragraph::new(status_line(app))
-            .style(Style::default().bg(Color::DarkGray).fg(Color::White)),
+        Paragraph::new(rendered_status_line(app, usize::from(chunks[1].width)))
+            .style(status_style(app)),
         chunks[1],
     );
     draw_mode(frame, app);
@@ -676,7 +677,7 @@ fn editor_rect(area: Rect) -> Rect {
 
 fn draw_editor(frame: &mut ratatui::Frame<'_>, app: &mut App, area: Rect) {
     let width = usize::from(area.width.max(1));
-    let lines = visual_lines(&app.editor, width);
+    let lines = visual_lines(app, width);
     let cursor = app.editor.cursor();
     let cursor_line = lines
         .iter()
@@ -717,19 +718,29 @@ fn draw_editor(frame: &mut ratatui::Frame<'_>, app: &mut App, area: Rect) {
     }
 }
 
-fn visual_lines(editor: &carta_tui::CompositeEditor, width: usize) -> Vec<VisualLine> {
+fn visual_lines(app: &App, width: usize) -> Vec<VisualLine> {
     let mut out = Vec::new();
-    for (region_index, region) in editor.regions().iter().enumerate() {
-        if region_index > 0 {
-            for text in [String::new(), "─".repeat(width), String::new()] {
-                out.push(VisualLine {
-                    region: None,
-                    start: 0,
-                    end: 0,
-                    text,
-                });
+    for (region_index, region) in app.editor.regions().iter().enumerate() {
+        match &app.view {
+            View::Chronological(_) => {
+                if region_index > 0 {
+                    out.push(generated_line(String::new()));
+                }
+                out.push(generated_line(chronological_separator(
+                    app,
+                    region.document,
+                    width,
+                )));
+                out.push(generated_line(String::new()));
             }
+            View::Work(_) if region_index > 0 => {
+                for text in [String::new(), "─".repeat(width), String::new()] {
+                    out.push(generated_line(text));
+                }
+            }
+            _ => {}
         }
+
         for (start, end) in visual_ranges(&region.text, width) {
             out.push(VisualLine {
                 region: Some(region_index),
@@ -740,6 +751,126 @@ fn visual_lines(editor: &carta_tui::CompositeEditor, width: usize) -> Vec<Visual
         }
     }
     out
+}
+
+fn generated_line(text: String) -> VisualLine {
+    VisualLine {
+        region: None,
+        start: 0,
+        end: 0,
+        text,
+    }
+}
+
+fn chronological_separator(app: &App, document: carta_core::DocumentId, width: usize) -> String {
+    if width == 0 {
+        return String::new();
+    }
+    let date = app
+        .archive
+        .documents()
+        .find(|info| info.id() == document)
+        .map_or_else(|| "senza data".to_owned(), |info| italian_date(info.created()));
+    let prefix = format!("── {date} ");
+    if display_width(&prefix) >= width {
+        return truncate_display(&prefix, width, false);
+    }
+
+    let memberships = membership_summary(app, document);
+    let available = width.saturating_sub(display_width(&prefix));
+    let suffix = if memberships.is_empty() || available < 5 {
+        String::new()
+    } else {
+        let summary = truncate_display(&memberships, available.saturating_sub(4), true);
+        format!(" {summary} ──")
+    };
+    let fill = width
+        .saturating_sub(display_width(&prefix))
+        .saturating_sub(display_width(&suffix));
+    format!("{prefix}{}{suffix}", "─".repeat(fill))
+}
+
+fn membership_summary(app: &App, document: carta_core::DocumentId) -> String {
+    let mut titles: Vec<_> = app
+        .archive
+        .works()
+        .filter(|work| work.documents().contains(&document))
+        .map(|work| work.title().to_owned())
+        .collect();
+    titles.sort_by_key(|title| title.to_lowercase());
+    let more = titles.len() > 2;
+    titles.truncate(2);
+    let mut summary = titles.join(" - ");
+    if more {
+        if !summary.is_empty() {
+            summary.push_str(" - ");
+        }
+        summary.push('…');
+    }
+    summary
+}
+
+fn italian_date(timestamp: carta_core::Timestamp) -> String {
+    let raw = timestamp.to_string();
+    let Ok(date) = DateTime::parse_from_rfc3339(&raw) else {
+        return raw.chars().take(10).collect();
+    };
+    let weekday = match date.weekday() {
+        Weekday::Mon => "lun",
+        Weekday::Tue => "mar",
+        Weekday::Wed => "mer",
+        Weekday::Thu => "gio",
+        Weekday::Fri => "ven",
+        Weekday::Sat => "sab",
+        Weekday::Sun => "dom",
+    };
+    let month = match date.month() {
+        1 => "gen",
+        2 => "feb",
+        3 => "mar",
+        4 => "apr",
+        5 => "mag",
+        6 => "giu",
+        7 => "lug",
+        8 => "ago",
+        9 => "set",
+        10 => "ott",
+        11 => "nov",
+        12 => "dic",
+        _ => "?",
+    };
+    format!("{weekday} {:02} {month} {}", date.day(), date.year())
+}
+
+fn display_width(text: &str) -> usize {
+    text.chars()
+        .map(|character| character.width().unwrap_or(0))
+        .sum()
+}
+
+fn truncate_display(text: &str, max_width: usize, ellipsis: bool) -> String {
+    if display_width(text) <= max_width {
+        return text.to_owned();
+    }
+    if max_width == 0 {
+        return String::new();
+    }
+    let reserve = usize::from(ellipsis);
+    let content_width = max_width.saturating_sub(reserve);
+    let mut result = String::new();
+    let mut used = 0;
+    for character in text.chars() {
+        let width = character.width().unwrap_or(0);
+        if used + width > content_width {
+            break;
+        }
+        result.push(character);
+        used += width;
+    }
+    if ellipsis {
+        result.push('…');
+    }
+    result
 }
 
 fn styled_line(line: &VisualLine, region: usize, selection: Option<(Cursor, Cursor)>) -> Line<'_> {
@@ -923,6 +1054,64 @@ fn draw_mode(frame: &mut ratatui::Frame<'_>, app: &App) {
         }
         AppMode::Editing => {}
     }
+}
+
+fn rendered_status_line(app: &App, width: usize) -> String {
+    let left = status_line(app);
+    if !app.status.is_empty() || !matches!(app.view, View::Chronological(_)) {
+        return truncate_display(&left, width, true);
+    }
+    let right = app
+        .editor
+        .current_document()
+        .map_or_else(String::new, |document| membership_summary(app, document));
+    if right.is_empty() {
+        return truncate_display(&left, width, true);
+    }
+
+    let right = truncate_display(&right, width.saturating_sub(1), true);
+    let right_width = display_width(&right);
+    let left_budget = width.saturating_sub(right_width.saturating_add(1));
+    let left = truncate_display(&left, left_budget, true);
+    let padding = width
+        .saturating_sub(display_width(&left))
+        .saturating_sub(right_width);
+    format!("{left}{}{right}", " ".repeat(padding))
+}
+
+fn status_style(app: &App) -> Style {
+    let View::Work(work) = &app.view else {
+        return Style::default().bg(Color::DarkGray).fg(Color::White);
+    };
+    let Some(color) = app.archive.work(*work).and_then(|work| work.color()) else {
+        return Style::default().bg(Color::DarkGray).fg(Color::White);
+    };
+    let Some((red, green, blue)) = parse_rgb(color) else {
+        return Style::default().bg(Color::DarkGray).fg(Color::White);
+    };
+    let luminance =
+        (299_u32 * u32::from(red) + 587_u32 * u32::from(green) + 114_u32 * u32::from(blue))
+            / 1000;
+    let foreground = if luminance >= 150 {
+        Color::Black
+    } else {
+        Color::White
+    };
+    Style::default()
+        .bg(Color::Rgb(red, green, blue))
+        .fg(foreground)
+}
+
+fn parse_rgb(color: &str) -> Option<(u8, u8, u8)> {
+    let value = color.strip_prefix('#')?;
+    if value.len() != 6 {
+        return None;
+    }
+    Some((
+        u8::from_str_radix(&value[0..2], 16).ok()?,
+        u8::from_str_radix(&value[2..4], 16).ok()?,
+        u8::from_str_radix(&value[4..6], 16).ok()?,
+    ))
 }
 
 fn status_line(app: &App) -> String {
@@ -1125,16 +1314,80 @@ mod tests {
     }
 
     #[test]
-    fn visual_lines_share_wrap_and_generate_three_boundary_rows() {
+    fn visual_lines_share_wrap_and_generate_three_work_boundary_rows() {
         let first = "word ".repeat(20);
-        let (_temporary, app) = app_with_documents(&[first.as_str(), "second"], false);
-        let lines = visual_lines(&app.editor, 80);
-        assert!(lines.iter().all(|line| line.text.width() <= 80));
-        let boundary = lines.iter().position(|line| line.region.is_none()).unwrap();
+        let (_temporary, app) = app_with_documents(&[first.as_str(), "second"], true);
+        let lines = visual_lines(&app, 80);
+        assert!(lines.iter().all(|line| display_width(&line.text) <= 80));
+        let boundary = lines
+            .windows(3)
+            .position(|window| {
+                window[0].region.is_none()
+                    && window[0].text.is_empty()
+                    && window[1].text == "─".repeat(80)
+                    && window[2].text.is_empty()
+            })
+            .unwrap();
         assert!(lines[boundary].text.is_empty());
         assert_eq!(lines[boundary + 1].text, "─".repeat(80));
         assert!(lines[boundary + 2].text.is_empty());
         assert_eq!(app.editor.regions()[0].text, first);
+    }
+
+    #[test]
+    fn chronological_headers_show_italian_date_and_up_to_two_work_memberships() {
+        use std::str::FromStr;
+
+        let timestamp =
+            carta_core::Timestamp::from_str("2026-09-25T12:00:00+02:00").unwrap();
+        assert_eq!(italian_date(timestamp), "ven 25 set 2026");
+
+        let (_temporary, mut app) = app_with_documents(&["first", "second"], false);
+        let document = app.editor.regions()[0].document;
+        app.archive
+            .create_work("Cinema".into(), vec![document])
+            .unwrap();
+        app.archive
+            .create_work("Appunti".into(), vec![document])
+            .unwrap();
+        app.archive
+            .create_work("Terzo".into(), vec![document])
+            .unwrap();
+
+        let lines = visual_lines(&app, 80);
+        let header = lines
+            .iter()
+            .find(|line| line.region.is_none() && line.text.contains("Cinema"))
+            .expect("chronological metadata separator");
+        assert!(header.text.contains("Appunti"));
+        assert!(header.text.contains('…'));
+        assert!(display_width(&header.text) <= 80);
+
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        let status = rendered_status_line(&app, 80);
+        assert!(status.ends_with("Appunti - Cinema - …") || status.ends_with("Cinema - Appunti - …"));
+    }
+
+    #[test]
+    fn work_status_uses_persisted_color_with_contrasting_text() {
+        let (_temporary, mut app) = app_with_documents(&["text"], true);
+        let View::Work(work) = &app.view else {
+            panic!("expected Work View")
+        };
+        let work = *work;
+        app.archive
+            .set_work_color(work, Some("#B5B9A4".into()))
+            .unwrap();
+        let light = status_style(&app);
+        assert_eq!(light.bg, Some(Color::Rgb(181, 185, 164)));
+        assert_eq!(light.fg, Some(Color::Black));
+
+        app.archive
+            .set_work_color(work, Some("#667A75".into()))
+            .unwrap();
+        let dark = status_style(&app);
+        assert_eq!(dark.bg, Some(Color::Rgb(102, 122, 117)));
+        assert_eq!(dark.fg, Some(Color::White));
     }
 
     #[test]
@@ -1145,8 +1398,12 @@ mod tests {
         dispatch(&mut app, KeyCode::Right, KeyModifiers::SHIFT);
         assert_eq!(app.editor.selected_text().as_deref(), Some("ab"));
 
-        let lines = visual_lines(&app.editor, 80);
-        let rendered = styled_line(&lines[0], 0, app.editor.selection());
+        let lines = visual_lines(&app, 80);
+        let authored = lines
+            .iter()
+            .find(|line| line.region == Some(0))
+            .expect("authored visual line");
+        let rendered = styled_line(authored, 0, app.editor.selection());
         assert!(rendered
             .spans
             .iter()
