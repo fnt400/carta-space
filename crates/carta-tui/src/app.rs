@@ -1263,6 +1263,18 @@ impl App {
         self.cat_erase_forward = true;
     }
 
+    pub fn cat_backspace(&mut self) -> bool {
+        let changed = self.editor.backspace();
+        if changed {
+            self.typed_span_start = None;
+            self.last_leap_span = None;
+            self.cat_span_fixed = None;
+            self.rehighlight_span = None;
+            self.cat_erase_forward = true;
+        }
+        changed
+    }
+
     pub fn cat_erase(&mut self) -> bool {
         let changed = if self.editor.cat_highlight().is_some() {
             self.editor.erase_cat_highlight()
