@@ -1201,6 +1201,20 @@ impl App {
         (start != end).then_some((start, end))
     }
 
+    pub fn cat_render_highlight(&self) -> Option<(Cursor, Cursor)> {
+        if let Some(highlight) = self.editor.cat_highlight() {
+            return Some(highlight);
+        }
+        let cursor = self.editor.cursor();
+        if self.cat_erase_forward {
+            self.cat_char_range_at(cursor)
+                .or_else(|| self.cat_previous_char_range(cursor))
+        } else {
+            self.cat_previous_char_range(cursor)
+                .or_else(|| self.cat_char_range_at(cursor))
+        }
+    }
+
     pub fn cat_insert(&mut self, value: &str) -> bool {
         let before = self.editor.cursor();
         let start = self.typed_span_start.unwrap_or(before);
