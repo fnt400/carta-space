@@ -15,14 +15,7 @@ use std::time::{Duration, Instant};
 pub type AppResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const WORK_COLOR_PALETTE: [&str; 8] = [
-    "#667A75",
-    "#6D7487",
-    "#806F6A",
-    "#756A80",
-    "#A9B39B",
-    "#B2A596",
-    "#9FAAB5",
-    "#A99EAE",
+    "#667A75", "#6D7487", "#806F6A", "#756A80", "#A9B39B", "#B2A596", "#9FAAB5", "#A99EAE",
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2286,15 +2279,25 @@ mod tests {
         assert!(archive.work(second).unwrap().color().is_none());
 
         let app = App::open(archive, None, Instant::now()).unwrap();
+        assert!(!app.archive.is_dirty().unwrap());
         let first_color = app.archive.work(first).unwrap().color().unwrap().to_owned();
-        let second_color = app.archive.work(second).unwrap().color().unwrap().to_owned();
+        let second_color = app
+            .archive
+            .work(second)
+            .unwrap()
+            .color()
+            .unwrap()
+            .to_owned();
         assert_ne!(first_color, second_color);
         assert!(first_color.starts_with('#'));
         assert_eq!(first_color.len(), 7);
         drop(app);
 
         let reopened = Archive::open(&root).unwrap();
-        assert_eq!(reopened.work(first).unwrap().color(), Some(first_color.as_str()));
+        assert_eq!(
+            reopened.work(first).unwrap().color(),
+            Some(first_color.as_str())
+        );
         assert_eq!(
             reopened.work(second).unwrap().color(),
             Some(second_color.as_str())
