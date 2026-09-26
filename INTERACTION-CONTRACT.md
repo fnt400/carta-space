@@ -741,7 +741,9 @@ Work Markdown export concatenates component Documents in Work order without UI b
 
 PDF export is a derived publishing operation implemented through Pandoc and an external PDF engine; LuaLaTeX is the initial preferred default. Carta v0.1 does not implement its own layout engine.
 
-Carta proposes a filename from the Document label or Work name and allows the user to change the filename before export.
+Carta proposes a short filesystem-safe filename from the Document label or Work name. The proposed stem is at most 40 characters, keeps letters and digits, replaces runs of punctuation/whitespace with a single `-`, and falls back to `document` when no usable name remains.
+
+The filename prompt is a normal editable text field. Left/Right move by character, Home/End move to the beginning/end, Backspace deletes before the cursor, and Delete deletes after it.
 
 All Document and Work exports are written under `$HOME/Downloads`. Carta creates that directory if it does not exist. Any directory component typed into the filename prompt is discarded so export cannot escape the Downloads directory.
 
