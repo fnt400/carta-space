@@ -254,7 +254,7 @@ Pressing and releasing a physical LEAP key without entering a query performs Can
 
 After typing, the Cat cursor is conceptually wide. The first creep makes it narrow on the previously highlighted character; a subsequent creep moves one character in the requested direction.
 
-Carta remembers the last explicit LEAP query for the session. `Leap Again Forward` and `Leap Again Backward` remain explicit command-palette commands; they are not bound to a bare tap of a physical LEAP key. The remembered query is session-global, so Leap Again may be used after changing Views.
+Carta remembers the last explicit LEAP query for the session. A bare tap of a physical LEAP key remains creep. The Canon Cat `LEAP AGAIN` chord is represented by Right Control as Carta's `USE FRONT` analogue: Right Control+Left Alt performs Leap Again Forward, and Right Control+Left Control performs Leap Again Backward. The same operations remain available in the command palette. The remembered query is session-global, so Leap Again may be used after changing Views.
 
 ### 4.5 Cat cursor and highlight interaction
 
@@ -319,6 +319,7 @@ The v0.1 TUI keeps direct bindings deliberately small:
 - Left Alt+Enter: LEAP to the end of the current visual line;
 - Esc: command palette;
 - Left Control + Left Alt together after a LEAP, creep sequence, or run of typing: extend the pending Cat highlight and copy it to the system clipboard;
+- physical Right Control+Left Control: Leap Again backward; physical Right Control+Left Alt: Leap Again forward;
 - physical Right Control+C with a Cat highlight: Cat COPY;
 - physical Right Control+C without a Cat highlight: paste system-clipboard text at the cursor;
 - Backspace or Delete: Cat ERASE; with an extended highlight erase the block, after typing erase backward, after LEAP/creep erase forward;
