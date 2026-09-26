@@ -42,6 +42,14 @@ struct RecoveredDocumentParts {
     directory: PathBuf,
     previous_content: Vec<u8>,
     metadata: Vec<u8>,
+    previous_missing: bool,
+}
+
+struct RecoveredWorkParts {
+    work: WorkId,
+    canonical_file: PathBuf,
+    previous: Vec<u8>,
+    previous_missing: bool,
 }
 
 pub(crate) struct Transaction {
@@ -195,18 +203,31 @@ fn preserve_owned_ambiguity(
             &parts.previous_content,
             parts.directory,
             parts.metadata,
+            parts.previous_missing,
         )?;
         return Ok(());
     }
 
-    if let Some((work, previous)) = work_conflict_parts(owned) {
-        let current_bytes = current_file_bytes(current).unwrap_or_default();
+    if let Some(parts) = work_conflict_parts(owned) {
+        let current_bytes = if owned
+            .path
+            .file_name()
+            .is_some_and(|name| name == "work.json")
+        {
+            current_file_bytes(current).unwrap_or_default().to_vec()
+        } else {
+            snapshot_entry_bytes(current, Path::new("work.json")).unwrap_or_default()
+        };
+        if current_bytes.is_empty() {
+            return Ok(());
+        }
         crate::conflict::preserve_recovered_work_conflict(
             root,
-            work,
-            current_bytes,
-            previous,
-            owned.path.clone(),
+            parts.work,
+            &current_bytes,
+            &parts.previous,
+            parts.canonical_file,
+            parts.previous_missing,
         )?;
     }
     Ok(())
@@ -247,13 +268,15 @@ fn document_conflict_parts(
     } else {
         snapshot_entry_bytes(&owned.state, Path::new("content.md")).unwrap_or_default()
     };
-    let metadata = if file_name.is_some() {
+    let metadata = if matches!(owned.state, PathState::Missing) {
+        snapshot_entry_bytes(current, Path::new("meta.json")).unwrap_or_default()
+    } else if file_name.is_some() {
         let path = root.join(&directory).join("meta.json");
         fs::read(&path).map_err(|error| Error::io(path, error))?
     } else {
         snapshot_entry_bytes(&owned.state, Path::new("meta.json")).unwrap_or_default()
     };
-    if previous_content.is_empty() && matches!(owned.state, PathState::Missing) {
+    if metadata.is_empty() {
         return Ok(None);
     }
     let _ = current;
@@ -262,6 +285,7 @@ fn document_conflict_parts(
         directory,
         previous_content,
         metadata,
+        previous_missing: matches!(owned.state, PathState::Missing),
     }))
 }
 
@@ -288,22 +312,37 @@ fn current_document_content(
     }
 }
 
-fn work_conflict_parts(owned: &OwnedPath) -> Option<(WorkId, &[u8])> {
-    let path = if owned
+fn work_conflict_parts(owned: &OwnedPath) -> Option<RecoveredWorkParts> {
+    let (directory, canonical_file, previous) = if owned
         .path
         .file_name()
         .is_some_and(|name| name == "work.json")
     {
-        &owned.path
+        (
+            owned.path.parent()?.to_path_buf(),
+            owned.path.clone(),
+            current_file_bytes(&owned.state)
+                .unwrap_or_default()
+                .to_vec(),
+        )
     } else {
-        return None;
+        (
+            owned.path.clone(),
+            owned.path.join("work.json"),
+            snapshot_entry_bytes(&owned.state, Path::new("work.json")).unwrap_or_default(),
+        )
     };
-    let work = path.parent()?.file_name()?.to_str()?.parse().ok()?;
-    path.parent()?
+    let work = directory.file_name()?.to_str()?.parse().ok()?;
+    directory
         .parent()?
         .file_name()
         .is_some_and(|name| name == "works")
-        .then_some((work, current_file_bytes(&owned.state).unwrap_or_default()))
+        .then_some(RecoveredWorkParts {
+            work,
+            canonical_file,
+            previous,
+            previous_missing: matches!(owned.state, PathState::Missing),
+        })
 }
 
 fn current_file_bytes(state: &PathState) -> Option<&[u8]> {

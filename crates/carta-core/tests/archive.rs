@@ -1163,6 +1163,53 @@ fn interrupted_recovery_preserves_changed_owned_path_as_conflict() {
 }
 
 #[test]
+fn interrupted_recovery_preserves_changed_operation_created_document() {
+    let (_temporary, archive) = create_archive();
+    let reference = archive.documents().next().map(|info| info.created());
+    let created = reference.unwrap_or_else(carta_core::Timestamp::now_local);
+    let volume = carta_core::Volume::new(created.year() as u16, created.month() as u8).unwrap();
+    let document = DocumentId::new_v7();
+    let relative = format!(
+        "volumes/{:04}/{:02}/{document}",
+        volume.year(),
+        volume.month()
+    );
+    write_crash_manifest(&archive, &[&relative]);
+    let directory = archive.root().join(&relative);
+    fs::create_dir_all(&directory).unwrap();
+    fs::write(
+        directory.join("meta.json"),
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "id": document,
+            "created": created,
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    fs::write(directory.join("content.md"), "created after crash").unwrap();
+    let root = archive.root().to_path_buf();
+    drop(archive);
+
+    let mut recovered = Archive::open(&root).unwrap();
+    assert!(!directory.exists());
+    let conflicts = recovered.conflicts().unwrap();
+    let carta_core::Conflict::Document(conflict) = &conflicts[0] else {
+        panic!("expected a Document conflict");
+    };
+    assert_eq!(conflict.document(), document);
+    assert!(conflict.external_missing());
+    assert_eq!(conflict.local(), b"created after crash");
+
+    recovered
+        .resolve_document_conflict(conflict.id(), carta_core::ConflictChoice::Local, false)
+        .unwrap();
+    assert_eq!(
+        recovered.read_document(document).unwrap().content(),
+        "created after crash"
+    );
+}
+
+#[test]
 fn reopen_removes_partial_restore_or_new_work_document_owned_paths() {
     let (_temporary, mut archive) = create_archive();
     let member = archive.create_document("member").unwrap();

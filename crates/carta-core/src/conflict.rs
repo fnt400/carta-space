@@ -416,6 +416,7 @@ pub(crate) fn preserve_recovered_document_conflict(
     previous: &[u8],
     canonical_directory: PathBuf,
     metadata: Vec<u8>,
+    external_missing: bool,
 ) -> Result<(), Error> {
     if conflicts_contain_document(root, document)? {
         return Ok(());
@@ -428,7 +429,7 @@ pub(crate) fn preserve_recovered_document_conflict(
             detected: Timestamp::now_local(),
             local: current.to_vec(),
             external: previous.to_vec(),
-            external_missing: false,
+            external_missing,
             canonical_directory,
             metadata,
         },
@@ -442,6 +443,7 @@ pub(crate) fn preserve_recovered_work_conflict(
     current: &[u8],
     previous: &[u8],
     canonical_file: PathBuf,
+    external_missing: bool,
 ) -> Result<(), Error> {
     if conflicts_contain_work(root, work)? {
         return Ok(());
@@ -454,7 +456,7 @@ pub(crate) fn preserve_recovered_work_conflict(
             detected: Timestamp::now_local(),
             local: current.to_vec(),
             external: previous.to_vec(),
-            external_missing: false,
+            external_missing,
             canonical_file,
         },
     )?;
