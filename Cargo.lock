@@ -175,6 +175,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "unicode-casefold",
+ "unicode-normalization",
  "uuid",
  "zip",
 ]

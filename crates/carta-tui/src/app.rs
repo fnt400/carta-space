@@ -1182,11 +1182,7 @@ impl App {
         }
     }
 
-    fn cat_fixed_boundary_for(
-        &self,
-        cursor: Cursor,
-        direction: LeapDirection,
-    ) -> Cursor {
+    fn cat_fixed_boundary_for(&self, cursor: Cursor, direction: LeapDirection) -> Cursor {
         let range = self.cat_origin_range(cursor).unwrap_or((cursor, cursor));
         match direction {
             LeapDirection::Forward => range.0,
@@ -1387,11 +1383,7 @@ impl App {
         }
     }
 
-    pub fn remember_direct_leap_span(
-        &mut self,
-        origin: Cursor,
-        direction: LeapDirection,
-    ) {
+    pub fn remember_direct_leap_span(&mut self, origin: Cursor, direction: LeapDirection) {
         let destination = self.editor.cursor();
         self.cat_span_fixed = Some(self.cat_fixed_boundary_for(origin, direction));
         self.typed_span_start = None;
@@ -1415,10 +1407,7 @@ impl App {
         let origin = self.editor.cursor();
         let Some(destination) = self
             .editor
-            .visual_boundary_cursor(
-                width,
-                matches!(direction, LeapDirection::Forward),
-            )
+            .visual_boundary_cursor(width, matches!(direction, LeapDirection::Forward))
         else {
             self.last_leap_span = None;
             return;
@@ -3247,20 +3236,16 @@ mod tests {
         app.cat_tap_leap(LeapDirection::Forward);
         assert_eq!(app.editor.cursor().byte, 2);
 
-        assert!(app.editor.set_cat_highlight(
-            Cursor { region: 0, byte: 1 },
-            Cursor { region: 0, byte: 4 },
-        ));
+        assert!(app
+            .editor
+            .set_cat_highlight(Cursor { region: 0, byte: 1 }, Cursor { region: 0, byte: 4 },));
         app.cat_tap_leap(LeapDirection::Backward);
         assert_eq!(app.editor.cursor().byte, 1);
         assert!(app.editor.cat_highlight().is_none());
         assert!(app.extend_last_leap_highlight());
         assert_eq!(
             app.editor.cat_highlight(),
-            Some((
-                Cursor { region: 0, byte: 1 },
-                Cursor { region: 0, byte: 4 }
-            ))
+            Some((Cursor { region: 0, byte: 1 }, Cursor { region: 0, byte: 4 }))
         );
     }
 

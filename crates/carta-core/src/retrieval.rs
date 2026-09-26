@@ -381,9 +381,7 @@ fn leap_matches(text: &str, query: &str) -> Vec<Range<usize>> {
         {
             let start = starts[start_index].0;
             let end_index = start_index + pattern.len();
-            let end = starts
-                .get(end_index)
-                .map_or(text.len(), |(byte, _)| *byte);
+            let end = starts.get(end_index).map_or(text.len(), |(byte, _)| *byte);
             matches.push(start..end);
         }
     }
@@ -460,14 +458,16 @@ fn folded_with_boundaries(value: &str) -> (String, BTreeMap<usize, usize>) {
     (output, boundaries)
 }
 
-
 #[cfg(test)]
 mod cat_leap_tests {
     use super::*;
 
     #[test]
     fn lowercase_leap_pattern_matches_both_cases_but_uppercase_is_strict() {
-        assert_eq!(leap_matches("me Me mE ME", "me"), vec![0..2, 3..5, 6..8, 9..11]);
+        assert_eq!(
+            leap_matches("me Me mE ME", "me"),
+            vec![0..2, 3..5, 6..8, 9..11]
+        );
         assert_eq!(leap_matches("a A á Á", "A"), vec![2..3, 7..9]);
     }
 

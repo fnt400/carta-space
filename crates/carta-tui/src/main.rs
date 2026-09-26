@@ -1531,7 +1531,13 @@ mod tests {
     #[test]
     fn left_control_enter_can_highlight_the_whole_visual_line() {
         let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
-        app.editor.set_cursor(Cursor { region: 0, byte: 10 }, false);
+        app.editor.set_cursor(
+            Cursor {
+                region: 0,
+                byte: 10,
+            },
+            false,
+        );
         let mut dispatcher = Dispatcher::default();
 
         handle_key(
@@ -1601,7 +1607,13 @@ mod tests {
             true,
         )
         .unwrap();
-        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 10 });
+        assert_eq!(
+            app.editor.cursor(),
+            Cursor {
+                region: 0,
+                byte: 10
+            }
+        );
 
         handle_key(
             &mut app,
