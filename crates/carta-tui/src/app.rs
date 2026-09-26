@@ -296,7 +296,8 @@ impl App {
     pub fn open(mut archive: Archive, session: Option<&Session>, now: Instant) -> AppResult<Self> {
         let current = current_volume();
         let mut provisional = None;
-        let view = match session.map(|s| &s.view) {
+        let mut position = session.and_then(|s| s.position.clone());
+        let mut view = match session.map(|s| &s.view) {
             Some(SavedView::Work { id }) if archive.work(*id).is_some() => View::Work(*id),
             Some(SavedView::Search { query, selected }) => View::Search {
                 query: query.clone(),
@@ -308,11 +309,26 @@ impl App {
             _ => {
                 let id = archive.create_document("")?;
                 provisional = Some(id);
+                position = Some(Position {
+                    document: id,
+                    byte: 0,
+                    scroll: 0,
+                });
                 View::Chronological(current)
             }
         };
-        let position = session.and_then(|s| s.position.as_ref());
-        let (mut editor, scroll) = load_editor(&archive, &view, position)?;
+        if matches!(&view, View::Chronological(volume) if archive.chronological_month(*volume).is_empty())
+        {
+            let id = archive.create_document("")?;
+            provisional = Some(id);
+            view = View::Chronological(current);
+            position = Some(Position {
+                document: id,
+                byte: 0,
+                scroll: 0,
+            });
+        }
+        let (mut editor, scroll) = load_editor(&archive, &view, position.as_ref())?;
         if let View::Search { selected, .. } = &view {
             editor.set_cursor(
                 Cursor {
@@ -1985,6 +2001,89 @@ mod tests {
         let resumed = App::open(reopened, Some(&session), now).unwrap();
         assert_eq!(resumed.archive.documents().count(), count);
         assert_eq!(resumed.editor.cursor().byte, "résumé".len());
+    }
+
+    #[test]
+    fn empty_chronological_restart_creates_a_selected_provisional_document() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let stale_document = DocumentId::new_v7();
+        let session = Session {
+            view: SavedView::Chronological {
+                year: current_volume().year(),
+                month: current_volume().month(),
+            },
+            position: Some(Position {
+                document: stale_document,
+                byte: 10,
+                scroll: 20,
+            }),
+            work_positions: BTreeMap::new(),
+            work_mru: Vec::new(),
+        };
+
+        let app = App::open(archive, Some(&session), Instant::now()).unwrap();
+
+        assert_eq!(app.editor.regions().len(), 1);
+        assert_ne!(app.editor.current_document(), Some(stale_document));
+        assert_eq!(app.provisional, app.editor.current_document());
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 0 });
+    }
+
+    #[test]
+    fn first_character_after_empty_chronological_restart_is_editable() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let session = Session::new(current_volume());
+        let mut app = App::open(archive, Some(&session), Instant::now()).unwrap();
+
+        assert!(app.editor.insert("x"));
+        app.autosave().unwrap();
+
+        let document = app.editor.current_document().unwrap();
+        assert_eq!(app.archive.read_document(document).unwrap().content(), "x");
+        assert!(app.provisional.is_none());
+    }
+
+    #[test]
+    fn empty_old_month_restart_moves_provisional_to_current_month() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let old = Volume::new(1900, 1).unwrap();
+        let session = Session::new(old);
+
+        let app = App::open(archive, Some(&session), Instant::now()).unwrap();
+
+        assert_eq!(app.view, View::Chronological(current_volume()));
+        let document = app.editor.current_document().unwrap();
+        assert_eq!(
+            app.archive
+                .documents()
+                .find(|info| info.id() == document)
+                .unwrap()
+                .volume(),
+            current_volume()
+        );
+    }
+
+    #[test]
+    fn empty_work_restart_remains_empty_and_creates_no_document() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let work = archive.create_empty_work("Empty".into()).unwrap();
+        let session = Session {
+            view: SavedView::Work { id: work },
+            position: None,
+            work_positions: BTreeMap::new(),
+            work_mru: Vec::new(),
+        };
+
+        let app = App::open(archive, Some(&session), Instant::now()).unwrap();
+
+        assert_eq!(app.view, View::Work(work));
+        assert!(app.editor.regions().is_empty());
+        assert_eq!(app.archive.documents().count(), 0);
+        assert!(app.provisional.is_none());
     }
 
     #[test]

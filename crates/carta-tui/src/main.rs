@@ -23,9 +23,12 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph};
 use ratatui::Terminal;
+use std::backtrace::Backtrace;
 use std::error::Error;
 use std::io::{self, Stdout};
+use std::panic::{self, AssertUnwindSafe};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use unicode_width::UnicodeWidthChar;
 
@@ -47,19 +50,30 @@ struct TerminalGuard {
 impl TerminalGuard {
     fn enter() -> io::Result<Self> {
         enable_raw_mode()?;
-        let mut stdout = io::stdout();
-        execute!(stdout, EnterAlternateScreen, Hide)?;
-        let enhancements = supports_keyboard_enhancement().unwrap_or(false);
-        if enhancements {
-            let flags = KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
-                | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
-                | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES;
-            execute!(stdout, PushKeyboardEnhancementFlags(flags))?;
+        let mut enhancements = false;
+        let result = (|| {
+            let mut stdout = io::stdout();
+            execute!(stdout, EnterAlternateScreen, Hide)?;
+            if supports_keyboard_enhancement().unwrap_or(false) {
+                let flags = KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                    | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
+                    | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES;
+                execute!(stdout, PushKeyboardEnhancementFlags(flags))?;
+                enhancements = true;
+            }
+            Ok(Self {
+                terminal: Terminal::new(CrosstermBackend::new(stdout))?,
+                enhancements,
+            })
+        })();
+        if result.is_err() {
+            if enhancements {
+                let _ = execute!(io::stdout(), PopKeyboardEnhancementFlags);
+            }
+            let _ = execute!(io::stdout(), Show, LeaveAlternateScreen);
+            let _ = disable_raw_mode();
         }
-        Ok(Self {
-            terminal: Terminal::new(CrosstermBackend::new(stdout))?,
-            enhancements,
-        })
+        result
     }
 }
 
@@ -74,9 +88,53 @@ impl Drop for TerminalGuard {
 }
 
 fn main() {
-    if let Err(error) = run() {
-        eprintln!("carta-tui: {error}");
-        std::process::exit(1);
+    let panic_report = Arc::new(Mutex::new(String::new()));
+    let report = Arc::clone(&panic_report);
+    let previous_hook = panic::take_hook();
+    panic::set_hook(Box::new(move |info| {
+        let payload = info
+            .payload()
+            .downcast_ref::<&str>()
+            .copied()
+            .or_else(|| info.payload().downcast_ref::<String>().map(String::as_str))
+            .unwrap_or("unknown panic payload");
+        let location = info.location().map_or_else(
+            || "unknown location".to_owned(),
+            |location| {
+                format!(
+                    "{}:{}:{}",
+                    location.file(),
+                    location.line(),
+                    location.column()
+                )
+            },
+        );
+        let backtrace = Backtrace::capture();
+        let mut diagnostic = format!("carta-tui panicked at {location}:\n{payload}");
+        if backtrace.status() == std::backtrace::BacktraceStatus::Captured {
+            diagnostic.push_str(&format!("\n\nStack backtrace:\n{backtrace}"));
+        }
+        if let Ok(mut stored) = report.lock() {
+            *stored = diagnostic;
+        }
+    }));
+
+    let outcome = panic::catch_unwind(AssertUnwindSafe(run));
+    panic::set_hook(previous_hook);
+    match outcome {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => {
+            eprintln!("carta-tui: {error}");
+            std::process::exit(1);
+        }
+        Err(_) => {
+            let diagnostic = panic_report
+                .lock()
+                .map(|report| report.clone())
+                .unwrap_or_else(|_| "carta-tui panicked (diagnostic unavailable)".to_owned());
+            eprintln!("{diagnostic}");
+            std::process::exit(101);
+        }
     }
 }
 
@@ -170,6 +228,56 @@ fn handle_key(
     }
     if key.kind != KeyEventKind::Press && key.kind != KeyEventKind::Repeat {
         return Ok(());
+    }
+
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
+        let editable = matches!(app.mode, AppMode::Editing)
+            && matches!(app.view, View::Chronological(_) | View::Work(_));
+        match key.code {
+            KeyCode::Left if key.modifiers.contains(KeyModifiers::SHIFT) => {
+                dispatcher.pending_control = None;
+                if editable {
+                    app.editor.move_word(false, true);
+                }
+                return Ok(());
+            }
+            KeyCode::Right if key.modifiers.contains(KeyModifiers::SHIFT) => {
+                dispatcher.pending_control = None;
+                if editable {
+                    app.editor.move_word(true, true);
+                }
+                return Ok(());
+            }
+            KeyCode::PageUp if !key.modifiers.contains(KeyModifiers::SHIFT) => {
+                dispatcher.pending_control = None;
+                if editable {
+                    app.editor.move_document(false);
+                }
+                return Ok(());
+            }
+            KeyCode::PageDown if !key.modifiers.contains(KeyModifiers::SHIFT) => {
+                dispatcher.pending_control = None;
+                if editable {
+                    app.editor.move_document(true);
+                }
+                return Ok(());
+            }
+            KeyCode::Home if !key.modifiers.contains(KeyModifiers::SHIFT) => {
+                dispatcher.pending_control = None;
+                if editable {
+                    app.editor.document_home(false);
+                }
+                return Ok(());
+            }
+            KeyCode::End if !key.modifiers.contains(KeyModifiers::SHIFT) => {
+                dispatcher.pending_control = None;
+                if editable {
+                    app.editor.document_end(false);
+                }
+                return Ok(());
+            }
+            _ => {}
+        }
     }
 
     if key
@@ -972,6 +1080,218 @@ fn centered(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
 mod tests {
     use super::*;
     use carta_tui::editor::Cursor;
+
+    fn dispatch(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
+        handle_key(
+            app,
+            &mut Clipboard::default(),
+            &mut Dispatcher::default(),
+            KeyEvent::new(code, modifiers),
+            true,
+        )
+        .unwrap();
+    }
+
+    fn app_with_documents(contents: &[&str], work: bool) -> (tempfile::TempDir, App) {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().join("archive");
+        let mut archive = Archive::create(&root).unwrap();
+        let documents: Vec<_> = contents
+            .iter()
+            .map(|content| archive.create_document(content).unwrap())
+            .collect();
+        let view = if work {
+            let id = archive.create_work("Work".into(), documents).unwrap();
+            carta_tui::session::SavedView::Work { id }
+        } else {
+            let volume = archive.documents().next().unwrap().volume();
+            carta_tui::session::SavedView::Chronological {
+                year: volume.year(),
+                month: volume.month(),
+            }
+        };
+        let session = carta_tui::session::Session {
+            view,
+            position: None,
+            work_positions: Default::default(),
+            work_mru: Vec::new(),
+        };
+        let app = App::open(archive, Some(&session), Instant::now()).unwrap();
+        (temporary, app)
+    }
+
+    #[test]
+    fn shift_arrows_create_extend_and_visibly_render_selection() {
+        let (_temporary, mut app) = app_with_documents(&["abc\ndef\nghi"], false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        dispatch(&mut app, KeyCode::Right, KeyModifiers::SHIFT);
+        dispatch(&mut app, KeyCode::Right, KeyModifiers::SHIFT);
+        assert_eq!(app.editor.selected_text().as_deref(), Some("ab"));
+
+        let lines = visual_lines(&app.editor, 80);
+        let rendered = styled_line(&lines[0], 0, app.editor.selection());
+        assert!(rendered
+            .spans
+            .iter()
+            .any(|span| span.style.bg == Some(Color::Blue)));
+
+        app.editor.set_cursor(Cursor { region: 0, byte: 3 }, false);
+        dispatch(&mut app, KeyCode::Left, KeyModifiers::SHIFT);
+        dispatch(&mut app, KeyCode::Left, KeyModifiers::SHIFT);
+        assert_eq!(app.editor.selected_text().as_deref(), Some("bc"));
+    }
+
+    #[test]
+    fn shift_up_and_down_extend_selection_and_shift_alone_is_inert() {
+        let (_temporary, mut app) = app_with_documents(&["abc\ndef\nghi"], false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 5 }, false);
+        dispatch(&mut app, KeyCode::Up, KeyModifiers::SHIFT);
+        assert_eq!(app.editor.selection().unwrap().0.byte, 1);
+
+        app.editor.set_cursor(Cursor { region: 0, byte: 5 }, false);
+        dispatch(&mut app, KeyCode::Down, KeyModifiers::SHIFT);
+        assert_eq!(app.editor.selection().unwrap().1.byte, 9);
+        let before = (app.editor.cursor(), app.editor.selection());
+        dispatch(
+            &mut app,
+            KeyCode::Modifier(ModifierKeyCode::LeftShift),
+            KeyModifiers::SHIFT,
+        );
+        assert_eq!((app.editor.cursor(), app.editor.selection()), before);
+    }
+
+    #[test]
+    fn ctrl_shift_arrows_select_by_word_without_starting_leap() {
+        let (_temporary, mut app) = app_with_documents(&["alpha beta gamma"], false);
+        let mut clipboard = Clipboard::default();
+        let mut dispatcher = Dispatcher {
+            pending_control: Some(LeapDirection::Backward),
+        };
+        app.editor.set_cursor(
+            Cursor {
+                region: 0,
+                byte: 11,
+            },
+            false,
+        );
+
+        handle_key(
+            &mut app,
+            &mut clipboard,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL | KeyModifiers::SHIFT),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.selected_text().as_deref(), Some("beta "));
+        assert!(matches!(app.mode, AppMode::Editing));
+        assert!(dispatcher.pending_control.is_none());
+
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        dispatch(
+            &mut app,
+            KeyCode::Right,
+            KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+        );
+        assert_eq!(app.editor.selected_text().as_deref(), Some("alpha "));
+    }
+
+    #[test]
+    fn ctrl_home_and_end_stay_within_current_document() {
+        let (_temporary, mut app) = app_with_documents(&["first", "second"], false);
+        app.editor.set_cursor(Cursor { region: 1, byte: 3 }, false);
+        dispatch(&mut app, KeyCode::Home, KeyModifiers::CONTROL);
+        assert_eq!(app.editor.cursor(), Cursor { region: 1, byte: 0 });
+        dispatch(&mut app, KeyCode::End, KeyModifiers::CONTROL);
+        assert_eq!(app.editor.cursor(), Cursor { region: 1, byte: 6 });
+    }
+
+    #[test]
+    fn ctrl_page_moves_between_documents_without_wrap_or_content_changes() {
+        for work in [false, true] {
+            let (_temporary, mut app) = app_with_documents(&["first", "second", "third"], work);
+            let original_view = app.view.clone();
+            let original: Vec<_> = app
+                .editor
+                .regions()
+                .iter()
+                .map(|region| region.text.clone())
+                .collect();
+
+            dispatch(&mut app, KeyCode::PageUp, KeyModifiers::CONTROL);
+            assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 0 });
+            dispatch(&mut app, KeyCode::PageDown, KeyModifiers::CONTROL);
+            assert_eq!(app.editor.cursor(), Cursor { region: 1, byte: 0 });
+            dispatch(&mut app, KeyCode::PageDown, KeyModifiers::CONTROL);
+            dispatch(&mut app, KeyCode::PageDown, KeyModifiers::CONTROL);
+            assert_eq!(app.editor.cursor(), Cursor { region: 2, byte: 0 });
+            dispatch(&mut app, KeyCode::PageUp, KeyModifiers::CONTROL);
+            assert_eq!(app.editor.cursor(), Cursor { region: 1, byte: 0 });
+            assert_eq!(
+                app.editor
+                    .regions()
+                    .iter()
+                    .map(|region| region.text.clone())
+                    .collect::<Vec<_>>(),
+                original
+            );
+            assert_eq!(app.view, original_view);
+        }
+    }
+
+    #[test]
+    fn assigned_control_chords_do_not_change_remembered_leap_query() {
+        let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
+        app.start_leap(LeapDirection::Forward, true);
+        app.leap_input("alpha");
+        app.end_leap();
+        assert_eq!(app.leap.remembered_query(), Some("alpha"));
+        let chords = [
+            (KeyCode::Left, KeyModifiers::CONTROL | KeyModifiers::SHIFT),
+            (KeyCode::Right, KeyModifiers::CONTROL | KeyModifiers::SHIFT),
+            (KeyCode::PageUp, KeyModifiers::CONTROL),
+            (KeyCode::PageDown, KeyModifiers::CONTROL),
+            (KeyCode::Home, KeyModifiers::CONTROL),
+            (KeyCode::End, KeyModifiers::CONTROL),
+            (
+                KeyCode::Char('c'),
+                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+            ),
+            (
+                KeyCode::Char('x'),
+                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+            ),
+            (
+                KeyCode::Char('v'),
+                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+            ),
+            (
+                KeyCode::Char('z'),
+                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+            ),
+            (
+                KeyCode::Char('y'),
+                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+            ),
+        ];
+        let mut clipboard = Clipboard::default();
+        for (code, modifiers) in chords {
+            let mut dispatcher = Dispatcher {
+                pending_control: Some(LeapDirection::Backward),
+            };
+            handle_key(
+                &mut app,
+                &mut clipboard,
+                &mut dispatcher,
+                KeyEvent::new(code, modifiers),
+                true,
+            )
+            .unwrap();
+            assert!(dispatcher.pending_control.is_none());
+            assert!(matches!(app.mode, AppMode::Editing));
+            assert_eq!(app.leap.remembered_query(), Some("alpha"));
+        }
+    }
 
     #[test]
     fn ctrl_shift_chord_does_not_start_leap_or_cancel_selection() {

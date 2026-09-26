@@ -122,6 +122,9 @@ impl CompositeEditor {
     }
 
     pub fn insert(&mut self, value: &str) -> bool {
+        if self.regions.is_empty() {
+            return false;
+        }
         if self.selection().is_some_and(|(a, b)| a.region != b.region) {
             return false;
         }
@@ -135,6 +138,9 @@ impl CompositeEditor {
     }
 
     pub fn backspace(&mut self) -> bool {
+        if self.regions.is_empty() {
+            return false;
+        }
         if self.selection().is_some() {
             return self.delete_selection();
         }
@@ -154,6 +160,9 @@ impl CompositeEditor {
     }
 
     pub fn delete(&mut self) -> bool {
+        if self.regions.is_empty() {
+            return false;
+        }
         if self.selection().is_some() {
             return self.delete_selection();
         }
@@ -183,6 +192,9 @@ impl CompositeEditor {
     }
 
     pub fn indent_less(&mut self) -> bool {
+        if self.regions.is_empty() {
+            return false;
+        }
         if self.selection().is_some_and(|(a, b)| a.region != b.region) {
             return false;
         }
@@ -209,6 +221,9 @@ impl CompositeEditor {
     }
 
     pub fn move_horizontal(&mut self, forward: bool, selecting: bool) {
+        if self.regions.is_empty() {
+            return;
+        }
         self.begin_selection(selecting);
         let text = &self.regions[self.cursor.region].text;
         if forward {
@@ -233,7 +248,55 @@ impl CompositeEditor {
         self.finish_selection(selecting);
     }
 
+    pub fn move_word(&mut self, forward: bool, selecting: bool) {
+        if self.regions.is_empty() {
+            return;
+        }
+        self.begin_selection(selecting);
+        let text = &self.regions[self.cursor.region].text;
+        if forward {
+            while self.cursor.byte < text.len()
+                && text[self.cursor.byte..]
+                    .chars()
+                    .next()
+                    .is_some_and(is_word_character)
+            {
+                self.cursor.byte += text[self.cursor.byte..].chars().next().unwrap().len_utf8();
+            }
+            while self.cursor.byte < text.len()
+                && text[self.cursor.byte..]
+                    .chars()
+                    .next()
+                    .is_some_and(|character| !is_word_character(character))
+            {
+                self.cursor.byte += text[self.cursor.byte..].chars().next().unwrap().len_utf8();
+            }
+        } else {
+            while self.cursor.byte > 0 {
+                let (previous, character) =
+                    text[..self.cursor.byte].char_indices().next_back().unwrap();
+                if is_word_character(character) {
+                    break;
+                }
+                self.cursor.byte = previous;
+            }
+            while self.cursor.byte > 0 {
+                let (previous, character) =
+                    text[..self.cursor.byte].char_indices().next_back().unwrap();
+                if !is_word_character(character) {
+                    break;
+                }
+                self.cursor.byte = previous;
+            }
+        }
+        self.preferred_column = None;
+        self.finish_selection(selecting);
+    }
+
     pub fn move_line(&mut self, down: bool, selecting: bool) {
+        if self.regions.is_empty() {
+            return;
+        }
         self.begin_selection(selecting);
         let text = &self.regions[self.cursor.region].text;
         let line_start = text[..self.cursor.byte].rfind('\n').map_or(0, |i| i + 1);
@@ -268,6 +331,9 @@ impl CompositeEditor {
     }
 
     pub fn home(&mut self, selecting: bool) {
+        if self.regions.is_empty() {
+            return;
+        }
         self.begin_selection(selecting);
         let text = &self.regions[self.cursor.region].text;
         self.cursor.byte = text[..self.cursor.byte].rfind('\n').map_or(0, |i| i + 1);
@@ -276,6 +342,9 @@ impl CompositeEditor {
     }
 
     pub fn end(&mut self, selecting: bool) {
+        if self.regions.is_empty() {
+            return;
+        }
         self.begin_selection(selecting);
         let text = &self.regions[self.cursor.region].text;
         self.cursor.byte = text[self.cursor.byte..]
@@ -292,6 +361,9 @@ impl CompositeEditor {
     }
 
     pub fn move_visual(&mut self, down: bool, width: usize, selecting: bool) {
+        if self.regions.is_empty() {
+            return;
+        }
         self.begin_selection(selecting);
         let ranges = visual_ranges(&self.regions[self.cursor.region].text, width.max(1));
         let row = ranges
@@ -336,6 +408,9 @@ impl CompositeEditor {
     }
 
     pub fn visual_home(&mut self, width: usize, selecting: bool) {
+        if self.regions.is_empty() {
+            return;
+        }
         self.begin_selection(selecting);
         let ranges = visual_ranges(&self.regions[self.cursor.region].text, width.max(1));
         self.cursor.byte = ranges
@@ -347,6 +422,9 @@ impl CompositeEditor {
     }
 
     pub fn visual_end(&mut self, width: usize, selecting: bool) {
+        if self.regions.is_empty() {
+            return;
+        }
         self.begin_selection(selecting);
         let ranges = visual_ranges(&self.regions[self.cursor.region].text, width.max(1));
         self.cursor.byte = ranges
@@ -360,6 +438,46 @@ impl CompositeEditor {
     pub fn page_visual(&mut self, down: bool, lines: usize, width: usize, selecting: bool) {
         for _ in 0..lines.max(1) {
             self.move_visual(down, width, selecting);
+        }
+    }
+
+    pub fn document_home(&mut self, selecting: bool) {
+        if self.regions.is_empty() {
+            return;
+        }
+        self.set_cursor(
+            Cursor {
+                region: self.cursor.region,
+                byte: 0,
+            },
+            selecting,
+        );
+    }
+
+    pub fn document_end(&mut self, selecting: bool) {
+        let Some(region) = self.regions.get(self.cursor.region) else {
+            return;
+        };
+        self.set_cursor(
+            Cursor {
+                region: self.cursor.region,
+                byte: region.text.len(),
+            },
+            selecting,
+        );
+    }
+
+    pub fn move_document(&mut self, forward: bool) {
+        if self.regions.is_empty() {
+            return;
+        }
+        let region = if forward {
+            (self.cursor.region + 1).min(self.regions.len() - 1)
+        } else {
+            self.cursor.region.saturating_sub(1)
+        };
+        if region != self.cursor.region {
+            self.set_cursor(Cursor { region, byte: 0 }, false);
         }
     }
 
@@ -446,6 +564,9 @@ fn ordered(a: Cursor, b: Cursor) -> (Cursor, Cursor) {
 }
 fn compare(a: Cursor, b: Cursor) -> Ordering {
     (a.region, a.byte).cmp(&(b.region, b.byte))
+}
+fn is_word_character(character: char) -> bool {
+    character.is_alphanumeric() || character == '_'
 }
 fn byte_at_column(text: &str, base: usize, column: usize) -> usize {
     text.char_indices()
@@ -542,5 +663,52 @@ mod tests {
         e.home(false);
         assert!(e.insert("    "));
         assert!(e.indent_less());
+    }
+
+    #[test]
+    fn word_selection_uses_predictable_boundaries() {
+        let mut e = CompositeEditor::new(
+            vec![Region {
+                document: id(),
+                text: "alpha, beta gamma".into(),
+            }],
+            Cursor {
+                region: 0,
+                byte: 12,
+            },
+        );
+        e.move_word(false, true);
+        assert_eq!(e.selected_text().as_deref(), Some("beta "));
+        e.move_word(false, true);
+        assert_eq!(e.selected_text().as_deref(), Some("alpha, beta "));
+
+        e.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        e.move_word(true, true);
+        assert_eq!(e.selected_text().as_deref(), Some("alpha, "));
+        e.move_word(true, true);
+        assert_eq!(e.selected_text().as_deref(), Some("alpha, beta "));
+    }
+
+    #[test]
+    fn zero_region_editor_accepts_normal_input_without_panicking() {
+        let mut e = CompositeEditor::new(Vec::new(), Cursor { region: 0, byte: 0 });
+        assert!(!e.insert("x"));
+        assert!(!e.backspace());
+        assert!(!e.delete());
+        assert!(!e.indent_less());
+        e.move_horizontal(true, true);
+        e.move_word(true, true);
+        e.move_line(true, true);
+        e.move_visual(true, 80, true);
+        e.home(true);
+        e.end(true);
+        e.visual_home(80, true);
+        e.visual_end(80, true);
+        e.page_visual(true, 20, 80, true);
+        e.document_home(true);
+        e.document_end(true);
+        e.move_document(true);
+        assert_eq!(e.cursor(), Cursor { region: 0, byte: 0 });
+        assert!(e.selection().is_none());
     }
 }

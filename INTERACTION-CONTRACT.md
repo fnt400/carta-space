@@ -285,9 +285,12 @@ The v0.1 TUI keeps direct bindings deliberately small:
 - Ctrl+Shift+X: Cut;
 - Ctrl+Shift+V: Paste;
 - Ctrl+Shift+Z: Undo;
-- Ctrl+Shift+Y: Redo.
+- Ctrl+Shift+Y: Redo;
+- Ctrl+Shift+Left/Right: extend the selection to the previous/next word boundary;
+- Ctrl+PageUp/PageDown: move to the previous/next Document in the current View, without wrapping;
+- Ctrl+Home/End: move to the beginning/end of the current Document.
 
-Recognized Ctrl+Shift editing chords MUST NOT start LEAP.
+Explicitly assigned Ctrl chords take precedence over the physical Control-key LEAP binding. They MUST NOT start LEAP, leave LEAP pending, or change the remembered LEAP query.
 
 Other direct shortcuts should be added only after real use demonstrates a need.
 
