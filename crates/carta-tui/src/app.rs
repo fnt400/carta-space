@@ -1250,6 +1250,7 @@ impl App {
             self.typed_span_start = None;
             self.last_leap_span = None;
             self.rehighlight_span = None;
+            self.cat_erase_forward = true;
         }
         changed
     }
@@ -1437,7 +1438,6 @@ impl App {
             }
         } else {
             self.leap.remember(&session);
-            self.cat_erase_forward = true;
             self.typed_span_start = None;
             self.rehighlight_span = None;
             if had_highlight && !palette {
@@ -1457,6 +1457,7 @@ impl App {
             } else {
                 self.last_leap_span = self.cat_span_between(origin, destination);
             }
+            self.cat_erase_forward = true;
         }
         self.mode = AppMode::Editing;
     }
