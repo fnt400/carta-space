@@ -588,6 +588,64 @@ impl CompositeEditor {
         self.finish_selection(selecting);
     }
 
+    pub fn logical_line_leap_cursor(&self, forward: bool) -> Option<Cursor> {
+        let region = self.regions.get(self.cursor.region)?;
+        let text = &region.text;
+
+        if forward {
+            let newline = text[self.cursor.byte..].find('\n')? + self.cursor.byte;
+            return Some(Cursor {
+                region: self.cursor.region,
+                byte: newline + 1,
+            });
+        }
+
+        if self.cursor.byte == 0 {
+            return Some(self.cursor);
+        }
+
+        let before = &text[..self.cursor.byte];
+        let newline = before.rfind('\n');
+        let current_line_start = newline.map_or(0, |index| index + 1);
+        if current_line_start < self.cursor.byte {
+            return Some(Cursor {
+                region: self.cursor.region,
+                byte: current_line_start,
+            });
+        }
+
+        let previous_line_start = newline
+            .and_then(|index| text[..index].rfind('\n').map(|previous| previous + 1))
+            .unwrap_or(0);
+        Some(Cursor {
+            region: self.cursor.region,
+            byte: previous_line_start,
+        })
+    }
+
+    pub fn document_boundary_cursor(&self, forward: bool) -> Option<Cursor> {
+        let region = self.regions.get(self.cursor.region)?;
+        Some(Cursor {
+            region: self.cursor.region,
+            byte: if forward { region.text.len() } else { 0 },
+        })
+    }
+
+    pub fn view_boundary_cursor(&self, forward: bool) -> Option<Cursor> {
+        if self.regions.is_empty() {
+            return None;
+        }
+        if forward {
+            let region = self.regions.len() - 1;
+            Some(Cursor {
+                region,
+                byte: self.regions[region].text.len(),
+            })
+        } else {
+            Some(Cursor { region: 0, byte: 0 })
+        }
+    }
+
     pub fn visual_boundary_cursor(&self, width: usize, forward: bool) -> Option<Cursor> {
         let region = self.regions.get(self.cursor.region)?;
         let ranges = visual_ranges(&region.text, width.max(1));
