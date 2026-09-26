@@ -1387,7 +1387,8 @@ mod tests {
         assert!(header.text.contains('…'));
         assert!(display_width(&header.text) <= 80);
 
-        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        app.editor
+            .set_cursor(Cursor { region: 0, byte: 0 }, false);
         let status = rendered_status_line(&app, 80);
         assert!(
             status.ends_with("Appunti - Cinema - …") || status.ends_with("Cinema - Appunti - …")
@@ -1485,7 +1486,8 @@ mod tests {
 
     #[test]
     fn right_control_c_copies_cat_highlight() {
-        let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
+        let (_temporary, mut app) =
+            app_with_documents(&["alpha beta"], false);
         assert!(app.editor.set_cat_highlight(
             Cursor { region: 0, byte: 6 },
             Cursor { region: 0, byte: 10 },
