@@ -1178,6 +1178,32 @@ impl App {
         }
     }
 
+    pub fn leap_visual_boundary(&mut self, direction: LeapDirection, width: usize) {
+        let origin = self.editor.cursor();
+        let Some(destination) = self
+            .editor
+            .visual_boundary_cursor(width, direction == LeapDirection::Forward)
+        else {
+            self.last_leap_span = None;
+            return;
+        };
+        let had_highlight = self.editor.cat_highlight().is_some();
+        self.editor.set_cursor_preserving_highlight(destination);
+
+        if had_highlight {
+            if self.editor.move_cat_highlight_to(destination) {
+                self.edited(Instant::now());
+                self.status = "Moved highlighted text".into();
+            }
+            self.last_leap_span = None;
+        } else if origin != destination {
+            self.last_leap_span = Some((origin, destination));
+            self.status.clear();
+        } else {
+            self.last_leap_span = None;
+        }
+    }
+
     pub fn extend_last_leap_highlight(&mut self) -> bool {
         let Some((start, end)) = self.last_leap_span else {
             return false;
