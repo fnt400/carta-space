@@ -377,7 +377,7 @@ Use `Duplicate as New` when an independent variant is required.
 
 ### 7.3 Add and remove
 
-`Add to Work…` opens a dmenu-like Work selector and appends the current Document to the selected Work. If the typed name matches no selectable Work, Enter creates a new Work with that name and immediately adds the current Document.
+`Add to Work…` opens a dmenu-like Work selector and appends the current Document to the selected Work. If the typed name matches no selectable Work, Enter creates a new Work with that name and immediately adds the current Document. After either operation, Carta opens that Work View with the added Document current.
 
 Works that already contain the Document are omitted. Carta never creates a second active Work with an equivalent title merely because the current Document is already a member.
 
