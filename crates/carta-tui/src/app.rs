@@ -307,6 +307,7 @@ pub struct App {
     pub leap: LeapRuntime,
     pub quit: bool,
     last_leap_span: Option<(Cursor, Cursor)>,
+    cat_span_fixed: Option<Cursor>,
     rehighlight_span: Option<(Cursor, Cursor)>,
     typed_span_start: Option<Cursor>,
     cat_erase_forward: bool,
@@ -407,6 +408,7 @@ impl App {
             leap: LeapRuntime::default(),
             quit: false,
             last_leap_span: None,
+            cat_span_fixed: None,
             rehighlight_span: None,
             typed_span_start: None,
             cat_erase_forward: true,
@@ -1174,6 +1176,37 @@ impl App {
         }
     }
 
+    fn cat_fixed_boundary_for(
+        &self,
+        cursor: Cursor,
+        direction: LeapDirection,
+    ) -> Cursor {
+        let range = self.cat_origin_range(cursor).unwrap_or((cursor, cursor));
+        match direction {
+            LeapDirection::Forward => range.0,
+            LeapDirection::Backward => range.1,
+        }
+    }
+
+    fn refresh_cat_span_from_fixed(&mut self) {
+        let Some(fixed) = self.cat_span_fixed else {
+            self.last_leap_span = None;
+            return;
+        };
+        let cursor = self.editor.cursor();
+        if fixed.region != cursor.region {
+            self.last_leap_span = None;
+            return;
+        }
+        let current = self.cat_origin_range(cursor).unwrap_or((cursor, cursor));
+        let (start, end) = if fixed.byte <= current.0.byte {
+            (fixed, current.1)
+        } else {
+            (current.0, fixed)
+        };
+        self.last_leap_span = (start != end).then_some((start, end));
+    }
+
     fn cat_span_between(
         &self,
         origin: Cursor,
@@ -1223,6 +1256,7 @@ impl App {
         }
         let after = self.editor.cursor();
         self.typed_span_start = Some(start);
+        self.cat_span_fixed = Some(start);
         self.last_leap_span =
             (start.region == after.region && start != after).then_some((start, after));
         self.rehighlight_span = None;
@@ -1238,6 +1272,7 @@ impl App {
         }
         let after = self.editor.cursor();
         self.typed_span_start = Some(start);
+        self.cat_span_fixed = Some(start);
         self.last_leap_span =
             (start.region == after.region && start != after).then_some((start, after));
         self.rehighlight_span = None;
@@ -1248,6 +1283,7 @@ impl App {
     pub fn cat_navigation(&mut self) {
         self.typed_span_start = None;
         self.last_leap_span = None;
+        self.cat_span_fixed = None;
         self.rehighlight_span = None;
         self.cat_erase_forward = true;
     }
@@ -1263,6 +1299,7 @@ impl App {
         if changed {
             self.typed_span_start = None;
             self.last_leap_span = None;
+            self.cat_span_fixed = None;
             self.rehighlight_span = None;
             self.cat_erase_forward = true;
         }
@@ -1273,14 +1310,16 @@ impl App {
         self.typed_span_start = None;
         if let Some((start, end)) = self.editor.cat_highlight() {
             self.rehighlight_span = Some((start, end));
-            self.last_leap_span = None;
+            self.last_leap_span = Some((start, end));
             self.editor.clear_cat_highlight();
             match direction {
                 LeapDirection::Forward => {
+                    self.cat_span_fixed = Some(start);
                     self.editor.set_cursor_preserving_highlight(end);
                     self.cat_erase_forward = false;
                 }
                 LeapDirection::Backward => {
+                    self.cat_span_fixed = Some(end);
                     self.editor.set_cursor_preserving_highlight(start);
                     self.cat_erase_forward = true;
                 }
@@ -1293,21 +1332,31 @@ impl App {
                 self.editor.set_cursor_preserving_highlight(start);
             }
             self.cat_erase_forward = true;
+            self.refresh_cat_span_from_fixed();
             return;
         }
 
         self.rehighlight_span = None;
         let origin = self.editor.cursor();
+        if self.cat_span_fixed.is_none() {
+            self.cat_span_fixed = Some(self.cat_fixed_boundary_for(origin, direction));
+        }
         self.editor
             .move_horizontal(matches!(direction, LeapDirection::Forward), false);
-        let destination = self.editor.cursor();
-        self.last_leap_span = self.cat_span_between(origin, destination);
         self.cat_erase_forward = true;
+        self.refresh_cat_span_from_fixed();
     }
 
     pub fn start_leap(&mut self, direction: LeapDirection, palette_mode: bool) {
         self.typed_span_start = None;
         self.rehighlight_span = None;
+        if self.editor.cat_highlight().is_none() {
+            self.cat_span_fixed =
+                Some(self.cat_fixed_boundary_for(self.editor.cursor(), direction));
+            self.last_leap_span = None;
+        } else {
+            self.cat_span_fixed = None;
+        }
         self.editor.cancel_selection();
         self.mode = AppMode::Leap {
             session: LeapSession::new(
@@ -1358,23 +1407,27 @@ impl App {
         }
     }
 
-    pub fn remember_direct_leap_span(&mut self, origin: Cursor) {
+    pub fn remember_direct_leap_span(
+        &mut self,
+        origin: Cursor,
+        direction: LeapDirection,
+    ) {
         let destination = self.editor.cursor();
-        self.last_leap_span = if origin.region == destination.region && origin != destination {
+        self.cat_span_fixed = Some(self.cat_fixed_boundary_for(origin, direction));
+        self.typed_span_start = None;
+        self.rehighlight_span = None;
+        self.cat_erase_forward = true;
+
+        if origin.region == destination.region && origin != destination {
             let (start, end) = if origin.byte <= destination.byte {
                 (origin, destination)
             } else {
                 (destination, origin)
             };
-            Some((start, end))
-        } else {
-            None
-        };
-        self.typed_span_start = None;
-        self.rehighlight_span = None;
-        self.cat_erase_forward = true;
-        if self.last_leap_span.is_some() {
+            self.last_leap_span = Some((start, end));
             self.status.clear();
+        } else {
+            self.last_leap_span = None;
         }
     }
 
@@ -1465,11 +1518,13 @@ impl App {
                         && destination.byte < end.byte
                     {
                         self.rehighlight_span = Some((destination, end));
+                        self.cat_span_fixed = Some(end);
                     }
                 }
                 self.last_leap_span = None;
             } else {
-                self.last_leap_span = self.cat_span_between(origin, destination);
+                self.cat_erase_forward = true;
+                self.refresh_cat_span_from_fixed();
             }
             self.cat_erase_forward = true;
         }
@@ -1489,6 +1544,7 @@ impl App {
 
     fn leap_again(&mut self, direction: LeapDirection) {
         let origin = self.editor.cursor();
+        self.cat_span_fixed = Some(self.cat_fixed_boundary_for(origin, direction));
         let regions: Vec<_> = self
             .editor
             .regions()
@@ -1506,10 +1562,10 @@ impl App {
                 byte: p.byte_offset(),
             };
             self.editor.set_cursor(destination, false);
-            self.last_leap_span = self.cat_span_between(origin, destination);
+            self.cat_erase_forward = true;
+            self.refresh_cat_span_from_fixed();
             self.typed_span_start = None;
             self.rehighlight_span = None;
-            self.cat_erase_forward = true;
             if let View::Search { selected, .. } = &mut self.view {
                 *selected = p.region();
             }
