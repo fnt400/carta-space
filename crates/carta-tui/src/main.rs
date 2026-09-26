@@ -8,7 +8,7 @@ use carta_tui::session::{
     load_last_archive, load_session, save_last_archive, save_session, state_root,
 };
 use carta_tui::App;
-use chrono::{DateTime, Datelike, Weekday};
+use chrono::{Datelike, Local, Weekday};
 use clap::Parser;
 use crossterm::cursor::{Hide, Show};
 use crossterm::event::{
@@ -373,7 +373,38 @@ fn handle_key(
         return Ok(());
     }
 
-    if key.modifiers.contains(KeyModifiers::CONTROL) {
+    if enhanced {
+        if let Some(pending) = dispatcher.pending_leap {
+            let handled = match (pending.direction, key.code) {
+                (LeapDirection::Backward, KeyCode::Enter)
+                | (LeapDirection::Forward, KeyCode::Enter) => {
+                    dispatcher.pending_leap = None;
+                    app.leap_logical_line(pending.direction);
+                    true
+                }
+                (LeapDirection::Backward, KeyCode::Home)
+                | (LeapDirection::Forward, KeyCode::End) => {
+                    dispatcher.pending_leap = None;
+                    app.leap_document_boundary(pending.direction);
+                    true
+                }
+                (LeapDirection::Backward, KeyCode::PageUp)
+                | (LeapDirection::Forward, KeyCode::PageDown) => {
+                    dispatcher.pending_leap = None;
+                    app.leap_view_boundary(pending.direction);
+                    true
+                }
+                _ => false,
+            };
+            if handled {
+                return Ok(());
+            }
+        }
+    }
+
+    if key.modifiers.contains(KeyModifiers::CONTROL)
+        && (!enhanced || dispatcher.right_control_held)
+    {
         let editable = matches!(app.mode, AppMode::Editing)
             && matches!(app.view, View::Chronological(_) | View::Work(_));
         match key.code {
@@ -485,22 +516,6 @@ fn handle_key(
         return Ok(());
     }
     if let Some(pending) = dispatcher.pending_leap.take() {
-        if key.code == KeyCode::Enter {
-            let (terminal_width, _) = crossterm::terminal::size().unwrap_or((80, 24));
-            let width = editor_width(terminal_width);
-            if app.editor.cat_highlight().is_some() {
-                app.leap_visual_boundary(pending.direction, width);
-            } else {
-                let origin = app.editor.cursor();
-                if matches!(pending.direction, LeapDirection::Backward) {
-                    app.editor.visual_home(width, false);
-                } else {
-                    app.editor.visual_end(width, false);
-                }
-                app.remember_direct_leap_span(origin, pending.direction);
-            }
-            return Ok(());
-        }
         dispatcher.active_leap = Some(pending);
         app.start_leap(pending.direction, false);
     }
@@ -1087,10 +1102,7 @@ fn membership_summary(app: &App, document: carta_core::DocumentId) -> String {
 }
 
 fn italian_date(timestamp: carta_core::Timestamp) -> String {
-    let raw = timestamp.to_string();
-    let Ok(date) = DateTime::parse_from_rfc3339(&raw) else {
-        return raw.chars().take(10).collect();
-    };
+    let date = timestamp.as_datetime().with_timezone(&Local);
     let weekday = match date.weekday() {
         Weekday::Mon => "lun",
         Weekday::Tue => "mar",
@@ -1526,7 +1538,11 @@ fn current_position(app: &App) -> String {
     }
 }
 fn date_only(timestamp: carta_core::Timestamp) -> String {
-    timestamp.to_string().chars().take(10).collect()
+    timestamp
+        .as_datetime()
+        .with_timezone(&Local)
+        .format("%Y-%m-%d")
+        .to_string()
 }
 fn list_position(selected: usize, total: usize) -> String {
     if total == 0 {
