@@ -814,7 +814,7 @@ fn draw_editor(frame: &mut ratatui::Frame<'_>, app: &mut App, area: Rect) {
     } else if cursor_line >= app.scroll + height {
         app.scroll = cursor_line + 1 - height;
     }
-    let selection = app.editor.selection();
+    let selection = app.cat_render_highlight();
     let rendered: Vec<_> = lines
         .iter()
         .skip(app.scroll)
