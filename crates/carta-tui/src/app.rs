@@ -151,6 +151,8 @@ pub enum Command {
     RenameWork,
     OpenWork,
     OpenChronologicalView,
+    CollapseView,
+    ExpandView,
     ShowMemberships,
     AddToWork,
     RemoveFromWork,
@@ -210,6 +212,8 @@ impl Command {
             Self::RenameWork => "Rename Work…",
             Self::OpenWork => "Open Work…",
             Self::OpenChronologicalView => "Open Chronological View",
+            Self::CollapseView => "Collapse View",
+            Self::ExpandView => "Expand View",
             Self::ShowMemberships => "Show Memberships",
             Self::AddToWork => "Add to Work…",
             Self::RemoveFromWork => "Remove from Work",
@@ -300,6 +304,7 @@ pub struct App {
     pub mode: AppMode,
     pub status: String,
     pub scroll: usize,
+    pub collapsed: bool,
     pub search_results: Vec<ResultRow>,
     pub history: Vec<carta_core::DocumentRevision>,
     pub work_history: Vec<carta_core::WorkSnapshot>,
@@ -401,6 +406,7 @@ impl App {
             mode: AppMode::Editing,
             status: String::new(),
             scroll,
+            collapsed: false,
             search_results,
             history: Vec::new(),
             work_history: Vec::new(),
@@ -486,6 +492,7 @@ impl App {
             ]);
         }
         if editable && has_doc {
+            commands.push(if self.collapsed { ExpandView } else { CollapseView });
             commands.extend([
                 DuplicateAsNew,
                 NewLinkedDocument,
@@ -604,6 +611,17 @@ impl App {
             RenameWork => self.prompt("New Work name", PromptAction::RenameWork),
             OpenWork => self.select_works(SelectAction::OpenWork, false),
             OpenChronologicalView => self.open_chronological_view()?,
+            CollapseView => {
+                self.autosave_for_destructive()?;
+                self.collapsed = true;
+                self.editor.document_home(false);
+                self.cat_navigation();
+                self.scroll = 0;
+            }
+            ExpandView => {
+                self.collapsed = false;
+                self.scroll = 0;
+            }
             ShowMemberships => self.show_memberships()?,
             AddToWork => self.select_works(SelectAction::AddToWork, true),
             RemoveFromWork => {
@@ -2293,6 +2311,7 @@ impl App {
             }
         }
         self.view = view;
+        self.collapsed = false;
         let remembered = match (&self.view, target) {
             (View::Work(work), None) => self.work_positions.get(work).cloned(),
             (_, Some((document, byte))) => Some(Position {
