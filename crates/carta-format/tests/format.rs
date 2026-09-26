@@ -68,10 +68,7 @@ fn preserves_unknown_document_and_work_members() {
 
 #[test]
 fn work_color_round_trips_as_optional_metadata_extension() {
-    let input = VALID_WORK.replace(
-        "\n}",
-        ",\n  \"color\": \"#6F7F8C\"\n}",
-    );
+    let input = VALID_WORK.replace("\n}", ",\n  \"color\": \"#6F7F8C\"\n}");
     let work = WorkMetadata::read_from(input.as_bytes()).unwrap();
     assert_eq!(work.color(), Some("#6F7F8C"));
 
