@@ -666,7 +666,7 @@ impl App {
                     .map(derived_label_from_text)
                     .unwrap_or_else(|| "document".to_owned());
                 self.prompt_prefilled(
-                    "Export Markdown path",
+                    "Export Markdown filename",
                     format!("{}.md", sanitize_filename(&label)),
                     PromptAction::ExportDocumentMarkdown,
                 )
@@ -679,7 +679,7 @@ impl App {
                     .map(derived_label_from_text)
                     .unwrap_or_else(|| "document".to_owned());
                 self.prompt_prefilled(
-                    "Export PDF path",
+                    "Export PDF filename",
                     format!("{}.pdf", sanitize_filename(&label)),
                     PromptAction::ExportDocumentPdf,
                 )
@@ -688,7 +688,7 @@ impl App {
                 self.autosave_for_destructive()?;
                 let title = self.archive.work(self.current_work()?).unwrap().title();
                 self.prompt_prefilled(
-                    "Export Work Markdown path",
+                    "Export Work Markdown filename",
                     format!("{}.md", sanitize_filename(title)),
                     PromptAction::ExportWorkMarkdown,
                 )
@@ -697,7 +697,7 @@ impl App {
                 self.autosave_for_destructive()?;
                 let title = self.archive.work(self.current_work()?).unwrap().title();
                 self.prompt_prefilled(
-                    "Export Work PDF path",
+                    "Export Work PDF filename",
                     format!("{}.pdf", sanitize_filename(title)),
                     PromptAction::ExportWorkPdf,
                 )
@@ -781,22 +781,32 @@ impl App {
                 self.structural("Imported Document")?;
                 self.open_document(id, true)?;
             }
-            PromptAction::ExportDocumentMarkdown => self
-                .archive
-                .export_document_markdown_file(self.current_document()?, input)?,
-            PromptAction::ExportDocumentPdf => self.archive.export_document_pdf_with(
-                self.current_document()?,
-                input,
-                &PdfExportOptions::default(),
-            )?,
-            PromptAction::ExportWorkMarkdown => self
-                .archive
-                .export_work_markdown_file(self.current_work()?, input)?,
-            PromptAction::ExportWorkPdf => self.archive.export_work_pdf_with(
-                self.current_work()?,
-                input,
-                &PdfExportOptions::default(),
-            )?,
+            PromptAction::ExportDocumentMarkdown => {
+                let path = downloads_export_path(&input)?;
+                self.archive
+                    .export_document_markdown_file(self.current_document()?, path)?;
+            }
+            PromptAction::ExportDocumentPdf => {
+                let path = downloads_export_path(&input)?;
+                self.archive.export_document_pdf_with(
+                    self.current_document()?,
+                    path,
+                    &PdfExportOptions::default(),
+                )?;
+            }
+            PromptAction::ExportWorkMarkdown => {
+                let path = downloads_export_path(&input)?;
+                self.archive
+                    .export_work_markdown_file(self.current_work()?, path)?;
+            }
+            PromptAction::ExportWorkPdf => {
+                let path = downloads_export_path(&input)?;
+                self.archive.export_work_pdf_with(
+                    self.current_work()?,
+                    path,
+                    &PdfExportOptions::default(),
+                )?;
+            }
             PromptAction::Package => {
                 self.autosave()?;
                 self.archive.package(input)?;
@@ -2537,6 +2547,18 @@ fn derived_label_from_text(content: &str) -> String {
         .filter(|line| !line.is_empty())
         .unwrap_or("document")
         .to_owned()
+}
+
+fn downloads_export_path(filename: &str) -> AppResult<std::path::PathBuf> {
+    let filename = std::path::Path::new(filename)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .ok_or("export filename must not be empty")?;
+    let home = std::env::var_os("HOME").ok_or("$HOME is not set")?;
+    let downloads = std::path::PathBuf::from(home).join("Downloads");
+    fs::create_dir_all(&downloads)?;
+    Ok(downloads.join(filename))
 }
 
 fn sanitize_filename(value: &str) -> String {
