@@ -1518,6 +1518,9 @@ impl App {
     ) -> bool {
         let origin = self.editor.cursor();
         if origin == destination {
+            if !preserve_anchor {
+                self.last_leap_span = None;
+            }
             return false;
         }
 
@@ -1752,9 +1755,7 @@ impl App {
 
     pub fn leap_again(&mut self, direction: LeapDirection) {
         if let Some(kind) = self.remembered_structural_leap {
-            let origin = self.editor.cursor();
-            self.cat_span_fixed = Some(self.cat_fixed_boundary_for(origin, direction));
-            self.perform_structural_leap(kind, direction, true, true);
+            self.perform_structural_leap(kind, direction, true, false);
             self.typed_span_start = None;
             self.rehighlight_span = None;
             return;
