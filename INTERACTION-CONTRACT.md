@@ -273,6 +273,8 @@ With an extended highlight active:
 
 Pressing the opposite LEAP key while a LEAP query is already active does not extend the highlight. Extension is a distinct two-LEAP gesture performed after the LEAP.
 
+Left Control+Enter and Left Alt+Enter are line-boundary LEAPs, not ordinary cursor movements. They therefore record the traversed span for the same two-LEAP highlight gesture. In particular, Left Control+Enter from the end of a visual line, or Left Alt+Enter from its beginning, followed by Left Control+Left Alt highlights the whole visual line.
+
 Ordinary typing or ordinary cursor navigation removes the extended highlight without deleting its text. Commands may explicitly operate on the highlighted text.
 
 ---
@@ -303,8 +305,8 @@ The v0.1 TUI keeps direct bindings deliberately small:
 
 - Left Control: LEAP backward;
 - Left Alt: LEAP forward;
-- Left Control+Enter: beginning of the current visual line;
-- Left Alt+Enter: end of the current visual line;
+- Left Control+Enter: LEAP to the beginning of the current visual line;
+- Left Alt+Enter: LEAP to the end of the current visual line;
 - Esc: command palette;
 - Left Control + Left Alt together after a LEAP: extend the Cat highlight over the traversed text and copy it to the system clipboard;
 - physical Right Control+C with a Cat highlight: Cat COPY;
