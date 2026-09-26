@@ -3108,7 +3108,7 @@ mod tests {
     }
 
     #[test]
-    fn leap_cursor_is_directional_without_changing_core_match_semantics() {
+    fn leap_cursor_lands_on_the_target_character_in_both_directions() {
         let temporary = tempfile::tempdir().unwrap();
         let archive = Archive::create(temporary.path().join("archive")).unwrap();
         let mut app = App::open(archive, None, Instant::now()).unwrap();
@@ -3117,7 +3117,7 @@ mod tests {
 
         app.start_leap(LeapDirection::Forward, true);
         app.leap_input("alpha");
-        assert_eq!(app.editor.cursor().byte, 16);
+        assert_eq!(app.editor.cursor().byte, 11);
         app.end_leap();
 
         app.editor.set_cursor(Cursor { region: 0, byte: 6 }, false);
@@ -3137,12 +3137,12 @@ mod tests {
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
         app.start_leap(LeapDirection::Forward, true);
         app.leap_input("one");
-        assert_eq!(app.editor.cursor().byte, 3);
+        assert_eq!(app.editor.cursor().byte, 0);
         app.end_leap();
         app.leap_again(LeapDirection::Forward);
-        assert_eq!(app.editor.cursor().byte, 7);
+        assert_eq!(app.editor.cursor().byte, 4);
         app.leap_again(LeapDirection::Forward);
-        assert_eq!(app.editor.cursor().byte, 11);
+        assert_eq!(app.editor.cursor().byte, 8);
 
         app.editor.set_cursor(
             Cursor {
@@ -3157,6 +3157,58 @@ mod tests {
         app.end_leap();
         app.leap_again(LeapDirection::Backward);
         assert_eq!(app.editor.cursor().byte, 4);
+    }
+
+    #[test]
+    fn cat_tap_leap_creeps_and_unhighlight_can_rehighlight() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        assert!(app.editor.insert("abcd"));
+        app.editor.set_cursor(Cursor { region: 0, byte: 1 }, false);
+        app.cat_erase_forward = true;
+
+        app.cat_tap_leap(LeapDirection::Forward);
+        assert_eq!(app.editor.cursor().byte, 2);
+
+        assert!(app.editor.set_cat_highlight(
+            Cursor { region: 0, byte: 1 },
+            Cursor { region: 0, byte: 4 },
+        ));
+        app.cat_tap_leap(LeapDirection::Backward);
+        assert_eq!(app.editor.cursor().byte, 1);
+        assert!(app.editor.cat_highlight().is_none());
+        assert!(app.extend_last_leap_highlight());
+        assert_eq!(
+            app.editor.cat_highlight(),
+            Some((
+                Cursor { region: 0, byte: 1 },
+                Cursor { region: 0, byte: 4 }
+            ))
+        );
+    }
+
+    #[test]
+    fn cat_typing_can_be_highlighted_and_erase_is_directional() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+
+        assert!(app.cat_insert("abc"));
+        assert!(!app.cat_erase_forward);
+        assert!(app.extend_last_leap_highlight());
+        assert_eq!(app.editor.selected_text().as_deref(), Some("abc"));
+        assert!(app.cat_erase());
+        assert_eq!(app.editor.current_text(), Some(""));
+
+        assert!(app.cat_insert("xy"));
+        assert!(app.cat_erase());
+        assert_eq!(app.editor.current_text(), Some("x"));
+
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        app.cat_navigation();
+        assert!(app.cat_erase());
+        assert_eq!(app.editor.current_text(), Some(""));
     }
 
     #[test]
