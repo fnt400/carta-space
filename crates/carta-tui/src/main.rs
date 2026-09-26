@@ -414,7 +414,17 @@ fn handle_key(
         if key.code == KeyCode::Enter {
             let (terminal_width, _) = crossterm::terminal::size().unwrap_or((80, 24));
             let width = editor_width(terminal_width);
-            app.leap_visual_boundary(pending.direction, width);
+            if app.editor.cat_highlight().is_some() {
+                app.leap_visual_boundary(pending.direction, width);
+            } else {
+                let origin = app.editor.cursor();
+                if matches!(pending.direction, LeapDirection::Backward) {
+                    app.editor.visual_home(width, false);
+                } else {
+                    app.editor.visual_end(width, false);
+                }
+                app.remember_direct_leap_span(origin);
+            }
             return Ok(());
         }
         dispatcher.active_leap = Some(pending);
@@ -1528,6 +1538,7 @@ mod tests {
             true,
         )
         .unwrap();
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 0 });
 
         handle_key(
             &mut app,
@@ -1577,6 +1588,7 @@ mod tests {
             true,
         )
         .unwrap();
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 10 });
 
         handle_key(
             &mut app,
