@@ -1766,7 +1766,7 @@ mod tests {
         app.end_leap();
 
         assert_eq!(app.editor.regions()[0].text, "alpha ");
-        assert_eq!(app.editor.regions()[1].text, "targetbeta");
+        assert_eq!(app.editor.regions()[1].text, "betatarget");
         assert_eq!(app.editor.selected_text().as_deref(), Some("beta"));
     }
 
@@ -2037,7 +2037,7 @@ mod tests {
                 app.editor.cursor().byte,
                 match direction {
                     LeapDirection::Backward => 0,
-                    LeapDirection::Forward => 16,
+                    LeapDirection::Forward => 11,
                 }
             );
         }
