@@ -482,12 +482,7 @@ mod cat_leap_tests {
         let document = DocumentId::new_v7();
         let regions = [DocumentTextRegion::new(document, "x x x")];
         let origin = LeapPosition::new(0, 0);
-        let mut session = LeapSession::with_query(
-            LeapDirection::Forward,
-            origin,
-            "x",
-            &regions,
-        );
+        let mut session = LeapSession::with_query(LeapDirection::Forward, origin, "x", &regions);
 
         assert_eq!(session.origin(), origin);
         assert_eq!(session.cursor(), LeapPosition::new(0, 0));
