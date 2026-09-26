@@ -307,6 +307,13 @@ impl Scheduler {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StructuralLeap {
+    LogicalLine,
+    DocumentBoundary,
+    ViewBoundary,
+}
+
 pub struct App {
     pub archive: Archive,
     pub view: View,
@@ -323,6 +330,7 @@ pub struct App {
     pub scheduler: Scheduler,
     pub leap: LeapRuntime,
     pub quit: bool,
+    remembered_structural_leap: Option<StructuralLeap>,
     last_leap_span: Option<(Cursor, Cursor)>,
     cat_span_fixed: Option<Cursor>,
     rehighlight_span: Option<(Cursor, Cursor)>,
@@ -425,6 +433,7 @@ impl App {
             scheduler: Scheduler::new(now),
             leap: LeapRuntime::default(),
             quit: false,
+            remembered_structural_leap: None,
             last_leap_span: None,
             cat_span_fixed: None,
             rehighlight_span: None,
@@ -1191,6 +1200,7 @@ impl App {
         self.back.clear();
         self.forward.clear();
         self.leap = LeapRuntime::default();
+        self.remembered_structural_leap = None;
         self.last_leap_span = None;
         self.cat_span_fixed = None;
         self.rehighlight_span = None;
@@ -1500,8 +1510,17 @@ impl App {
         }
     }
 
-    fn leap_to_cursor(&mut self, direction: LeapDirection, destination: Cursor) {
+    fn leap_to_cursor(
+        &mut self,
+        direction: LeapDirection,
+        destination: Cursor,
+        preserve_anchor: bool,
+    ) -> bool {
         let origin = self.editor.cursor();
+        if origin == destination {
+            return false;
+        }
+
         let had_highlight = self.editor.cat_highlight().is_some();
         self.editor.set_cursor_preserving_highlight(destination);
 
@@ -1523,42 +1542,124 @@ impl App {
             }
             self.last_leap_span = None;
             self.cat_erase_forward = true;
+        } else if preserve_anchor {
+            self.typed_span_start = None;
+            self.rehighlight_span = None;
+            self.cat_erase_forward = true;
+            self.refresh_cat_span_from_fixed();
+            if self.last_leap_span.is_some() {
+                self.status.clear();
+            }
         } else {
             self.remember_direct_leap_span(origin, direction);
         }
+        true
+    }
+
+    fn remember_structural_leap(&mut self, kind: StructuralLeap) {
+        self.remembered_structural_leap = Some(kind);
+    }
+
+    fn structural_leap_destination(
+        &self,
+        kind: StructuralLeap,
+        direction: LeapDirection,
+        repeating: bool,
+    ) -> Option<Cursor> {
+        let forward = matches!(direction, LeapDirection::Forward);
+        match kind {
+            StructuralLeap::LogicalLine => self.editor.logical_line_leap_cursor(forward),
+            StructuralLeap::DocumentBoundary if !repeating => {
+                self.editor.document_boundary_cursor(forward)
+            }
+            StructuralLeap::DocumentBoundary => {
+                let cursor = self.editor.cursor();
+                let regions = self.editor.regions();
+                let region = regions.get(cursor.region)?;
+                if forward {
+                    if cursor.byte < region.text.len() {
+                        Some(Cursor {
+                            region: cursor.region,
+                            byte: region.text.len(),
+                        })
+                    } else if cursor.region + 1 < regions.len() {
+                        let next = cursor.region + 1;
+                        Some(Cursor {
+                            region: next,
+                            byte: regions[next].text.len(),
+                        })
+                    } else {
+                        None
+                    }
+                } else if cursor.byte > 0 {
+                    Some(Cursor {
+                        region: cursor.region,
+                        byte: 0,
+                    })
+                } else if cursor.region > 0 {
+                    Some(Cursor {
+                        region: cursor.region - 1,
+                        byte: 0,
+                    })
+                } else {
+                    None
+                }
+            }
+            StructuralLeap::ViewBoundary => self.editor.view_boundary_cursor(forward),
+        }
+    }
+
+    fn perform_structural_leap(
+        &mut self,
+        kind: StructuralLeap,
+        direction: LeapDirection,
+        repeating: bool,
+        preserve_anchor: bool,
+    ) -> bool {
+        let Some(destination) =
+            self.structural_leap_destination(kind, direction, repeating)
+        else {
+            self.last_leap_span = None;
+            return false;
+        };
+        self.leap_to_cursor(direction, destination, preserve_anchor)
     }
 
     pub fn leap_logical_line(&mut self, direction: LeapDirection) {
-        let Some(destination) = self
-            .editor
-            .logical_line_leap_cursor(matches!(direction, LeapDirection::Forward))
-        else {
-            self.last_leap_span = None;
-            return;
-        };
-        self.leap_to_cursor(direction, destination);
+        self.remember_structural_leap(StructuralLeap::LogicalLine);
+        self.perform_structural_leap(
+            StructuralLeap::LogicalLine,
+            direction,
+            false,
+            false,
+        );
     }
 
     pub fn leap_document_boundary(&mut self, direction: LeapDirection) {
-        let Some(destination) = self
-            .editor
-            .document_boundary_cursor(matches!(direction, LeapDirection::Forward))
-        else {
-            self.last_leap_span = None;
-            return;
-        };
-        self.leap_to_cursor(direction, destination);
+        self.remember_structural_leap(StructuralLeap::DocumentBoundary);
+        self.perform_structural_leap(
+            StructuralLeap::DocumentBoundary,
+            direction,
+            false,
+            false,
+        );
     }
 
     pub fn leap_view_boundary(&mut self, direction: LeapDirection) {
-        let Some(destination) = self
-            .editor
-            .view_boundary_cursor(matches!(direction, LeapDirection::Forward))
-        else {
-            self.last_leap_span = None;
-            return;
+        self.remember_structural_leap(StructuralLeap::ViewBoundary);
+        self.perform_structural_leap(
+            StructuralLeap::ViewBoundary,
+            direction,
+            false,
+            false,
+        );
+    }
+
+    pub fn leap_again_active_structural(&mut self, direction: LeapDirection) -> bool {
+        let Some(kind) = self.remembered_structural_leap else {
+            return false;
         };
-        self.leap_to_cursor(direction, destination);
+        self.perform_structural_leap(kind, direction, true, true)
     }
 
     pub fn extend_last_leap_highlight(&mut self) -> bool {
@@ -1602,6 +1703,7 @@ impl App {
             self.rehighlight_span = None;
         } else {
             self.leap.remember(&session);
+            self.remembered_structural_leap = None;
             self.typed_span_start = None;
             self.rehighlight_span = None;
             if !matched {
@@ -1649,6 +1751,15 @@ impl App {
     }
 
     pub fn leap_again(&mut self, direction: LeapDirection) {
+        if let Some(kind) = self.remembered_structural_leap {
+            let origin = self.editor.cursor();
+            self.cat_span_fixed = Some(self.cat_fixed_boundary_for(origin, direction));
+            self.perform_structural_leap(kind, direction, true, true);
+            self.typed_span_start = None;
+            self.rehighlight_span = None;
+            return;
+        }
+
         let origin = self.editor.cursor();
         self.cat_span_fixed = Some(self.cat_fixed_boundary_for(origin, direction));
         let regions: Vec<_> = self
