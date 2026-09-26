@@ -1,4 +1,5 @@
 use crate::editor::{CompositeEditor, Cursor, Region};
+use crate::help::{documents as help_documents, HelpKind};
 use crate::palette;
 use crate::session::{Position, SavedView, Session};
 use carta_core::{
@@ -38,6 +39,10 @@ pub enum View {
         selected: usize,
     },
     Conflicts {
+        selected: usize,
+    },
+    Help {
+        kind: HelpKind,
         selected: usize,
     },
 }
@@ -190,6 +195,8 @@ pub enum Command {
     LeapAgainBackward,
     Undo,
     Redo,
+    Cheatsheet,
+    Manual,
     Quit,
     ShowConflicts,
     UseLocal,
@@ -251,6 +258,8 @@ impl Command {
             Self::LeapAgainBackward => "Leap Again Backward",
             Self::Undo => "Undo",
             Self::Redo => "Redo",
+            Self::Cheatsheet => "Cheatsheet",
+            Self::Manual => "Manual",
             Self::Quit => "Quit",
             Self::ShowConflicts => "Show Conflicts",
             Self::UseLocal => "Use Local Variant",
@@ -476,6 +485,8 @@ impl App {
             CreateCheckpoint,
             Back,
             Forward,
+            Cheatsheet,
+            Manual,
             Quit,
             ShowConflicts,
         ];
@@ -726,6 +737,8 @@ impl App {
                     self.edited(Instant::now());
                 }
             }
+            Cheatsheet => self.open_help(HelpKind::Cheatsheet)?,
+            Manual => self.open_help(HelpKind::Manual)?,
             Quit => self.finish_quit()?,
             ShowConflicts => self.show_conflicts()?,
             UseLocal => self.prompt("Type USE LOCAL to resolve", PromptAction::ResolveLocal),
@@ -1034,6 +1047,9 @@ impl App {
                 move_index(selected, len, down);
             }
             View::Conflicts { selected } => move_index(selected, self.conflicts.len(), down),
+            View::Help { kind, selected } => {
+                move_index(selected, help_documents(*kind).len(), down)
+            }
             _ => {}
         }
         if let View::Search { selected, .. } = self.view {
@@ -2290,6 +2306,18 @@ impl App {
             .volume();
         self.switch_view(View::Chronological(volume), Some((id, 0)), navigation)
     }
+    fn open_help(&mut self, kind: HelpKind) -> AppResult {
+        self.autosave()?;
+        self.push_navigation();
+        self.view = View::Help { kind, selected: 0 };
+        self.editor = CompositeEditor::new(Vec::new(), Cursor { region: 0, byte: 0 });
+        self.mode = AppMode::Editing;
+        self.status.clear();
+        self.scroll = 0;
+        self.collapsed = false;
+        Ok(())
+    }
+
     fn switch_view(
         &mut self,
         view: View,
