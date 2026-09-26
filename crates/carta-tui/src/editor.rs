@@ -162,7 +162,10 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return false;
         }
-        if self.conventional_selection().is_some_and(|(a, b)| a.region != b.region) {
+        if self
+            .conventional_selection()
+            .is_some_and(|(a, b)| a.region != b.region)
+        {
             return false;
         }
         self.record();
@@ -257,7 +260,9 @@ impl CompositeEditor {
             return false;
         };
         self.record();
-        self.regions[start.region].text.replace_range(start.byte..end.byte, value);
+        self.regions[start.region]
+            .text
+            .replace_range(start.byte..end.byte, value);
         self.cursor = Cursor {
             region: start.region,
             byte: start.byte + value.len(),
@@ -940,7 +945,7 @@ mod tests {
 
         assert!(e.set_cat_highlight(
             Cursor { region: 0, byte: 6 },
-            Cursor { region: 0, byte: 10 }
+            Cursor { region: 0, byte: 10 },
         ));
         assert_eq!(e.selected_text().as_deref(), Some("beta"));
         assert!(e.copy_cat_highlight());
@@ -964,7 +969,7 @@ mod tests {
         let mut e = editor();
         assert!(!e.set_cat_highlight(
             Cursor { region: 0, byte: 0 },
-            Cursor { region: 1, byte: 0 }
+            Cursor { region: 1, byte: 0 },
         ));
         assert!(e.cat_highlight().is_none());
     }
