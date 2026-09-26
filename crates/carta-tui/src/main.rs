@@ -835,24 +835,20 @@ fn draw(frame: &mut ratatui::Frame<'_>, app: &mut App) {
         View::Trash { selected } => {
             let mut items = Vec::new();
             if let Some(trash) = &app.trash {
-                items.extend(
-                    trash.documents().iter().map(|d| {
-                        ListItem::new(format!(
-                            "Document · {} · {}",
-                            local_timestamp(d.created()),
-                            d.label()
-                        ))
-                    }),
-                );
-                items.extend(
-                    trash.works().iter().map(|w| {
-                        ListItem::new(format!(
-                            "Work · {} · {}",
-                            local_timestamp(w.created()),
-                            w.title()
-                        ))
-                    }),
-                );
+                items.extend(trash.documents().iter().map(|d| {
+                    ListItem::new(format!(
+                        "Document · {} · {}",
+                        local_timestamp(d.created()),
+                        d.label()
+                    ))
+                }));
+                items.extend(trash.works().iter().map(|w| {
+                    ListItem::new(format!(
+                        "Work · {} · {}",
+                        local_timestamp(w.created()),
+                        w.title()
+                    ))
+                }));
             }
             draw_list(frame, chunks[0], "Trash".into(), items, *selected);
         }
@@ -1723,11 +1719,13 @@ mod tests {
     fn displayed_dates_use_the_system_local_timezone() {
         use std::str::FromStr;
 
-        let timestamp =
-            carta_core::Timestamp::from_str("2026-01-01T00:30:00+14:00").unwrap();
+        let timestamp = carta_core::Timestamp::from_str("2026-01-01T00:30:00+14:00").unwrap();
         let expected = timestamp.as_datetime().with_timezone(&Local);
 
-        assert_eq!(date_only(timestamp), expected.format("%Y-%m-%d").to_string());
+        assert_eq!(
+            date_only(timestamp),
+            expected.format("%Y-%m-%d").to_string()
+        );
         assert_eq!(local_timestamp(timestamp), expected.to_rfc3339());
     }
 
@@ -1807,7 +1805,13 @@ mod tests {
         let (_temporary, mut app) = app_with_documents(&[content.as_str()], false);
         let mut dispatcher = Dispatcher::default();
 
-        app.editor.set_cursor(Cursor { region: 0, byte: 90 }, false);
+        app.editor.set_cursor(
+            Cursor {
+                region: 0,
+                byte: 90,
+            },
+            false,
+        );
         handle_key(
             &mut app,
             &mut dispatcher,
@@ -1859,10 +1863,9 @@ mod tests {
     fn leap_enter_moves_highlight_between_real_line_starts() {
         let (_temporary, mut app) = app_with_documents(&["one\ntwo\nthree"], false);
         app.editor.set_cursor(Cursor { region: 0, byte: 4 }, false);
-        assert!(app.editor.set_cat_highlight(
-            Cursor { region: 0, byte: 4 },
-            Cursor { region: 0, byte: 7 },
-        ));
+        assert!(app
+            .editor
+            .set_cat_highlight(Cursor { region: 0, byte: 4 }, Cursor { region: 0, byte: 7 },));
         let mut dispatcher = Dispatcher::default();
 
         handle_key(
@@ -2253,7 +2256,12 @@ mod tests {
         app.end_leap();
         assert_eq!(app.leap.remembered_query(), Some("alpha"));
 
-        for code in [KeyCode::PageUp, KeyCode::PageDown, KeyCode::Home, KeyCode::End] {
+        for code in [
+            KeyCode::PageUp,
+            KeyCode::PageDown,
+            KeyCode::Home,
+            KeyCode::End,
+        ] {
             let mut dispatcher = Dispatcher {
                 right_control_held: true,
                 ..Dispatcher::default()
@@ -2279,7 +2287,12 @@ mod tests {
         app.leap_input("alpha");
         app.end_leap();
 
-        for code in [KeyCode::PageUp, KeyCode::PageDown, KeyCode::Home, KeyCode::End] {
+        for code in [
+            KeyCode::PageUp,
+            KeyCode::PageDown,
+            KeyCode::Home,
+            KeyCode::End,
+        ] {
             let mut dispatcher = Dispatcher::default();
             handle_key(
                 &mut app,
