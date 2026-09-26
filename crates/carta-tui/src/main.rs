@@ -580,7 +580,8 @@ fn handle_normal(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
             app.editor.indent_less()
         }
         KeyCode::Tab => app.cat_insert("    "),
-        KeyCode::Backspace | KeyCode::Delete => app.cat_erase(),
+        KeyCode::Backspace => app.cat_backspace(),
+        KeyCode::Delete => app.cat_erase(),
         KeyCode::Left => {
             app.editor.move_horizontal(false, false);
             app.cat_navigation();
@@ -1531,6 +1532,37 @@ mod tests {
         let dark = status_style(&app);
         assert_eq!(dark.bg, Some(Color::Rgb(102, 122, 117)));
         assert_eq!(dark.fg, Some(Color::White));
+    }
+
+    #[test]
+    fn backspace_is_always_backward_while_delete_uses_cat_erase_direction() {
+        let (_temporary, mut app) = app_with_documents(&["abcd"], false);
+
+        app.editor.set_cursor(Cursor { region: 0, byte: 2 }, false);
+        app.cat_navigation();
+        dispatch(&mut app, KeyCode::Backspace, KeyModifiers::NONE);
+        assert_eq!(app.editor.current_text(), Some("acd"));
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 1 });
+
+        app.editor.set_cursor(Cursor { region: 0, byte: 1 }, false);
+        app.cat_navigation();
+        dispatch(&mut app, KeyCode::Delete, KeyModifiers::NONE);
+        assert_eq!(app.editor.current_text(), Some("ad"));
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 1 });
+    }
+
+    #[test]
+    fn backspace_erases_an_extended_cat_highlight_as_a_block() {
+        let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
+        assert!(app.editor.set_cat_highlight(
+            Cursor { region: 0, byte: 6 },
+            Cursor { region: 0, byte: 10 },
+        ));
+
+        dispatch(&mut app, KeyCode::Backspace, KeyModifiers::NONE);
+
+        assert_eq!(app.editor.current_text(), Some("alpha "));
+        assert!(app.editor.cat_highlight().is_none());
     }
 
     #[test]
