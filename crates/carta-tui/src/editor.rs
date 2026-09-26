@@ -487,6 +487,12 @@ impl CompositeEditor {
     pub fn redo(&mut self) -> bool {
         self.swap_history(false)
     }
+    pub fn can_undo(&self) -> bool {
+        !self.undo.is_empty()
+    }
+    pub fn can_redo(&self) -> bool {
+        !self.redo.is_empty()
+    }
 
     fn swap_history(&mut self, undo: bool) -> bool {
         let source = if undo { &mut self.undo } else { &mut self.redo };

@@ -281,8 +281,6 @@ The v0.1 TUI keeps direct bindings deliberately small:
 - Left Control: LEAP backward;
 - Right Control: LEAP forward;
 - Esc: command palette;
-- Ctrl+Shift+Z: Undo;
-- Ctrl+Shift+Y: Redo;
 - Ctrl+Shift+Left/Right: extend the selection to the previous/next word boundary;
 - Ctrl+PageUp/PageDown: move to the previous/next Document in the current View, without wrapping;
 - Ctrl+Home/End: move to the beginning/end of the current Document.
@@ -290,6 +288,8 @@ The v0.1 TUI keeps direct bindings deliberately small:
 Explicitly assigned Ctrl chords take precedence over the physical Control-key LEAP binding. They MUST NOT start LEAP, leave LEAP pending, or change the remembered LEAP query.
 
 Other direct shortcuts should be added only after real use demonstrates a need.
+
+`Undo` and `Redo` are contextual command-palette commands. They are available in editable Views when the session-local editor history can apply them.
 
 ---
 

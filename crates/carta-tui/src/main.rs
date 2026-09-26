@@ -271,29 +271,6 @@ fn handle_key(
         }
     }
 
-    if key
-        .modifiers
-        .contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT)
-    {
-        match key.code {
-            KeyCode::Char('z' | 'Z') => {
-                dispatcher.pending_control = None;
-                if app.editor.undo() {
-                    app.edited(Instant::now());
-                }
-                return Ok(());
-            }
-            KeyCode::Char('y' | 'Y') => {
-                dispatcher.pending_control = None;
-                if app.editor.redo() {
-                    app.edited(Instant::now());
-                }
-                return Ok(());
-            }
-            _ => {}
-        }
-    }
-
     if enhanced && key.kind == KeyEventKind::Press {
         match key.code {
             KeyCode::Modifier(ModifierKeyCode::LeftControl) => {
@@ -1214,14 +1191,6 @@ mod tests {
             (KeyCode::PageDown, KeyModifiers::CONTROL),
             (KeyCode::Home, KeyModifiers::CONTROL),
             (KeyCode::End, KeyModifiers::CONTROL),
-            (
-                KeyCode::Char('z'),
-                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
-            ),
-            (
-                KeyCode::Char('y'),
-                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
-            ),
         ];
         for (code, modifiers) in chords {
             let mut dispatcher = Dispatcher {

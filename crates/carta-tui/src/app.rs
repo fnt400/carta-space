@@ -38,7 +38,7 @@ pub enum View {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Location {
     view: View,
     cursor: Cursor,
@@ -136,6 +136,7 @@ pub enum Command {
     CreateWork,
     RenameWork,
     OpenWork,
+    OpenChronologicalView,
     ShowMemberships,
     AddToWork,
     RemoveFromWork,
@@ -169,6 +170,8 @@ pub enum Command {
     LeapBackward,
     LeapAgainForward,
     LeapAgainBackward,
+    Undo,
+    Redo,
     Quit,
     ShowConflicts,
     UseLocal,
@@ -189,6 +192,7 @@ impl Command {
             Self::CreateWork => "Create Work…",
             Self::RenameWork => "Rename Work…",
             Self::OpenWork => "Open Work…",
+            Self::OpenChronologicalView => "Open Chronological View",
             Self::ShowMemberships => "Show Memberships",
             Self::AddToWork => "Add to Work…",
             Self::RemoveFromWork => "Remove from Work",
@@ -222,6 +226,8 @@ impl Command {
             Self::LeapBackward => "LEAP Backward…",
             Self::LeapAgainForward => "Leap Again Forward",
             Self::LeapAgainBackward => "Leap Again Backward",
+            Self::Undo => "Undo",
+            Self::Redo => "Redo",
             Self::Quit => "Quit",
             Self::ShowConflicts => "Show Conflicts",
             Self::UseLocal => "Use Local Variant",
@@ -458,11 +464,18 @@ impl App {
                 ExportDocumentPdf,
             ]);
         }
+        if editable && self.editor.can_undo() {
+            commands.push(Undo);
+        }
+        if editable && self.editor.can_redo() {
+            commands.push(Redo);
+        }
         if matches!(self.view, View::Chronological(_)) {
             commands.extend([PreviousMonth, NextMonth, GoToMonth]);
         }
         if matches!(self.view, View::Work(_)) {
             commands.extend([
+                OpenChronologicalView,
                 RenameWork,
                 TrashWork,
                 WorkHistory,
@@ -541,6 +554,7 @@ impl App {
             CreateWork => self.prompt("Work name", PromptAction::CreateWork),
             RenameWork => self.prompt("New Work name", PromptAction::RenameWork),
             OpenWork => self.select_works(SelectAction::OpenWork, false),
+            OpenChronologicalView => self.open_chronological_view()?,
             ShowMemberships => self.show_memberships()?,
             AddToWork => self.select_works(SelectAction::AddToWork, true),
             RemoveFromWork => {
@@ -629,6 +643,16 @@ impl App {
             LeapBackward => self.start_leap(LeapDirection::Backward, true),
             LeapAgainForward => self.leap_again(LeapDirection::Forward),
             LeapAgainBackward => self.leap_again(LeapDirection::Backward),
+            Undo => {
+                if self.editor.undo() {
+                    self.edited(Instant::now());
+                }
+            }
+            Redo => {
+                if self.editor.redo() {
+                    self.edited(Instant::now());
+                }
+            }
             Quit => self.finish_quit()?,
             ShowConflicts => self.show_conflicts()?,
             UseLocal => self.prompt("Type USE LOCAL to resolve", PromptAction::ResolveLocal),
@@ -664,7 +688,7 @@ impl App {
             PromptAction::CreateWork => {
                 let id = self.archive.create_empty_work(input)?;
                 self.structural("Created Work")?;
-                self.switch_view(View::Work(id), None, false)?;
+                self.switch_view(View::Work(id), None, true)?;
             }
             PromptAction::RenameWork => {
                 self.archive.rename_work(self.current_work()?, input)?;
@@ -848,7 +872,7 @@ impl App {
         let action = action.clone();
         self.mode = AppMode::Editing;
         match action {
-            SelectAction::OpenWork => self.switch_view(View::Work(value.parse()?), None, false)?,
+            SelectAction::OpenWork => self.switch_view(View::Work(value.parse()?), None, true)?,
             SelectAction::AddToWork => {
                 self.archive
                     .add_document_to_work(value.parse()?, self.current_document()?)?;
@@ -1153,6 +1177,27 @@ impl App {
             self.switch_view(View::Chronological(current_volume()), Some((id, 0)), false)?;
         }
         Ok(())
+    }
+    fn open_chronological_view(&mut self) -> AppResult {
+        let (volume, target) = match self.editor.current_document() {
+            Some(document) => {
+                let volume = self
+                    .archive
+                    .documents()
+                    .find(|info| info.id() == document)
+                    .ok_or("missing Document")?
+                    .volume();
+                (volume, Some((document, self.editor.cursor().byte)))
+            }
+            None => (current_volume(), None),
+        };
+        if self.archive.chronological_month(volume).is_empty() {
+            let document = self.archive.create_document("")?;
+            self.provisional = Some(document);
+            self.switch_view(View::Chronological(volume), Some((document, 0)), true)
+        } else {
+            self.switch_view(View::Chronological(volume), target, true)
+        }
     }
     fn move_work(&mut self, earlier: bool) -> AppResult {
         let work = self.current_work()?;
@@ -1802,14 +1847,18 @@ impl App {
         Ok(())
     }
     fn push_navigation(&mut self) {
-        self.back.push(Location {
+        let location = Location {
             view: self.view.clone(),
             cursor: self.editor.cursor(),
             scroll: self.scroll,
-        });
+        };
+        if self.back.last() != Some(&location) {
+            self.back.push(location);
+        }
         self.forward.clear();
     }
     fn navigate(&mut self, forward: bool) -> AppResult {
+        self.autosave()?;
         let source = if forward {
             &mut self.forward
         } else {
@@ -2542,5 +2591,142 @@ mod tests {
         app.leap_again(LeapDirection::Forward);
         assert_eq!(app.editor.cursor().region, 1);
         assert!(matches!(app.view, View::Search { selected: 1, .. }));
+    }
+
+    #[test]
+    fn work_document_opens_its_volume_in_chronological_view() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let document = app.current_document().unwrap();
+        assert!(app.editor.insert("document text"));
+        app.autosave().unwrap();
+        let work = app
+            .archive
+            .create_work("Work".into(), vec![document])
+            .unwrap();
+        app.switch_view(View::Work(work), Some((document, "document ".len())), false)
+            .unwrap();
+
+        app.execute(Command::OpenChronologicalView).unwrap();
+
+        let volume = app
+            .archive
+            .documents()
+            .find(|info| info.id() == document)
+            .unwrap()
+            .volume();
+        assert_eq!(app.view, View::Chronological(volume));
+        assert_eq!(app.editor.current_document(), Some(document));
+        assert_eq!(app.editor.cursor().byte, "document ".len());
+    }
+
+    #[test]
+    fn empty_work_opens_a_writable_current_chronological_view() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let work = archive.create_empty_work("Empty".into()).unwrap();
+        let session = Session {
+            view: SavedView::Work { id: work },
+            position: None,
+            work_positions: BTreeMap::new(),
+            work_mru: Vec::new(),
+        };
+        let mut app = App::open(archive, Some(&session), Instant::now()).unwrap();
+
+        app.execute(Command::OpenChronologicalView).unwrap();
+
+        assert_eq!(app.view, View::Chronological(current_volume()));
+        assert_eq!(app.editor.regions().len(), 1);
+        assert!(app.editor.insert("writable"));
+    }
+
+    #[test]
+    fn create_work_records_chronological_view_for_back_navigation() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let chronological = app.view.clone();
+
+        app.execute(Command::CreateWork).unwrap();
+        let AppMode::Prompt { input, .. } = &mut app.mode else {
+            panic!("expected Work name prompt")
+        };
+        *input = "New Work".into();
+        app.submit_prompt().unwrap();
+        assert!(matches!(app.view, View::Work(_)));
+        app.execute(Command::Back).unwrap();
+
+        assert_eq!(app.view, chronological);
+    }
+
+    #[test]
+    fn open_work_records_chronological_view_for_back_navigation() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let work = archive.create_empty_work("Other Work".into()).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let chronological = app.view.clone();
+
+        app.execute(Command::OpenWork).unwrap();
+        app.submit_selector().unwrap();
+        assert_eq!(app.view, View::Work(work));
+        app.execute(Command::Back).unwrap();
+
+        assert_eq!(app.view, chronological);
+    }
+
+    #[test]
+    fn work_chronological_back_and_forward_restore_each_view() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let document = app.current_document().unwrap();
+        let work = app
+            .archive
+            .create_work("Work".into(), vec![document])
+            .unwrap();
+        app.switch_view(View::Work(work), None, false).unwrap();
+
+        app.execute(Command::OpenChronologicalView).unwrap();
+        app.execute(Command::Back).unwrap();
+        assert_eq!(app.view, View::Work(work));
+        app.execute(Command::Forward).unwrap();
+
+        assert!(matches!(app.view, View::Chronological(_)));
+        assert_eq!(app.editor.current_document(), Some(document));
+    }
+
+    #[test]
+    fn palette_undo_redo_mark_dirty_and_autosave() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let document = app.current_document().unwrap();
+        assert!(app.editor.insert("first"));
+        app.autosave().unwrap();
+        assert!(app.editor.insert(" second"));
+        assert!(app.commands().contains(&Command::Undo));
+        assert!(app.palette_commands("").contains(&Command::Undo));
+
+        app.execute(Command::Undo).unwrap();
+        assert_eq!(app.editor.current_text(), Some("first"));
+        assert!(app.editor.is_dirty());
+        assert!(app.commands().contains(&Command::Redo));
+        assert!(app.palette_commands("").contains(&Command::Redo));
+        app.tick(Instant::now() + Duration::from_secs(2)).unwrap();
+        assert_eq!(
+            app.archive.read_document(document).unwrap().content(),
+            "first"
+        );
+
+        app.execute(Command::Redo).unwrap();
+        assert_eq!(app.editor.current_text(), Some("first second"));
+        assert!(app.editor.is_dirty());
+        app.tick(Instant::now() + Duration::from_secs(2)).unwrap();
+        assert_eq!(
+            app.archive.read_document(document).unwrap().content(),
+            "first second"
+        );
     }
 }
