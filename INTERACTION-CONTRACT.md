@@ -177,7 +177,7 @@ The separator is generated UI:
 
 The cursor may cross boundaries.
 
-Selections may cross boundaries for copying, but destructive editing MUST NOT cross them.
+Cat highlights never cross Document boundaries. A highlighted block may nevertheless be moved to a destination in another Document of the same editable View; generated separators remain outside authored text and are never moved, copied, or erased.
 
 ### 3.6 Status bar
 
@@ -256,11 +256,24 @@ A tap of Left Alt with no new query performs `Leap Again Forward`.
 
 The remembered query is session-global: after changing Views, Leap Again searches the new current View using the same query.
 
-### 4.5 Selection interaction
+### 4.5 Cat highlight interaction
 
-In v0.1, starting LEAP cancels the current selection and performs navigation only.
+The reference TUI uses Canon Cat-style extended highlighting as its text-selection model.
 
-Future frontends may experiment with Cat-style selection + LEAP behavior without changing the archive model.
+After a successful LEAP within one Document, pressing physical Left Control and physical Left Alt together extends the highlight across the text traversed by that LEAP. If the preceding LEAP crossed a Document boundary, Carta does not create an extended highlight.
+
+With an extended highlight active:
+
+- starting another LEAP keeps the highlighted text in place while only the cursor moves;
+- releasing the LEAP key at a destination outside the highlight moves the highlighted text to that destination;
+- the moved text remains highlighted so it may immediately be moved again;
+- the destination may be in another Document of the same editable View;
+- a LEAP landing inside the highlight does not move the text and collapses the extended highlight;
+- tapping a LEAP key without a query collapses the highlight rather than performing Leap Again.
+
+Pressing the opposite LEAP key while a LEAP query is already active does not extend the highlight. Extension is a distinct two-LEAP gesture performed after the LEAP.
+
+Ordinary typing or ordinary cursor navigation removes the extended highlight without deleting its text. Commands may explicitly operate on the highlighted text.
 
 ---
 
@@ -293,7 +306,9 @@ The v0.1 TUI keeps direct bindings deliberately small:
 - Left Control+Enter: beginning of the current visual line;
 - Left Alt+Enter: end of the current visual line;
 - Esc: command palette;
-- Ctrl+Shift+Left/Right: extend the selection to the previous/next word boundary;
+- Left Control + Left Alt together after a LEAP: extend the Cat highlight over the traversed text;
+- physical Right Control+C: Cat COPY;
+- Backspace or Delete with an extended Cat highlight: erase the highlighted text;
 - Ctrl+PageUp/PageDown: move to the previous/next Document in the current View, without wrapping;
 - Ctrl+Home/End: move to the beginning/end of the current Document.
 
@@ -309,15 +324,22 @@ Other direct shortcuts should be added only after real use demonstrates a need.
 
 ### 6.1 Selection
 
-v0.1 uses conventional contemporary text selection, including Shift plus cursor movement and optional mouse selection where the frontend supports it.
+v0.1 uses the Cat extended highlight described in §4.5 rather than conventional Shift-based text selection. Shift plus cursor movement does not extend a selection; Shift remains available for normal character entry and commands such as Shift+Tab.
 
-LEAP is not the primary selection mechanism in v0.1.
+An extended highlight is always contained within one Document. Generated Document separators are never highlightable authored text.
 
-### 6.2 Copy, Cut, Paste
+### 6.2 Copy, move, erase, and paste
 
-v0.1 does not reserve direct Copy, Cut, or Paste bindings. The terminal emulator remains responsible for its normal clipboard chords and inserts pasted text as ordinary literal text.
+Carta's direct COPY operation is physical Right Control+C. It follows the Canon Cat model rather than a clipboard model:
 
-A future Carta clipboard, if introduced, will use plain Unicode/Markdown text rather than a Carta-specific serialized object. A selection may cross Document boundaries for copying, but destructive editing MUST NOT cross them.
+1. if an extended Cat highlight exists, COPY duplicates that text immediately after the original;
+2. the original becomes unhighlighted and the new copy remains highlighted;
+3. the highlighted copy can then be moved elsewhere by LEAP;
+4. if COPY is invoked immediately after a LEAP without first extending the highlight manually, Carta automatically extends the last LEAP span before copying.
+
+There is no direct Cut or Paste command in this model. Moving highlighted text by LEAP replaces Cut/Paste for authored text rearrangement. Backspace or Delete erases an extended highlight as one editing operation.
+
+Carta's Cat COPY is not the operating-system clipboard. Text pasted by the terminal continues to arrive as ordinary literal input. System-clipboard integration may be added separately later without changing Cat movement semantics.
 
 ### 6.3 Undo and Redo
 
@@ -746,7 +768,8 @@ The following are explicitly outside v0.1 interaction scope:
 - bibliography;
 - tags/taxonomies;
 - AI-first workflows;
-- Cat-style selection+LEAP editing;
+- automatic highlighting of recently typed text in the full Canon Cat sense;
+- Canon Cat directional single-character ERASE behavior;
 - WYSIWYG editing;
 - Document split/merge;
 - Work Wipe;
