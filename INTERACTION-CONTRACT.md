@@ -260,7 +260,7 @@ The remembered query is session-global: after changing Views, Leap Again searche
 
 The reference TUI uses Canon Cat-style extended highlighting as its text-selection model.
 
-After a successful LEAP within one Document, pressing physical Left Control and physical Left Alt together extends the highlight across the text traversed by that LEAP. If the preceding LEAP crossed a Document boundary, Carta does not create an extended highlight.
+After a successful LEAP within one Document, pressing physical Left Control and physical Left Alt together extends the highlight across the text traversed by that LEAP. The reference TUI also copies the newly highlighted text to the operating-system clipboard for use in other applications. If the preceding LEAP crossed a Document boundary, Carta does not create an extended highlight. A clipboard failure does not cancel the Cat highlight.
 
 With an extended highlight active:
 
@@ -306,8 +306,9 @@ The v0.1 TUI keeps direct bindings deliberately small:
 - Left Control+Enter: beginning of the current visual line;
 - Left Alt+Enter: end of the current visual line;
 - Esc: command palette;
-- Left Control + Left Alt together after a LEAP: extend the Cat highlight over the traversed text;
-- physical Right Control+C: Cat COPY;
+- Left Control + Left Alt together after a LEAP: extend the Cat highlight over the traversed text and copy it to the system clipboard;
+- physical Right Control+C with a Cat highlight: Cat COPY;
+- physical Right Control+C without a Cat highlight: paste system-clipboard text at the cursor;
 - Backspace or Delete with an extended Cat highlight: erase the highlighted text;
 - Ctrl+PageUp/PageDown: move to the previous/next Document in the current View, without wrapping;
 - Ctrl+Home/End: move to the beginning/end of the current Document.
@@ -330,16 +331,16 @@ An extended highlight is always contained within one Document. Generated Documen
 
 ### 6.2 Copy, move, erase, and paste
 
-Carta's direct COPY operation is physical Right Control+C. It follows the Canon Cat model rather than a clipboard model:
+Physical Right Control+C is context-sensitive:
 
-1. if an extended Cat highlight exists, COPY duplicates that text immediately after the original;
-2. the original becomes unhighlighted and the new copy remains highlighted;
-3. the highlighted copy can then be moved elsewhere by LEAP;
-4. if COPY is invoked immediately after a LEAP without first extending the highlight manually, Carta automatically extends the last LEAP span before copying.
+1. with an extended Cat highlight, it performs Cat COPY: the highlighted text is duplicated immediately after the original, the original becomes unhighlighted, and the new copy remains highlighted so it may immediately be moved by LEAP;
+2. without an extended Cat highlight, it pastes textual content from the operating-system clipboard at the cursor as ordinary authored text.
 
-There is no direct Cut or Paste command in this model. Moving highlighted text by LEAP replaces Cut/Paste for authored text rearrangement. Backspace or Delete erases an extended highlight as one editing operation.
+Creating a Cat highlight with Left Control + Left Alt also exports that highlighted text to the operating-system clipboard. This makes Cat selection interoperable with other applications without changing the internal move/copy model.
 
-Carta's Cat COPY is not the operating-system clipboard. Text pasted by the terminal continues to arrive as ordinary literal input. System-clipboard integration may be added separately later without changing Cat movement semantics.
+There is no direct Cut command. Moving highlighted text by LEAP replaces Cut/Paste for rearranging text already inside Carta. Backspace or Delete erases an extended highlight as one editing operation.
+
+Clipboard integration belongs to the frontend, not the archive/core model. Clipboard failure MUST NOT invalidate or cancel an otherwise successful Cat highlight. When pasting clipboard text, CRLF and lone CR line endings are normalized to LF before insertion. Non-text or unavailable clipboard content leaves the Document unchanged and may be reported in the status bar.
 
 ### 6.3 Undo and Redo
 
