@@ -1,11 +1,11 @@
 use carta_core::{Archive, LeapDirection};
-use chrono::{DateTime, Datelike, Weekday};
 use carta_tui::app::{AppMode, View};
 use carta_tui::editor::{visual_ranges, Cursor};
 use carta_tui::session::{
     load_last_archive, load_session, save_last_archive, save_session, state_root,
 };
 use carta_tui::App;
+use chrono::{DateTime, Datelike, Weekday};
 use clap::Parser;
 use crossterm::cursor::{Hide, Show};
 use crossterm::event::{
@@ -770,7 +770,10 @@ fn chronological_separator(app: &App, document: carta_core::DocumentId, width: u
         .archive
         .documents()
         .find(|info| info.id() == document)
-        .map_or_else(|| "senza data".to_owned(), |info| italian_date(info.created()));
+        .map_or_else(
+            || "senza data".to_owned(),
+            |info| italian_date(info.created()),
+        );
     let prefix = format!("── {date} ");
     if display_width(&prefix) >= width {
         return truncate_display(&prefix, width, false);
@@ -1090,8 +1093,7 @@ fn status_style(app: &App) -> Style {
         return Style::default().bg(Color::DarkGray).fg(Color::White);
     };
     let luminance =
-        (299_u32 * u32::from(red) + 587_u32 * u32::from(green) + 114_u32 * u32::from(blue))
-            / 1000;
+        (299_u32 * u32::from(red) + 587_u32 * u32::from(green) + 114_u32 * u32::from(blue)) / 1000;
     let foreground = if luminance >= 150 {
         Color::Black
     } else {
@@ -1337,8 +1339,7 @@ mod tests {
     fn chronological_headers_show_italian_date_and_up_to_two_work_memberships() {
         use std::str::FromStr;
 
-        let timestamp =
-            carta_core::Timestamp::from_str("2026-09-25T12:00:00+02:00").unwrap();
+        let timestamp = carta_core::Timestamp::from_str("2026-09-25T12:00:00+02:00").unwrap();
         assert_eq!(italian_date(timestamp), "ven 25 set 2026");
 
         let (_temporary, mut app) = app_with_documents(&["first", "second"], false);
@@ -1364,7 +1365,9 @@ mod tests {
 
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
         let status = rendered_status_line(&app, 80);
-        assert!(status.ends_with("Appunti - Cinema - …") || status.ends_with("Cinema - Appunti - …"));
+        assert!(
+            status.ends_with("Appunti - Cinema - …") || status.ends_with("Cinema - Appunti - …")
+        );
     }
 
     #[test]
