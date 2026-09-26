@@ -282,8 +282,7 @@ fn handle_key(
                 .is_some_and(|pending| pending.key == released)
             {
                 let pending = dispatcher.pending_leap.take().unwrap();
-                app.start_leap(pending.direction, false);
-                app.end_leap();
+                app.cat_tap_leap(pending.direction);
             } else if dispatcher
                 .active_leap
                 .is_some_and(|active| active.key == released)
@@ -317,7 +316,7 @@ fn handle_key(
                     }
                     Ok(text) => {
                         let text = normalize_clipboard_text(&text);
-                        if app.editor.insert(&text) {
+                        if app.cat_insert(&text) {
                             app.edited(Instant::now());
                             app.status.clear();
                         }
@@ -339,6 +338,7 @@ fn handle_key(
                 dispatcher.pending_leap = None;
                 if editable {
                     app.editor.move_document(false);
+                    app.cat_navigation();
                 }
                 return Ok(());
             }
@@ -346,6 +346,7 @@ fn handle_key(
                 dispatcher.pending_leap = None;
                 if editable {
                     app.editor.move_document(true);
+                    app.cat_navigation();
                 }
                 return Ok(());
             }
@@ -353,6 +354,7 @@ fn handle_key(
                 dispatcher.pending_leap = None;
                 if editable {
                     app.editor.document_home(false);
+                    app.cat_navigation();
                 }
                 return Ok(());
             }
@@ -360,6 +362,7 @@ fn handle_key(
                 dispatcher.pending_leap = None;
                 if editable {
                     app.editor.document_end(false);
+                    app.cat_navigation();
                 }
                 return Ok(());
             }
@@ -551,43 +554,53 @@ fn handle_normal(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
     let page = usize::from(height.saturating_sub(2).max(1));
     let changed = match key.code {
         KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-            app.editor.insert(&c.to_string())
+            app.cat_insert(&c.to_string())
         }
-        KeyCode::Enter => app.editor.insert_newline_with_list_continuation(),
-        KeyCode::Tab if shift => app.editor.indent_less(),
-        KeyCode::Tab => app.editor.insert("    "),
-        KeyCode::Backspace => app.editor.backspace(),
-        KeyCode::Delete => app.editor.delete(),
+        KeyCode::Enter => app.cat_insert_newline(),
+        KeyCode::Tab if shift => {
+            app.cat_navigation();
+            app.editor.indent_less()
+        }
+        KeyCode::Tab => app.cat_insert("    "),
+        KeyCode::Backspace | KeyCode::Delete => app.cat_erase(),
         KeyCode::Left => {
             app.editor.move_horizontal(false, false);
+            app.cat_navigation();
             false
         }
         KeyCode::Right => {
             app.editor.move_horizontal(true, false);
+            app.cat_navigation();
             false
         }
         KeyCode::Up => {
             app.editor.move_visual(false, width, false);
+            app.cat_navigation();
             false
         }
         KeyCode::Down => {
             app.editor.move_visual(true, width, false);
+            app.cat_navigation();
             false
         }
         KeyCode::Home => {
             app.editor.visual_home(width, false);
+            app.cat_navigation();
             false
         }
         KeyCode::End => {
             app.editor.visual_end(width, false);
+            app.cat_navigation();
             false
         }
         KeyCode::PageUp => {
             app.editor.page_visual(false, page, width, false);
+            app.cat_navigation();
             false
         }
         KeyCode::PageDown => {
             app.editor.page_visual(true, page, width, false);
+            app.cat_navigation();
             false
         }
         _ => false,
