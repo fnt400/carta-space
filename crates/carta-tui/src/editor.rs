@@ -320,7 +320,7 @@ impl CompositeEditor {
         };
         if destination.region == start.region
             && destination.byte >= start.byte
-            && destination.byte <= end.byte
+            && destination.byte < end.byte
         {
             self.cat_highlight = None;
             self.cursor = destination;
