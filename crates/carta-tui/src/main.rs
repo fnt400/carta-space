@@ -414,11 +414,7 @@ fn handle_key(
         if key.code == KeyCode::Enter {
             let (terminal_width, _) = crossterm::terminal::size().unwrap_or((80, 24));
             let width = editor_width(terminal_width);
-            if pending.direction == LeapDirection::Backward {
-                app.editor.visual_home(width, false);
-            } else {
-                app.editor.visual_end(width, false);
-            }
+            app.leap_visual_boundary(pending.direction, width);
             return Ok(());
         }
         dispatcher.active_leap = Some(pending);
@@ -1507,6 +1503,104 @@ mod tests {
 
         dispatch(&mut app, KeyCode::Down, KeyModifiers::SHIFT);
         assert!(app.editor.selection().is_none());
+    }
+
+    #[test]
+    fn left_control_enter_can_highlight_the_whole_visual_line() {
+        let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 10 }, false);
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::CONTROL | KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(app.editor.selected_text().as_deref(), Some("alpha beta"));
+        assert_eq!(dispatcher.clipboard.get_text().unwrap(), "alpha beta");
+    }
+
+    #[test]
+    fn left_alt_enter_can_highlight_the_whole_visual_line() {
+        let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT),
+            true,
+        )
+        .unwrap();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::CONTROL | KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(app.editor.selected_text().as_deref(), Some("alpha beta"));
+        assert_eq!(dispatcher.clipboard.get_text().unwrap(), "alpha beta");
     }
 
     #[test]
