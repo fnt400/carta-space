@@ -122,6 +122,7 @@ pub enum AppMode {
     Prompt {
         title: String,
         input: String,
+        cursor: usize,
         details: Vec<String>,
         action: PromptAction,
     },
@@ -1724,15 +1725,18 @@ impl App {
         self.mode = AppMode::Prompt {
             title: title.into(),
             input: String::new(),
+            cursor: 0,
             details: Vec::new(),
             action,
         };
     }
 
     fn prompt_prefilled(&mut self, title: &str, input: String, action: PromptAction) {
+        let cursor = input.len();
         self.mode = AppMode::Prompt {
             title: title.into(),
             input,
+            cursor,
             details: Vec::new(),
             action,
         };
@@ -1742,6 +1746,7 @@ impl App {
         self.mode = AppMode::Prompt {
             title: title.into(),
             input: String::new(),
+            cursor: 0,
             details,
             action,
         };
@@ -2227,6 +2232,7 @@ impl App {
         self.mode = AppMode::Prompt {
             title: format!("Type exactly: {token}"),
             input: String::new(),
+            cursor: 0,
             details: vec![guarantee],
             action: PromptAction::ConfirmWipe,
         };
@@ -2594,25 +2600,54 @@ fn downloads_export_path(filename: &str) -> AppResult<std::path::PathBuf> {
 }
 
 fn sanitize_filename(value: &str) -> String {
-    let sanitized = value
-        .chars()
-        .map(|character| match character {
-            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' | '\0' => '-',
-            character if character.is_control() => '-',
-            character => character,
-        })
-        .collect::<String>();
-    let sanitized = sanitized.trim().trim_matches('.');
-    if sanitized.is_empty() {
+    const MAX_STEM_CHARS: usize = 40;
+
+    let mut out = String::new();
+    let mut separator_pending = false;
+    for character in value.trim().chars() {
+        if character.is_alphanumeric() {
+            if separator_pending && !out.is_empty() {
+                out.push('-');
+            }
+            out.push(character);
+            separator_pending = false;
+        } else if !out.is_empty() {
+            separator_pending = true;
+        }
+
+        if out.chars().count() >= MAX_STEM_CHARS {
+            break;
+        }
+    }
+
+    while out.ends_with('-') {
+        out.pop();
+    }
+    if out.is_empty() {
         "document".to_owned()
     } else {
-        sanitized.to_owned()
+        out
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn export_filename_is_short_and_free_of_punctuation() {
+        assert_eq!(
+            sanitize_filename("# Titolo: prova / con caratteri? speciali"),
+            "Titolo-prova-con-caratteri-speciali"
+        );
+        assert!(sanitize_filename(
+            "Questo è un titolo estremamente lungo che deve essere accorciato senza simboli"
+        )
+        .chars()
+        .count()
+            <= 40);
+        assert_eq!(sanitize_filename("***"), "document");
+    }
+
     #[test]
     fn scheduler_waits_for_idle_and_checkpoint_interval() {
         let now = Instant::now();
