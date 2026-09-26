@@ -86,11 +86,18 @@ For human-facing labels:
 
 Later headings are internal document structure, not the Document title.
 
-### 2.4 No split or merge in v0.1
+### 2.4 Split Document at Point
 
-v0.1 does not expose Document split or merge operations.
+`Split Document at Point` is an explicit structural operation. It splits the current Document at the cursor byte boundary:
 
-Document boundaries are intentionally stable. If later use demonstrates a real need, split/merge or extraction semantics may be designed separately.
+- authored content before the cursor remains in the original Document;
+- authored content from the cursor onward moves to a new Document;
+- the new Document receives a new UUID;
+- its `created` timestamp is the smallest representable timestamp after the original Document's immutable creation timestamp;
+- every Work containing the source inserts the new Document immediately after the source, preserving composition order;
+- the command leaves the cursor at the beginning of the new Document.
+
+Ordinary editing still cannot create, delete, or cross a generated Document boundary. v0.1 does not expose a merge operation.
 
 ### 2.5 Duplicate as New
 
@@ -212,6 +219,11 @@ The reference TUI uses:
 - physical Left Alt = LEAP forward.
 
 Physical Right Alt/AltGr is never a LEAP key and remains available for international text entry. Physical Right Control is not a LEAP key.
+
+The reference TUI also uses Right Control as the Carta command modifier:
+
+- `RightCtrl+Z` = Undo;
+- `RightCtrl+R` = Redo.
 
 These are frontend bindings, not archive semantics.
 
