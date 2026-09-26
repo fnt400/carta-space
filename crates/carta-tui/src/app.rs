@@ -1490,28 +1490,18 @@ impl App {
         self.rehighlight_span = None;
         self.cat_erase_forward = true;
 
-        if origin.region == destination.region && origin != destination {
-            let (start, end) = if origin.byte <= destination.byte {
-                (origin, destination)
-            } else {
-                (destination, origin)
-            };
-            self.last_leap_span = Some((start, end));
-            self.status.clear();
+        if origin != destination {
+            self.refresh_cat_span_from_fixed();
+            if self.last_leap_span.is_some() {
+                self.status.clear();
+            }
         } else {
             self.last_leap_span = None;
         }
     }
 
-    pub fn leap_visual_boundary(&mut self, direction: LeapDirection, width: usize) {
+    fn leap_to_cursor(&mut self, direction: LeapDirection, destination: Cursor) {
         let origin = self.editor.cursor();
-        let Some(destination) = self
-            .editor
-            .visual_boundary_cursor(width, matches!(direction, LeapDirection::Forward))
-        else {
-            self.last_leap_span = None;
-            return;
-        };
         let had_highlight = self.editor.cat_highlight().is_some();
         self.editor.set_cursor_preserving_highlight(destination);
 
@@ -1533,12 +1523,42 @@ impl App {
             }
             self.last_leap_span = None;
             self.cat_erase_forward = true;
-        } else if origin != destination {
-            self.last_leap_span = Some((origin, destination));
-            self.status.clear();
         } else {
-            self.last_leap_span = None;
+            self.remember_direct_leap_span(origin, direction);
         }
+    }
+
+    pub fn leap_logical_line(&mut self, direction: LeapDirection) {
+        let Some(destination) = self
+            .editor
+            .logical_line_leap_cursor(matches!(direction, LeapDirection::Forward))
+        else {
+            self.last_leap_span = None;
+            return;
+        };
+        self.leap_to_cursor(direction, destination);
+    }
+
+    pub fn leap_document_boundary(&mut self, direction: LeapDirection) {
+        let Some(destination) = self
+            .editor
+            .document_boundary_cursor(matches!(direction, LeapDirection::Forward))
+        else {
+            self.last_leap_span = None;
+            return;
+        };
+        self.leap_to_cursor(direction, destination);
+    }
+
+    pub fn leap_view_boundary(&mut self, direction: LeapDirection) {
+        let Some(destination) = self
+            .editor
+            .view_boundary_cursor(matches!(direction, LeapDirection::Forward))
+        else {
+            self.last_leap_span = None;
+            return;
+        };
+        self.leap_to_cursor(direction, destination);
     }
 
     pub fn extend_last_leap_highlight(&mut self) -> bool {
