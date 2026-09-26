@@ -394,6 +394,13 @@ fn handle_key(
                 dispatcher.right_control_held = true;
                 return Ok(());
             }
+            KeyCode::Modifier(
+                ModifierKeyCode::LeftShift
+                | ModifierKeyCode::RightShift
+                | ModifierKeyCode::RightAlt,
+            ) => {
+                return Ok(());
+            }
             KeyCode::Modifier(key @ (ModifierKeyCode::LeftControl | ModifierKeyCode::LeftAlt)) => {
                 if dispatcher.active_leap.is_some() {
                     return Ok(());
@@ -1970,20 +1977,100 @@ mod tests {
     }
 
     #[test]
-    fn unrelated_modifier_cancels_pending_leap_without_starting_selection() {
-        let temporary = tempfile::tempdir().unwrap();
-        let archive = Archive::create(temporary.path().join("archive")).unwrap();
-        let mut app = App::open(archive, None, Instant::now()).unwrap();
-        assert!(app.editor.insert("selected"));
+    fn shift_pressed_after_leap_key_remains_part_of_the_leap_pattern() {
+        for (key, modifiers, direction, origin, expected) in [
+            (
+                ModifierKeyCode::LeftAlt,
+                KeyModifiers::ALT,
+                LeapDirection::Forward,
+                0,
+                1,
+            ),
+            (
+                ModifierKeyCode::LeftControl,
+                KeyModifiers::CONTROL,
+                LeapDirection::Backward,
+                3,
+                1,
+            ),
+        ] {
+            let (_temporary, mut app) = app_with_documents(&["a#b"], false);
+            app.editor.set_cursor(Cursor { region: 0, byte: origin }, false);
+            app.cat_navigation();
+            let mut dispatcher = Dispatcher::default();
+
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new(KeyCode::Modifier(key), modifiers),
+                true,
+            )
+            .unwrap();
+            assert!(dispatcher.pending_leap.is_some());
+
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new(
+                    KeyCode::Modifier(ModifierKeyCode::LeftShift),
+                    modifiers | KeyModifiers::SHIFT,
+                ),
+                true,
+            )
+            .unwrap();
+            assert!(dispatcher.pending_leap.is_some());
+
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new(
+                    KeyCode::Char('#'),
+                    modifiers | KeyModifiers::SHIFT,
+                ),
+                true,
+            )
+            .unwrap();
+            assert!(matches!(app.mode, AppMode::Leap { .. }));
+
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new_with_kind(
+                    KeyCode::Modifier(key),
+                    KeyModifiers::SHIFT,
+                    KeyEventKind::Release,
+                ),
+                true,
+            )
+            .unwrap();
+
+            assert_eq!(app.editor.cursor().byte, expected);
+            assert_eq!(app.leap.remembered_query(), Some("#"));
+            assert!(matches!(app.mode, AppMode::Editing));
+            assert_eq!(
+                direction,
+                if key == ModifierKeyCode::LeftAlt {
+                    LeapDirection::Forward
+                } else {
+                    LeapDirection::Backward
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn altgr_pressed_after_leap_key_does_not_cancel_pending_leap() {
+        let (_temporary, mut app) = app_with_documents(&["a@b"], false);
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        app.cat_navigation();
         let mut dispatcher = Dispatcher::default();
 
         handle_key(
             &mut app,
             &mut dispatcher,
             KeyEvent::new(
-                KeyCode::Modifier(ModifierKeyCode::LeftControl),
-                KeyModifiers::CONTROL,
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::ALT,
             ),
             true,
         )
@@ -1992,15 +2079,35 @@ mod tests {
             &mut app,
             &mut dispatcher,
             KeyEvent::new(
-                KeyCode::Modifier(ModifierKeyCode::LeftShift),
-                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+                KeyCode::Modifier(ModifierKeyCode::RightAlt),
+                KeyModifiers::ALT,
             ),
             true,
         )
         .unwrap();
-        assert!(matches!(app.mode, AppMode::Editing));
-        assert!(app.editor.selection().is_none());
-        assert!(dispatcher.pending_leap.is_none());
+        assert!(dispatcher.pending_leap.is_some());
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('@'), KeyModifiers::ALT),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new_with_kind(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
+            ),
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(app.editor.cursor().byte, 1);
+        assert_eq!(app.leap.remembered_query(), Some("@"));
     }
 
     #[test]
@@ -2058,7 +2165,7 @@ mod tests {
     }
 
     #[test]
-    fn cancelled_control_does_not_creep_and_pasted_text_stays_normal_input() {
+    fn shift_modified_pending_control_still_returns_to_normal_input_after_release() {
         let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
         app.start_leap(LeapDirection::Forward, true);
         app.leap_input("beta");
