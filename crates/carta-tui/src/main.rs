@@ -403,7 +403,9 @@ fn handle_key(
     }
 
     if key.modifiers.contains(KeyModifiers::CONTROL)
-        && (!enhanced || dispatcher.right_control_held)
+        && (!enhanced
+            || dispatcher.right_control_held
+            || (dispatcher.pending_leap.is_none() && dispatcher.active_leap.is_none()))
     {
         let editable = matches!(app.mode, AppMode::Editing)
             && matches!(app.view, View::Chronological(_) | View::Work(_));
@@ -1776,17 +1778,13 @@ mod tests {
     }
 
     #[test]
-    fn left_control_enter_can_highlight_the_whole_visual_line() {
-        let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
-        app.editor.set_cursor(
-            Cursor {
-                region: 0,
-                byte: 10,
-            },
-            false,
-        );
+    fn leap_enter_uses_logical_lf_boundaries_not_visual_wrap() {
+        let first = "a".repeat(100);
+        let content = format!("{first}\nsecond");
+        let (_temporary, mut app) = app_with_documents(&[content.as_str()], false);
         let mut dispatcher = Dispatcher::default();
 
+        app.editor.set_cursor(Cursor { region: 0, byte: 90 }, false);
         handle_key(
             &mut app,
             &mut dispatcher,
@@ -1806,37 +1804,8 @@ mod tests {
         .unwrap();
         assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 0 });
 
-        handle_key(
-            &mut app,
-            &mut dispatcher,
-            KeyEvent::new(
-                KeyCode::Modifier(ModifierKeyCode::LeftControl),
-                KeyModifiers::CONTROL,
-            ),
-            true,
-        )
-        .unwrap();
-        handle_key(
-            &mut app,
-            &mut dispatcher,
-            KeyEvent::new(
-                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
-                KeyModifiers::CONTROL | KeyModifiers::ALT,
-            ),
-            true,
-        )
-        .unwrap();
-
-        assert_eq!(app.editor.selected_text().as_deref(), Some("alpha beta"));
-        assert_eq!(dispatcher.clipboard.get_text().unwrap(), "alpha beta");
-    }
-
-    #[test]
-    fn left_alt_enter_can_highlight_the_whole_visual_line() {
-        let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
-        let mut dispatcher = Dispatcher::default();
-
+        app.cat_navigation();
         handle_key(
             &mut app,
             &mut dispatcher,
@@ -1858,9 +1827,20 @@ mod tests {
             app.editor.cursor(),
             Cursor {
                 region: 0,
-                byte: 10
+                byte: 101
             }
         );
+    }
+
+    #[test]
+    fn leap_enter_moves_highlight_between_real_line_starts() {
+        let (_temporary, mut app) = app_with_documents(&["one\ntwo\nthree"], false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 4 }, false);
+        assert!(app.editor.set_cat_highlight(
+            Cursor { region: 0, byte: 4 },
+            Cursor { region: 0, byte: 7 },
+        ));
+        let mut dispatcher = Dispatcher::default();
 
         handle_key(
             &mut app,
@@ -1875,16 +1855,89 @@ mod tests {
         handle_key(
             &mut app,
             &mut dispatcher,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.current_text(), Some("twoone\n\nthree"));
+        assert_eq!(app.editor.selected_text().as_deref(), Some("two"));
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
             KeyEvent::new(
                 KeyCode::Modifier(ModifierKeyCode::LeftAlt),
-                KeyModifiers::CONTROL | KeyModifiers::ALT,
+                KeyModifiers::ALT,
             ),
             true,
         )
         .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.current_text(), Some("one\ntwo\nthree"));
+        assert_eq!(app.editor.selected_text().as_deref(), Some("two"));
+    }
 
-        assert_eq!(app.editor.selected_text().as_deref(), Some("alpha beta"));
-        assert_eq!(dispatcher.clipboard.get_text().unwrap(), "alpha beta");
+    #[test]
+    fn cat_boundary_leaps_target_document_and_view_edges() {
+        let (_temporary, mut app) = app_with_documents(&["abc", "def", "ghi"], true);
+
+        let cases = [
+            (
+                Cursor { region: 1, byte: 1 },
+                ModifierKeyCode::LeftControl,
+                KeyModifiers::CONTROL,
+                KeyCode::Home,
+                Cursor { region: 1, byte: 0 },
+            ),
+            (
+                Cursor { region: 1, byte: 1 },
+                ModifierKeyCode::LeftAlt,
+                KeyModifiers::ALT,
+                KeyCode::End,
+                Cursor { region: 1, byte: 3 },
+            ),
+            (
+                Cursor { region: 1, byte: 1 },
+                ModifierKeyCode::LeftControl,
+                KeyModifiers::CONTROL,
+                KeyCode::PageUp,
+                Cursor { region: 0, byte: 0 },
+            ),
+            (
+                Cursor { region: 1, byte: 1 },
+                ModifierKeyCode::LeftAlt,
+                KeyModifiers::ALT,
+                KeyCode::PageDown,
+                Cursor { region: 2, byte: 3 },
+            ),
+        ];
+
+        for (origin, modifier, modifiers, code, expected) in cases {
+            app.editor.set_cursor(origin, false);
+            app.cat_navigation();
+            let mut dispatcher = Dispatcher::default();
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new(KeyCode::Modifier(modifier), modifiers),
+                true,
+            )
+            .unwrap();
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new(code, modifiers),
+                true,
+            )
+            .unwrap();
+            assert_eq!(app.editor.cursor(), expected);
+        }
     }
 
     #[test]
