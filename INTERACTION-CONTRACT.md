@@ -281,9 +281,6 @@ The v0.1 TUI keeps direct bindings deliberately small:
 - Left Control: LEAP backward;
 - Right Control: LEAP forward;
 - Esc: command palette;
-- Ctrl+Shift+C: Copy;
-- Ctrl+Shift+X: Cut;
-- Ctrl+Shift+V: Paste;
 - Ctrl+Shift+Z: Undo;
 - Ctrl+Shift+Y: Redo;
 - Ctrl+Shift+Left/Right: extend the selection to the previous/next word boundary;
@@ -306,17 +303,9 @@ LEAP is not the primary selection mechanism in v0.1.
 
 ### 6.2 Copy, Cut, Paste
 
-Copy/Cut/Paste use the operating-system clipboard when available.
+v0.1 does not reserve direct Copy, Cut, or Paste bindings. The terminal emulator remains responsible for its normal clipboard chords and inserts pasted text as ordinary literal text.
 
-A frontend MAY provide an internal clipboard only as fallback.
-
-Clipboard payload is plain Unicode/Markdown text, not a Carta-specific serialized object.
-
-A selection may cross Document boundaries for Copy. In that case only visible text is copied; UI separators, UUIDs, and structural metadata are omitted.
-
-Cut, Delete, replacement, and other destructive operations MUST NOT act across Document boundaries.
-
-Paste is literal. Carta does not reinterpret or rewrite pasted Markdown or `carta:` links.
+A future Carta clipboard, if introduced, will use plain Unicode/Markdown text rather than a Carta-specific serialized object. A selection may cross Document boundaries for copying, but destructive editing MUST NOT cross them.
 
 ### 6.3 Undo and Redo
 

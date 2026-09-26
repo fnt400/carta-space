@@ -11,6 +11,7 @@ use crossterm::terminal::{disable_raw_mode, enable_raw_mode, supports_keyboard_e
 
 const ENHANCEMENTS: KeyboardEnhancementFlags = KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
     .union(KeyboardEnhancementFlags::REPORT_EVENT_TYPES)
+    .union(KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS)
     .union(KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES);
 
 struct TerminalGuard {

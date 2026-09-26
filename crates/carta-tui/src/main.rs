@@ -1,6 +1,5 @@
 use carta_core::{Archive, LeapDirection};
 use carta_tui::app::{AppMode, View};
-use carta_tui::clipboard::Clipboard;
 use carta_tui::editor::Cursor;
 use carta_tui::session::{
     load_last_archive, load_session, save_last_archive, save_session, state_root,
@@ -57,6 +56,7 @@ impl TerminalGuard {
             if supports_keyboard_enhancement().unwrap_or(false) {
                 let flags = KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
                     | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
+                    | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
                     | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES;
                 execute!(stdout, PushKeyboardEnhancementFlags(flags))?;
                 enhancements = true;
@@ -164,7 +164,6 @@ fn run() -> Result<(), Box<dyn Error>> {
     if !terminal.enhancements {
         app.status = "Compatibility keyboard mode: use palette LEAP commands".into();
     }
-    let mut clipboard = Clipboard::default();
     let mut dispatcher = Dispatcher::default();
     let mut last_session_save = Instant::now();
 
@@ -172,19 +171,12 @@ fn run() -> Result<(), Box<dyn Error>> {
         terminal.terminal.draw(|frame| draw(frame, &mut app))?;
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
-                if let Err(error) = handle_key(
-                    &mut app,
-                    &mut clipboard,
-                    &mut dispatcher,
-                    key,
-                    terminal.enhancements,
-                ) {
+                if let Err(error) =
+                    handle_key(&mut app, &mut dispatcher, key, terminal.enhancements)
+                {
                     app.status = error.to_string();
                     app.mode = AppMode::Editing;
                     let _ = app.reveal_conflicts();
-                }
-                if app.take_wiped_document().is_some() {
-                    clipboard.clear_internal();
                 }
             }
         }
@@ -207,7 +199,6 @@ struct Dispatcher {
 
 fn handle_key(
     app: &mut App,
-    clipboard: &mut Clipboard,
     dispatcher: &mut Dispatcher,
     key: KeyEvent,
     enhanced: bool,
@@ -285,34 +276,6 @@ fn handle_key(
         .contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT)
     {
         match key.code {
-            KeyCode::Char('c' | 'C') => {
-                dispatcher.pending_control = None;
-                if let Some(text) = app.editor.selected_text() {
-                    clipboard.copy(text);
-                }
-                return Ok(());
-            }
-            KeyCode::Char('x' | 'X') => {
-                dispatcher.pending_control = None;
-                if let Some(text) = app.editor.selected_text() {
-                    if app.editor.delete_selection() {
-                        clipboard.copy(text);
-                        app.edited(Instant::now());
-                    } else {
-                        app.status = "Cut cannot cross a Document boundary".into();
-                    }
-                }
-                return Ok(());
-            }
-            KeyCode::Char('v' | 'V') => {
-                dispatcher.pending_control = None;
-                if !app.editor.insert(&clipboard.paste()) {
-                    app.status = "Paste cannot replace a cross-boundary selection".into();
-                } else {
-                    app.edited(Instant::now());
-                }
-                return Ok(());
-            }
             KeyCode::Char('z' | 'Z') => {
                 dispatcher.pending_control = None;
                 if app.editor.undo() {
@@ -346,6 +309,7 @@ fn handle_key(
     }
 
     if dispatcher.pending_control.is_some() && matches!(key.code, KeyCode::Modifier(_)) {
+        dispatcher.pending_control = None;
         return Ok(());
     }
     if let Some(direction) = dispatcher.pending_control.take() {
@@ -1084,7 +1048,6 @@ mod tests {
     fn dispatch(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
         handle_key(
             app,
-            &mut Clipboard::default(),
             &mut Dispatcher::default(),
             KeyEvent::new(code, modifiers),
             true,
@@ -1163,7 +1126,6 @@ mod tests {
     #[test]
     fn ctrl_shift_arrows_select_by_word_without_starting_leap() {
         let (_temporary, mut app) = app_with_documents(&["alpha beta gamma"], false);
-        let mut clipboard = Clipboard::default();
         let mut dispatcher = Dispatcher {
             pending_control: Some(LeapDirection::Backward),
         };
@@ -1177,7 +1139,6 @@ mod tests {
 
         handle_key(
             &mut app,
-            &mut clipboard,
             &mut dispatcher,
             KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL | KeyModifiers::SHIFT),
             true,
@@ -1254,18 +1215,6 @@ mod tests {
             (KeyCode::Home, KeyModifiers::CONTROL),
             (KeyCode::End, KeyModifiers::CONTROL),
             (
-                KeyCode::Char('c'),
-                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
-            ),
-            (
-                KeyCode::Char('x'),
-                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
-            ),
-            (
-                KeyCode::Char('v'),
-                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
-            ),
-            (
                 KeyCode::Char('z'),
                 KeyModifiers::CONTROL | KeyModifiers::SHIFT,
             ),
@@ -1274,14 +1223,12 @@ mod tests {
                 KeyModifiers::CONTROL | KeyModifiers::SHIFT,
             ),
         ];
-        let mut clipboard = Clipboard::default();
         for (code, modifiers) in chords {
             let mut dispatcher = Dispatcher {
                 pending_control: Some(LeapDirection::Backward),
             };
             handle_key(
                 &mut app,
-                &mut clipboard,
                 &mut dispatcher,
                 KeyEvent::new(code, modifiers),
                 true,
@@ -1294,7 +1241,7 @@ mod tests {
     }
 
     #[test]
-    fn ctrl_shift_chord_does_not_start_leap_or_cancel_selection() {
+    fn ctrl_shift_cancels_pending_leap_without_changing_selection() {
         let temporary = tempfile::tempdir().unwrap();
         let archive = Archive::create(temporary.path().join("archive")).unwrap();
         let mut app = App::open(archive, None, Instant::now()).unwrap();
@@ -1308,12 +1255,10 @@ mod tests {
             true,
         );
         let selection = app.editor.selection();
-        let mut clipboard = Clipboard::default();
         let mut dispatcher = Dispatcher::default();
 
         handle_key(
             &mut app,
-            &mut clipboard,
             &mut dispatcher,
             KeyEvent::new(
                 KeyCode::Modifier(ModifierKeyCode::LeftControl),
@@ -1324,7 +1269,40 @@ mod tests {
         .unwrap();
         handle_key(
             &mut app,
-            &mut clipboard,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftShift),
+                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+            ),
+            true,
+        )
+        .unwrap();
+        assert!(matches!(app.mode, AppMode::Editing));
+        assert_eq!(app.editor.selection(), selection);
+        assert!(dispatcher.pending_control.is_none());
+    }
+
+    #[test]
+    fn cancelled_control_does_not_leap_again_and_pasted_text_stays_normal_input() {
+        let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
+        app.start_leap(LeapDirection::Forward, true);
+        app.leap_input("beta");
+        app.end_leap();
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
             &mut dispatcher,
             KeyEvent::new(
                 KeyCode::Modifier(ModifierKeyCode::LeftShift),
@@ -1335,19 +1313,104 @@ mod tests {
         .unwrap();
         handle_key(
             &mut app,
-            &mut clipboard,
             &mut dispatcher,
-            KeyEvent::new(
-                KeyCode::Char('c'),
-                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+            KeyEvent::new_with_kind(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
             ),
             true,
         )
         .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('p'), KeyModifiers::NONE),
+            true,
+        )
+        .unwrap();
 
+        assert_eq!(app.editor.regions()[0].text, "palpha beta");
         assert!(matches!(app.mode, AppMode::Editing));
-        assert_eq!(app.editor.selection(), selection);
-        assert!(dispatcher.pending_control.is_none());
+    }
+
+    #[test]
+    fn left_and_right_control_keep_leap_and_leap_again_behavior() {
+        for (control, direction) in [
+            (ModifierKeyCode::LeftControl, LeapDirection::Backward),
+            (ModifierKeyCode::RightControl, LeapDirection::Forward),
+        ] {
+            let (_temporary, mut app) = app_with_documents(&["alpha beta alpha"], false);
+            app.editor.set_cursor(Cursor { region: 0, byte: 6 }, false);
+            let mut dispatcher = Dispatcher::default();
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new(KeyCode::Modifier(control), KeyModifiers::CONTROL),
+                true,
+            )
+            .unwrap();
+            for c in "alpha".chars() {
+                handle_key(
+                    &mut app,
+                    &mut dispatcher,
+                    KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL),
+                    true,
+                )
+                .unwrap();
+            }
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new_with_kind(
+                    KeyCode::Modifier(control),
+                    KeyModifiers::NONE,
+                    KeyEventKind::Release,
+                ),
+                true,
+            )
+            .unwrap();
+
+            assert_eq!(app.leap.remembered_query(), Some("alpha"));
+            assert!(matches!(app.mode, AppMode::Editing));
+            let first_match = match direction {
+                LeapDirection::Backward => 0,
+                LeapDirection::Forward => 11,
+            };
+            assert_eq!(app.editor.cursor().byte, first_match);
+
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new(KeyCode::Modifier(control), KeyModifiers::CONTROL),
+                true,
+            )
+            .unwrap();
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new_with_kind(
+                    KeyCode::Modifier(control),
+                    KeyModifiers::NONE,
+                    KeyEventKind::Release,
+                ),
+                true,
+            )
+            .unwrap();
+
+            assert!(matches!(app.mode, AppMode::Editing));
+            assert_eq!(app.leap.remembered_query(), Some("alpha"));
+            assert_ne!(app.editor.cursor().byte, first_match);
+        }
+    }
+
+    #[test]
+    fn layout_resolved_text_is_inserted_without_key_mapping() {
+        let (_temporary, mut app) = app_with_documents(&[""], false);
+        dispatch(&mut app, KeyCode::Char('A'), KeyModifiers::NONE);
+        dispatch(&mut app, KeyCode::Char('!'), KeyModifiers::NONE);
+        dispatch(&mut app, KeyCode::Char('É'), KeyModifiers::NONE);
+        assert_eq!(app.editor.regions()[0].text, "A!É");
     }
 
     #[test]

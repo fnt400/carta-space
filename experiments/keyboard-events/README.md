@@ -7,11 +7,8 @@ It requests these kitty keyboard protocol enhancements when the terminal reports
 
 - disambiguated escape codes;
 - press, repeat, and release event types;
+- alternate keycodes, so Crossterm reports the layout-produced shifted character;
 - escape-code reporting for every key, required for releases of ordinary text keys.
-
-`REPORT_ALTERNATE_KEYS` is deliberately not requested: Crossterm may use the alternate keycode
-instead of the resulting character, which would make the AltGr and international text test less
-representative.
 
 ## Run
 

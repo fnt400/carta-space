@@ -1,5 +1,4 @@
 pub mod app;
-pub mod clipboard;
 pub mod editor;
 pub mod palette;
 pub mod session;

@@ -287,7 +287,6 @@ pub struct App {
     forward: Vec<Location>,
     provisional: Option<DocumentId>,
     pending_wipe: Option<carta_core::WipePlan>,
-    wiped_document: Option<DocumentId>,
     work_positions: BTreeMap<WorkId, Position>,
     work_mru: Vec<WorkId>,
 }
@@ -378,7 +377,6 @@ impl App {
             forward: Vec::new(),
             provisional,
             pending_wipe: None,
-            wiped_document: None,
             work_positions: session.map_or_else(BTreeMap::new, |s| s.work_positions.clone()),
             work_mru: session.map_or_else(Vec::new, |s| s.work_mru.clone()),
         })
@@ -1017,14 +1015,7 @@ impl App {
         Ok(())
     }
 
-    pub fn take_wiped_document(&mut self) -> Option<DocumentId> {
-        self.wiped_document.take()
-    }
-
     fn finish_wipe(&mut self, document: DocumentId) -> AppResult {
-        // Signal clipboard cleanup before any fallible refresh: core Wipe has
-        // already completed and no Carta-managed in-memory copy may survive.
-        self.wiped_document = Some(document);
         self.editor = CompositeEditor::new(Vec::new(), Cursor { region: 0, byte: 0 });
         self.search_results.clear();
         self.history.clear();
@@ -2490,8 +2481,6 @@ mod tests {
         assert!(app.back.is_empty());
         assert!(app.forward.is_empty());
         assert!(matches!(app.view, View::Trash { selected: 0 }));
-        assert_eq!(app.take_wiped_document(), Some(target));
-        assert_eq!(app.take_wiped_document(), None);
     }
 
     #[test]
