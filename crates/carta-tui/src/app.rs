@@ -1126,6 +1126,10 @@ impl App {
         self.forward.clear();
         self.leap = LeapRuntime::default();
         self.last_leap_span = None;
+        self.cat_span_fixed = None;
+        self.rehighlight_span = None;
+        self.typed_span_start = None;
+        self.cat_erase_forward = true;
         self.pending_wipe = None;
         self.provisional = self.provisional.filter(|id| *id != document);
         self.trash = Some(self.archive.trash_inventory()?);
@@ -2265,6 +2269,10 @@ impl App {
         let (editor, scroll) = load_editor(&self.archive, &self.view, position.as_ref())?;
         self.editor = editor;
         self.last_leap_span = None;
+        self.cat_span_fixed = None;
+        self.rehighlight_span = None;
+        self.typed_span_start = None;
+        self.cat_erase_forward = true;
         self.scroll = scroll;
         Ok(())
     }
