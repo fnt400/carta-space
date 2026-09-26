@@ -378,25 +378,24 @@ fn handle_key(
             let handled = match (pending.direction, key.code) {
                 (LeapDirection::Backward, KeyCode::Enter)
                 | (LeapDirection::Forward, KeyCode::Enter) => {
-                    dispatcher.pending_leap = None;
                     app.leap_logical_line(pending.direction);
                     true
                 }
                 (LeapDirection::Backward, KeyCode::Home)
                 | (LeapDirection::Forward, KeyCode::End) => {
-                    dispatcher.pending_leap = None;
                     app.leap_document_boundary(pending.direction);
                     true
                 }
                 (LeapDirection::Backward, KeyCode::PageUp)
                 | (LeapDirection::Forward, KeyCode::PageDown) => {
-                    dispatcher.pending_leap = None;
                     app.leap_view_boundary(pending.direction);
                     true
                 }
                 _ => false,
             };
             if handled {
+                dispatcher.pending_leap = None;
+                dispatcher.active_leap = Some(pending);
                 return Ok(());
             }
         }
@@ -450,10 +449,12 @@ fn handle_key(
         match key.code {
             KeyCode::Modifier(ModifierKeyCode::RightControl) => {
                 dispatcher.right_control_held = true;
-                if dispatcher.active_leap.is_some()
-                    && matches!(app.mode, AppMode::Leap { palette: false, .. })
-                {
-                    app.leap_again_active();
+                if let Some(active) = dispatcher.active_leap {
+                    if matches!(app.mode, AppMode::Leap { palette: false, .. }) {
+                        app.leap_again_active();
+                    } else {
+                        app.leap_again_active_structural(active.direction);
+                    }
                 }
                 return Ok(());
             }
