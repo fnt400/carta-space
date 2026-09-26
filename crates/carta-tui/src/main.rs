@@ -384,8 +384,9 @@ fn handle_key(
                         if app.extend_last_leap_highlight() {
                             if let Some(text) = app.editor.selected_text() {
                                 if let Err(error) = dispatcher.clipboard.set_text(text) {
-                                    app.status =
-                                        format!("Cat highlight active; clipboard unavailable: {error}");
+                                    app.status = format!(
+                                        "Cat highlight active; clipboard unavailable: {error}"
+                                    );
                                 }
                             }
                         }
