@@ -145,7 +145,9 @@ impl CompositeEditor {
             return self.insert("\n");
         }
         let text = &self.regions[self.cursor.region].text;
-        let line_start = text[..self.cursor.byte].rfind('\n').map_or(0, |index| index + 1);
+        let line_start = text[..self.cursor.byte]
+            .rfind('\n')
+            .map_or(0, |index| index + 1);
         let before_cursor = &text[line_start..self.cursor.byte];
         let continuation = list_continuation_prefix(before_cursor);
         let mut insertion = String::from("\n");
@@ -743,7 +745,6 @@ mod tests {
         e.move_word(true, true);
         assert_eq!(e.selected_text().as_deref(), Some("alpha, beta "));
     }
-
 
     #[test]
     fn enter_continues_unordered_lists_without_changing_other_lines() {

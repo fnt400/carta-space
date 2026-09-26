@@ -2709,7 +2709,6 @@ mod tests {
         assert_eq!(app.editor.current_document(), Some(document));
     }
 
-
     #[test]
     fn palette_inserts_current_local_date_and_time() {
         let temporary = tempfile::tempdir().unwrap();
