@@ -3,6 +3,7 @@ use std::ops::Range;
 
 use carta_format::{DocumentId, Timestamp};
 use unicode_casefold::UnicodeCaseFold;
+use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
 
 use crate::MarkdownLink;
 
@@ -283,7 +284,6 @@ fn leap_match(
     direction: LeapDirection,
     include_origin: bool,
 ) -> Option<LeapMatch> {
-    let query = folded(query);
     if query.is_empty() || origin.region >= regions.len() {
         return None;
     }
@@ -300,7 +300,7 @@ fn leap_match(
                 } else {
                     0
                 };
-                if let Some(range) = all_matches(region.text, &query).into_iter().find(|range| {
+                if let Some(range) = leap_matches(region.text, query).into_iter().find(|range| {
                     range.start >= minimum
                         && (include_origin
                             || index != origin.region
@@ -310,7 +310,7 @@ fn leap_match(
                 }
             }
             for (index, region) in regions.iter().enumerate().take(origin.region + 1) {
-                if let Some(range) = all_matches(region.text, &query).into_iter().find(|range| {
+                if let Some(range) = leap_matches(region.text, query).into_iter().find(|range| {
                     index < origin.region
                         || range.start < origin.byte_offset
                         || (!include_origin && range.start == origin.byte_offset)
@@ -326,7 +326,7 @@ fn leap_match(
                 } else {
                     regions[index].text.len()
                 };
-                if let Some(range) = all_matches(regions[index].text, &query)
+                if let Some(range) = leap_matches(regions[index].text, query)
                     .into_iter()
                     .rev()
                     .find(|range| range.start < maximum)
@@ -335,7 +335,7 @@ fn leap_match(
                 }
             }
             for index in (origin.region..regions.len()).rev() {
-                if let Some(range) = all_matches(regions[index].text, &query)
+                if let Some(range) = leap_matches(regions[index].text, query)
                     .into_iter()
                     .rev()
                     .find(|range| index > origin.region || range.start >= origin.byte_offset)
@@ -360,6 +360,63 @@ fn make_leap_match(
         range,
         wrapped,
     }
+}
+
+fn leap_matches(text: &str, query: &str) -> Vec<Range<usize>> {
+    let pattern: Vec<char> = query.chars().collect();
+    if pattern.is_empty() {
+        return Vec::new();
+    }
+
+    let starts: Vec<(usize, char)> = text.char_indices().collect();
+    let mut matches = Vec::new();
+    for start_index in 0..starts.len() {
+        if start_index + pattern.len() > starts.len() {
+            break;
+        }
+        if pattern
+            .iter()
+            .zip(starts[start_index..].iter().map(|(_, character)| character))
+            .all(|(pattern, text)| cat_leap_char_matches(*pattern, *text))
+        {
+            let start = starts[start_index].0;
+            let end_index = start_index + pattern.len();
+            let end = starts
+                .get(end_index)
+                .map_or(text.len(), |(byte, _)| *byte);
+            matches.push(start..end);
+        }
+    }
+    matches
+}
+
+fn cat_leap_char_matches(pattern: char, text: char) -> bool {
+    let (pattern_base, pattern_marks) = decomposed_char(pattern);
+    let (text_base, text_marks) = decomposed_char(text);
+
+    if !pattern_marks.is_empty() && pattern_marks != text_marks {
+        return false;
+    }
+
+    if pattern.is_uppercase() {
+        pattern_base == text_base && text.is_uppercase()
+    } else {
+        folded(&pattern_base.to_string()) == folded(&text_base.to_string())
+    }
+}
+
+fn decomposed_char(character: char) -> (char, String) {
+    let decomposed: Vec<char> = character.to_string().nfd().collect();
+    let base = decomposed
+        .iter()
+        .copied()
+        .find(|character| !is_combining_mark(*character))
+        .unwrap_or(character);
+    let marks = decomposed
+        .into_iter()
+        .filter(|character| is_combining_mark(*character))
+        .collect();
+    (base, marks)
 }
 
 fn all_matches(text: &str, folded_query: &str) -> Vec<Range<usize>> {
@@ -401,4 +458,22 @@ fn folded_with_boundaries(value: &str) -> (String, BTreeMap<usize, usize>) {
         boundaries.insert(output.len(), end);
     }
     (output, boundaries)
+}
+
+
+#[cfg(test)]
+mod cat_leap_tests {
+    use super::*;
+
+    #[test]
+    fn lowercase_leap_pattern_matches_both_cases_but_uppercase_is_strict() {
+        assert_eq!(leap_matches("me Me mE ME", "me"), vec![0..2, 3..5, 6..8, 9..11]);
+        assert_eq!(leap_matches("a A á Á", "A"), vec![2..3, 7..9]);
+    }
+
+    #[test]
+    fn plain_leap_character_matches_accented_text() {
+        assert_eq!(leap_matches("a á A Á", "a"), vec![0..1, 2..4, 5..6, 7..9]);
+        assert_eq!(leap_matches("a á A Á", "á"), vec![2..4, 7..9]);
+    }
 }
