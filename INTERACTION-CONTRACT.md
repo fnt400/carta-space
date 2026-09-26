@@ -235,6 +235,7 @@ It does not expose a runtime scope selector. Whole-Archive search is a separate 
 LEAP is momentary/quasimodal and incremental:
 
 - while a LEAP key is held, typed characters extend the query;
+- character-producing modifiers such as Shift and Right Alt/AltGr may be pressed either before or after the LEAP key; they do not cancel a pending LEAP;
 - Backspace shortens the query;
 - lowercase pattern characters match both lowercase and uppercase text;
 - uppercase pattern characters match uppercase text only;
