@@ -299,7 +299,11 @@ fn handle_key(
         return Ok(());
     }
 
-    if dispatcher.right_control_held && enhanced && key.kind == KeyEventKind::Press {
+    if dispatcher.right_control_held
+        && dispatcher.active_leap.is_none()
+        && enhanced
+        && key.kind == KeyEventKind::Press
+    {
         if let KeyCode::Modifier(key @ (ModifierKeyCode::LeftControl | ModifierKeyCode::LeftAlt)) =
             key.code
         {
@@ -2241,6 +2245,59 @@ mod tests {
 
         assert_eq!(app.editor.regions()[0].text, "palpha beta");
         assert!(matches!(app.mode, AppMode::Editing));
+    }
+
+    #[test]
+    fn opposite_leap_can_highlight_while_use_front_is_still_held() {
+        let (_temporary, mut app) = app_with_documents(&["a x b x c"], false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        app.cat_navigation();
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('x'), KeyModifiers::ALT),
+            true,
+        )
+        .unwrap();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL | KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.cursor().byte, 6);
+        assert!(dispatcher.right_control_held);
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::CONTROL | KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+
+        assert!(matches!(app.mode, AppMode::Editing));
+        assert_eq!(app.editor.selected_text().as_deref(), Some("a x b x"));
     }
 
     #[test]
