@@ -1480,19 +1480,19 @@ impl App {
         let session = session.clone();
         let palette = *palette;
         let query_empty = session.query().is_empty();
-        let direction = session.direction();
+        let matched = session.current_match().is_some();
         let destination = self.editor.cursor();
         let had_highlight = self.editor.cat_highlight().is_some();
 
-        if query_empty {
-            if !palette {
-                self.cat_tap_leap(direction);
-            }
-        } else {
+        if !query_empty {
             self.leap.remember(&session);
             self.typed_span_start = None;
             self.rehighlight_span = None;
-            if had_highlight && !palette {
+            if !matched {
+                self.last_leap_span = None;
+                self.cat_span_fixed = None;
+                self.cat_erase_forward = true;
+            } else if had_highlight && !palette {
                 let previous_highlight = self.editor.cat_highlight();
                 if self.editor.move_cat_highlight_to(destination) {
                     self.edited(Instant::now());
@@ -1507,11 +1507,11 @@ impl App {
                     }
                 }
                 self.last_leap_span = None;
+                self.cat_erase_forward = true;
             } else {
                 self.cat_erase_forward = true;
                 self.refresh_cat_span_from_fixed();
             }
-            self.cat_erase_forward = true;
         }
         self.mode = AppMode::Editing;
     }
@@ -3329,6 +3329,44 @@ mod tests {
         assert_eq!(app.editor.cursor().byte, 2);
         assert!(app.extend_last_leap_highlight());
         assert_eq!(app.editor.selected_text().as_deref(), Some("abc"));
+    }
+
+    #[test]
+    fn erased_leap_pattern_returns_to_origin_without_creeping() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        assert!(app.editor.insert("abc abc"));
+        app.editor.set_cursor(Cursor { region: 0, byte: 1 }, false);
+        app.cat_navigation();
+
+        app.start_leap(LeapDirection::Forward, false);
+        app.leap_input("a");
+        app.leap_backspace();
+        assert_eq!(app.editor.cursor().byte, 1);
+        app.end_leap();
+
+        assert_eq!(app.editor.cursor().byte, 1);
+        assert!(app.last_leap_span.is_none());
+    }
+
+    #[test]
+    fn failed_leap_rebounds_without_creating_an_extended_span() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        assert!(app.editor.insert("abcdef"));
+        app.editor.set_cursor(Cursor { region: 0, byte: 2 }, false);
+        app.cat_navigation();
+
+        app.start_leap(LeapDirection::Forward, false);
+        app.leap_input("zzz");
+        assert_eq!(app.editor.cursor().byte, 2);
+        app.end_leap();
+
+        assert_eq!(app.editor.cursor().byte, 2);
+        assert!(app.last_leap_span.is_none());
+        assert!(app.cat_span_fixed.is_none());
     }
 
     #[test]
