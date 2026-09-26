@@ -1969,7 +1969,13 @@ mod tests {
                 true,
             )
             .unwrap();
-            assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: expected });
+            assert_eq!(
+                app.editor.cursor(),
+                Cursor {
+                    region: 0,
+                    byte: expected
+                }
+            );
             handle_key(
                 &mut app,
                 &mut dispatcher,

@@ -1619,9 +1619,7 @@ impl App {
         repeating: bool,
         preserve_anchor: bool,
     ) -> bool {
-        let Some(destination) =
-            self.structural_leap_destination(kind, direction, repeating)
-        else {
+        let Some(destination) = self.structural_leap_destination(kind, direction, repeating) else {
             self.last_leap_span = None;
             return false;
         };
@@ -1630,32 +1628,17 @@ impl App {
 
     pub fn leap_logical_line(&mut self, direction: LeapDirection) {
         self.remember_structural_leap(StructuralLeap::LogicalLine);
-        self.perform_structural_leap(
-            StructuralLeap::LogicalLine,
-            direction,
-            false,
-            false,
-        );
+        self.perform_structural_leap(StructuralLeap::LogicalLine, direction, false, false);
     }
 
     pub fn leap_document_boundary(&mut self, direction: LeapDirection) {
         self.remember_structural_leap(StructuralLeap::DocumentBoundary);
-        self.perform_structural_leap(
-            StructuralLeap::DocumentBoundary,
-            direction,
-            false,
-            false,
-        );
+        self.perform_structural_leap(StructuralLeap::DocumentBoundary, direction, false, false);
     }
 
     pub fn leap_view_boundary(&mut self, direction: LeapDirection) {
         self.remember_structural_leap(StructuralLeap::ViewBoundary);
-        self.perform_structural_leap(
-            StructuralLeap::ViewBoundary,
-            direction,
-            false,
-            false,
-        );
+        self.perform_structural_leap(StructuralLeap::ViewBoundary, direction, false, false);
     }
 
     pub fn leap_again_active_structural(&mut self, direction: LeapDirection) -> bool {
