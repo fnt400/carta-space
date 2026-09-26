@@ -1720,6 +1720,18 @@ mod tests {
     }
 
     #[test]
+    fn displayed_dates_use_the_system_local_timezone() {
+        use std::str::FromStr;
+
+        let timestamp =
+            carta_core::Timestamp::from_str("2026-01-01T00:30:00+14:00").unwrap();
+        let expected = timestamp.as_datetime().with_timezone(&Local);
+
+        assert_eq!(date_only(timestamp), expected.format("%Y-%m-%d").to_string());
+        assert_eq!(local_timestamp(timestamp), expected.to_rfc3339());
+    }
+
+    #[test]
     fn work_status_uses_persisted_color_with_contrasting_text() {
         let (_temporary, mut app) = app_with_documents(&["text"], true);
         let View::Work(work) = &app.view else {
