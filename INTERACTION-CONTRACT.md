@@ -164,7 +164,7 @@ Each Work remembers its last local cursor/scroll position when possible.
 
 ### 3.5 Document boundaries
 
-In multi-Document editable Views, boundaries are shown as a simple continuous separator line with no embedded title or metadata.
+In multi-Document editable Views, boundaries are shown as one generated blank line, a simple continuous separator line, and one generated blank line. The basic Work View boundary contains no embedded metadata; the Chronological View may add derived context as specified separately.
 
 The separator is generated UI:
 
@@ -200,14 +200,16 @@ UUIDs, filesystem paths, Git state, and similar implementation details do not be
 
 ### 4.1 Bindings
 
-The reference TUI initially uses:
+The reference TUI uses:
 
 - physical Left Control = LEAP backward;
-- physical Right Control = LEAP forward.
+- physical Left Alt = LEAP forward.
+
+Physical Right Alt/AltGr is never a LEAP key and remains available for international text entry. Physical Right Control is not a LEAP key.
 
 These are frontend bindings, not archive semantics.
 
-If the terminal cannot distinguish the two physical Control keys and their press/release events, the TUI remains usable in a degraded compatibility mode. It MUST NOT substitute Alt-based bindings or other bindings that interfere with AltGr or international text entry. The command palette instead exposes:
+If the terminal cannot distinguish the required physical modifier keys and their press/release events, the TUI remains usable in a degraded compatibility mode. Left Alt is used only when it is reported distinctly from Right Alt/AltGr; Carta MUST NOT treat Right Alt/AltGr as LEAP. The command palette instead exposes:
 
 - `LEAP Forward…`;
 - `LEAP Backward…`;
@@ -232,7 +234,7 @@ LEAP is momentary/quasimodal and incremental:
 - the result updates immediately;
 - search wraps circularly within the current View;
 - wrap SHOULD receive subtle feedback;
-- releasing the LEAP key ends the operation and leaves the cursor at the match;
+- releasing the LEAP key ends the operation; backward LEAP leaves the cursor at the start of the match, while forward LEAP leaves it immediately after the match;
 - if no match exists, Carta does not leave the original position;
 - the active query may be shown transiently and disappears when LEAP ends.
 
@@ -244,7 +246,7 @@ Carta remembers the last LEAP query for the session.
 
 A tap of Left Control with no new query performs `Leap Again Backward`.
 
-A tap of Right Control with no new query performs `Leap Again Forward`.
+A tap of Left Alt with no new query performs `Leap Again Forward`.
 
 The remembered query is session-global: after changing Views, Leap Again searches the new current View using the same query.
 
@@ -281,7 +283,9 @@ Editable Views expose `Insert Current Date and Time`, which inserts the current 
 The v0.1 TUI keeps direct bindings deliberately small:
 
 - Left Control: LEAP backward;
-- Right Control: LEAP forward;
+- Left Alt: LEAP forward;
+- Left Control+Enter: beginning of the current visual line;
+- Left Alt+Enter: end of the current visual line;
 - Esc: command palette;
 - Ctrl+Shift+Left/Right: extend the selection to the previous/next word boundary;
 - Ctrl+PageUp/PageDown: move to the previous/next Document in the current View, without wrapping;
@@ -327,7 +331,7 @@ Future frontends may render headings, emphasis, links, or other syntax more rich
 
 ### 6.5 Wrapping and indentation
 
-Soft wrap is visual only. Carta does not automatically hard-wrap authored lines.
+Soft wrap is visual only. Carta does not automatically hard-wrap authored lines. In editable Chronological and Work Views, the writing surface is centered and at most 80 terminal columns wide, or the available width when the terminal is narrower. Cursor movement and wrapping use that same visual width.
 
 `Tab` inserts four spaces.
 

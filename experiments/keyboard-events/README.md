@@ -29,13 +29,17 @@ RAII guard on normal exit, I/O errors, and unwinding panics. Uncatchable termina
 A fully useful result should contain separate lines resembling:
 
 ```text
-KEY kind=Press   code=Modifier(LeftControl)  modifiers=KeyModifiers(CONTROL)
-KEY kind=Release code=Modifier(LeftControl)  modifiers=KeyModifiers(0x0)
+KEY kind=Press   code=Modifier(LeftControl) modifiers=KeyModifiers(CONTROL)
+KEY kind=Release code=Modifier(LeftControl) modifiers=KeyModifiers(0x0)
+KEY kind=Press   code=Modifier(LeftAlt)     modifiers=KeyModifiers(ALT)
+KEY kind=Release code=Modifier(LeftAlt)     modifiers=KeyModifiers(0x0)
+KEY kind=Press   code=Modifier(RightAlt)    modifiers=KeyModifiers(ALT)
 KEY kind=Press   code=Modifier(RightControl) modifiers=KeyModifiers(CONTROL)
-KEY kind=Release code=Modifier(RightControl) modifiers=KeyModifiers(0x0)
 ```
 
-The exact modifier value on a modifier's own release can vary. The important observations are the
-`LeftControl`/`RightControl` code and separate `Press`/`Release` kinds. If startup says that enhanced
-reporting is unsupported, or every event is only `Press`, that terminal path does not provide the
-required fidelity through Crossterm.
+The exact modifier value on a modifier's own release can vary. The important observations are distinct
+`LeftControl`, `LeftAlt`, `RightAlt`, and `RightControl` codes plus separate `Press`/`Release` kinds.
+Carta uses `LeftControl` for LEAP backward and `LeftAlt` for LEAP forward; `RightAlt` must remain
+available for AltGr/international input. Also test Shift, an ordinary character, Shift+character, and
+RightAlt/AltGr+character. If startup says enhanced reporting is unsupported, or every event is only
+`Press`, that terminal path does not provide the required fidelity through Crossterm.

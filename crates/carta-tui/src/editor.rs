@@ -456,8 +456,12 @@ impl CompositeEditor {
     }
 
     pub fn page_visual(&mut self, down: bool, lines: usize, width: usize, selecting: bool) {
-        for _ in 0..lines.max(1) {
+        let mut remaining = lines.max(1);
+        while remaining > 0 {
+            let before = self.cursor.region;
             self.move_visual(down, width, selecting);
+            remaining =
+                remaining.saturating_sub(if self.cursor.region != before { 4 } else { 1 });
         }
     }
 
@@ -631,30 +635,72 @@ fn byte_at_column(text: &str, base: usize, column: usize) -> usize {
         .map_or(base + text.len(), |(i, _)| base + i)
 }
 
-fn visual_ranges(text: &str, width: usize) -> Vec<(usize, usize)> {
+pub fn visual_ranges(text: &str, width: usize) -> Vec<(usize, usize)> {
+    let width = width.max(1);
     if text.is_empty() {
         return vec![(0, 0)];
     }
+
     let mut ranges = Vec::new();
-    let mut start = 0;
-    let mut used = 0;
-    for (byte, character) in text.char_indices() {
-        if character == '\n' {
-            ranges.push((start, byte));
-            start = byte + 1;
-            used = 0;
-            continue;
+    let mut logical_start = 0;
+    loop {
+        let logical_end = text[logical_start..]
+            .find('\n')
+            .map_or(text.len(), |offset| logical_start + offset);
+        wrap_logical_line(text, logical_start, logical_end, width, &mut ranges);
+        if logical_end == text.len() {
+            break;
         }
-        let character_width = character.width().unwrap_or(0);
-        if used > 0 && used + character_width > width {
-            ranges.push((start, byte));
-            start = byte;
-            used = 0;
+        logical_start = logical_end + 1;
+        if logical_start == text.len() {
+            ranges.push((logical_start, logical_start));
+            break;
         }
-        used += character_width;
     }
-    ranges.push((start, text.len()));
     ranges
+}
+
+fn wrap_logical_line(
+    text: &str,
+    line_start: usize,
+    line_end: usize,
+    width: usize,
+    ranges: &mut Vec<(usize, usize)>,
+) {
+    if line_start == line_end {
+        ranges.push((line_start, line_end));
+        return;
+    }
+
+    let mut start = line_start;
+    while start < line_end {
+        let mut used = 0;
+        let mut last_break = None;
+        let mut overflow = None;
+
+        for (relative, character) in text[start..line_end].char_indices() {
+            let byte = start + relative;
+            let character_width = character.width().unwrap_or(0);
+            if used > 0 && used + character_width > width {
+                overflow = Some(byte);
+                break;
+            }
+            used += character_width;
+            if character.is_whitespace() {
+                last_break = Some(byte + character.len_utf8());
+            }
+        }
+
+        let Some(overflow_byte) = overflow else {
+            ranges.push((start, line_end));
+            break;
+        };
+        let end = last_break
+            .filter(|break_byte| *break_byte > start)
+            .unwrap_or(overflow_byte);
+        ranges.push((start, end));
+        start = end;
+    }
 }
 
 fn byte_at_visual_column(text: &str, range: (usize, usize), column: usize) -> usize {
@@ -801,6 +847,24 @@ mod tests {
         );
         assert!(paren.insert_newline_with_list_continuation());
         assert_eq!(paren.regions()[0].text, "3) item\n4) ");
+    }
+
+    #[test]
+    fn visual_wrap_prefers_word_boundaries_and_covers_source_bytes() {
+        let text = "alpha beta gamma";
+        let ranges = visual_ranges(text, 10);
+        assert_eq!(ranges, vec![(0, 6), (6, 11), (11, 16)]);
+        assert_eq!(
+            ranges
+                .iter()
+                .map(|(start, end)| &text[*start..*end])
+                .collect::<String>(),
+            text
+        );
+
+        let long = "abcdefghijk";
+        assert_eq!(visual_ranges(long, 5), vec![(0, 5), (5, 10), (10, 11)]);
+        assert_eq!(visual_ranges("a\n", 80), vec![(0, 1), (2, 2)]);
     }
 
     #[test]

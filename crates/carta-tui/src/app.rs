@@ -1090,7 +1090,7 @@ impl App {
             .collect();
         if let AppMode::Leap { session, .. } = &mut self.mode {
             session.push_str(value, &regions);
-            let p = session.cursor();
+            let p = leap_cursor_position(session);
             self.editor.set_cursor(
                 Cursor {
                     region: p.region(),
@@ -1112,7 +1112,7 @@ impl App {
             .collect();
         if let AppMode::Leap { session, .. } = &mut self.mode {
             session.backspace(&regions);
-            let p = session.cursor();
+            let p = leap_cursor_position(session);
             self.editor.set_cursor(
                 Cursor {
                     region: p.region(),
@@ -1162,11 +1162,16 @@ impl App {
             LeapPosition::new(self.editor.cursor().region, self.editor.cursor().byte),
             &regions,
         ) {
+            let range = found.range();
             let p = found.position();
+            let byte = match direction {
+                LeapDirection::Forward => range.end,
+                LeapDirection::Backward => range.start,
+            };
             self.editor.set_cursor(
                 Cursor {
                     region: p.region(),
-                    byte: p.byte_offset(),
+                    byte,
                 },
                 false,
             );
@@ -1969,6 +1974,20 @@ fn search_result_view_text(result: &ResultRow) -> String {
         result.context
     )
 }
+fn leap_cursor_position(session: &LeapSession) -> LeapPosition {
+    let Some(found) = session.current_match() else {
+        return session.origin();
+    };
+    let range = found.range();
+    LeapPosition::new(
+        found.position().region(),
+        match session.direction() {
+            LeapDirection::Forward => range.end,
+            LeapDirection::Backward => range.start,
+        },
+    )
+}
+
 fn current_volume() -> Volume {
     let now = Local::now();
     Volume::new(now.year() as u16, now.month() as u8).unwrap()
@@ -2603,6 +2622,52 @@ mod tests {
         app.leap_again(LeapDirection::Forward);
         assert_eq!(app.editor.cursor().region, 1);
         assert!(matches!(app.view, View::Search { selected: 1, .. }));
+    }
+
+    #[test]
+    fn leap_cursor_is_directional_without_changing_core_match_semantics() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        assert!(app.editor.insert("alpha beta alpha"));
+        app.editor.set_cursor(Cursor { region: 0, byte: 6 }, false);
+
+        app.start_leap(LeapDirection::Forward, true);
+        app.leap_input("alpha");
+        assert_eq!(app.editor.cursor().byte, 16);
+        app.end_leap();
+
+        app.editor.set_cursor(Cursor { region: 0, byte: 6 }, false);
+        app.start_leap(LeapDirection::Backward, true);
+        app.leap_input("alpha");
+        assert_eq!(app.editor.cursor().byte, 0);
+        app.end_leap();
+    }
+
+    #[test]
+    fn directional_leap_again_advances_from_directional_cursor() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        assert!(app.editor.insert("one one one"));
+
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        app.start_leap(LeapDirection::Forward, true);
+        app.leap_input("one");
+        assert_eq!(app.editor.cursor().byte, 3);
+        app.end_leap();
+        app.leap_again(LeapDirection::Forward);
+        assert_eq!(app.editor.cursor().byte, 7);
+        app.leap_again(LeapDirection::Forward);
+        assert_eq!(app.editor.cursor().byte, 11);
+
+        app.editor.set_cursor(Cursor { region: 0, byte: 11 }, false);
+        app.start_leap(LeapDirection::Backward, true);
+        app.leap_input("one");
+        assert_eq!(app.editor.cursor().byte, 8);
+        app.end_leap();
+        app.leap_again(LeapDirection::Backward);
+        assert_eq!(app.editor.cursor().byte, 4);
     }
 
     #[test]

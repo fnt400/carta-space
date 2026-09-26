@@ -96,8 +96,12 @@ fn run() -> io::Result<()> {
         terminal.line("enhanced keyboard reporting: NOT SUPPORTED; using legacy events")?;
     }
 
-    terminal
-        .line("Expected distinguishing codes: Modifier(LeftControl) and Modifier(RightControl).")?;
+    terminal.line(
+        "Carta keys: Modifier(LeftControl) = LEAP backward; Modifier(LeftAlt) = LEAP forward.",
+    )?;
+    terminal.line(
+        "Modifier(RightAlt) must remain available for AltGr/international input; inspect RightControl, Shift, and character events too.",
+    )?;
     terminal.line("Exit with Esc or F12 (on Press).")?;
     terminal.line("")?;
 

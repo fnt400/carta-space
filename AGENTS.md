@@ -34,7 +34,7 @@ Carta Space defines two momentary LEAP controls:
 - LEAP backward
 - LEAP forward
 
-The reference TUI currently maps them experimentally to the physical left Control and right Control keys.
+The reference TUI currently maps them to physical Left Control for LEAP backward and physical Left Alt for LEAP forward. Physical Right Alt/AltGr is reserved for normal international text entry and must not trigger LEAP.
 
 Do not encode those physical key bindings into the archive format or core domain model.
 

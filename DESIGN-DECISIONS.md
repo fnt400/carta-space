@@ -236,9 +236,9 @@ No empty `assets`, `tags`, `bibliography`, `ai`, or similar directories are crea
 
 ## DD-020 — LEAP is an interface concept, not a storage-format property
 
-**Decision:** Carta Space defines two momentary LEAP controls, backward and forward. The initial terminal frontend will experimentally map them to the physical left and right Control keys.
+**Decision:** Carta Space defines two momentary LEAP controls, backward and forward. The reference terminal frontend maps them to physical Left Control for backward and physical Left Alt for forward.
 
-**Why:** AltGr is required for normal text entry on common international keyboard layouts, making the two Alt keys a poor default. The two Control keys are physically convenient and preserve the intended two-handed quasimodal interaction. Modern terminal keyboard protocols can distinguish the physical controls and report press/release events.
+**Why:** Dogfooding showed that the left-hand pair is more useful ergonomically for the current reference interaction. The binding depends on modern terminal keyboard reporting that distinguishes physical Left Alt from Right Alt/AltGr. Right Alt/AltGr remains reserved for ordinary international text entry.
 
 Exact key bindings remain outside the storage-format specification. A frontend on a platform that cannot expose the two physical Control keys may choose a different mapping.
 
@@ -290,21 +290,13 @@ A graphical frontend remains a possible future frontend, not a competing core im
 
 ---
 
-## DD-024 — Left and right Control are the initial LEAP bindings
+## DD-024 — Left Control and Left Alt are the reference TUI LEAP bindings
 
-**Decision:** In the reference TUI, physical left Control is the default experimental binding for LEAP backward and physical right Control for LEAP forward.
+**Decision:** In the reference TUI, physical Left Control is the binding for LEAP backward and physical Left Alt is the binding for LEAP forward. Physical Right Alt/AltGr and Right Control are not LEAP keys.
 
-**Alternatives considered:** left/right Alt, function keys, Caps Lock, dedicated remapped keys.
+**Why:** Real use of the initial Left/Right Control experiment motivated moving forward LEAP to Left Alt. Enhanced Crossterm keyboard reporting can distinguish physical Left Alt from Right Alt, allowing the reference TUI to keep AltGr available for international text entry.
 
-**Why not Alt:** On international keyboard layouts AltGr is required for ordinary character entry, including accented characters.
-
-**Why not function keys or Caps Lock:** They are less attractive ergonomically for the intended momentary, frequently held LEAP gesture.
-
-**Why Control:** The two keys are physically distinct, convenient to hold, and available on standard keyboards.
-
-**Experiment result:** In the reference terminal environment, Crossterm with enhanced keyboard reporting distinguished `LeftControl` from `RightControl` and delivered separate `Press` and `Release` events. This confirms the technical feasibility of the initial reference-TUI binding in that environment. The binding remains a frontend decision and is not part of the archive format or core domain model.
-
-This remains an experiment. Real use may justify a different default. Carta Space itself defines two LEAP controls, not two specific keyboard scancodes.
+**Constraint:** The binding is a frontend decision, not archive or core semantics. If a terminal path cannot report the required physical modifier identity and press/release events, palette LEAP remains the compatibility path.
 
 ---
 
@@ -434,9 +426,9 @@ A dedicated writing device with a keyboard and simple display is therefore a nat
 
 ## DD-038 — LEAP has a palette compatibility mode
 
-**Decision:** Physical Left and Right Control remain the normal momentary LEAP controls when terminal event fidelity is sufficient. On terminals that cannot distinguish them and report press/release events, the TUI exposes directional incremental LEAP and Leap Again through the command palette instead of inventing Alt-based shortcuts.
+**Decision:** Physical Left Control and physical Left Alt are the normal momentary LEAP controls when terminal event fidelity is sufficient. On terminals that cannot distinguish the required physical keys and report press/release events, the TUI exposes directional incremental LEAP and Leap Again through the command palette.
 
-**Why:** Carta must remain usable on conventional terminal paths without compromising AltGr or international text entry. The fallback is deliberately degraded and does not redefine normal LEAP semantics.
+**Why:** Carta must remain usable on conventional terminal paths without compromising Right Alt/AltGr or international text entry. The fallback is deliberately degraded and does not redefine normal LEAP semantics.
 
 ---
 

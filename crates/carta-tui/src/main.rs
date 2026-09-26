@@ -1,6 +1,6 @@
 use carta_core::{Archive, LeapDirection};
 use carta_tui::app::{AppMode, View};
-use carta_tui::editor::Cursor;
+use carta_tui::editor::{visual_ranges, Cursor};
 use carta_tui::session::{
     load_last_archive, load_session, save_last_archive, save_session, state_root,
 };
@@ -194,7 +194,14 @@ fn run() -> Result<(), Box<dyn Error>> {
 
 #[derive(Default)]
 struct Dispatcher {
-    pending_control: Option<LeapDirection>,
+    pending_leap: Option<PendingLeap>,
+    active_leap: Option<PendingLeap>,
+}
+
+#[derive(Clone, Copy)]
+struct PendingLeap {
+    direction: LeapDirection,
+    key: ModifierKeyCode,
 }
 
 fn handle_key(
@@ -204,15 +211,22 @@ fn handle_key(
     enhanced: bool,
 ) -> Result<(), Box<dyn Error>> {
     if key.kind == KeyEventKind::Release {
-        if matches!(
-            key.code,
-            KeyCode::Modifier(ModifierKeyCode::LeftControl | ModifierKeyCode::RightControl)
-        ) {
-            if let Some(direction) = dispatcher.pending_control.take() {
-                app.start_leap(direction, false);
+        if let KeyCode::Modifier(released) = key.code {
+            if dispatcher
+                .pending_leap
+                .is_some_and(|pending| pending.key == released)
+            {
+                let pending = dispatcher.pending_leap.take().unwrap();
+                app.start_leap(pending.direction, false);
                 app.end_leap();
-            } else if matches!(app.mode, AppMode::Leap { .. }) {
-                app.end_leap();
+            } else if dispatcher
+                .active_leap
+                .is_some_and(|active| active.key == released)
+            {
+                dispatcher.active_leap = None;
+                if matches!(app.mode, AppMode::Leap { .. }) {
+                    app.end_leap();
+                }
             }
         }
         return Ok(());
@@ -226,42 +240,42 @@ fn handle_key(
             && matches!(app.view, View::Chronological(_) | View::Work(_));
         match key.code {
             KeyCode::Left if key.modifiers.contains(KeyModifiers::SHIFT) => {
-                dispatcher.pending_control = None;
+                dispatcher.pending_leap = None;
                 if editable {
                     app.editor.move_word(false, true);
                 }
                 return Ok(());
             }
             KeyCode::Right if key.modifiers.contains(KeyModifiers::SHIFT) => {
-                dispatcher.pending_control = None;
+                dispatcher.pending_leap = None;
                 if editable {
                     app.editor.move_word(true, true);
                 }
                 return Ok(());
             }
             KeyCode::PageUp if !key.modifiers.contains(KeyModifiers::SHIFT) => {
-                dispatcher.pending_control = None;
+                dispatcher.pending_leap = None;
                 if editable {
                     app.editor.move_document(false);
                 }
                 return Ok(());
             }
             KeyCode::PageDown if !key.modifiers.contains(KeyModifiers::SHIFT) => {
-                dispatcher.pending_control = None;
+                dispatcher.pending_leap = None;
                 if editable {
                     app.editor.move_document(true);
                 }
                 return Ok(());
             }
             KeyCode::Home if !key.modifiers.contains(KeyModifiers::SHIFT) => {
-                dispatcher.pending_control = None;
+                dispatcher.pending_leap = None;
                 if editable {
                     app.editor.document_home(false);
                 }
                 return Ok(());
             }
             KeyCode::End if !key.modifiers.contains(KeyModifiers::SHIFT) => {
-                dispatcher.pending_control = None;
+                dispatcher.pending_leap = None;
                 if editable {
                     app.editor.document_end(false);
                 }
@@ -274,23 +288,40 @@ fn handle_key(
     if enhanced && key.kind == KeyEventKind::Press {
         match key.code {
             KeyCode::Modifier(ModifierKeyCode::LeftControl) => {
-                dispatcher.pending_control = Some(LeapDirection::Backward);
+                dispatcher.pending_leap = Some(PendingLeap {
+                    direction: LeapDirection::Backward,
+                    key: ModifierKeyCode::LeftControl,
+                });
                 return Ok(());
             }
-            KeyCode::Modifier(ModifierKeyCode::RightControl) => {
-                dispatcher.pending_control = Some(LeapDirection::Forward);
+            KeyCode::Modifier(ModifierKeyCode::LeftAlt) => {
+                dispatcher.pending_leap = Some(PendingLeap {
+                    direction: LeapDirection::Forward,
+                    key: ModifierKeyCode::LeftAlt,
+                });
                 return Ok(());
             }
             _ => {}
         }
     }
 
-    if dispatcher.pending_control.is_some() && matches!(key.code, KeyCode::Modifier(_)) {
-        dispatcher.pending_control = None;
+    if dispatcher.pending_leap.is_some() && matches!(key.code, KeyCode::Modifier(_)) {
+        dispatcher.pending_leap = None;
         return Ok(());
     }
-    if let Some(direction) = dispatcher.pending_control.take() {
-        app.start_leap(direction, false);
+    if let Some(pending) = dispatcher.pending_leap.take() {
+        if key.code == KeyCode::Enter {
+            let (terminal_width, _) = crossterm::terminal::size().unwrap_or((80, 24));
+            let width = editor_width(terminal_width);
+            if pending.direction == LeapDirection::Backward {
+                app.editor.visual_home(width, false);
+            } else {
+                app.editor.visual_end(width, false);
+            }
+            return Ok(());
+        }
+        dispatcher.active_leap = Some(pending);
+        app.start_leap(pending.direction, false);
     }
 
     if let AppMode::Palette { query, selected } = &app.mode {
@@ -397,8 +428,8 @@ fn handle_normal(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
-    let (width, height) = crossterm::terminal::size().unwrap_or((80, 24));
-    let width = usize::from(width.max(1));
+    let (terminal_width, height) = crossterm::terminal::size().unwrap_or((80, 24));
+    let width = editor_width(terminal_width);
     let page = usize::from(height.saturating_sub(2).max(1));
     let changed = match key.code {
         KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -455,7 +486,7 @@ fn draw(frame: &mut ratatui::Frame<'_>, app: &mut App) {
         .constraints([Constraint::Min(1), Constraint::Length(1)])
         .split(frame.area());
     match &app.view {
-        View::Chronological(_) | View::Work(_) => draw_editor(frame, app, chunks[0]),
+        View::Chronological(_) | View::Work(_) => draw_editor(frame, app, editor_rect(chunks[0])),
         View::Search { query, selected } => {
             let items: Vec<_> = app
                 .search_results
@@ -622,6 +653,15 @@ struct VisualLine {
     text: String,
 }
 
+fn editor_width(terminal_width: u16) -> usize {
+    usize::from(terminal_width.min(80).max(1))
+}
+
+fn editor_rect(area: Rect) -> Rect {
+    let width = area.width.min(80);
+    Rect::new(area.x + (area.width - width) / 2, area.y, width, area.height)
+}
+
 fn draw_editor(frame: &mut ratatui::Frame<'_>, app: &mut App, area: Rect) {
     let width = usize::from(area.width.max(1));
     let lines = visual_lines(&app.editor, width);
@@ -669,55 +709,23 @@ fn visual_lines(editor: &carta_tui::CompositeEditor, width: usize) -> Vec<Visual
     let mut out = Vec::new();
     for (region_index, region) in editor.regions().iter().enumerate() {
         if region_index > 0 {
-            out.push(VisualLine {
-                region: None,
-                start: 0,
-                end: 0,
-                text: "─".repeat(width),
-            });
+            for text in [String::new(), "─".repeat(width), String::new()] {
+                out.push(VisualLine {
+                    region: None,
+                    start: 0,
+                    end: 0,
+                    text,
+                });
+            }
         }
-        if region.text.is_empty() {
+        for (start, end) in visual_ranges(&region.text, width) {
             out.push(VisualLine {
                 region: Some(region_index),
-                start: 0,
-                end: 0,
-                text: String::new(),
+                start,
+                end,
+                text: region.text[start..end].into(),
             });
-            continue;
         }
-        let mut start = 0;
-        let mut used = 0;
-        for (byte, character) in region.text.char_indices() {
-            if character == '\n' {
-                out.push(VisualLine {
-                    region: Some(region_index),
-                    start,
-                    end: byte,
-                    text: region.text[start..byte].into(),
-                });
-                start = byte + 1;
-                used = 0;
-                continue;
-            }
-            let char_width = character.width().unwrap_or(0);
-            if used > 0 && used + char_width > width {
-                out.push(VisualLine {
-                    region: Some(region_index),
-                    start,
-                    end: byte,
-                    text: region.text[start..byte].into(),
-                });
-                start = byte;
-                used = 0;
-            }
-            used += char_width;
-        }
-        out.push(VisualLine {
-            region: Some(region_index),
-            start,
-            end: region.text.len(),
-            text: region.text[start..].into(),
-        });
     }
     out
 }
@@ -1061,6 +1069,27 @@ mod tests {
     }
 
     #[test]
+    fn editor_rect_is_centered_and_capped_at_eighty_columns() {
+        assert_eq!(editor_rect(Rect::new(0, 0, 160, 20)), Rect::new(40, 0, 80, 20));
+        assert_eq!(editor_rect(Rect::new(0, 0, 70, 20)), Rect::new(0, 0, 70, 20));
+        assert_eq!(editor_width(160), 80);
+        assert_eq!(editor_width(70), 70);
+    }
+
+    #[test]
+    fn visual_lines_share_wrap_and_generate_three_boundary_rows() {
+        let first = "word ".repeat(20);
+        let (_temporary, app) = app_with_documents(&[first.as_str(), "second"], false);
+        let lines = visual_lines(&app.editor, 80);
+        assert!(lines.iter().all(|line| line.text.width() <= 80));
+        let boundary = lines.iter().position(|line| line.region.is_none()).unwrap();
+        assert!(lines[boundary].text.is_empty());
+        assert_eq!(lines[boundary + 1].text, "─".repeat(80));
+        assert!(lines[boundary + 2].text.is_empty());
+        assert_eq!(app.editor.regions()[0].text, first);
+    }
+
+    #[test]
     fn shift_arrows_create_extend_and_visibly_render_selection() {
         let (_temporary, mut app) = app_with_documents(&["abc\ndef\nghi"], false);
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
@@ -1104,7 +1133,11 @@ mod tests {
     fn ctrl_shift_arrows_select_by_word_without_starting_leap() {
         let (_temporary, mut app) = app_with_documents(&["alpha beta gamma"], false);
         let mut dispatcher = Dispatcher {
-            pending_control: Some(LeapDirection::Backward),
+            pending_leap: Some(PendingLeap {
+                direction: LeapDirection::Backward,
+                key: ModifierKeyCode::LeftControl,
+            }),
+            ..Dispatcher::default()
         };
         app.editor.set_cursor(
             Cursor {
@@ -1123,7 +1156,7 @@ mod tests {
         .unwrap();
         assert_eq!(app.editor.selected_text().as_deref(), Some("beta "));
         assert!(matches!(app.mode, AppMode::Editing));
-        assert!(dispatcher.pending_control.is_none());
+        assert!(dispatcher.pending_leap.is_none());
 
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
         dispatch(
@@ -1194,7 +1227,11 @@ mod tests {
         ];
         for (code, modifiers) in chords {
             let mut dispatcher = Dispatcher {
-                pending_control: Some(LeapDirection::Backward),
+                pending_leap: Some(PendingLeap {
+                    direction: LeapDirection::Backward,
+                    key: ModifierKeyCode::LeftControl,
+                }),
+                ..Dispatcher::default()
             };
             handle_key(
                 &mut app,
@@ -1203,7 +1240,7 @@ mod tests {
                 true,
             )
             .unwrap();
-            assert!(dispatcher.pending_control.is_none());
+            assert!(dispatcher.pending_leap.is_none());
             assert!(matches!(app.mode, AppMode::Editing));
             assert_eq!(app.leap.remembered_query(), Some("alpha"));
         }
@@ -1248,7 +1285,7 @@ mod tests {
         .unwrap();
         assert!(matches!(app.mode, AppMode::Editing));
         assert_eq!(app.editor.selection(), selection);
-        assert!(dispatcher.pending_control.is_none());
+        assert!(dispatcher.pending_leap.is_none());
     }
 
     #[test]
@@ -1304,73 +1341,75 @@ mod tests {
     }
 
     #[test]
-    fn left_and_right_control_keep_leap_and_leap_again_behavior() {
-        for (control, direction) in [
-            (ModifierKeyCode::LeftControl, LeapDirection::Backward),
-            (ModifierKeyCode::RightControl, LeapDirection::Forward),
+    fn left_control_and_left_alt_keep_leap_behavior() {
+        for (key, modifiers, direction) in [
+            (ModifierKeyCode::LeftControl, KeyModifiers::CONTROL, LeapDirection::Backward),
+            (ModifierKeyCode::LeftAlt, KeyModifiers::ALT, LeapDirection::Forward),
         ] {
             let (_temporary, mut app) = app_with_documents(&["alpha beta alpha"], false);
             app.editor.set_cursor(Cursor { region: 0, byte: 6 }, false);
             let mut dispatcher = Dispatcher::default();
-            handle_key(
-                &mut app,
-                &mut dispatcher,
-                KeyEvent::new(KeyCode::Modifier(control), KeyModifiers::CONTROL),
-                true,
-            )
-            .unwrap();
-            for c in "alpha".chars() {
-                handle_key(
-                    &mut app,
-                    &mut dispatcher,
-                    KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL),
-                    true,
-                )
-                .unwrap();
+            handle_key(&mut app, &mut dispatcher, KeyEvent::new(KeyCode::Modifier(key), modifiers), true).unwrap();
+            for character in "alpha".chars() {
+                handle_key(&mut app, &mut dispatcher, KeyEvent::new(KeyCode::Char(character), modifiers), true).unwrap();
             }
             handle_key(
                 &mut app,
                 &mut dispatcher,
-                KeyEvent::new_with_kind(
-                    KeyCode::Modifier(control),
-                    KeyModifiers::NONE,
-                    KeyEventKind::Release,
-                ),
+                KeyEvent::new_with_kind(KeyCode::Modifier(key), KeyModifiers::NONE, KeyEventKind::Release),
                 true,
-            )
-            .unwrap();
-
+            ).unwrap();
             assert_eq!(app.leap.remembered_query(), Some("alpha"));
             assert!(matches!(app.mode, AppMode::Editing));
-            let first_match = match direction {
+            assert_eq!(app.editor.cursor().byte, match direction {
                 LeapDirection::Backward => 0,
-                LeapDirection::Forward => 11,
-            };
-            assert_eq!(app.editor.cursor().byte, first_match);
-
-            handle_key(
-                &mut app,
-                &mut dispatcher,
-                KeyEvent::new(KeyCode::Modifier(control), KeyModifiers::CONTROL),
-                true,
-            )
-            .unwrap();
-            handle_key(
-                &mut app,
-                &mut dispatcher,
-                KeyEvent::new_with_kind(
-                    KeyCode::Modifier(control),
-                    KeyModifiers::NONE,
-                    KeyEventKind::Release,
-                ),
-                true,
-            )
-            .unwrap();
-
-            assert!(matches!(app.mode, AppMode::Editing));
-            assert_eq!(app.leap.remembered_query(), Some("alpha"));
-            assert_ne!(app.editor.cursor().byte, first_match);
+                LeapDirection::Forward => 16,
+            });
         }
+    }
+
+    #[test]
+    fn right_modifiers_are_not_leap_and_altgr_text_is_inserted() {
+        let (_temporary, mut app) = app_with_documents(&[""], false);
+        let mut dispatcher = Dispatcher::default();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Modifier(ModifierKeyCode::RightControl), KeyModifiers::CONTROL),
+            true,
+        ).unwrap();
+        assert!(dispatcher.pending_leap.is_none());
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Modifier(ModifierKeyCode::RightAlt), KeyModifiers::ALT),
+            true,
+        ).unwrap();
+        assert!(dispatcher.pending_leap.is_none());
+        handle_key(&mut app, &mut dispatcher, KeyEvent::new(KeyCode::Char('@'), KeyModifiers::ALT), true).unwrap();
+        assert_eq!(app.editor.current_text(), Some("@"));
+    }
+
+    #[test]
+    fn leap_enter_moves_to_visual_line_edge_and_release_is_inert() {
+        let (_temporary, mut app) = app_with_documents(&["abcdefghij"], false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 7 }, false);
+        let mut dispatcher = Dispatcher::default();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Modifier(ModifierKeyCode::LeftControl), KeyModifiers::CONTROL),
+            true,
+        ).unwrap();
+        handle_key(&mut app, &mut dispatcher, KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL), true).unwrap();
+        assert_eq!(app.editor.cursor().byte, 0);
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new_with_kind(KeyCode::Modifier(ModifierKeyCode::LeftControl), KeyModifiers::NONE, KeyEventKind::Release),
+            true,
+        ).unwrap();
+        assert!(matches!(app.mode, AppMode::Editing));
     }
 
     #[test]
