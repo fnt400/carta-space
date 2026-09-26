@@ -227,6 +227,21 @@ impl LeapSession {
             .map_or(self.origin, LeapMatch::position)
     }
 
+    pub fn repeat(&mut self, regions: &[DocumentTextRegion<'_>]) -> bool {
+        if self.query.is_empty() {
+            return false;
+        }
+        let Some(current) = self.current.as_ref() else {
+            return false;
+        };
+        let origin = current.position();
+        let Some(next) = leap_match(regions, origin, &self.query, self.direction, false) else {
+            return false;
+        };
+        self.current = Some(next);
+        true
+    }
+
     fn update(&mut self, regions: &[DocumentTextRegion<'_>]) {
         self.current = if self.query.is_empty() {
             None
@@ -461,6 +476,30 @@ fn folded_with_boundaries(value: &str) -> (String, BTreeMap<usize, usize>) {
 #[cfg(test)]
 mod cat_leap_tests {
     use super::*;
+
+    #[test]
+    fn active_leap_repeat_advances_without_changing_the_original_origin() {
+        let document = DocumentId::new_v7();
+        let regions = [DocumentTextRegion::new(document, "x x x")];
+        let origin = LeapPosition::new(0, 0);
+        let mut session = LeapSession::with_query(
+            LeapDirection::Forward,
+            origin,
+            "x",
+            &regions,
+        );
+
+        assert_eq!(session.origin(), origin);
+        assert_eq!(session.cursor(), LeapPosition::new(0, 0));
+
+        assert!(session.repeat(&regions));
+        assert_eq!(session.origin(), origin);
+        assert_eq!(session.cursor(), LeapPosition::new(0, 2));
+
+        assert!(session.repeat(&regions));
+        assert_eq!(session.origin(), origin);
+        assert_eq!(session.cursor(), LeapPosition::new(0, 4));
+    }
 
     #[test]
     fn lowercase_leap_pattern_matches_both_cases_but_uppercase_is_strict() {
