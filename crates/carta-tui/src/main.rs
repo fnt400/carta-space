@@ -1882,7 +1882,61 @@ mod tests {
     }
 
     #[test]
-    fn cancelled_control_does_not_leap_again_and_pasted_text_stays_normal_input() {
+    fn tapping_physical_leap_keys_creeps_one_character() {
+        let (_temporary, mut app) = app_with_documents(&["abcd"], false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 1 }, false);
+        app.cat_navigation();
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new_with_kind(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
+            ),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 2 });
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new_with_kind(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
+            ),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 1 });
+    }
+
+    #[test]
+    fn cancelled_control_does_not_creep_and_pasted_text_stays_normal_input() {
         let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
         app.start_leap(LeapDirection::Forward, true);
         app.leap_input("beta");
