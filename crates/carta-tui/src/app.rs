@@ -306,6 +306,7 @@ pub struct App {
     pub scheduler: Scheduler,
     pub leap: LeapRuntime,
     pub quit: bool,
+    last_leap_span: Option<(Cursor, Cursor)>,
     back: Vec<Location>,
     forward: Vec<Location>,
     provisional: Option<DocumentId>,
@@ -402,6 +403,7 @@ impl App {
             scheduler: Scheduler::new(now),
             leap: LeapRuntime::default(),
             quit: false,
+            last_leap_span: None,
             back: Vec::new(),
             forward: Vec::new(),
             provisional,
@@ -1115,6 +1117,7 @@ impl App {
         self.back.clear();
         self.forward.clear();
         self.leap = LeapRuntime::default();
+        self.last_leap_span = None;
         self.pending_wipe = None;
         self.provisional = self.provisional.filter(|id| *id != document);
         self.trash = Some(self.archive.trash_inventory()?);
@@ -1145,18 +1148,16 @@ impl App {
         if let AppMode::Leap { session, .. } = &mut self.mode {
             session.push_str(value, &regions);
             let p = leap_cursor_position(session);
-            self.editor.set_cursor(
-                Cursor {
-                    region: p.region(),
-                    byte: p.byte_offset(),
-                },
-                false,
-            );
+            self.editor.set_cursor_preserving_highlight(Cursor {
+                region: p.region(),
+                byte: p.byte_offset(),
+            });
             if let View::Search { selected, .. } = &mut self.view {
                 *selected = p.region();
             }
         }
     }
+
     pub fn leap_backspace(&mut self) {
         let regions: Vec<_> = self
             .editor
@@ -1167,24 +1168,76 @@ impl App {
         if let AppMode::Leap { session, .. } = &mut self.mode {
             session.backspace(&regions);
             let p = leap_cursor_position(session);
-            self.editor.set_cursor(
-                Cursor {
-                    region: p.region(),
-                    byte: p.byte_offset(),
-                },
-                false,
-            );
+            self.editor.set_cursor_preserving_highlight(Cursor {
+                region: p.region(),
+                byte: p.byte_offset(),
+            });
             if let View::Search { selected, .. } = &mut self.view {
                 *selected = p.region();
             }
         }
     }
+
+    pub fn extend_last_leap_highlight(&mut self) -> bool {
+        let Some((start, end)) = self.last_leap_span else {
+            return false;
+        };
+        if self.editor.set_cat_highlight(start, end) {
+            self.status.clear();
+            true
+        } else {
+            self.status = "Cat highlight cannot cross a Document boundary".into();
+            false
+        }
+    }
+
+    pub fn copy_cat_highlight(&mut self) -> bool {
+        if self.editor.copy_cat_highlight() {
+            self.edited(Instant::now());
+            self.status = "Copied highlighted text".into();
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn end_leap(&mut self) {
-        if let AppMode::Leap { session, palette } = &self.mode {
-            if session.query().is_empty() && !palette {
-                self.leap_again(session.direction());
+        let AppMode::Leap { session, palette } = &self.mode else {
+            return;
+        };
+        let session = session.clone();
+        let palette = *palette;
+        let query_empty = session.query().is_empty();
+        let direction = session.direction();
+        let origin = Cursor {
+            region: session.origin().region(),
+            byte: session.origin().byte_offset(),
+        };
+        let destination = self.editor.cursor();
+        let had_highlight = self.editor.cat_highlight().is_some();
+
+        if query_empty && !palette {
+            if let Some((start, end)) = self.editor.cat_highlight() {
+                let cursor = match direction {
+                    LeapDirection::Backward => start,
+                    LeapDirection::Forward => end,
+                };
+                self.editor.clear_cat_highlight();
+                self.editor.set_cursor_preserving_highlight(cursor);
             } else {
-                self.leap.remember(session);
+                self.leap_again(direction);
+            }
+        } else {
+            self.leap.remember(&session);
+            if !query_empty && had_highlight && !palette {
+                if self.editor.move_cat_highlight_to(destination) {
+                    self.edited(Instant::now());
+                    self.status = "Moved highlighted text".into();
+                }
+            } else if !query_empty && origin.region == destination.region && origin != destination {
+                self.last_leap_span = Some((origin, destination));
+            } else if !query_empty {
+                self.last_leap_span = None;
             }
         }
         self.mode = AppMode::Editing;
@@ -1193,18 +1246,16 @@ impl App {
     pub fn cancel_leap(&mut self) {
         if let AppMode::Leap { session, .. } = &self.mode {
             let origin = session.origin();
-            self.editor.set_cursor(
-                Cursor {
-                    region: origin.region(),
-                    byte: origin.byte_offset(),
-                },
-                false,
-            );
+            self.editor.set_cursor_preserving_highlight(Cursor {
+                region: origin.region(),
+                byte: origin.byte_offset(),
+            });
         }
         self.mode = AppMode::Editing;
     }
 
     fn leap_again(&mut self, direction: LeapDirection) {
+        let origin = self.editor.cursor();
         let regions: Vec<_> = self
             .editor
             .regions()
@@ -1222,13 +1273,16 @@ impl App {
                 LeapDirection::Forward => range.end,
                 LeapDirection::Backward => range.start,
             };
-            self.editor.set_cursor(
-                Cursor {
-                    region: p.region(),
-                    byte,
-                },
-                false,
-            );
+            let destination = Cursor {
+                region: p.region(),
+                byte,
+            };
+            self.editor.set_cursor(destination, false);
+            self.last_leap_span = if origin.region == destination.region && origin != destination {
+                Some((origin, destination))
+            } else {
+                None
+            };
             if let View::Search { selected, .. } = &mut self.view {
                 *selected = p.region();
             }
@@ -1941,6 +1995,7 @@ impl App {
         });
         let (editor, scroll) = load_editor(&self.archive, &self.view, position.as_ref())?;
         self.editor = editor;
+        self.last_leap_span = None;
         self.scroll = scroll;
         Ok(())
     }
