@@ -945,7 +945,10 @@ mod tests {
 
         assert!(e.set_cat_highlight(
             Cursor { region: 0, byte: 6 },
-            Cursor { region: 0, byte: 10 },
+            Cursor {
+                region: 0,
+                byte: 10
+            },
         ));
         assert_eq!(e.selected_text().as_deref(), Some("beta"));
         assert!(e.copy_cat_highlight());
@@ -967,10 +970,7 @@ mod tests {
     #[test]
     fn cat_highlight_cannot_cross_document_boundary() {
         let mut e = editor();
-        assert!(!e.set_cat_highlight(
-            Cursor { region: 0, byte: 0 },
-            Cursor { region: 1, byte: 0 },
-        ));
+        assert!(!e.set_cat_highlight(Cursor { region: 0, byte: 0 }, Cursor { region: 1, byte: 0 },));
         assert!(e.cat_highlight().is_none());
     }
 

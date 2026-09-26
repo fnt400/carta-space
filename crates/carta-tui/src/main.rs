@@ -1485,11 +1485,13 @@ mod tests {
 
     #[test]
     fn right_control_c_copies_cat_highlight() {
-        let (_temporary, mut app) =
-            app_with_documents(&["alpha beta"], false);
+        let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
         assert!(app.editor.set_cat_highlight(
             Cursor { region: 0, byte: 6 },
-            Cursor { region: 0, byte: 10 },
+            Cursor {
+                region: 0,
+                byte: 10
+            },
         ));
         let mut dispatcher = Dispatcher::default();
 
@@ -1531,12 +1533,14 @@ mod tests {
 
     #[test]
     fn leap_moves_cat_highlight_to_another_document_on_release() {
-        let (_temporary, mut app) =
-            app_with_documents(&["alpha beta", "target"], false);
+        let (_temporary, mut app) = app_with_documents(&["alpha beta", "target"], false);
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
         assert!(app.editor.set_cat_highlight(
             Cursor { region: 0, byte: 6 },
-            Cursor { region: 0, byte: 10 },
+            Cursor {
+                region: 0,
+                byte: 10
+            },
         ));
 
         app.start_leap(LeapDirection::Forward, false);
