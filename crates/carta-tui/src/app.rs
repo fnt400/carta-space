@@ -323,7 +323,12 @@ pub struct App {
 
 impl App {
     pub fn open(mut archive: Archive, session: Option<&Session>, now: Instant) -> AppResult<Self> {
-        ensure_work_colors(&mut archive)?;
+        if ensure_work_colors(&mut archive)? {
+            archive.checkpoint(
+                CheckpointKind::Structural,
+                Some("Assigned persistent Work colors"),
+            )?;
+        }
         let current = current_volume();
         let mut provisional = None;
         let mut position = session.and_then(|s| s.position.clone());
@@ -1900,7 +1905,12 @@ impl App {
             self.push_navigation();
         }
         if let View::Work(work) = &view {
-            ensure_work_color(&mut self.archive, *work)?;
+            if ensure_work_color(&mut self.archive, *work)? {
+                self.archive.checkpoint(
+                    CheckpointKind::Structural,
+                    Some("Assigned persistent Work color"),
+                )?;
+            }
         }
         self.view = view;
         let remembered = match (&self.view, target) {
@@ -2048,17 +2058,18 @@ fn search_result_view_text(result: &ResultRow) -> String {
         result.context
     )
 }
-fn ensure_work_colors(archive: &mut Archive) -> AppResult {
+fn ensure_work_colors(archive: &mut Archive) -> AppResult<bool> {
     let works: Vec<_> = archive.works().map(|work| work.id()).collect();
+    let mut changed = false;
     for work in works {
-        ensure_work_color(archive, work)?;
+        changed |= ensure_work_color(archive, work)?;
     }
-    Ok(())
+    Ok(changed)
 }
 
-fn ensure_work_color(archive: &mut Archive, work: WorkId) -> AppResult {
+fn ensure_work_color(archive: &mut Archive, work: WorkId) -> AppResult<bool> {
     if archive.work(work).and_then(|work| work.color()).is_some() {
-        return Ok(());
+        return Ok(false);
     }
 
     let mut usage = [0_usize; WORK_COLOR_PALETTE.len()];
@@ -2078,7 +2089,7 @@ fn ensure_work_color(archive: &mut Archive, work: WorkId) -> AppResult {
         .min_by_key(|(index, count)| (**count, *index))
         .map_or(0, |(index, _)| index);
     archive.set_work_color(work, Some(WORK_COLOR_PALETTE[index].to_owned()))?;
-    Ok(())
+    Ok(true)
 }
 
 fn leap_cursor_position(session: &LeapSession) -> LeapPosition {
@@ -2382,6 +2393,8 @@ mod tests {
         let work = app.archive.create_work("Work".into(), vec![first]).unwrap();
         app.structural("Created test Work").unwrap();
         app.switch_view(View::Work(work), None, false).unwrap();
+        assert!(!app.archive.is_dirty().unwrap());
+        assert!(app.archive.work(work).unwrap().color().is_some());
         let before = app.archive.history().unwrap().len();
 
         app.new_document().unwrap();
