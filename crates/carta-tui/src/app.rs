@@ -1178,6 +1178,18 @@ impl App {
         }
     }
 
+    pub fn remember_direct_leap_span(&mut self, origin: Cursor) {
+        let destination = self.editor.cursor();
+        self.last_leap_span = if origin.region == destination.region && origin != destination {
+            Some((origin, destination))
+        } else {
+            None
+        };
+        if self.last_leap_span.is_some() {
+            self.status.clear();
+        }
+    }
+
     pub fn leap_visual_boundary(&mut self, direction: LeapDirection, width: usize) {
         let origin = self.editor.cursor();
         let Some(destination) = self
