@@ -25,6 +25,11 @@ impl Timestamp {
     pub fn as_datetime(self) -> DateTime<FixedOffset> {
         self.0
     }
+
+    /// Returns the smallest representable timestamp after this one.
+    pub fn successor(self) -> Self {
+        Self(self.0 + chrono::Duration::nanoseconds(1))
+    }
 }
 
 impl FromStr for Timestamp {
