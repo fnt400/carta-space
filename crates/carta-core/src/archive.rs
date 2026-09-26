@@ -171,6 +171,131 @@ impl Archive {
         Ok(destination)
     }
 
+    pub fn split_document_at(
+        &mut self,
+        source: DocumentId,
+        byte_offset: usize,
+    ) -> Result<DocumentId, Error> {
+        let original = self.read_document(source)?.content().to_owned();
+        if !original.is_char_boundary(byte_offset) {
+            return Err(Error::InvalidByteBoundary {
+                document: source,
+                offset: byte_offset,
+            });
+        }
+
+        let source_info = self
+            .documents
+            .get(&source)
+            .ok_or(Error::MissingDocument(source))?;
+        let created = source_info.created().successor();
+        let volume = Volume::from_timestamp(created).ok_or(Error::InvalidVolumeDate(created))?;
+        let target = DocumentId::new_v7();
+        let month_path = self
+            .root
+            .join("volumes")
+            .join(format!("{:04}", volume.year()))
+            .join(format!("{:02}", volume.month()));
+        let destination = month_path.join(target.to_string());
+        let staging = month_path.join(format!(".carta-document-{target}"));
+
+        let memberships: Vec<_> = self
+            .works
+            .values()
+            .filter(|work| work.documents().contains(&source))
+            .map(Work::id)
+            .collect();
+        for work in &memberships {
+            self.ensure_work_current(
+                self.works
+                    .get(work)
+                    .expect("membership Work came from the current archive"),
+            )?;
+        }
+
+        let mut owned = vec![
+            info_relative(&self.root, &destination)?,
+            info_relative(&self.root, &staging)?,
+            info_relative(&self.root, &source_info.path.join("content.md"))?,
+        ];
+        for work in &memberships {
+            owned.push(info_relative(
+                &self.root,
+                &self
+                    .works
+                    .get(work)
+                    .expect("membership Work came from the current archive")
+                    .path
+                    .join("work.json"),
+            )?);
+        }
+
+        let transaction = crate::transaction::Transaction::begin(
+            &self.root,
+            "Saved state before Split Document",
+            owned,
+        )?;
+        let metadata = DocumentMetadata::new(target, created);
+        let (before, after) = original.split_at(byte_offset);
+        let operation = (|| {
+            self.edit_document(source, before)?;
+
+            fs::create_dir_all(&month_path).map_err(|error| Error::io(&month_path, error))?;
+            fs::create_dir(&staging).map_err(|error| Error::io(&staging, error))?;
+            let mut guard = CleanupDirectory::new(staging.clone());
+            write_document_metadata(&staging.join("meta.json"), &metadata)?;
+            fs::write(staging.join("content.md"), after.as_bytes())
+                .map_err(|error| Error::io(staging.join("content.md"), error))?;
+            let metadata_bytes = fs::read(staging.join("meta.json"))
+                .map_err(|error| Error::io(staging.join("meta.json"), error))?;
+
+            for work in &memberships {
+                let current = self.works.get(work).ok_or(Error::MissingWork(*work))?;
+                let mut documents = current.documents().to_vec();
+                let index = documents
+                    .iter()
+                    .position(|document| *document == source)
+                    .ok_or(Error::DocumentNotInWork {
+                        work: *work,
+                        document: source,
+                    })?;
+                documents.insert(index + 1, target);
+                let work_metadata = current
+                    .metadata
+                    .with_documents(documents)
+                    .map_err(|error| Error::format(current.path.join("work.json"), error))?;
+                self.replace_work(*work, work_metadata)?;
+            }
+
+            fs::rename(&staging, &destination).map_err(|error| Error::io(&destination, error))?;
+            guard.disarm();
+            sync_created_directory(&destination)?;
+            Ok(metadata_bytes)
+        })();
+
+        match operation {
+            Ok(metadata_bytes) => {
+                self.documents.insert(
+                    target,
+                    DocumentInfo {
+                        metadata,
+                        volume,
+                        path: destination,
+                        metadata_bytes,
+                        content_bytes: after.as_bytes().to_vec(),
+                    },
+                );
+                transaction.commit()?;
+                Ok(target)
+            }
+            Err(error) => {
+                let error = transaction.rollback_error(error);
+                self.refresh()?;
+                Err(error)
+            }
+        }
+    }
+
     pub fn refresh(&mut self) -> Result<(), Error> {
         crate::transaction::recover(&self.root)?;
         recover_creation_staging(&self.root)?;
