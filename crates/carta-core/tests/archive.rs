@@ -517,7 +517,10 @@ fn splits_document_at_point_and_preserves_work_order() {
         .unwrap()
         .created();
     assert_eq!(target_created, source_created.successor());
-    assert_eq!(archive.work(work).unwrap().documents(), &[source, target, trailing]);
+    assert_eq!(
+        archive.work(work).unwrap().documents(),
+        &[source, target, trailing]
+    );
 }
 
 #[test]

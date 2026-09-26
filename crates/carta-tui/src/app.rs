@@ -503,7 +503,11 @@ impl App {
             ]);
         }
         if editable && has_doc {
-            commands.push(if self.collapsed { ExpandView } else { CollapseView });
+            commands.push(if self.collapsed {
+                ExpandView
+            } else {
+                CollapseView
+            });
             commands.extend([
                 DuplicateAsNew,
                 NewLinkedDocument,

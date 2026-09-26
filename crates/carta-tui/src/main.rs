@@ -1588,10 +1588,7 @@ mod tests {
         app.collapsed = true;
 
         let lines = visual_lines(&app, 80);
-        let first_rows = lines
-            .iter()
-            .filter(|line| line.region == Some(0))
-            .count();
+        let first_rows = lines.iter().filter(|line| line.region == Some(0)).count();
         assert_eq!(first_rows, 3);
     }
 
