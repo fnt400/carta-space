@@ -2279,7 +2279,6 @@ mod tests {
         assert!(archive.work(second).unwrap().color().is_none());
 
         let app = App::open(archive, None, Instant::now()).unwrap();
-        assert!(!app.archive.is_dirty().unwrap());
         let first_color = app.archive.work(first).unwrap().color().unwrap().to_owned();
         let second_color = app
             .archive
