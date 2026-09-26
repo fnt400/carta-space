@@ -1334,6 +1334,7 @@ impl App {
         } else {
             self.cat_span_fixed = None;
         }
+        self.cat_erase_forward = true;
         self.editor.cancel_selection();
         self.mode = AppMode::Leap {
             session: LeapSession::new(
