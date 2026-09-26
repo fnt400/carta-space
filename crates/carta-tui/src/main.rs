@@ -1259,7 +1259,6 @@ fn centered(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
 mod tests {
     use super::*;
     use carta_tui::editor::Cursor;
-    use unicode_width::UnicodeWidthStr;
 
     fn dispatch(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
         handle_key(
