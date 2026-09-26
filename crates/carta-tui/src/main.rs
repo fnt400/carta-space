@@ -3,6 +3,7 @@ use arboard::Clipboard;
 use carta_core::{Archive, LeapDirection};
 use carta_tui::app::{AppMode, View};
 use carta_tui::editor::{visual_ranges, Cursor};
+use carta_tui::help::{documents as help_documents, HelpKind};
 use carta_tui::session::{
     load_last_archive, load_session, save_last_archive, save_session, state_root,
 };
@@ -23,7 +24,7 @@ use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph};
+use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap};
 use ratatui::Terminal;
 use std::backtrace::Backtrace;
 use std::error::Error;
@@ -609,6 +610,7 @@ fn handle_normal(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
             | View::WorkHistory { .. }
             | View::Trash { .. }
             | View::Conflicts { .. }
+            | View::Help { .. }
     ) {
         match key.code {
             KeyCode::Up => app.move_list_selection(false),
@@ -853,6 +855,19 @@ fn draw(frame: &mut ratatui::Frame<'_>, app: &mut App) {
             frame.render_widget(
                 Paragraph::new(preview).block(Block::default().title("Variants (read-only)")),
                 panes[1],
+            );
+        }
+        View::Help { kind, selected } => {
+            let documents = help_documents(*kind);
+            let document = documents.get(*selected).or_else(|| documents.first());
+            let (title, body) = document
+                .map(|document| (document.title, document.body))
+                .unwrap_or(("Carta Space Help", "No help document available."));
+            frame.render_widget(
+                Paragraph::new(body)
+                    .wrap(Wrap { trim: false })
+                    .block(Block::default().borders(Borders::ALL).title(title)),
+                chunks[0],
             );
         }
     }
@@ -1435,6 +1450,20 @@ fn status_line(app: &App) -> String {
             }
         }
         View::Conflicts { .. } => format!("Conflicts · {} preserved", app.conflicts.len()),
+        View::Help { kind, selected } => {
+            let documents = help_documents(*kind);
+            let label = match kind {
+                HelpKind::Cheatsheet => "Cheatsheet",
+                HelpKind::Manual => "Manual",
+            };
+            let title = documents
+                .get(*selected)
+                .map_or("Help", |document| document.title);
+            format!(
+                "{label} · {title} · {}",
+                list_position(*selected, documents.len())
+            )
+        }
     }
 }
 fn current_label(app: &App) -> String {
