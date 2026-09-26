@@ -18,6 +18,7 @@ pub struct Cursor {
 struct Snapshot {
     regions: Vec<Region>,
     cursor: Cursor,
+    cat_highlight: Option<(Cursor, Cursor)>,
 }
 
 #[derive(Debug, Clone)]
@@ -25,6 +26,7 @@ pub struct CompositeEditor {
     regions: Vec<Region>,
     cursor: Cursor,
     anchor: Option<Cursor>,
+    cat_highlight: Option<(Cursor, Cursor)>,
     preferred_column: Option<usize>,
     undo: Vec<Snapshot>,
     redo: Vec<Snapshot>,
@@ -37,6 +39,7 @@ impl CompositeEditor {
             regions,
             cursor,
             anchor: None,
+            cat_highlight: None,
             preferred_column: None,
             undo: Vec::new(),
             redo: Vec::new(),
@@ -76,6 +79,7 @@ impl CompositeEditor {
                 .any(|region| region.document == document)
         });
         self.anchor = None;
+        self.cat_highlight = None;
         self.cursor = Cursor { region: 0, byte: 0 };
         self.clamp_cursor();
     }
@@ -89,6 +93,7 @@ impl CompositeEditor {
     }
 
     pub fn set_cursor(&mut self, cursor: Cursor, selecting: bool) {
+        self.cat_highlight = None;
         self.begin_selection(selecting);
         self.cursor = cursor;
         self.clamp_cursor();
@@ -96,13 +101,45 @@ impl CompositeEditor {
         self.finish_selection(selecting);
     }
 
+    pub fn set_cursor_preserving_highlight(&mut self, cursor: Cursor) {
+        self.cursor = cursor;
+        self.clamp_cursor();
+        self.preferred_column = None;
+    }
+
     pub fn cancel_selection(&mut self) {
         self.anchor = None;
     }
 
+    pub fn clear_cat_highlight(&mut self) {
+        self.cat_highlight = None;
+    }
+
+    pub fn cat_highlight(&self) -> Option<(Cursor, Cursor)> {
+        self.cat_highlight
+    }
+
+    pub fn set_cat_highlight(&mut self, start: Cursor, end: Cursor) -> bool {
+        if start.region != end.region || start == end {
+            return false;
+        }
+        let (start, end) = ordered(start, end);
+        let Some(region) = self.regions.get(start.region) else {
+            return false;
+        };
+        if end.byte > region.text.len()
+            || !region.text.is_char_boundary(start.byte)
+            || !region.text.is_char_boundary(end.byte)
+        {
+            return false;
+        }
+        self.anchor = None;
+        self.cat_highlight = Some((start, end));
+        true
+    }
+
     pub fn selection(&self) -> Option<(Cursor, Cursor)> {
-        let anchor = self.anchor?;
-        (anchor != self.cursor).then(|| ordered(anchor, self.cursor))
+        self.cat_highlight.or_else(|| self.conventional_selection())
     }
 
     pub fn selected_text(&self) -> Option<String> {
@@ -125,7 +162,8 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return false;
         }
-        if self.selection().is_some_and(|(a, b)| a.region != b.region) {
+        self.cat_highlight = None;
+        if self.conventional_selection().is_some_and(|(a, b)| a.region != b.region) {
             return false;
         }
         self.record();
@@ -199,7 +237,10 @@ impl CompositeEditor {
     }
 
     pub fn delete_selection(&mut self) -> bool {
-        let Some((start, end)) = self.selection() else {
+        if self.cat_highlight.is_some() {
+            return self.erase_cat_highlight();
+        }
+        let Some((start, end)) = self.conventional_selection() else {
             return false;
         };
         if start.region != end.region {
@@ -208,6 +249,98 @@ impl CompositeEditor {
         self.record();
         self.delete_selection_inner();
         self.changed();
+        true
+    }
+
+    pub fn erase_cat_highlight(&mut self) -> bool {
+        let Some((start, end)) = self.cat_highlight else {
+            return false;
+        };
+        self.record();
+        self.regions[start.region].text.drain(start.byte..end.byte);
+        self.cursor = start;
+        self.anchor = None;
+        self.cat_highlight = None;
+        self.preferred_column = None;
+        self.dirty = true;
+        true
+    }
+
+    pub fn copy_cat_highlight(&mut self) -> bool {
+        let Some((start, end)) = self.cat_highlight else {
+            return false;
+        };
+        let copy = self.regions[start.region].text[start.byte..end.byte].to_owned();
+        if copy.is_empty() {
+            return false;
+        }
+        self.record();
+        self.regions[start.region].text.insert_str(end.byte, &copy);
+        let copy_start = Cursor {
+            region: start.region,
+            byte: end.byte,
+        };
+        let copy_end = Cursor {
+            region: start.region,
+            byte: end.byte + copy.len(),
+        };
+        self.cursor = copy_end;
+        self.anchor = None;
+        self.cat_highlight = Some((copy_start, copy_end));
+        self.preferred_column = None;
+        self.dirty = true;
+        true
+    }
+
+    pub fn move_cat_highlight_to(&mut self, destination: Cursor) -> bool {
+        let Some((start, end)) = self.cat_highlight else {
+            return false;
+        };
+        if destination.region == start.region
+            && destination.byte >= start.byte
+            && destination.byte <= end.byte
+        {
+            self.cat_highlight = None;
+            self.cursor = destination;
+            return false;
+        }
+        let Some(target_region) = self.regions.get(destination.region) else {
+            return false;
+        };
+        if destination.byte > target_region.text.len()
+            || !target_region.text.is_char_boundary(destination.byte)
+        {
+            return false;
+        }
+
+        let moved = self.regions[start.region].text[start.byte..end.byte].to_owned();
+        if moved.is_empty() {
+            return false;
+        }
+        self.record();
+        self.regions[start.region].text.drain(start.byte..end.byte);
+        let removed_len = end.byte - start.byte;
+        let insertion_byte = if destination.region == start.region && destination.byte > end.byte {
+            destination.byte - removed_len
+        } else {
+            destination.byte
+        };
+        self.regions[destination.region]
+            .text
+            .insert_str(insertion_byte, &moved);
+        let moved_start = Cursor {
+            region: destination.region,
+            byte: insertion_byte,
+        };
+        let moved_end = Cursor {
+            region: destination.region,
+            byte: insertion_byte + moved.len(),
+        };
+        self.cursor = moved_end;
+        self.anchor = None;
+        self.cat_highlight = Some((moved_start, moved_end));
+        self.preferred_column = None;
+        self.dirty = true;
         true
     }
 
@@ -244,6 +377,7 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return;
         }
+        self.cat_highlight = None;
         self.begin_selection(selecting);
         let text = &self.regions[self.cursor.region].text;
         if forward {
@@ -272,6 +406,7 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return;
         }
+        self.cat_highlight = None;
         self.begin_selection(selecting);
         let text = &self.regions[self.cursor.region].text;
         if forward {
@@ -317,6 +452,7 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return;
         }
+        self.cat_highlight = None;
         self.begin_selection(selecting);
         let text = &self.regions[self.cursor.region].text;
         let line_start = text[..self.cursor.byte].rfind('\n').map_or(0, |i| i + 1);
@@ -354,6 +490,7 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return;
         }
+        self.cat_highlight = None;
         self.begin_selection(selecting);
         let text = &self.regions[self.cursor.region].text;
         self.cursor.byte = text[..self.cursor.byte].rfind('\n').map_or(0, |i| i + 1);
@@ -365,6 +502,7 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return;
         }
+        self.cat_highlight = None;
         self.begin_selection(selecting);
         let text = &self.regions[self.cursor.region].text;
         self.cursor.byte = text[self.cursor.byte..]
@@ -384,6 +522,7 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return;
         }
+        self.cat_highlight = None;
         self.begin_selection(selecting);
         let ranges = visual_ranges(&self.regions[self.cursor.region].text, width.max(1));
         let row = ranges
@@ -431,6 +570,7 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return;
         }
+        self.cat_highlight = None;
         self.begin_selection(selecting);
         let ranges = visual_ranges(&self.regions[self.cursor.region].text, width.max(1));
         self.cursor.byte = ranges
@@ -445,6 +585,7 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return;
         }
+        self.cat_highlight = None;
         self.begin_selection(selecting);
         let ranges = visual_ranges(&self.regions[self.cursor.region].text, width.max(1));
         self.cursor.byte = ranges
@@ -525,6 +666,7 @@ impl CompositeEditor {
         let current = Snapshot {
             regions: self.regions.clone(),
             cursor: self.cursor,
+            cat_highlight: self.cat_highlight,
         };
         if undo {
             self.redo.push(current);
@@ -534,6 +676,7 @@ impl CompositeEditor {
         self.regions = snapshot.regions;
         self.cursor = snapshot.cursor;
         self.anchor = None;
+        self.cat_highlight = snapshot.cat_highlight;
         self.dirty = true;
         true
     }
@@ -542,6 +685,7 @@ impl CompositeEditor {
         self.undo.push(Snapshot {
             regions: self.regions.clone(),
             cursor: self.cursor,
+            cat_highlight: self.cat_highlight,
         });
         if self.undo.len() > 200 {
             self.undo.remove(0);
@@ -550,11 +694,16 @@ impl CompositeEditor {
     }
     fn changed(&mut self) {
         self.anchor = None;
+        self.cat_highlight = None;
         self.preferred_column = None;
         self.dirty = true;
     }
+    fn conventional_selection(&self) -> Option<(Cursor, Cursor)> {
+        let anchor = self.anchor?;
+        (anchor != self.cursor).then(|| ordered(anchor, self.cursor))
+    }
     fn delete_selection_inner(&mut self) {
-        if let Some((start, end)) = self.selection() {
+        if let Some((start, end)) = self.conventional_selection() {
             self.regions[start.region].text.drain(start.byte..end.byte);
             self.cursor = start;
             self.anchor = None;
@@ -754,6 +903,55 @@ mod tests {
         assert!(!e.delete_selection());
         assert!(!e.insert("x"));
     }
+    #[test]
+    fn cat_highlight_copies_moves_erases_and_undo_restores_it() {
+        let first = id();
+        let second = id();
+        let mut e = CompositeEditor::new(
+            vec![
+                Region {
+                    document: first,
+                    text: "alpha beta".into(),
+                },
+                Region {
+                    document: second,
+                    text: "target".into(),
+                },
+            ],
+            Cursor { region: 0, byte: 0 },
+        );
+
+        assert!(e.set_cat_highlight(
+            Cursor { region: 0, byte: 6 },
+            Cursor { region: 0, byte: 10 }
+        ));
+        assert_eq!(e.selected_text().as_deref(), Some("beta"));
+        assert!(e.copy_cat_highlight());
+        assert_eq!(e.regions()[0].text, "alpha betabeta");
+        assert_eq!(e.selected_text().as_deref(), Some("beta"));
+
+        assert!(e.move_cat_highlight_to(Cursor { region: 1, byte: 0 }));
+        assert_eq!(e.regions()[0].text, "alpha beta");
+        assert_eq!(e.regions()[1].text, "betatarget");
+        assert_eq!(e.selected_text().as_deref(), Some("beta"));
+
+        assert!(e.erase_cat_highlight());
+        assert_eq!(e.regions()[1].text, "target");
+        assert!(e.undo());
+        assert_eq!(e.regions()[1].text, "betatarget");
+        assert_eq!(e.selected_text().as_deref(), Some("beta"));
+    }
+
+    #[test]
+    fn cat_highlight_cannot_cross_document_boundary() {
+        let mut e = editor();
+        assert!(!e.set_cat_highlight(
+            Cursor { region: 0, byte: 0 },
+            Cursor { region: 1, byte: 0 }
+        ));
+        assert!(e.cat_highlight().is_none());
+    }
+
     #[test]
     fn unicode_edit_undo_redo_and_indent() {
         let mut e = editor();
