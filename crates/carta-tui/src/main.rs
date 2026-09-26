@@ -547,13 +547,30 @@ fn handle_key(
             _ => {}
         },
         AppMode::Palette { .. } => unreachable!(),
-        AppMode::Prompt { input, .. } => match key.code {
+        AppMode::Prompt { input, cursor, .. } => match key.code {
             KeyCode::Esc => app.cancel_mode(),
             KeyCode::Enter => app.submit_prompt()?,
+            KeyCode::Left => *cursor = previous_char_boundary(input, *cursor),
+            KeyCode::Right => *cursor = next_char_boundary(input, *cursor),
+            KeyCode::Home => *cursor = 0,
+            KeyCode::End => *cursor = input.len(),
             KeyCode::Backspace => {
-                input.pop();
+                let previous = previous_char_boundary(input, *cursor);
+                if previous < *cursor {
+                    input.replace_range(previous..*cursor, "");
+                    *cursor = previous;
+                }
             }
-            KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => input.push(c),
+            KeyCode::Delete => {
+                let next = next_char_boundary(input, *cursor);
+                if next > *cursor {
+                    input.replace_range(*cursor..next, "");
+                }
+            }
+            KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                input.insert(*cursor, c);
+                *cursor += c.len_utf8();
+            }
             _ => {}
         },
         AppMode::Confirm { .. } => match key.code {
@@ -592,6 +609,21 @@ fn handle_key(
         AppMode::Editing => handle_normal(app, key)?,
     }
     Ok(())
+}
+
+fn previous_char_boundary(text: &str, cursor: usize) -> usize {
+    text[..cursor.min(text.len())]
+        .char_indices()
+        .next_back()
+        .map_or(0, |(index, _)| index)
+}
+
+fn next_char_boundary(text: &str, cursor: usize) -> usize {
+    let cursor = cursor.min(text.len());
+    text[cursor..]
+        .chars()
+        .next()
+        .map_or(text.len(), |character| cursor + character.len_utf8())
 }
 
 fn normalize_clipboard_text(text: &str) -> String {
@@ -1253,6 +1285,7 @@ fn draw_mode(frame: &mut ratatui::Frame<'_>, app: &App) {
         AppMode::Prompt {
             title,
             input,
+            cursor,
             details,
             ..
         } => {
@@ -1280,7 +1313,7 @@ fn draw_mode(frame: &mut ratatui::Frame<'_>, app: &App) {
             frame.set_cursor_position((
                 prompt.x
                     + 1
-                    + input
+                    + input[..(*cursor).min(input.len())]
                         .chars()
                         .map(|c| c.width().unwrap_or(0))
                         .sum::<usize>()
@@ -1572,6 +1605,15 @@ mod tests {
         );
         assert_eq!(editor_width(160), 80);
         assert_eq!(editor_width(70), 70);
+    }
+
+    #[test]
+    fn prompt_cursor_moves_on_utf8_character_boundaries() {
+        let text = "aèz";
+        assert_eq!(next_char_boundary(text, 0), 1);
+        assert_eq!(next_char_boundary(text, 1), 3);
+        assert_eq!(previous_char_boundary(text, 3), 1);
+        assert_eq!(previous_char_boundary(text, 1), 0);
     }
 
     #[test]
