@@ -1,3 +1,5 @@
+#[cfg(not(test))]
+use arboard::Clipboard;
 use carta_core::{Archive, LeapDirection};
 use carta_tui::app::{AppMode, View};
 use carta_tui::editor::{visual_ranges, Cursor};
@@ -199,6 +201,54 @@ struct Dispatcher {
     active_leap: Option<PendingLeap>,
     suppressed_leap_releases: u8,
     right_control_held: bool,
+    clipboard: ClipboardBridge,
+}
+
+#[derive(Default)]
+struct ClipboardBridge {
+    #[cfg(not(test))]
+    system: Option<Clipboard>,
+    #[cfg(test)]
+    text: Option<String>,
+}
+
+impl ClipboardBridge {
+    #[cfg(not(test))]
+    fn system(&mut self) -> Result<&mut Clipboard, String> {
+        if self.system.is_none() {
+            self.system = Some(Clipboard::new().map_err(|error| error.to_string())?);
+        }
+        self.system
+            .as_mut()
+            .ok_or_else(|| "system clipboard unavailable".to_owned())
+    }
+
+    fn set_text(&mut self, text: String) -> Result<(), String> {
+        #[cfg(not(test))]
+        {
+            self.system()?
+                .set_text(text)
+                .map_err(|error| error.to_string())
+        }
+        #[cfg(test)]
+        {
+            self.text = Some(text);
+            Ok(())
+        }
+    }
+
+    fn get_text(&mut self) -> Result<String, String> {
+        #[cfg(not(test))]
+        {
+            self.system()?.get_text().map_err(|error| error.to_string())
+        }
+        #[cfg(test)]
+        {
+            self.text
+                .clone()
+                .ok_or_else(|| "system clipboard has no text".to_owned())
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -258,7 +308,25 @@ fn handle_key(
         if matches!(app.mode, AppMode::Editing)
             && matches!(app.view, View::Chronological(_) | View::Work(_))
         {
-            app.copy_cat_highlight();
+            if app.editor.cat_highlight().is_some() {
+                app.copy_cat_highlight();
+            } else {
+                match dispatcher.clipboard.get_text() {
+                    Ok(text) if text.is_empty() => {
+                        app.status = "System clipboard is empty".into();
+                    }
+                    Ok(text) => {
+                        let text = normalize_clipboard_text(&text);
+                        if app.editor.insert(&text) {
+                            app.edited(Instant::now());
+                            app.status.clear();
+                        }
+                    }
+                    Err(error) => {
+                        app.status = format!("System clipboard unavailable: {error}");
+                    }
+                }
+            }
         }
         return Ok(());
     }
@@ -313,7 +381,14 @@ fn handle_key(
                     if pending.key != key {
                         dispatcher.pending_leap = None;
                         dispatcher.suppressed_leap_releases = 2;
-                        app.extend_last_leap_highlight();
+                        if app.extend_last_leap_highlight() {
+                            if let Some(text) = app.editor.selected_text() {
+                                if let Err(error) = dispatcher.clipboard.set_text(text) {
+                                    app.status =
+                                        format!("Cat highlight active; clipboard unavailable: {error}");
+                                }
+                            }
+                        }
                         return Ok(());
                     }
                     return Ok(());
@@ -436,6 +511,10 @@ fn handle_key(
         AppMode::Editing => handle_normal(app, key)?,
     }
     Ok(())
+}
+
+fn normalize_clipboard_text(text: &str) -> String {
+    text.replace("\r\n", "\n").replace('\r', "\n")
 }
 
 fn handle_normal(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
@@ -1480,7 +1559,8 @@ mod tests {
         .unwrap();
 
         assert!(app.editor.cat_highlight().is_some());
-        assert!(app.editor.selected_text().is_some());
+        let selected = app.editor.selected_text().expect("Cat highlight text");
+        assert_eq!(dispatcher.clipboard.get_text().unwrap(), selected);
     }
 
     #[test]
@@ -1518,17 +1598,35 @@ mod tests {
     }
 
     #[test]
-    fn copy_after_leap_auto_extends_the_last_leap_span() {
+    fn right_control_c_without_highlight_pastes_system_clipboard() {
         let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
-        app.start_leap(LeapDirection::Forward, false);
-        app.leap_input("beta");
-        app.end_leap();
+        let mut dispatcher = Dispatcher::default();
+        dispatcher
+            .clipboard
+            .set_text("outside\r\ntext".into())
+            .unwrap();
 
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(app.editor.regions()[0].text, "outside\ntextalpha beta");
         assert!(app.editor.cat_highlight().is_none());
-        assert!(app.copy_cat_highlight());
-        assert_eq!(app.editor.regions()[0].text, "alpha betaalpha beta");
-        assert_eq!(app.editor.selected_text().as_deref(), Some("alpha beta"));
     }
 
     #[test]
