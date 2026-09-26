@@ -1451,11 +1451,11 @@ mod tests {
             true,
         )
         .unwrap();
-        let release = KeyEvent::new(
+        let release = KeyEvent::new_with_kind(
             KeyCode::Modifier(ModifierKeyCode::LeftAlt),
             KeyModifiers::NONE,
-        )
-        .with_kind(KeyEventKind::Release);
+            KeyEventKind::Release,
+        );
         handle_key(&mut app, &mut dispatcher, release, true).unwrap();
 
         handle_key(
