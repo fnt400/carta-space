@@ -1485,7 +1485,11 @@ impl App {
         let destination = self.editor.cursor();
         let had_highlight = self.editor.cat_highlight().is_some();
 
-        if !query_empty {
+        if query_empty {
+            self.last_leap_span = None;
+            self.cat_span_fixed = None;
+            self.rehighlight_span = None;
+        } else {
             self.leap.remember(&session);
             self.typed_span_start = None;
             self.rehighlight_span = None;
@@ -1525,6 +1529,11 @@ impl App {
                 byte: origin.byte_offset(),
             });
         }
+        self.last_leap_span = None;
+        self.cat_span_fixed = None;
+        self.rehighlight_span = None;
+        self.typed_span_start = None;
+        self.cat_erase_forward = true;
         self.mode = AppMode::Editing;
     }
 
@@ -3349,6 +3358,7 @@ mod tests {
 
         assert_eq!(app.editor.cursor().byte, 1);
         assert!(app.last_leap_span.is_none());
+        assert!(app.cat_span_fixed.is_none());
     }
 
     #[test]
