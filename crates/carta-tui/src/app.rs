@@ -1179,7 +1179,7 @@ impl App {
         origin: Cursor,
         destination: Cursor,
     ) -> Option<(Cursor, Cursor)> {
-        if origin.region != destination.region {
+        if origin.region != destination.region || origin == destination {
             return None;
         }
         let origin_range = self
@@ -1247,7 +1247,6 @@ impl App {
             self.editor.backspace()
         };
         if changed {
-            self.edited(Instant::now());
             self.typed_span_start = None;
             self.last_leap_span = None;
             self.rehighlight_span = None;
@@ -1339,10 +1338,18 @@ impl App {
     pub fn remember_direct_leap_span(&mut self, origin: Cursor) {
         let destination = self.editor.cursor();
         self.last_leap_span = if origin.region == destination.region && origin != destination {
-            Some((origin, destination))
+            let (start, end) = if origin.byte <= destination.byte {
+                (origin, destination)
+            } else {
+                (destination, origin)
+            };
+            Some((start, end))
         } else {
             None
         };
+        self.typed_span_start = None;
+        self.rehighlight_span = None;
+        self.cat_erase_forward = true;
         if self.last_leap_span.is_some() {
             self.status.clear();
         }
