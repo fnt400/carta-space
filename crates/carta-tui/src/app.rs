@@ -1273,6 +1273,14 @@ impl App {
             return;
         }
 
+        if !self.cat_erase_forward {
+            if let Some((start, _)) = self.cat_previous_char_range(self.editor.cursor()) {
+                self.editor.set_cursor_preserving_highlight(start);
+            }
+            self.cat_erase_forward = true;
+            return;
+        }
+
         self.rehighlight_span = None;
         let origin = self.editor.cursor();
         self.editor
@@ -1433,9 +1441,17 @@ impl App {
             self.typed_span_start = None;
             self.rehighlight_span = None;
             if had_highlight && !palette {
+                let previous_highlight = self.editor.cat_highlight();
                 if self.editor.move_cat_highlight_to(destination) {
                     self.edited(Instant::now());
                     self.status = "Moved highlighted text".into();
+                } else if let Some((start, end)) = previous_highlight {
+                    if destination.region == start.region
+                        && destination.byte >= start.byte
+                        && destination.byte < end.byte
+                    {
+                        self.rehighlight_span = Some((destination, end));
+                    }
                 }
                 self.last_leap_span = None;
             } else {
