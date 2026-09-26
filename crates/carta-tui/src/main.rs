@@ -426,7 +426,7 @@ fn handle_key(
                 } else {
                     app.editor.visual_end(width, false);
                 }
-                app.remember_direct_leap_span(origin);
+                app.remember_direct_leap_span(origin, pending.direction);
             }
             return Ok(());
         }
