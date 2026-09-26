@@ -588,6 +588,18 @@ impl CompositeEditor {
         self.finish_selection(selecting);
     }
 
+    pub fn visual_boundary_cursor(&self, width: usize, forward: bool) -> Option<Cursor> {
+        let region = self.regions.get(self.cursor.region)?;
+        let ranges = visual_ranges(&region.text, width.max(1));
+        let range = ranges
+            .iter()
+            .rfind(|(start, end)| self.cursor.byte >= *start && self.cursor.byte <= *end)?;
+        Some(Cursor {
+            region: self.cursor.region,
+            byte: if forward { range.1 } else { range.0 },
+        })
+    }
+
     pub fn visual_home(&mut self, width: usize, selecting: bool) {
         if self.regions.is_empty() {
             return;
