@@ -322,7 +322,8 @@ The v0.1 TUI keeps direct bindings deliberately small:
 - physical Right Control+Left Control: Leap Again backward; physical Right Control+Left Alt: Leap Again forward;
 - physical Right Control+C with a Cat highlight: Cat COPY;
 - physical Right Control+C without a Cat highlight: paste system-clipboard text at the cursor;
-- Backspace or Delete: Cat ERASE; with an extended highlight erase the block, after typing erase backward, after LEAP/creep erase forward;
+- Backspace: modern backward deletion; with an extended Cat highlight it erases the whole highlighted block;
+- Delete: Canon Cat ERASE; with an extended highlight it erases the block, after typing it erases backward, and after LEAP/creep it erases forward;
 - Ctrl+PageUp/PageDown: move to the previous/next Document in the current View, without wrapping;
 - Ctrl+Home/End: move to the beginning/end of the current Document.
 
@@ -353,7 +354,7 @@ Item 2 is an intentional Carta deviation from the original Canon Cat. The Cat's 
 
 Creating a Cat highlight with Left Control + Left Alt also exports that highlighted text to the operating-system clipboard. This makes Cat selection interoperable with other applications without changing the internal move/copy model.
 
-There is no direct Cut command. Moving highlighted text by LEAP replaces Cut/Paste for rearranging text already inside Carta. Backspace or Delete erases an extended highlight as one editing operation.
+There is no direct Cut command. Moving highlighted text by LEAP replaces Cut/Paste for rearranging text already inside Carta. Backspace and Delete both erase an extended highlight as one editing operation, but outside an extended highlight Backspace keeps conventional modern backward-delete semantics while Delete carries the Canon Cat directional ERASE semantics.
 
 Clipboard integration belongs to the frontend, not the archive/core model. Clipboard failure MUST NOT invalidate or cancel an otherwise successful Cat highlight. When pasting clipboard text, CRLF and lone CR line endings are normalized to LF before insertion. Non-text or unavailable clipboard content leaves the Document unchanged and may be reported in the status bar.
 
