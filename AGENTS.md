@@ -165,3 +165,22 @@ Do not broaden the task beyond what was requested.
 If a small implementation decision is reversible and does not affect the format or architecture, choose the simplest reasonable option and proceed.
 
 If a decision changes the format, archive semantics, LEAP interaction model, Trash/Wipe or history guarantees, or crate boundaries, surface it explicitly before making the change.
+
+
+## Development workflow roles
+
+The default workflow is defined in `DEVELOPMENT-WORKFLOW.md`.
+
+For the current v0.1 development cycle, design/review and repository implementation are normally handled in ChatGPT. ChatGPT may inspect the repository, edit tracked source and documentation, create focused commits, and push them to the active development branch.
+
+OpenCode is normally used as the local execution and runtime-verification agent. Unless a task explicitly says otherwise, it should not modify repository files. Its main responsibilities are to run builds, formatters, linters, automated tests, reproduce runtime failures, exercise the TUI, inspect terminal/keyboard behavior, and report exact results.
+
+The normal loop is therefore:
+
+```text
+user/dogfooding -> ChatGPT implementation -> local pull -> OpenCode verification -> ChatGPT review/fix
+```
+
+For current v0.1 work, the active development branch is `opencode/v0.1`. Do not write implementation commits to `main` unless explicitly requested.
+
+If local verification requires a code change, OpenCode should report the failure rather than silently patching it unless the task explicitly authorizes edits.
