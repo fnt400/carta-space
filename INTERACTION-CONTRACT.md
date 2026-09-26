@@ -359,7 +359,7 @@ The v0.1 TUI keeps direct bindings deliberately small:
 - Left Alt+PageDown: LEAP to the end of the current View;
 - Esc: command palette;
 - Left Control + Left Alt together after a LEAP, creep sequence, or run of typing: extend the pending Cat highlight and copy it to the system clipboard;
-- while a LEAP key is held with an active pattern, press Right Control repeatedly to Leap Again through further occurrences without changing the original anchor; press the opposite LEAP key while still holding the first to turn the whole traversed range into the Cat highlight;
+- while a LEAP key is held after either a text-pattern or structural LEAP, press Right Control repeatedly to Leap Again through further targets of the same kind without changing the original anchor; press the opposite LEAP key while still holding the first to turn the traversed range into the Cat highlight when that range remains within one Document;
 - outside an active LEAP, physical Right Control+Left Control: Leap Again backward; physical Right Control+Left Alt: Leap Again forward;
 - physical Right Control+C with a Cat highlight: Cat COPY;
 - physical Right Control+C without a Cat highlight: paste system-clipboard text at the cursor;
