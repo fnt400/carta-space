@@ -340,9 +340,13 @@ In an editable multi-Document View, ordinary text editing MUST NOT be able to de
 
 A frontend MUST require an explicit structural operation to reorder Documents in a Work or remove a Document reference from a Work.
 
-Draft 0.1 interaction semantics do not define Document split or merge operations. A frontend claiming v0.1 interaction conformance SHOULD NOT invent split/merge semantics without a later accepted design decision.
+Draft 0.1 defines one explicit structural split operation. Splitting a Document at a valid UTF-8 byte boundary MUST preserve the original Document identity for the content before the split, create a new UUIDv7 Document for the content at and after the split, and assign the new Document the smallest representable `created` timestamp greater than the original immutable `created` value.
 
-This requirement prevents accidental corruption of the logical structure.
+If the source Document belongs to one or more Works, each such Work MUST insert the new Document immediately after the source. This preserves the authored composition order across all projections of the split Document.
+
+Draft 0.1 does not define a Document merge operation.
+
+This requirement prevents accidental corruption of the logical structure while keeping boundary changes explicit.
 
 ---
 
@@ -431,9 +435,9 @@ Generated separators between component Documents MUST NOT be editable as ordinar
 
 Editing text in a component region MUST edit the referenced Document itself, not a duplicate.
 
-A frontend MAY provide explicit structural commands for insertion, removal, and reordering.
+A frontend MAY provide explicit structural commands for insertion, removal, reordering, and the normative Document split defined in section 9.
 
-Draft 0.1 does not define split or merge interaction semantics.
+Draft 0.1 does not define merge interaction semantics.
 
 The exact appearance of boundaries is not specified by the archive format.
 
