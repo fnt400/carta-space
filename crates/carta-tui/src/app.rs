@@ -143,6 +143,7 @@ pub enum Command {
     NewDocument,
     DuplicateAsNew,
     NewLinkedDocument,
+    SplitDocument,
     PreviousMonth,
     NextMonth,
     GoToMonth,
@@ -201,6 +202,7 @@ impl Command {
             Self::NewDocument => "New Document",
             Self::DuplicateAsNew => "Duplicate as New",
             Self::NewLinkedDocument => "New Linked Document",
+            Self::SplitDocument => "Split Document at Point",
             Self::PreviousMonth => "Previous Month",
             Self::NextMonth => "Next Month",
             Self::GoToMonth => "Go to Month…",
@@ -487,6 +489,7 @@ impl App {
             commands.extend([
                 DuplicateAsNew,
                 NewLinkedDocument,
+                SplitDocument,
                 ShowMemberships,
                 AddToWork,
                 InsertLink,
@@ -581,6 +584,18 @@ impl App {
                 )?;
                 self.structural("Created linked Document")?;
                 self.open_document(id, true)?;
+            }
+            SplitDocument => {
+                self.autosave_for_destructive()?;
+                let source = self.current_document()?;
+                let target = self
+                    .archive
+                    .split_document_at(source, self.editor.cursor().byte)?;
+                self.archive
+                    .checkpoint(CheckpointKind::Structural, Some("Split Document"))?;
+                self.reload_view(None)?;
+                self.open_document(target, false)?;
+                self.status = "Split Document".into();
             }
             PreviousMonth => self.change_month(-1)?,
             NextMonth => self.change_month(1)?,
