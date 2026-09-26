@@ -58,8 +58,6 @@ pub enum PromptAction {
     ExportWorkPdf,
     Package,
     Checkpoint,
-    ConfirmTrashDocument,
-    ConfirmTrashWork,
     ConfirmRestoreDocument,
     ConfirmRestoreDocumentVersion,
     ConfirmRestoreWork,
@@ -70,6 +68,12 @@ pub enum PromptAction {
     ResolveExternal,
     ResolveLocalPreserve,
     ResolveExternalPreserve,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfirmAction {
+    TrashDocument(DocumentId),
+    TrashWork(WorkId),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -111,6 +115,11 @@ pub enum AppMode {
         input: String,
         details: Vec<String>,
         action: PromptAction,
+    },
+    Confirm {
+        title: String,
+        details: Vec<String>,
+        action: ConfirmAction,
     },
     Selector {
         title: String,
@@ -591,10 +600,7 @@ impl App {
             RestoreAsNew => self.restore_history(true)?,
             RestoreWorkVersion => self.prepare_work_history_restore()?,
             Trash => self.prepare_trash()?,
-            TrashWork => {
-                self.autosave_for_destructive()?;
-                self.prompt("Type TRASH WORK to confirm", PromptAction::ConfirmTrashWork)
-            }
+            TrashWork => self.prepare_trash_work()?,
             ShowTrash => self.show_trash()?,
             RestoreTrash => self.restore_trash()?,
             Wipe => self.prepare_wipe()?,
@@ -744,20 +750,6 @@ impl App {
                 self.archive
                     .checkpoint(CheckpointKind::Manual, Some(&input))?;
             }
-            PromptAction::ConfirmTrashDocument => {
-                if input == "TRASH" {
-                    self.autosave_for_destructive()?;
-                    self.archive.trash_document(self.current_document()?)?;
-                    self.reload_after_removal()?;
-                }
-            }
-            PromptAction::ConfirmTrashWork => {
-                if input == "TRASH WORK" {
-                    self.autosave_for_destructive()?;
-                    self.archive.trash_work(self.current_work()?)?;
-                    self.switch_view(View::Chronological(current_volume()), None, false)?;
-                }
-            }
             PromptAction::ConfirmRestoreDocument => {
                 if input == "RESTORE" {
                     if let Some(id) = self.selected_trashed_document() {
@@ -861,6 +853,30 @@ impl App {
         Ok(())
     }
 
+    pub fn submit_confirmation(&mut self, confirmed: bool) -> AppResult {
+        let AppMode::Confirm { action, .. } = self.mode.clone() else {
+            return Ok(());
+        };
+        self.mode = AppMode::Editing;
+        if !confirmed {
+            self.status = "Trash cancelled".into();
+            return Ok(());
+        }
+        match action {
+            ConfirmAction::TrashDocument(document) => {
+                self.autosave_for_destructive()?;
+                self.archive.trash_document(document)?;
+                self.reload_after_removal()?;
+            }
+            ConfirmAction::TrashWork(work) => {
+                self.autosave_for_destructive()?;
+                self.archive.trash_work(work)?;
+                self.switch_view(View::Chronological(current_volume()), None, false)?;
+            }
+        }
+        Ok(())
+    }
+
     pub fn submit_selector(&mut self) -> AppResult {
         let AppMode::Selector {
             query,
@@ -872,16 +888,38 @@ impl App {
         else {
             return Ok(());
         };
+        let query = query.clone();
+        let selected = *selected;
+        let choices = choices.clone();
+        let action = action.clone();
         let filtered: Vec<_> = choices
             .iter()
-            .filter(|c| palette::matches(query, &c.label))
+            .filter(|c| palette::matches(&query, &c.label))
             .collect();
-        let Some(choice) = filtered.get((*selected).min(filtered.len().saturating_sub(1))) else {
+
+        if action == SelectAction::AddToWork && filtered.is_empty() && !query.trim().is_empty() {
+            let document = self.current_document()?;
+            self.mode = AppMode::Editing;
+            if let Some(existing) = self.archive.work_title_conflict(&query, None) {
+                if self
+                    .archive
+                    .work(existing)
+                    .is_some_and(|work| work.documents().contains(&document))
+                {
+                    self.status = "Document already belongs to that Work".into();
+                    return Ok(());
+                }
+            }
+            self.archive.create_work(query, vec![document])?;
+            self.structural("Created Work and added Document")?;
+            return Ok(());
+        }
+
+        let Some(choice) = filtered.get(selected.min(filtered.len().saturating_sub(1))) else {
             return Ok(());
         };
         let value = choice.value.clone();
         let label = choice.label.clone();
-        let action = action.clone();
         self.mode = AppMode::Editing;
         match action {
             SelectAction::OpenWork => self.switch_view(View::Work(value.parse()?), None, true)?,
@@ -1557,8 +1595,7 @@ impl App {
     fn prepare_trash(&mut self) -> AppResult {
         self.autosave_for_destructive()?;
         if matches!(self.view, View::Work(_)) && self.editor.current_document().is_none() {
-            self.prompt("Type TRASH WORK to confirm", PromptAction::ConfirmTrashWork);
-            return Ok(());
+            return self.prepare_trash_work();
         }
         let impact = self
             .archive
@@ -1594,13 +1631,33 @@ impl App {
                 ));
             }
         }
-        self.prompt_with_details(
-            "Type TRASH to remove Work references and trash",
+        let document = self.current_document()?;
+        self.mode = AppMode::Confirm {
+            title: "Trash Document? [y/N]".into(),
             details,
-            PromptAction::ConfirmTrashDocument,
-        );
+            action: ConfirmAction::TrashDocument(document),
+        };
         Ok(())
     }
+
+    fn prepare_trash_work(&mut self) -> AppResult {
+        self.autosave_for_destructive()?;
+        let work = self.current_work()?;
+        let title = self
+            .archive
+            .work(work)
+            .map_or_else(|| "Work".to_owned(), |work| work.title().to_owned());
+        self.mode = AppMode::Confirm {
+            title: "Trash Work? [y/N]".into(),
+            details: vec![
+                format!("Work: {title}"),
+                "The Work will move to Trash. Its Documents remain in the Archive.".into(),
+            ],
+            action: ConfirmAction::TrashWork(work),
+        };
+        Ok(())
+    }
+
     fn show_trash(&mut self) -> AppResult {
         self.push_navigation();
         self.trash = Some(self.archive.trash_inventory()?);
@@ -2280,13 +2337,53 @@ mod tests {
             .unwrap();
 
         app.prepare_trash().unwrap();
-        let AppMode::Prompt { details, .. } = &app.mode else {
-            panic!("expected confirmation prompt")
+        let AppMode::Confirm { details, .. } = &app.mode else {
+            panic!("expected y/n confirmation")
         };
         let text = details.join("\n");
         assert!(text.contains("My Work"));
         assert!(text.contains("Source context"));
         assert!(text.contains("[Target](carta:doc:"));
+    }
+
+    #[test]
+    fn trash_confirmation_yes_executes_and_no_cancels() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let document = app.current_document().unwrap();
+        assert!(app.editor.insert("keep or trash"));
+        app.autosave().unwrap();
+
+        app.prepare_trash().unwrap();
+        app.submit_confirmation(false).unwrap();
+        assert!(app.archive.read_document(document).is_ok());
+
+        app.prepare_trash().unwrap();
+        app.submit_confirmation(true).unwrap();
+        assert!(app.archive.read_document(document).is_err());
+    }
+
+    #[test]
+    fn add_to_work_creates_missing_work_with_current_document() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let document = app.current_document().unwrap();
+
+        app.select_works(SelectAction::AddToWork, true);
+        let AppMode::Selector { query, .. } = &mut app.mode else {
+            panic!("expected Work selector")
+        };
+        *query = "New Dogfooding Work".into();
+        app.submit_selector().unwrap();
+
+        let work = app
+            .archive
+            .works()
+            .find(|work| work.title() == "New Dogfooding Work")
+            .expect("new Work should exist");
+        assert_eq!(work.documents(), &[document]);
     }
 
     #[test]

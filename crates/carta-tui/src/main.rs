@@ -375,6 +375,13 @@ fn handle_key(
             KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => input.push(c),
             _ => {}
         },
+        AppMode::Confirm { .. } => match key.code {
+            KeyCode::Char('y' | 'Y') => app.submit_confirmation(true)?,
+            KeyCode::Char('n' | 'N') | KeyCode::Esc | KeyCode::Enter => {
+                app.submit_confirmation(false)?
+            }
+            _ => {}
+        },
         AppMode::Selector {
             query,
             selected,
@@ -832,6 +839,35 @@ fn draw_mode(frame: &mut ratatui::Frame<'_>, app: &App) {
                     .highlight_style(Style::default().bg(Color::Blue)),
                 area,
                 &mut state,
+            );
+        }
+        AppMode::Confirm { title, details, .. } => {
+            let height = (details.len() as u16 + 4).min(area.height.max(4));
+            let prompt = Rect {
+                x: area.x,
+                y: area.y + area.height.saturating_sub(height) / 2,
+                width: area.width,
+                height,
+            };
+            frame.render_widget(Clear, prompt);
+            let text = if details.is_empty() {
+                "Press y to confirm; n or Esc to cancel.".to_owned()
+            } else {
+                format!(
+                    "{}\n\nPress y to confirm; n or Esc to cancel.",
+                    details.join("\n")
+                )
+            };
+            frame.render_widget(
+                Paragraph::new(text)
+                    .style(Style::default().fg(Color::Red))
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .border_style(Style::default().fg(Color::Red))
+                            .title(title.as_str()),
+                    ),
+                prompt,
             );
         }
         AppMode::Prompt {
