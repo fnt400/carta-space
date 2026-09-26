@@ -328,6 +328,7 @@ fn handle_key(
         dispatcher.pending_leap = None;
         if matches!(app.mode, AppMode::Editing)
             && matches!(app.view, View::Chronological(_) | View::Work(_))
+            && !app.collapsed
         {
             let command = if matches!(key.code, KeyCode::Char('z' | 'Z')) {
                 carta_tui::Command::Undo
@@ -346,6 +347,7 @@ fn handle_key(
         dispatcher.pending_leap = None;
         if matches!(app.mode, AppMode::Editing)
             && matches!(app.view, View::Chronological(_) | View::Work(_))
+            && !app.collapsed
         {
             if app.editor.cat_highlight().is_some() {
                 app.copy_cat_highlight();
@@ -616,6 +618,22 @@ fn handle_normal(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
         }
         return Ok(());
     }
+    if app.collapsed {
+        match key.code {
+            KeyCode::Up | KeyCode::PageUp => {
+                app.editor.move_document(false);
+                app.cat_navigation();
+            }
+            KeyCode::Down | KeyCode::PageDown => {
+                app.editor.move_document(true);
+                app.cat_navigation();
+            }
+            KeyCode::Enter => app.execute(carta_tui::Command::ExpandView)?,
+            _ => {}
+        }
+        return Ok(());
+    }
+
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
     let (terminal_width, height) = crossterm::terminal::size().unwrap_or((80, 24));
     let width = editor_width(terminal_width);
@@ -878,24 +896,28 @@ fn draw_editor(frame: &mut ratatui::Frame<'_>, app: &mut App, area: Rect) {
         })
         .unwrap_or(0);
     let height = usize::from(area.height.max(1));
-    if cursor_line < app.scroll {
-        app.scroll = cursor_line;
-    } else if cursor_line >= app.scroll + height {
-        app.scroll = cursor_line + 1 - height;
-    }
+    let (scroll, top_padding) = anchored_viewport(cursor_line, height);
+    app.scroll = scroll;
     let selection = app.cat_render_highlight();
-    let rendered: Vec<_> = lines
-        .iter()
-        .skip(app.scroll)
-        .take(height)
-        .map(|line| {
-            if let Some(region) = line.region {
-                styled_line(line, region, selection)
-            } else {
-                Line::styled(line.text.clone(), Style::default().fg(Color::DarkGray))
-            }
-        })
-        .collect();
+    let selection_style = if app.editor.cat_highlight().is_some() {
+        Style::default().bg(Color::Blue)
+    } else {
+        Style::default().bg(Color::DarkGray).fg(Color::White)
+    };
+    let mut rendered = vec![Line::raw(String::new()); top_padding];
+    rendered.extend(
+        lines
+            .iter()
+            .skip(app.scroll)
+            .take(height.saturating_sub(top_padding))
+            .map(|line| {
+                if let Some(region) = line.region {
+                    styled_line(line, region, selection, selection_style)
+                } else {
+                    Line::styled(line.text.clone(), Style::default().fg(Color::DarkGray))
+                }
+            }),
+    );
     frame.render_widget(Paragraph::new(rendered), area);
     if matches!(app.mode, AppMode::Editing | AppMode::Leap { .. }) {
         if let Some(line) = lines.get(cursor_line) {
@@ -904,10 +926,18 @@ fn draw_editor(frame: &mut ratatui::Frame<'_>, app: &mut App, area: Rect) {
             let x = text.chars().map(|c| c.width().unwrap_or(0)).sum::<usize>();
             frame.set_cursor_position((
                 area.x + x.min(width.saturating_sub(1)) as u16,
-                area.y + cursor_line.saturating_sub(app.scroll) as u16,
+                area.y + top_padding as u16 + cursor_line.saturating_sub(app.scroll) as u16,
             ));
         }
     }
+}
+
+fn anchored_viewport(cursor_line: usize, height: usize) -> (usize, usize) {
+    let target_row = height.saturating_mul(2) / 3;
+    (
+        cursor_line.saturating_sub(target_row),
+        target_row.saturating_sub(cursor_line),
+    )
 }
 
 fn visual_lines(app: &App, width: usize) -> Vec<VisualLine> {
@@ -933,7 +963,11 @@ fn visual_lines(app: &App, width: usize) -> Vec<VisualLine> {
             _ => {}
         }
 
-        for (start, end) in visual_ranges(&region.text, width) {
+        let visible_rows = if app.collapsed { 3 } else { usize::MAX };
+        for (start, end) in visual_ranges(&region.text, width)
+            .into_iter()
+            .take(visible_rows)
+        {
             out.push(VisualLine {
                 region: Some(region_index),
                 start,
@@ -1068,7 +1102,12 @@ fn truncate_display(text: &str, max_width: usize, ellipsis: bool) -> String {
     result
 }
 
-fn styled_line(line: &VisualLine, region: usize, selection: Option<(Cursor, Cursor)>) -> Line<'_> {
+fn styled_line(
+    line: &VisualLine,
+    region: usize,
+    selection: Option<(Cursor, Cursor)>,
+    selection_style: Style,
+) -> Line<'_> {
     let Some((start, end)) = selection else {
         return Line::raw(line.text.clone());
     };
@@ -1095,7 +1134,7 @@ fn styled_line(line: &VisualLine, region: usize, selection: Option<(Cursor, Curs
     let b = selected_end - line.start;
     Line::from(vec![
         Span::raw(text[..a].to_owned()),
-        Span::styled(text[a..b].to_owned(), Style::default().bg(Color::Blue)),
+        Span::styled(text[a..b].to_owned(), selection_style),
         Span::raw(text[b..].to_owned()),
     ])
 }
@@ -1504,6 +1543,27 @@ mod tests {
         );
         assert_eq!(editor_width(160), 80);
         assert_eq!(editor_width(70), 70);
+    }
+
+    #[test]
+    fn editor_viewport_keeps_cursor_at_two_thirds_with_top_padding() {
+        assert_eq!(anchored_viewport(0, 21), (0, 14));
+        assert_eq!(anchored_viewport(8, 21), (0, 6));
+        assert_eq!(anchored_viewport(20, 21), (6, 0));
+    }
+
+    #[test]
+    fn collapsed_view_shows_only_three_authored_rows_per_document() {
+        let (_temporary, mut app) =
+            app_with_documents(&["one\ntwo\nthree\nfour\nfive", "second"], false);
+        app.collapsed = true;
+
+        let lines = visual_lines(&app, 80);
+        let first_rows = lines
+            .iter()
+            .filter(|line| line.region == Some(0))
+            .count();
+        assert_eq!(first_rows, 3);
     }
 
     #[test]
