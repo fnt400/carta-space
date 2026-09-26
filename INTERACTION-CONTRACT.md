@@ -193,7 +193,7 @@ This padding is presentation only. It MUST NOT insert whitespace or line breaks 
 
 In multi-Document editable Views, boundaries are generated UI rather than authored text. A Work View uses one generated blank line, a simple continuous separator line, and one generated blank line between Documents.
 
-A Chronological View gives every Document a generated metadata separator. The separator includes the Document creation date and up to two Work memberships; if more memberships exist, an ellipsis indicates the remainder. The date uses a compact human-readable form such as `ven 25 set 2026`. A blank generated row separates the metadata line from authored text and from the preceding Document.
+A Chronological View gives every Document a generated metadata separator. The separator includes the Document creation date and up to two Work memberships; if more memberships exist, an ellipsis indicates the remainder. The date uses the system local timezone and a compact human-readable form such as `ven 25 set 2026`. A blank generated row separates the metadata line from authored text and from the preceding Document.
 
 The separator is generated UI:
 
@@ -317,7 +317,7 @@ With an extended highlight active:
 
 Pressing the opposite LEAP key while a physical LEAP query is active ends that LEAP and extends the highlight from the session's original anchor to its current target. This is what allows one or more in-session LEAP AGAIN operations to enlarge the eventual selection.
 
-Left Control+Enter and Left Alt+Enter are Carta line-boundary LEAP adaptations. They record the traversed line span for the same two-LEAP highlight gesture without including a Markdown newline character in the selection.
+Left Control+Enter and Left Alt+Enter treat authored LF characters as Cat-style RETURN targets rather than using visual wrapping. Left Control+Enter LEAPs backward to the beginning of the current logical line, or to the previous logical line when already at a line start. Left Alt+Enter LEAPs forward to the beginning of the next logical line. These operations use the same Cat LEAP state as ordinary pattern LEAP: they establish an extendable span and move an active Cat highlight to the target, so they can be used to reposition text by logical lines.
 
 Ordinary cursor navigation abandons a pending Cat span. Starting to type collapses an extended highlight and begins a new typed span; pressing both LEAP keys after a run of typing highlights that recently typed text.
 
@@ -351,8 +351,12 @@ The v0.1 TUI keeps direct bindings deliberately small:
 
 - hold Left Control + pattern: LEAP backward; tap Left Control: creep backward;
 - hold Left Alt + pattern: LEAP forward; tap Left Alt: creep forward;
-- Left Control+Enter: LEAP to the beginning of the current visual line;
-- Left Alt+Enter: LEAP to the end of the current visual line;
+- Left Control+Enter: LEAP backward to a logical line start using authored LF;
+- Left Alt+Enter: LEAP forward to the next logical line start using authored LF;
+- Left Control+Home: LEAP to the beginning of the current Document;
+- Left Alt+End: LEAP to the end of the current Document;
+- Left Control+PageUp: LEAP to the beginning of the current View;
+- Left Alt+PageDown: LEAP to the end of the current View;
 - Esc: command palette;
 - Left Control + Left Alt together after a LEAP, creep sequence, or run of typing: extend the pending Cat highlight and copy it to the system clipboard;
 - while a LEAP key is held with an active pattern, press Right Control repeatedly to Leap Again through further occurrences without changing the original anchor; press the opposite LEAP key while still holding the first to turn the whole traversed range into the Cat highlight;
@@ -363,8 +367,9 @@ The v0.1 TUI keeps direct bindings deliberately small:
 - physical Right Control+R: Redo;
 - Backspace: modern backward deletion; with an extended Cat highlight it erases the whole highlighted block;
 - Delete: Canon Cat ERASE; with an extended highlight it erases the block, after typing it erases backward, and after LEAP/creep it erases forward;
-- Ctrl+PageUp/PageDown: move to the previous/next Document in the current View, without wrapping;
-- Ctrl+Home/End: move to the beginning/end of the current Document.
+- physical Right Control+PageUp/PageDown: move to the previous/next Document in the current View, without wrapping;
+- physical Right Control+Home/End: move to the beginning/end of the current Document.
+In degraded keyboard mode where physical Control sides cannot be distinguished, conventional Ctrl+PageUp/PageDown and Ctrl+Home/End remain compatibility fallbacks.
 
 Explicitly assigned Ctrl chords take precedence over the physical Control-key LEAP binding. They MUST NOT start LEAP, leave LEAP pending, or change the remembered LEAP query.
 
