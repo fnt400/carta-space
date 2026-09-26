@@ -21,8 +21,12 @@ Right Ctrl                  Carta command modifier
 Right Ctrl + Z              Undo
 Right Ctrl + R              Redo
 Right Ctrl + C              Cat COPY when highlighted; otherwise paste system clipboard
-Left Ctrl + Enter           LEAP to start of visual line
-Left Alt + Enter            LEAP to end of visual line
+Left Ctrl + Enter           LEAP to current/previous LF line start
+Left Alt + Enter            LEAP to next LF line start
+Left Ctrl + Home            LEAP to start of current Document
+Left Alt + End              LEAP to end of current Document
+Left Ctrl + PageUp          LEAP to start of current View
+Left Alt + PageDown         LEAP to end of current View
 Right Ctrl + Left Alt       Leap Again forward
 Right Ctrl + Left Ctrl      Leap Again backward
 
@@ -36,10 +40,10 @@ LEAP inside it collapses the highlight and allows rehighlighting.
 
 DOCUMENT NAVIGATION
 
-Ctrl + PageUp               Previous Document
-Ctrl + PageDown             Next Document
-Ctrl + Home                 Start of current Document
-Ctrl + End                  End of current Document
+Right Ctrl + PageUp         Previous Document
+Right Ctrl + PageDown       Next Document
+Right Ctrl + Home           Start of current Document
+Right Ctrl + End            End of current Document
 PageUp / PageDown           Move by one screen
 Home / End                  Start/end of visual line
 
@@ -93,7 +97,9 @@ A lowercase query character matches either case. An uppercase query character re
 
 A successful LEAP lands on the target character. A failed LEAP rebounds to its origin. Releasing a LEAP key after no query performs creep in that direction.
 
-LeftCtrl+Enter and LeftAlt+Enter LEAP to the beginning and end of the current visual line respectively."#,
+LeftCtrl+Enter and LeftAlt+Enter search authored LF boundaries, not wrapped screen rows. Backward LEAP goes to the current logical line start (or the previous one when already at a line start); forward LEAP goes to the next logical line start. With a Cat highlight active these same LEAPs move the highlighted text.
+
+LeftCtrl+Home and LeftAlt+End LEAP to the beginning and end of the current Document. LeftCtrl+PageUp and LeftAlt+PageDown LEAP to the beginning and end of the current View."#,
     },
     HelpDocument {
         title: "5. Leap Again and Cat highlight",
