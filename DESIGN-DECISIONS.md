@@ -400,9 +400,9 @@ A dedicated writing device with a keyboard and simple display is therefore a nat
 
 ## DD-035 — Session/UI state is local and disposable
 
-**Decision:** Cursor/scroll positions, last View, per-Work resume positions, MRU Work ordering, and similar UI state are device-local, non-canonical, and excluded from Git history.
+**Decision:** Cursor/scroll positions, last View, per-Work resume positions, MRU Work ordering, and similar UI state are device-local, non-canonical, and excluded from Git history. The reference implementation keeps these files under the Carta XDG data root, `$XDG_DATA_HOME/carta` (fallback `~/.local/share/carta`), outside the `archive/` Git working tree.
 
-**Why:** Such state improves continuity but is not authored content and should not create merge/synchronization pressure or affect archive recoverability.
+**Why:** Such state improves continuity but is not authored content and should not create merge/synchronization pressure or affect archive recoverability. Keeping the default Archive and its device-local sidecar state below one deterministic XDG data root avoids hidden last-used paths while preserving the boundary between canonical Archive data and disposable UI state.
 
 ---
 
