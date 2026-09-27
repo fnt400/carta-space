@@ -262,7 +262,9 @@ Physical Right Alt/AltGr is never a LEAP key and remains available for internati
 The reference TUI also uses Right Control as the Carta command modifier:
 
 - `RightCtrl+Z` = Undo;
-- `RightCtrl+R` = Redo.
+- `RightCtrl+R` = Redo;
+- `RightCtrl+W` = `Open Work…`;
+- `RightCtrl+L` = `Insert Link…` when point is not on a link, otherwise `Open Link`.
 
 These are frontend bindings, not archive semantics.
 
@@ -397,7 +399,7 @@ Explicitly assigned Ctrl chords take precedence over the physical Control-key LE
 
 Other direct shortcuts should be added only after real use demonstrates a need.
 
-`Undo` and `Redo` are contextual command-palette commands and also have the direct RightCtrl+Z / RightCtrl+R bindings. They are available in editable Views when the session-local editor history can apply them.
+`Undo` and `Redo` are contextual command-palette commands and also have the direct RightCtrl+Z / RightCtrl+R bindings. They are available in editable Views when the session-local editor history can apply them. `Open Work…` and the contextual Insert/Open Link action also have the direct RightCtrl+W / RightCtrl+L bindings.
 
 ---
 
