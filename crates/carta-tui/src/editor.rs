@@ -588,41 +588,6 @@ impl CompositeEditor {
         self.finish_selection(selecting);
     }
 
-    pub fn logical_line_leap_cursor(&self, forward: bool) -> Option<Cursor> {
-        let region = self.regions.get(self.cursor.region)?;
-        let text = &region.text;
-
-        if forward {
-            let newline = text[self.cursor.byte..].find('\n')? + self.cursor.byte;
-            return Some(Cursor {
-                region: self.cursor.region,
-                byte: newline + 1,
-            });
-        }
-
-        if self.cursor.byte == 0 {
-            return Some(self.cursor);
-        }
-
-        let before = &text[..self.cursor.byte];
-        let newline = before.rfind('\n');
-        let current_line_start = newline.map_or(0, |index| index + 1);
-        if current_line_start < self.cursor.byte {
-            return Some(Cursor {
-                region: self.cursor.region,
-                byte: current_line_start,
-            });
-        }
-
-        let previous_line_start = newline
-            .and_then(|index| text[..index].rfind('\n').map(|previous| previous + 1))
-            .unwrap_or(0);
-        Some(Cursor {
-            region: self.cursor.region,
-            byte: previous_line_start,
-        })
-    }
-
     pub fn document_boundary_cursor(&self, forward: bool) -> Option<Cursor> {
         let region = self.regions.get(self.cursor.region)?;
         Some(Cursor {

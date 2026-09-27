@@ -395,11 +395,6 @@ fn handle_key(
     if enhanced {
         if let Some(pending) = dispatcher.pending_leap {
             let handled = match (pending.direction, key.code) {
-                (LeapDirection::Backward, KeyCode::Enter)
-                | (LeapDirection::Forward, KeyCode::Enter) => {
-                    app.leap_logical_line(pending.direction);
-                    true
-                }
                 (LeapDirection::Backward, KeyCode::Home)
                 | (LeapDirection::Forward, KeyCode::End) => {
                     app.leap_document_boundary(pending.direction);
@@ -578,6 +573,8 @@ fn handle_key(
             KeyCode::Enter => {
                 if matches!(app.mode, AppMode::Leap { palette: true, .. }) {
                     app.end_leap();
+                } else {
+                    app.leap_input("\n");
                 }
             }
             KeyCode::Esc => app.cancel_leap(),
@@ -1819,25 +1816,19 @@ mod tests {
     }
 
     #[test]
-    fn leap_enter_uses_logical_lf_boundaries_not_visual_wrap() {
-        let first = "a".repeat(100);
-        let content = format!("{first}\nsecond");
-        let (_temporary, mut app) = app_with_documents(&[content.as_str()], false);
+    fn leap_enter_builds_a_normal_incremental_pattern() {
+        let (_temporary, mut app) = app_with_documents(&["a\nb\n\nc"], false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        app.cat_navigation();
+        let original = app.editor.current_text().unwrap().to_owned();
         let mut dispatcher = Dispatcher::default();
 
-        app.editor.set_cursor(
-            Cursor {
-                region: 0,
-                byte: 90,
-            },
-            false,
-        );
         handle_key(
             &mut app,
             &mut dispatcher,
             KeyEvent::new(
-                KeyCode::Modifier(ModifierKeyCode::LeftControl),
-                KeyModifiers::CONTROL,
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::ALT,
             ),
             true,
         )
@@ -1845,22 +1836,84 @@ mod tests {
         handle_key(
             &mut app,
             &mut dispatcher,
-            KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL),
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT),
             true,
         )
         .unwrap();
-        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 0 });
+        let AppMode::Leap { session, .. } = &app.mode else {
+            panic!("expected active LEAP")
+        };
+        assert_eq!(session.query(), "\n");
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 1 });
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT),
+            true,
+        )
+        .unwrap();
+        let AppMode::Leap { session, .. } = &app.mode else {
+            panic!("expected active LEAP")
+        };
+        assert_eq!(session.query(), "\n\n");
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 3 });
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Backspace, KeyModifiers::ALT),
+            true,
+        )
+        .unwrap();
+        let AppMode::Leap { session, .. } = &app.mode else {
+            panic!("expected active LEAP")
+        };
+        assert_eq!(session.query(), "\n");
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 1 });
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('c'), KeyModifiers::ALT),
+            true,
+        )
+        .unwrap();
+        let AppMode::Leap { session, .. } = &app.mode else {
+            panic!("expected active LEAP")
+        };
+        assert_eq!(session.query(), "\nc");
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 4 });
+        assert_eq!(app.editor.current_text(), Some(original.as_str()));
+
         handle_key(
             &mut app,
             &mut dispatcher,
             KeyEvent::new_with_kind(
-                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
                 KeyModifiers::NONE,
                 KeyEventKind::Release,
             ),
             true,
         )
         .unwrap();
+
+        assert!(matches!(app.mode, AppMode::Editing));
+        assert_eq!(app.leap.remembered_query(), Some("\nc"));
+        assert_eq!(app.editor.current_text(), Some(original.as_str()));
+    }
+
+    #[test]
+    fn leap_enter_crosses_documents_and_wraps_without_synthetic_lf() {
+        let (_temporary, mut app) =
+            app_with_documents(&["first", "second\nline", "third"], true);
+        let original: Vec<_> = app
+            .editor
+            .regions()
+            .iter()
+            .map(|region| region.text.clone())
+            .collect();
+        let mut dispatcher = Dispatcher::default();
 
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
         app.cat_navigation();
@@ -1881,22 +1934,66 @@ mod tests {
             true,
         )
         .unwrap();
+        assert_eq!(app.editor.cursor(), Cursor { region: 1, byte: 6 });
+        let AppMode::Leap { session, .. } = &app.mode else {
+            panic!("expected active LEAP")
+        };
+        assert!(!session.current_match().unwrap().wrapped());
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new_with_kind(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
+            ),
+            true,
+        )
+        .unwrap();
+
+        app.editor.set_cursor(Cursor { region: 2, byte: 5 }, false);
+        app.cat_navigation();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.cursor(), Cursor { region: 1, byte: 6 });
+        let AppMode::Leap { session, .. } = &app.mode else {
+            panic!("expected active LEAP")
+        };
+        assert!(session.current_match().unwrap().wrapped());
+
         assert_eq!(
-            app.editor.cursor(),
-            Cursor {
-                region: 0,
-                byte: 101
-            }
+            app.editor
+                .regions()
+                .iter()
+                .map(|region| region.text.clone())
+                .collect::<Vec<_>>(),
+            original
         );
     }
 
     #[test]
-    fn leap_enter_moves_highlight_between_real_line_starts() {
+    fn leap_enter_moves_existing_highlight_only_on_release() {
         let (_temporary, mut app) = app_with_documents(&["one\ntwo\nthree"], false);
         app.editor.set_cursor(Cursor { region: 0, byte: 4 }, false);
         assert!(app
             .editor
-            .set_cat_highlight(Cursor { region: 0, byte: 4 }, Cursor { region: 0, byte: 7 },));
+            .set_cat_highlight(Cursor { region: 0, byte: 4 }, Cursor { region: 0, byte: 7 }));
         let mut dispatcher = Dispatcher::default();
 
         handle_key(
@@ -1916,8 +2013,11 @@ mod tests {
             true,
         )
         .unwrap();
-        assert_eq!(app.editor.current_text(), Some("twoone\n\nthree"));
+
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 3 });
+        assert_eq!(app.editor.current_text(), Some("one\ntwo\nthree"));
         assert_eq!(app.editor.selected_text().as_deref(), Some("two"));
+
         handle_key(
             &mut app,
             &mut dispatcher,
@@ -1930,29 +2030,12 @@ mod tests {
         )
         .unwrap();
 
-        handle_key(
-            &mut app,
-            &mut dispatcher,
-            KeyEvent::new(
-                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
-                KeyModifiers::ALT,
-            ),
-            true,
-        )
-        .unwrap();
-        handle_key(
-            &mut app,
-            &mut dispatcher,
-            KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT),
-            true,
-        )
-        .unwrap();
-        assert_eq!(app.editor.current_text(), Some("one\ntwo\nthree"));
+        assert_eq!(app.editor.current_text(), Some("onetwo\n\nthree"));
         assert_eq!(app.editor.selected_text().as_deref(), Some("two"));
     }
 
     #[test]
-    fn active_logical_line_leap_again_preserves_origin_for_highlight() {
+    fn active_enter_leap_again_preserves_origin_and_highlights_target_lf() {
         let (_temporary, mut app) = app_with_documents(&["a\nb\nc\nd"], false);
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
         app.cat_navigation();
@@ -1975,9 +2058,9 @@ mod tests {
             true,
         )
         .unwrap();
-        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 2 });
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 1 });
 
-        for expected in [4, 6] {
+        for expected in [3, 5] {
             handle_key(
                 &mut app,
                 &mut dispatcher,
@@ -1988,13 +2071,13 @@ mod tests {
                 true,
             )
             .unwrap();
-            assert_eq!(
-                app.editor.cursor(),
-                Cursor {
-                    region: 0,
-                    byte: expected
-                }
-            );
+
+            let AppMode::Leap { session, .. } = &app.mode else {
+                panic!("expected active LEAP")
+            };
+            assert_eq!(session.origin().byte_offset(), 0);
+            assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: expected });
+
             handle_key(
                 &mut app,
                 &mut dispatcher,
@@ -2019,8 +2102,52 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(app.editor.selected_text().as_deref(), Some("a\nb\nc\nd"));
-        assert_eq!(dispatcher.clipboard.get_text().unwrap(), "a\nb\nc\nd");
+        assert_eq!(app.editor.selected_text().as_deref(), Some("a\nb\nc\n"));
+        assert_eq!(dispatcher.clipboard.get_text().unwrap(), "a\nb\nc\n");
+    }
+
+    #[test]
+    fn enter_leap_highlight_does_not_cross_document_boundary() {
+        let (_temporary, mut app) = app_with_documents(&["a", "b\nc"], true);
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        app.cat_navigation();
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.cursor(), Cursor { region: 1, byte: 1 });
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::CONTROL | KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+
+        assert!(app.editor.cat_highlight().is_none());
+        assert_eq!(
+            app.status,
+            "Cat highlight cannot cross a Document boundary"
+        );
     }
 
     #[test]

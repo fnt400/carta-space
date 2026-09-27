@@ -330,7 +330,6 @@ impl Scheduler {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum StructuralLeap {
-    LogicalLine,
     DocumentBoundary,
     ViewBoundary,
 }
@@ -1317,16 +1316,13 @@ impl App {
             return;
         };
         let cursor = self.editor.cursor();
-        if fixed.region != cursor.region {
-            self.last_leap_span = None;
-            return;
-        }
         let current = self.cat_origin_range(cursor).unwrap_or((cursor, cursor));
-        let (start, end) = if fixed.byte <= current.0.byte {
-            (fixed, current.1)
-        } else {
-            (current.0, fixed)
-        };
+        let (start, end) =
+            if (fixed.region, fixed.byte) <= (current.0.region, current.0.byte) {
+                (fixed, current.1)
+            } else {
+                (current.0, fixed)
+            };
         self.last_leap_span = (start != end).then_some((start, end));
     }
 
@@ -1618,7 +1614,6 @@ impl App {
     ) -> Option<Cursor> {
         let forward = matches!(direction, LeapDirection::Forward);
         match kind {
-            StructuralLeap::LogicalLine => self.editor.logical_line_leap_cursor(forward),
             StructuralLeap::DocumentBoundary if !repeating => {
                 self.editor.document_boundary_cursor(forward)
             }
@@ -1671,11 +1666,6 @@ impl App {
             return false;
         };
         self.leap_to_cursor(direction, destination, preserve_anchor)
-    }
-
-    pub fn leap_logical_line(&mut self, direction: LeapDirection) {
-        self.remember_structural_leap(StructuralLeap::LogicalLine);
-        self.perform_structural_leap(StructuralLeap::LogicalLine, direction, false, false);
     }
 
     pub fn leap_document_boundary(&mut self, direction: LeapDirection) {
