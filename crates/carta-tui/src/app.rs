@@ -1151,7 +1151,11 @@ impl App {
             && !self.editor.is_dirty()
             && !self.archive.is_dirty()?
         {
-            self.sync_now(false)?;
+            if self.archive.sync_remote()?.is_some() {
+                self.sync_now(false)?;
+            } else {
+                self.scheduler.sync_attempted(now);
+            }
         }
         Ok(())
     }
@@ -1902,8 +1906,21 @@ impl App {
     }
 
     fn sync_now(&mut self, include_current: bool) -> AppResult {
+        let attempted = Instant::now();
+        if self.archive.sync_remote()?.is_none() {
+            self.scheduler.sync_attempted(attempted);
+            self.status = "Synchronization is not configured".into();
+            return Ok(());
+        }
+
         if include_current {
             self.autosave()?;
+            if self.provisional.is_some() {
+                self.scheduler.sync_attempted(attempted);
+                self.status =
+                    "Sync deferred · the current empty Document is still provisional".into();
+                return Ok(());
+            }
             if self.archive.is_dirty()? {
                 self.checkpoint(
                     CheckpointKind::Automatic,
@@ -1914,7 +1931,6 @@ impl App {
 
         let current_document = self.editor.current_document();
         let cursor_byte = self.editor.cursor().byte;
-        let attempted = Instant::now();
         let result = self.archive.sync();
         self.scheduler.sync_attempted(attempted);
 
@@ -1939,7 +1955,7 @@ impl App {
                 }
                 SyncOutcome::Conflict => {
                     self.status =
-                        "Sync conflict · local and remote histories preserved; synchronization paused"
+                        "Sync conflict · local and remote histories preserved; resolution required"
                             .into();
                 }
             },
@@ -2908,6 +2924,31 @@ fn sanitize_filename(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sync_now_does_not_checkpoint_a_provisional_document() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let remote = temporary.path().join("remote.git");
+        let status = std::process::Command::new("git")
+            .args(["init", "--bare", "--quiet"])
+            .arg(&remote)
+            .status()
+            .unwrap();
+        assert!(status.success());
+
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        app.archive
+            .set_sync_remote(remote.to_str().unwrap())
+            .unwrap();
+        assert_eq!(app.archive.history().unwrap().len(), 1);
+
+        app.sync_now(true).unwrap();
+
+        assert_eq!(app.archive.history().unwrap().len(), 1);
+        assert!(app.provisional.is_some());
+        assert!(app.status.contains("provisional"));
+    }
 
     #[test]
     fn sync_scheduler_runs_after_checkpoint_and_periodically() {

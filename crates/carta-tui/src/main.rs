@@ -161,7 +161,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     } else {
         match archive.sync() {
             Ok(report) if report.outcome() == SyncOutcome::Conflict => Some(
-                "Sync conflict · local and remote histories preserved; synchronization paused"
+                "Sync conflict · local and remote histories preserved; resolution required"
                     .to_owned(),
             ),
             Ok(_) => None,

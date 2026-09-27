@@ -162,7 +162,7 @@ WARNING: synchronization is not encrypted in v0.1. Anyone who can read the remot
 
 Carta attempts synchronization at startup when the Archive is clean, after checkpoints, periodically while an editable Archive is clean, and on normal Quit. Sync Now performs an immediate checkpoint when necessary and then synchronizes.
 
-Carta uses fetch, Archive-identity validation, fast-forward or a normal three-way merge, then push. It does not normally rebase or force-push. If Git cannot merge diverged histories cleanly, Carta leaves the working tree untouched, preserves both histories, reports a sync conflict, and pauses synchronization until the histories are reconciled."#,
+Carta uses fetch, Archive-identity validation, fast-forward or a normal three-way merge, then push. It does not normally rebase or force-push. If Git cannot merge diverged histories cleanly, Carta leaves the working tree untouched, preserves both histories, and reports a sync conflict that cannot complete until the histories are reconciled."#,
     },
     HelpDocument {
         title: "12. Keyboard and terminal notes",
