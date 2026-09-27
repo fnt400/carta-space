@@ -43,34 +43,76 @@ impl Session {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct LastArchive {
-    path: PathBuf,
+pub fn data_root() -> io::Result<PathBuf> {
+    if let Some(path) = std::env::var_os("XDG_DATA_HOME") {
+        if !path.is_empty() {
+            return Ok(PathBuf::from(path).join("carta"));
+        }
+    }
+    let home = std::env::var_os("HOME").ok_or_else(|| {
+        io::Error::new(io::ErrorKind::NotFound, "HOME and XDG_DATA_HOME are unset")
+    })?;
+    Ok(PathBuf::from(home).join(".local/share/carta"))
 }
 
-pub fn state_root() -> io::Result<PathBuf> {
+pub fn default_archive_path() -> io::Result<PathBuf> {
+    Ok(data_root()?.join("archive"))
+}
+
+pub fn migrate_legacy_state(root: &Path) -> io::Result<()> {
+    let legacy = legacy_state_root()?;
+    migrate_legacy_state_from(&legacy, root)
+}
+
+fn legacy_state_root() -> io::Result<PathBuf> {
     if let Some(path) = std::env::var_os("XDG_STATE_HOME") {
-        return Ok(PathBuf::from(path).join("carta-space"));
+        if !path.is_empty() {
+            return Ok(PathBuf::from(path).join("carta-space"));
+        }
     }
     let home = std::env::var_os("HOME").ok_or_else(|| {
         io::Error::new(io::ErrorKind::NotFound, "HOME and XDG_STATE_HOME are unset")
     })?;
     Ok(PathBuf::from(home).join(".local/state/carta-space"))
 }
-pub fn load_last_archive(root: &Path) -> io::Result<Option<PathBuf>> {
-    read_json(&root.join("last-archive.json")).map(|v: Option<LastArchive>| v.map(|x| x.path))
+
+fn migrate_legacy_state_from(legacy: &Path, root: &Path) -> io::Result<()> {
+    if legacy == root || !legacy.is_dir() {
+        return Ok(());
+    }
+
+    fs::create_dir_all(root)?;
+    for entry in fs::read_dir(legacy)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        let name = entry.file_name();
+        let Some(name_str) = name.to_str() else {
+            continue;
+        };
+
+        if name_str.starts_with("session-") && name_str.ends_with(".json") {
+            let target = root.join(&name);
+            if !target.exists() {
+                fs::copy(entry.path(), &target)?;
+            }
+            fs::remove_file(entry.path())?;
+        } else if name_str == "last-archive.json" {
+            fs::remove_file(entry.path())?;
+        }
+    }
+
+    if fs::read_dir(legacy)?.next().is_none() {
+        fs::remove_dir(legacy)?;
+    }
+    Ok(())
 }
-pub fn save_last_archive(root: &Path, path: &Path) -> io::Result<()> {
-    write_json(
-        &root.join("last-archive.json"),
-        &LastArchive {
-            path: path.to_path_buf(),
-        },
-    )
-}
+
 pub fn load_session(root: &Path, id: ArchiveId) -> io::Result<Option<Session>> {
     read_json(&root.join(format!("session-{id}.json")))
 }
+
 pub fn save_session(root: &Path, id: ArchiveId, session: &Session) -> io::Result<()> {
     write_json(&root.join(format!("session-{id}.json")), session)
 }
@@ -84,6 +126,7 @@ fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> io::Result<Option<T>>
         Err(e) => Err(e),
     }
 }
+
 fn write_json<T: Serialize>(path: &Path, value: &T) -> io::Result<()> {
     fs::create_dir_all(path.parent().unwrap())?;
     let temporary = path.with_extension("tmp");
@@ -97,13 +140,38 @@ fn write_json<T: Serialize>(path: &Path, value: &T) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn session_round_trips_outside_archive() {
+    fn session_round_trips_in_data_root() {
         let dir = tempfile::tempdir().unwrap();
         let id = ArchiveId::new_v7();
         let volume = Volume::new(2026, 9).unwrap();
         let session = Session::new(volume);
         save_session(dir.path(), id, &session).unwrap();
         assert_eq!(load_session(dir.path(), id).unwrap(), Some(session));
+    }
+
+    #[test]
+    fn legacy_state_migration_moves_sessions_and_discards_last_archive() {
+        let temporary = tempfile::tempdir().unwrap();
+        let legacy = temporary.path().join("legacy-state");
+        let root = temporary.path().join("data");
+        fs::create_dir_all(&legacy).unwrap();
+
+        let id = ArchiveId::new_v7();
+        let session = Session::new(Volume::new(2026, 9).unwrap());
+        save_session(&legacy, id, &session).unwrap();
+        fs::write(
+            legacy.join("last-archive.json"),
+            r#"{"path":"/tmp/obsolete"}"#,
+        )
+        .unwrap();
+
+        migrate_legacy_state_from(&legacy, &root).unwrap();
+
+        assert_eq!(load_session(&root, id).unwrap(), Some(session));
+        assert!(!legacy.join(format!("session-{id}.json")).exists());
+        assert!(!legacy.join("last-archive.json").exists());
+        assert!(!legacy.exists());
     }
 }
