@@ -116,7 +116,7 @@ A portable `.cat` package is a ZIP-based container of that tree. Its purpose is 
 
 `carta-core` creates packages through a temporary sibling of the destination, validates the ZIP and its unpacked Archive before replacement, and checkpoints current state first. The exact uncompressed `mimetype` is the first member; canonical files, unknown resources, and complete Git history are included, while reserved Carta-managed temporary artifacts are omitted.
 
-Document and Work PDF exports stream their exact Markdown export to Pandoc and an external PDF engine. LuaLaTeX is the default engine. PDF output is written to a temporary sibling and atomically replaces a regular destination only after Pandoc succeeds. Pandoc and the selected engine must be installed separately; neither is an Archive-format dependency.
+Built-in PDF publication is intentionally deferred beyond v0.1. Markdown export remains available for external publishing tools.
 
 ## Command line
 
@@ -130,15 +130,13 @@ carta --archive <path> import <file>
 carta --archive <path> search <literal-query>
 carta --archive <path> export markdown-document <document-id>
 carta --archive <path> export markdown-work <work-id>
-carta --archive <path> export pdf-document <document-id> <output.pdf>
-carta --archive <path> export pdf-work <work-id> <output.pdf>
 carta --archive <path> package <output.cat>
 carta --archive <path> trash inventory|impact|document|work ...
 carta --archive <path> restore document|work ...
 carta --archive <path> wipe execute <document-id> --confirm "WIPE <document-id> PERMANENTLY"
 ```
 
-Markdown exports are written exactly to standard output. PDF and package destinations must be outside the Archive. Trash mutations require `--confirm`; `wipe execute --confirm` performs a fresh preflight and requires the exact strong confirmation phrase without an interactive prompt. Run `carta <command> --help` for complete arguments.
+Markdown exports are written exactly to standard output. Package destinations must be outside the Archive. Trash mutations require `--confirm`; `wipe execute --confirm` performs a fresh preflight and requires the exact strong confirmation phrase without an interactive prompt. Run `carta <command> --help` for complete arguments.
 
 ## Terminal interface
 
@@ -152,7 +150,7 @@ carta-tui
 
 Device-local session state is stored alongside the default Archive root under `$XDG_DATA_HOME/carta` (or `~/.local/share/carta`), but outside the `archive/` Git working tree; session files are named `session-<archive-id>.json`. On startup, the TUI migrates legacy session files from `$XDG_STATE_HOME/carta-space` (or `~/.local/state/carta-space`) and discards the obsolete `last-archive.json`. A new Archive or an Archive without session state opens directly into a provisional empty Document in the current month.
 
-The default surface is an editable, soft-wrapped monthly Chronological View or continuous Work View. Generated separator lines protect Document boundaries. `Esc` opens the contextual command palette; direct shortcuts are limited to physical left/right Control LEAP on capable terminals. Undo and redo are contextual palette commands. Copy, Cut, and Paste remain terminal-emulator operations. PDF export requires Pandoc and LuaLaTeX as described above.
+The default surface is an editable, soft-wrapped monthly Chronological View or continuous Work View. Generated separator lines protect Document boundaries. `Esc` opens the contextual command palette. On capable terminals, physical Left Ctrl/Left Alt provide LEAP and Right Ctrl is the Carta command modifier: RightCtrl+Z/R handle undo/redo, RightCtrl+C performs Cat COPY or clipboard paste, RightCtrl+W opens the Work selector, and RightCtrl+L inserts or opens a link at point. Copy, Cut, and Paste otherwise remain terminal-emulator operations.
 
 If canonical Document content or Work structure changes externally while the TUI has a divergent local edit, `carta-core` durably preserves both variants under `.git/carta-conflicts/` before refusing the write. The TUI opens a read-only Conflicts view where the user explicitly chooses the current local or external variant. For Documents, the non-selected variant may optionally be preserved as a new neutral Document; Work resolution never creates a second Work automatically. These records are device-local recovery state, are excluded from portable packages, and are scrubbed when their Document is Wiped.
 
