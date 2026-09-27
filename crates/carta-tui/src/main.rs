@@ -212,6 +212,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         }
     }
     save_session(&state, archive_id, &app.session())?;
+    let _ = app.archive.sync();
     Ok(())
 }
 
