@@ -151,6 +151,10 @@ pub enum Command {
     DuplicateAsNew,
     NewLinkedDocument,
     SplitDocument,
+    LockDocument,
+    UnlockDocument,
+    LockWork,
+    UnlockWork,
     PreviousMonth,
     NextMonth,
     GoToMonth,
@@ -216,6 +220,10 @@ impl Command {
             Self::DuplicateAsNew => "Duplicate as New",
             Self::NewLinkedDocument => "New Linked Document",
             Self::SplitDocument => "Split Document at Point",
+            Self::LockDocument => "Lock Document",
+            Self::UnlockDocument => "Unlock Document",
+            Self::LockWork => "Lock Work",
+            Self::UnlockWork => "Unlock Work",
             Self::PreviousMonth => "Previous Month",
             Self::NextMonth => "Next Month",
             Self::GoToMonth => "Go to Month…",
@@ -504,6 +512,11 @@ impl App {
         use Command::*;
         let editable = matches!(self.view, View::Chronological(_) | View::Work(_));
         let has_doc = self.editor.current_document().is_some();
+        let doc_locked = self.current_document_is_locked();
+        let work_locked = match self.view {
+            View::Work(id) => self.archive.work_is_locked(id).unwrap_or(true),
+            _ => false,
+        };
         let mut commands = vec![
             NewDocument,
             CreateWork,
@@ -540,6 +553,18 @@ impl App {
             } else {
                 CollapseView
             });
+            let document = self.editor.current_document().expect("has_doc was checked");
+            commands.push(
+                if self
+                    .archive
+                    .document_is_explicitly_locked(document)
+                    .unwrap_or(false)
+                {
+                    UnlockDocument
+                } else {
+                    LockDocument
+                },
+            );
             commands.extend([
                 DuplicateAsNew,
                 NewLinkedDocument,
@@ -555,16 +580,17 @@ impl App {
                 ExportDocumentPdf,
             ]);
         }
-        if editable && self.editor.can_undo() {
+        if editable && !doc_locked && self.editor.can_undo() {
             commands.push(Undo);
         }
-        if editable && self.editor.can_redo() {
+        if editable && !doc_locked && self.editor.can_redo() {
             commands.push(Redo);
         }
         if matches!(self.view, View::Chronological(_)) {
             commands.extend([PreviousMonth, NextMonth, GoToMonth]);
         }
         if matches!(self.view, View::Work(_)) {
+            commands.push(if work_locked { UnlockWork } else { LockWork });
             commands.extend([
                 OpenChronologicalView,
                 RenameWork,
@@ -649,6 +675,40 @@ impl App {
                 self.reload_view(None)?;
                 self.open_document(target, false)?;
                 self.status = "Split Document".into();
+            }
+            LockDocument => {
+                self.autosave_for_destructive()?;
+                let document = self.current_document()?;
+                self.archive.set_document_locked(document, true)?;
+                self.editor.clear_cat_highlight();
+                self.cat_navigation();
+                self.structural("Locked Document")?;
+                self.status = "Document locked".into();
+            }
+            UnlockDocument => {
+                let document = self.current_document()?;
+                self.archive.set_document_locked(document, false)?;
+                self.structural("Unlocked Document")?;
+                self.status = if self.archive.document_is_locked(document)? {
+                    "Document unlock removed; still locked by a Work".into()
+                } else {
+                    "Document unlocked".into()
+                };
+            }
+            LockWork => {
+                self.autosave_for_destructive()?;
+                let work = self.current_work()?;
+                self.archive.set_work_locked(work, true)?;
+                self.editor.clear_cat_highlight();
+                self.cat_navigation();
+                self.structural("Locked Work")?;
+                self.status = "Work locked".into();
+            }
+            UnlockWork => {
+                let work = self.current_work()?;
+                self.archive.set_work_locked(work, false)?;
+                self.structural("Unlocked Work")?;
+                self.status = "Work unlocked".into();
             }
             PreviousMonth => self.change_month(-1)?,
             NextMonth => self.change_month(1)?,
@@ -763,13 +823,13 @@ impl App {
             LeapAgainForward => self.leap_again(LeapDirection::Forward),
             LeapAgainBackward => self.leap_again(LeapDirection::Backward),
             Undo => {
-                if self.editor.undo() {
+                if !self.block_current_document_edit() && self.editor.undo() {
                     self.cat_navigation();
                     self.edited(Instant::now());
                 }
             }
             Redo => {
-                if self.editor.redo() {
+                if !self.block_current_document_edit() && self.editor.redo() {
                     self.cat_navigation();
                     self.edited(Instant::now());
                 }
@@ -1342,7 +1402,25 @@ impl App {
         }
     }
 
+    pub fn current_document_is_locked(&self) -> bool {
+        self.editor
+            .current_document()
+            .is_some_and(|document| self.archive.document_is_locked(document).unwrap_or(true))
+    }
+
+    fn block_current_document_edit(&mut self) -> bool {
+        if self.current_document_is_locked() {
+            self.status = "Document is locked".into();
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn cat_insert(&mut self, value: &str) -> bool {
+        if self.block_current_document_edit() {
+            return false;
+        }
         let before = self.editor.cursor();
         let start = self.typed_span_start.unwrap_or(before);
         if !self.editor.insert(value) {
@@ -1359,6 +1437,9 @@ impl App {
     }
 
     pub fn cat_insert_newline(&mut self) -> bool {
+        if self.block_current_document_edit() {
+            return false;
+        }
         let before = self.editor.cursor();
         let start = self.typed_span_start.unwrap_or(before);
         if !self.editor.insert_newline_with_list_continuation() {
@@ -1374,6 +1455,14 @@ impl App {
         true
     }
 
+    pub fn cat_indent_less(&mut self) -> bool {
+        if self.block_current_document_edit() {
+            return false;
+        }
+        self.cat_navigation();
+        self.editor.indent_less()
+    }
+
     pub fn cat_navigation(&mut self) {
         self.typed_span_start = None;
         self.last_leap_span = None;
@@ -1383,6 +1472,9 @@ impl App {
     }
 
     pub fn cat_backspace(&mut self) -> bool {
+        if self.block_current_document_edit() {
+            return false;
+        }
         let changed = self.editor.backspace();
         if changed {
             self.typed_span_start = None;
@@ -1395,6 +1487,9 @@ impl App {
     }
 
     pub fn cat_erase(&mut self) -> bool {
+        if self.block_current_document_edit() {
+            return false;
+        }
         let changed = if self.editor.cat_highlight().is_some() {
             self.editor.erase_cat_highlight()
         } else if self.cat_erase_forward {
@@ -1688,6 +1783,9 @@ impl App {
     }
 
     pub fn extend_last_leap_highlight(&mut self) -> bool {
+        if self.block_current_document_edit() {
+            return false;
+        }
         let Some((start, end)) = self.last_leap_span.or(self.rehighlight_span) else {
             return false;
         };
@@ -1702,6 +1800,9 @@ impl App {
     }
 
     pub fn copy_cat_highlight(&mut self) -> bool {
+        if self.block_current_document_edit() {
+            return false;
+        }
         if self.editor.copy_cat_highlight() {
             self.edited(Instant::now());
             self.status = "Copied highlighted text".into();
@@ -2041,7 +2142,11 @@ impl App {
             .works()
             .filter(|w| !omit_member || current.is_none_or(|d| !w.documents().contains(&d)))
             .map(|w| Choice {
-                label: w.title().into(),
+                label: if w.locked() {
+                    format!("{} [LOCKED]", w.title())
+                } else {
+                    w.title().into()
+                },
                 value: w.id().to_string(),
             })
             .collect();
