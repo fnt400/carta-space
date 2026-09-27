@@ -389,6 +389,8 @@ The v0.1 TUI keeps direct bindings deliberately small:
 - outside an active LEAP, physical Right Control+Left Control: Leap Again backward; physical Right Control+Left Alt: Leap Again forward;
 - physical Right Control+C with a Cat highlight: Cat COPY;
 - physical Right Control+C without a Cat highlight: paste system-clipboard text at the cursor;
+- physical Right Control+B: insert `**` before and after point, leaving point between the marker pairs;
+- physical Right Control+I: insert `*` before and after point, leaving point between the markers;
 - physical Right Control+Z: Undo;
 - physical Right Control+R: Redo;
 - Backspace: modern backward deletion; with an extended Cat highlight it erases the whole highlighted block;
