@@ -1874,9 +1874,10 @@ mod tests {
             panic!("expected Work View")
         };
         let title = work.archive.work(*work_id).unwrap().title();
+        let expected_suffix = format!("{title} ");
         let work_status = rendered_status_line(&work, 80);
         assert!(work_status.starts_with(' '));
-        assert!(work_status.ends_with(&format!("{title} ")));
+        assert!(work_status.ends_with(expected_suffix.as_str()));
         assert_eq!(display_width(&work_status), 80);
     }
 
