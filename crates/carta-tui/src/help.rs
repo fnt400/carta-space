@@ -55,6 +55,7 @@ Duplicate as New
 New Linked Document
 Collapse View / Expand View
 Open Work / Add to Work / Remove from Work
+Lock/Unlock Document / Lock/Unlock Work
 Search Archive
 Document History / Work History
 Trash / Show Trash
@@ -136,7 +137,9 @@ Generated boundaries cannot be changed by Backspace, Delete, typing, or Cat high
 
 New Document inside a Work is inserted after the current Document. Add to Work switches to the selected Work after adding the Document. Reordering commands affect Work order only, not chronological creation order.
 
-A Document may belong to several Works. Splitting such a Document inserts the new second half after the source in every Work that contains it."#,
+A Document may belong to several Works. Splitting such a Document inserts the new second half after the source in every Work that contains it.
+
+Lock Document makes that Document read-only until Unlock Document. Lock Work freezes Work structure and makes every member Document read-only everywhere it is opened, including Chronological View or another Work. Unlock Work removes only the Work lock; an individually locked Document remains locked. Locked Documents are marked on their generated separator and in the status bar. Locked Works are marked in the status bar and Work selector."#,
     },
     HelpDocument {
         title: "9. Search, history and trash",

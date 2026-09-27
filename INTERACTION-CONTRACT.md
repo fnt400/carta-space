@@ -125,6 +125,21 @@ The label remains ordinary editable Markdown. No special continuation relation i
 
 A linked Document does not automatically inherit the current Work, even when the command is invoked from a Work View.
 
+### 2.7 Lock and unlock
+
+`Lock Document` stores a persistent lock on the current Document. A locked Document remains readable, searchable, navigable, exportable, and duplicable, but authored content and destructive or restore operations that would alter it are rejected until `Unlock Document`.
+
+`Lock Work` stores a persistent lock on the Work itself. While locked:
+
+- Work title, membership, ordering, Trash, history restore, and other Work mutations are rejected;
+- every active Document referenced by that Work is effectively read-only everywhere, including Chronological View and other Work Views.
+
+Document lock and Work lock are independent. `Unlock Work` removes only the Work lock and MUST NOT remove a Document's own lock. `Unlock Document` removes only the Document's own lock; the Document remains read-only if it still belongs to any locked Work.
+
+The TUI indicates an effective Document lock in the generated separator and status bar. It indicates a locked Work in the status bar and appends `[LOCKED]` to that Work in Work-selection lists.
+
+Lock state is canonical Archive metadata and therefore follows the Archive across devices and synchronization.
+
 ---
 
 ## 3. Views

@@ -330,6 +330,12 @@ Carta Space Draft 0.1 defines no Markdown extensions.
 
 Unknown members MUST be preserved when a frontend rewrites the object.
 
+### 8.4 `locked` (optional)
+
+A Document MAY contain a `locked` Boolean member. `true` means that authored content and structural operations that would alter the Document are locked until an explicit unlock operation. An absent member or `false` means that the Document has no own lock.
+
+A Document MAY still be effectively read-only because it is referenced by a locked Work; that derived state is not duplicated into the Document metadata.
+
 ---
 
 ## 9. Document boundaries
@@ -422,6 +428,12 @@ A Work MAY contain a `color` member as a stable presentation hint.
 When written by the reference implementation, it is a string in `#RRGGBB` form. Frontends MAY ignore this hint, but a frontend that rewrites `work.json` MUST preserve it unless the user explicitly changes the Work color.
 
 The color is not part of Work identity, title uniqueness, ordering, or membership semantics.
+
+### 10.6 `locked` (optional)
+
+A Work MAY contain a `locked` Boolean member. `true` locks mutations of the Work structure and makes every currently referenced Document effectively read-only while the Work remains locked. An absent member or `false` means that the Work has no lock.
+
+Unlocking a Work MUST NOT remove any Document's own `locked` state.
 
 Unknown members MUST be preserved when a frontend rewrites `work.json`.
 
