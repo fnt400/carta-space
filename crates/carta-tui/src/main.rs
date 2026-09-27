@@ -1905,8 +1905,7 @@ mod tests {
 
     #[test]
     fn leap_enter_crosses_documents_and_wraps_without_synthetic_lf() {
-        let (_temporary, mut app) =
-            app_with_documents(&["first", "second\nline", "third"], true);
+        let (_temporary, mut app) = app_with_documents(&["first", "second\nline", "third"], true);
         let original: Vec<_> = app
             .editor
             .regions()
@@ -2076,7 +2075,13 @@ mod tests {
                 panic!("expected active LEAP")
             };
             assert_eq!(session.origin().byte_offset(), 0);
-            assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: expected });
+            assert_eq!(
+                app.editor.cursor(),
+                Cursor {
+                    region: 0,
+                    byte: expected
+                }
+            );
 
             handle_key(
                 &mut app,
@@ -2144,10 +2149,7 @@ mod tests {
         .unwrap();
 
         assert!(app.editor.cat_highlight().is_none());
-        assert_eq!(
-            app.status,
-            "Cat highlight cannot cross a Document boundary"
-        );
+        assert_eq!(app.status, "Cat highlight cannot cross a Document boundary");
     }
 
     #[test]

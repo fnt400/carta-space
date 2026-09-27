@@ -1317,12 +1317,11 @@ impl App {
         };
         let cursor = self.editor.cursor();
         let current = self.cat_origin_range(cursor).unwrap_or((cursor, cursor));
-        let (start, end) =
-            if (fixed.region, fixed.byte) <= (current.0.region, current.0.byte) {
-                (fixed, current.1)
-            } else {
-                (current.0, fixed)
-            };
+        let (start, end) = if (fixed.region, fixed.byte) <= (current.0.region, current.0.byte) {
+            (fixed, current.1)
+        } else {
+            (current.0, fixed)
+        };
         self.last_leap_span = (start != end).then_some((start, end));
     }
 
