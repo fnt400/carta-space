@@ -367,7 +367,7 @@ The palette is transient and dmenu-like:
 
 The palette is contextual. Commands that cannot apply in the current context SHOULD be hidden rather than shown disabled.
 
-Editable Views expose `Insert Current Date and Time`, which inserts the current local date and time at the cursor as `YYYY-MM-DD HH:MM`. History and Work History expose `Return to Previous View`, which returns to the View from which history was opened.
+Editable Views expose `Go to Start of View` and `Go to End of View`, which move point to the first byte of the first Document or the final byte of the last Document in the current View. These are palette navigation commands, not LEAP targets and have no direct keybindings. Editable Views also expose `Insert Current Date and Time`, which inserts the current local date and time at the cursor as `YYYY-MM-DD HH:MM`. History and Work History expose `Return to Previous View`, which returns to the View from which history was opened.
 
 `Cheatsheet` and `Manual` are always available from the palette. They open built-in read-only Help Views supplied by the frontend rather than Documents stored in the Archive. The manual is divided into topic Documents; Up/Down moves between topics. Help Views participate in navigation history, so `Back` returns to the previous working context.
 
