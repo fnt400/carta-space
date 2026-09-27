@@ -3318,5 +3318,4 @@ mod tests {
         assert!(status_line(&app).contains("[LOCK DOC]"));
         assert!(chronological_separator(&app, document, 80).contains("[LOCKED]"));
     }
-
 }

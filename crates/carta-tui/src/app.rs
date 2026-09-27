@@ -4328,5 +4328,4 @@ mod tests {
             .iter()
             .any(|choice| choice.label == "Protected [LOCKED]"));
     }
-
 }

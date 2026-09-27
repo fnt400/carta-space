@@ -1351,7 +1351,6 @@ fn reopen_removes_partial_restore_or_new_work_document_owned_paths() {
     assert!(!restore_staging.exists());
 }
 
-
 #[test]
 fn document_lock_persists_and_blocks_content_changes() {
     let (_temporary, mut archive) = create_archive();
@@ -1367,12 +1366,18 @@ fn document_lock_persists_and_blocks_content_changes() {
 
     let mut reopened = Archive::open(archive.root()).unwrap();
     assert!(reopened.document_is_explicitly_locked(document).unwrap());
-    assert_eq!(reopened.read_document(document).unwrap().content(), "original");
+    assert_eq!(
+        reopened.read_document(document).unwrap().content(),
+        "original"
+    );
 
     reopened.set_document_locked(document, false).unwrap();
     reopened.edit_document(document, "changed").unwrap();
     assert!(!reopened.document_is_locked(document).unwrap());
-    assert_eq!(reopened.read_document(document).unwrap().content(), "changed");
+    assert_eq!(
+        reopened.read_document(document).unwrap().content(),
+        "changed"
+    );
 }
 
 #[test]
@@ -1414,7 +1419,6 @@ fn work_lock_makes_member_documents_effectively_read_only() {
     archive.edit_document(first, "changed").unwrap();
     assert_eq!(archive.read_document(first).unwrap().content(), "changed");
 }
-
 
 #[test]
 fn unchanged_locked_document_does_not_block_other_document_saves() {
