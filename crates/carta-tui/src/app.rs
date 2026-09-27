@@ -4,7 +4,7 @@ use crate::palette;
 use crate::session::{Position, SavedView, Session};
 use carta_core::{
     Archive, CartaLinkTarget, CheckpointKind, Conflict, ConflictChoice, DocumentId,
-    DocumentTextRegion, LeapDirection, LeapPosition, LeapRuntime, LeapSession, PdfExportOptions,
+    DocumentTextRegion, LeapDirection, LeapPosition, LeapRuntime, LeapSession,
     SyncOutcome, Volume, WorkId, WorkRestoreOptions,
 };
 use chrono::{Datelike, Local};
@@ -64,9 +64,7 @@ pub enum PromptAction {
     RenameWork,
     Import,
     ExportDocumentMarkdown,
-    ExportDocumentPdf,
     ExportWorkMarkdown,
-    ExportWorkPdf,
     Package,
     Checkpoint,
     SyncRemote,
@@ -191,9 +189,7 @@ pub enum Command {
     Wipe,
     Import,
     ExportDocumentMarkdown,
-    ExportDocumentPdf,
     ExportWorkMarkdown,
-    ExportWorkPdf,
     Package,
     CreateCheckpoint,
     SyncNow,
@@ -260,9 +256,7 @@ impl Command {
             Self::Wipe => "Wipe permanently",
             Self::Import => "Import…",
             Self::ExportDocumentMarkdown => "Export Document as Markdown…",
-            Self::ExportDocumentPdf => "Export Document as PDF…",
             Self::ExportWorkMarkdown => "Export Work as Markdown…",
-            Self::ExportWorkPdf => "Export Work as PDF…",
             Self::Package => "Package Archive…",
             Self::CreateCheckpoint => "Create Checkpoint…",
             Self::SyncNow => "Sync Now",
@@ -583,8 +577,7 @@ impl App {
                 InsertDateTime,
                 Trash,
                 ExportDocumentMarkdown,
-                ExportDocumentPdf,
-            ]);
+                        ]);
         }
         if editable && !doc_locked && self.editor.can_undo() {
             commands.push(Undo);
@@ -607,8 +600,7 @@ impl App {
                 MoveLater,
                 MoveAfter,
                 ExportWorkMarkdown,
-                ExportWorkPdf,
-            ]);
+                        ]);
         }
         if has_doc && self.link_under_cursor().is_some() {
             commands.push(OpenLink);
@@ -783,19 +775,6 @@ impl App {
                     PromptAction::ExportDocumentMarkdown,
                 )
             }
-            ExportDocumentPdf => {
-                self.autosave_for_destructive()?;
-                let label = self
-                    .editor
-                    .current_text()
-                    .map(derived_label_from_text)
-                    .unwrap_or_else(|| "document".to_owned());
-                self.prompt_prefilled(
-                    "Export PDF filename",
-                    format!("{}.pdf", sanitize_filename(&label)),
-                    PromptAction::ExportDocumentPdf,
-                )
-            }
             ExportWorkMarkdown => {
                 self.autosave_for_destructive()?;
                 let title = self.archive.work(self.current_work()?).unwrap().title();
@@ -803,15 +782,6 @@ impl App {
                     "Export Work Markdown filename",
                     format!("{}.md", sanitize_filename(title)),
                     PromptAction::ExportWorkMarkdown,
-                )
-            }
-            ExportWorkPdf => {
-                self.autosave_for_destructive()?;
-                let title = self.archive.work(self.current_work()?).unwrap().title();
-                self.prompt_prefilled(
-                    "Export Work PDF filename",
-                    format!("{}.pdf", sanitize_filename(title)),
-                    PromptAction::ExportWorkPdf,
                 )
             }
             Package => self.prompt("Package .cat path", PromptAction::Package),
@@ -902,26 +872,10 @@ impl App {
                 self.archive
                     .export_document_markdown_file(self.current_document()?, path)?;
             }
-            PromptAction::ExportDocumentPdf => {
-                let path = downloads_export_path(&input)?;
-                self.archive.export_document_pdf_with(
-                    self.current_document()?,
-                    path,
-                    &PdfExportOptions::default(),
-                )?;
-            }
             PromptAction::ExportWorkMarkdown => {
                 let path = downloads_export_path(&input)?;
                 self.archive
                     .export_work_markdown_file(self.current_work()?, path)?;
-            }
-            PromptAction::ExportWorkPdf => {
-                let path = downloads_export_path(&input)?;
-                self.archive.export_work_pdf_with(
-                    self.current_work()?,
-                    path,
-                    &PdfExportOptions::default(),
-                )?;
             }
             PromptAction::Package => {
                 self.autosave()?;
