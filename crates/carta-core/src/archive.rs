@@ -81,8 +81,8 @@ impl Archive {
         let root = path.as_ref().to_path_buf();
         crate::package::cleanup_registered_temporaries(&root)?;
         crate::transaction::recover(&root)?;
-        recover_creation_staging(&root)?;
         recover_git_omitted_empty_roots(&root)?;
+        recover_creation_staging(&root)?;
         let scanned = scan_archive_with_recovery_documents(
             &root,
             crate::conflict::missing_document_infos(&root)?,
@@ -300,6 +300,7 @@ impl Archive {
 
     pub fn refresh(&mut self) -> Result<(), Error> {
         crate::transaction::recover(&self.root)?;
+        recover_git_omitted_empty_roots(&self.root)?;
         recover_creation_staging(&self.root)?;
         let scanned = scan_archive_with_recovery_documents(
             &self.root,
