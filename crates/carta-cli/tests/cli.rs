@@ -32,7 +32,9 @@ fn create_validate_and_inspect_have_scriptable_success_output() {
 fn commands_default_to_xdg_data_archive() {
     let temporary = tempfile::tempdir().unwrap();
     let xdg_data_home = temporary.path().join("xdg-data");
-    let archive = xdg_data_home.join("carta/archive");
+    let carta_data = xdg_data_home.join("carta");
+    let archive = carta_data.join("archive");
+    fs::create_dir_all(&carta_data).unwrap();
 
     Command::cargo_bin("carta")
         .unwrap()
