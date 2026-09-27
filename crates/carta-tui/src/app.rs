@@ -15,8 +15,10 @@ use std::time::{Duration, Instant};
 
 pub type AppResult<T = ()> = Result<T, Box<dyn Error>>;
 
+const STATUS_MESSAGE_TIMEOUT: Duration = Duration::from_secs(10);
+
 const WORK_COLOR_PALETTE: [&str; 8] = [
-    "#667A75", "#6D7487", "#806F6A", "#756A80", "#A9B39B", "#B2A596", "#9FAAB5", "#A99EAE",
+    "#236B61", "#3F5794", "#9A4F32", "#704B91", "#5F7B2D", "#9A6B2F", "#3D748C", "#8A4F78",
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -348,6 +350,8 @@ pub struct App {
     pub editor: CompositeEditor,
     pub mode: AppMode,
     pub status: String,
+    status_observed: String,
+    status_since: Option<Instant>,
     pub scroll: usize,
     pub collapsed: bool,
     pub search_results: Vec<ResultRow>,
@@ -451,6 +455,8 @@ impl App {
             editor,
             mode: AppMode::Editing,
             status: String::new(),
+            status_observed: String::new(),
+            status_since: None,
             scroll,
             collapsed: false,
             search_results,
@@ -1198,6 +1204,7 @@ impl App {
         if self.quit {
             return Ok(());
         }
+        self.expire_status(now);
         if self.scheduler.autosave_due(now, self.editor.is_dirty()) {
             self.autosave()?;
         }
@@ -1220,6 +1227,24 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    fn expire_status(&mut self, now: Instant) {
+        if self.status != self.status_observed {
+            self.status_observed.clone_from(&self.status);
+            self.status_since = (!self.status.is_empty()).then_some(now);
+            return;
+        }
+
+        if !self.status.is_empty()
+            && self
+                .status_since
+                .is_some_and(|since| now.duration_since(since) >= STATUS_MESSAGE_TIMEOUT)
+        {
+            self.status.clear();
+            self.status_observed.clear();
+            self.status_since = None;
+        }
     }
 
     pub fn edited(&mut self, now: Instant) {
@@ -3292,6 +3317,24 @@ mod tests {
         assert!(app.editor.regions().is_empty());
         assert_eq!(app.archive.documents().count(), 0);
         assert!(app.provisional.is_none());
+    }
+
+    #[test]
+    fn status_message_expires_after_ten_seconds() {
+        let temporary = tempfile::tempdir().unwrap();
+        let start = Instant::now();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, start).unwrap();
+
+        app.status = "Temporary message".into();
+        app.tick(start).unwrap();
+        assert_eq!(app.status, "Temporary message");
+
+        app.tick(start + Duration::from_secs(9)).unwrap();
+        assert_eq!(app.status, "Temporary message");
+
+        app.tick(start + Duration::from_secs(10)).unwrap();
+        assert!(app.status.is_empty());
     }
 
     #[test]
