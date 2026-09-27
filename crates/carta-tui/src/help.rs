@@ -21,8 +21,8 @@ Right Ctrl                  Carta command modifier
 Right Ctrl + Z              Undo
 Right Ctrl + R              Redo
 Right Ctrl + C              Cat COPY when highlighted; otherwise paste system clipboard
-Left Ctrl + Enter           LEAP to current/previous LF line start
-Left Alt + Enter            LEAP to next LF line start
+Left Ctrl + Enter           Add LF to backward LEAP pattern
+Left Alt + Enter            Add LF to forward LEAP pattern
 Left Ctrl + Home            LEAP to start of current Document
 Left Alt + End              LEAP to end of current Document
 Left Ctrl + PageUp          LEAP to start of current View
@@ -98,7 +98,9 @@ A lowercase query character matches either case. An uppercase query character re
 
 A successful LEAP lands on the target character. A failed LEAP rebounds to its origin. Releasing a LEAP key after no query performs creep in that direction.
 
-LeftCtrl+Enter and LeftAlt+Enter search authored LF boundaries, not wrapped screen rows. Backward LEAP goes to the current logical line start (or the previous one when already at a line start); forward LEAP goes to the next logical line start. With a Cat highlight active these same LEAPs move the highlighted text.
+Enter while a physical LEAP is held is normal pattern input for the authored LF character. Enter+Enter therefore searches two consecutive LF characters, and Enter followed by ordinary characters searches that mixed pattern. LF searches use the normal current-View scope and wrap behavior; Document boundaries do not create synthetic LF characters. The Cat cursor logically rests on the matched LF, without any extra LF marker in the TUI.
+
+With a Cat highlight active, the text remains in place while the LEAP query and Leap Again choose a destination; the move occurs only when the physical LEAP key is released.
 
 LeftCtrl+Home and LeftAlt+End LEAP to the beginning and end of the current Document. LeftCtrl+PageUp and LeftAlt+PageDown LEAP to the beginning and end of the current View."#,
     },
@@ -106,7 +108,7 @@ LeftCtrl+Home and LeftAlt+End LEAP to the beginning and end of the current Docum
         title: "5. Leap Again and Cat highlight",
         body: r#"RightCtrl+LeftAlt repeats the last LEAP forward; RightCtrl+LeftCtrl repeats it backward.
 
-During an active physical LEAP, pressing Right Control performs Leap Again without changing the original LEAP origin. This applies both to text-pattern LEAPs and to structural LEAPs using Enter, Home/End, or PageUp/PageDown. Right Control can be pressed repeatedly to reach later matches, logical line starts, or Document boundaries. Pressing the opposite LEAP key while the first remains held highlights the interval from the original origin through the final reachable target.
+During an active physical LEAP, pressing Right Control performs Leap Again without changing the original LEAP origin. This applies to text patterns, including patterns containing LF entered with Enter, and to structural LEAPs using Home/End or PageUp/PageDown. Right Control can be pressed repeatedly to reach later matches or structural boundaries. Pressing the opposite LEAP key while the first remains held highlights the interval from the original origin through the final reachable target.
 
 After releasing the LEAP key, RightCtrl+LeftAlt or RightCtrl+LeftCtrl repeats the most recently used text or structural LEAP in the requested direction. A structural LEAP replaces an older text pattern for Leap Again.
 

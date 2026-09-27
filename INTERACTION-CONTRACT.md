@@ -267,8 +267,9 @@ It does not expose a runtime scope selector. Whole-Archive search is a separate 
 LEAP is momentary/quasimodal and incremental:
 
 - while a LEAP key is held, typed characters extend the query;
+- Enter during a physical LEAP appends the authored LF character (`\n`) to that same query; repeated Enter presses and following characters continue the same pattern;
 - character-producing modifiers such as Shift and Right Alt/AltGr may be pressed either before or after the LEAP key; they do not cancel a pending LEAP;
-- Backspace shortens the query;
+- Backspace shortens the query, including an LF previously added with Enter;
 - lowercase pattern characters match both lowercase and uppercase text;
 - uppercase pattern characters match uppercase text only;
 - an unaccented pattern character also matches the corresponding accented character; an accented pattern character requires the same accent;
@@ -279,7 +280,9 @@ LEAP is momentary/quasimodal and incremental:
 - if no match exists, Carta rebounds to the original position;
 - the active query may be shown transiently and disappears when LEAP ends.
 
-A single match MUST be entirely within one Document. LEAP may navigate across Document boundaries, but the query cannot match text formed by concatenating the end of one Document and the beginning of another.
+A single match MUST be entirely within one Document. LEAP may navigate across Document boundaries, but the query cannot match text formed by concatenating the end of one Document and the beginning of another. Document boundaries do not synthesize LF characters.
+
+When an LF is the first character of the matching pattern, the logical Cat cursor rests on that LF. The TUI does not need to draw a special LF marker; the authored line break already supplies the visual structure.
 
 ### 4.4 Creep and Leap Again
 
@@ -287,7 +290,7 @@ Pressing and releasing a physical LEAP key without entering a query performs Can
 
 After typing, the Cat cursor is conceptually wide. The first creep makes it narrow on the previously highlighted character; a subsequent creep moves one character in the requested direction.
 
-Carta remembers the last explicit LEAP target for the session. That target may be a text pattern or one of Carta's structural Cat targets: logical LF line boundary, Document boundary, or View boundary. A bare tap of a physical LEAP key remains creep. Right Control is Carta's `USE FRONT` analogue. While a physical LEAP is still held, each press of Right Control performs LEAP AGAIN for that same target kind and direction without ending the LEAP operation or changing its original anchor. Repeated Right Control presses therefore advance through successive text matches, LF line starts, or Document boundaries while preserving the starting point. Pressing the opposite LEAP key before releasing the original LEAP extends the Cat highlight from that original anchor to the final reachable target. Outside an active LEAP, Right Control+Left Alt performs Leap Again Forward and Right Control+Left Control performs Leap Again Backward using the most recently remembered text or structural target. A structural LEAP supersedes an older text pattern for Leap Again; if no further structural target exists, Carta does not fall back to an older text query. The same operations remain available in the command palette. Remembered LEAP state is session-global, so Leap Again may be used after changing Views.
+Carta remembers the last explicit LEAP target for the session. That target may be a text pattern, including LF characters entered with Enter, or one of Carta's structural Cat targets: Document boundary or View boundary. A bare tap of a physical LEAP key remains creep. Right Control is Carta's `USE FRONT` analogue. While a physical LEAP is still held, each press of Right Control performs LEAP AGAIN for that same target kind and direction without ending the LEAP operation or changing its original anchor. Repeated Right Control presses therefore advance through successive text matches or structural boundaries while preserving the starting point. Pressing the opposite LEAP key before releasing the original LEAP extends the Cat highlight from that original anchor to the final reachable target. Outside an active LEAP, Right Control+Left Alt performs Leap Again Forward and Right Control+Left Control performs Leap Again Backward using the most recently remembered text or structural target. A structural LEAP supersedes an older text pattern for Leap Again; if no further structural target exists, Carta does not fall back to an older text query. The same operations remain available in the command palette. Remembered LEAP state is session-global, so Leap Again may be used after changing Views.
 
 ### 4.5 Cat cursor and highlight interaction
 
@@ -317,7 +320,7 @@ With an extended highlight active:
 
 Pressing the opposite LEAP key while a physical LEAP query is active ends that LEAP and extends the highlight from the session's original anchor to its current target. This is what allows one or more in-session LEAP AGAIN operations to enlarge the eventual selection.
 
-Left Control+Enter and Left Alt+Enter treat authored LF characters as Cat-style RETURN targets rather than using visual wrapping. Left Control+Enter LEAPs backward to the beginning of the current logical line, or to the previous logical line when already at a line start. Left Alt+Enter LEAPs forward to the beginning of the next logical line. These operations use the same Cat LEAP state as ordinary pattern LEAP: they establish an extendable span, move an active Cat highlight to the target, remain active until the physical LEAP key is released, and support Right Control LEAP AGAIN while held. The Document- and View-boundary LEAPs follow the same rule.
+Enter during a physical LEAP is ordinary Canon Cat pattern input representing an authored LF character. Thus Enter searches LF in the chosen direction, Enter+Enter searches two consecutive LF characters, and Enter followed by ordinary characters searches the corresponding mixed pattern. The Cat cursor lands on the first character of the match, so an LF target is itself included when the LEAP span is extended into a highlight. Query changes and in-session LEAP AGAIN are navigational only; with an existing Cat highlight, authored text remains in place until the physical LEAP key is released. Document- and View-boundary LEAPs remain separate structural targets.
 
 Ordinary cursor navigation abandons a pending Cat span. Starting to type collapses an extended highlight and begins a new typed span; pressing both LEAP keys after a run of typing highlights that recently typed text.
 
@@ -351,8 +354,8 @@ The v0.1 TUI keeps direct bindings deliberately small:
 
 - hold Left Control + pattern: LEAP backward; tap Left Control: creep backward;
 - hold Left Alt + pattern: LEAP forward; tap Left Alt: creep forward;
-- Left Control+Enter: LEAP backward to a logical line start using authored LF;
-- Left Alt+Enter: LEAP forward to the next logical line start using authored LF;
+- Left Control+Enter: append authored LF to the backward LEAP pattern;
+- Left Alt+Enter: append authored LF to the forward LEAP pattern;
 - Left Control+Home: LEAP to the beginning of the current Document;
 - Left Alt+End: LEAP to the end of the current Document;
 - Left Control+PageUp: LEAP to the beginning of the current View;
