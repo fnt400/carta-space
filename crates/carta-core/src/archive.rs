@@ -13,7 +13,8 @@ use carta_format::{
 use crate::validation::{scan_archive, scan_archive_with_recovery_documents};
 use crate::{
     extract_markdown_links, Backlink, CartaLinkTarget, Document, DocumentInfo, Error,
-    LinkResolution, MarkdownLink, SearchResult, ValidationErrors, Volume, Work, WorkProjection,
+    LinkResolution, MarkdownLink, SearchResult, ValidationErrors, ValidationIssue,
+    ValidationIssueKind, Volume, Work, WorkProjection,
 };
 
 #[derive(Debug)]
@@ -952,6 +953,10 @@ fn recover_git_omitted_empty_roots(root: &Path) -> Result<(), Error> {
         )?;
         if output.stdout.is_empty() {
             fs::create_dir(&path).map_err(|error| Error::io(&path, error))?;
+        } else {
+            return Err(Error::InvalidArchive(ValidationErrors::new(vec![
+                ValidationIssue::new(path, ValidationIssueKind::MissingEntry),
+            ])));
         }
     }
     Ok(())
