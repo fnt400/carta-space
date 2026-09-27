@@ -7,7 +7,6 @@ use carta_format::ArchiveMetadata;
 use crate::{Archive, Error};
 
 const SYNC_REMOTE: &str = "carta-sync";
-const SYNC_BRANCH: &str = "carta";
 const SYNC_TRACKING_REF: &str = "refs/remotes/carta-sync/carta";
 const CARTA_AUTHOR_NAME: &str = "Carta Space";
 const CARTA_AUTHOR_EMAIL: &str = "history@carta.space";
@@ -100,7 +99,7 @@ impl Archive {
                 Ok(SyncReport::new(SyncOutcome::Published))
             }
             RemoteState::OtherBranches => Err(Error::SyncRemoteNotEmpty),
-            RemoteState::Carta(_) => {
+            RemoteState::Carta => {
                 fetch_carta(&self.root)?;
                 validate_remote_archive(self)?;
 
@@ -139,7 +138,7 @@ impl Archive {
 enum RemoteState {
     Empty,
     OtherBranches,
-    Carta(String),
+    Carta,
 }
 
 enum MergeTree {
@@ -157,11 +156,8 @@ fn remote_state(root: &Path) -> Result<RemoteState, Error> {
     let mut any = false;
     for line in text.lines() {
         any = true;
-        let Some((object, reference)) = line.split_once(char::is_whitespace) else {
-            continue;
-        };
-        if reference.trim() == "refs/heads/carta" {
-            return Ok(RemoteState::Carta(object.trim().to_owned()));
+        if line.split_whitespace().nth(1) == Some("refs/heads/carta") {
+            return Ok(RemoteState::Carta);
         }
     }
     if any {
@@ -365,7 +361,7 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::process::Command;
 
-    use super::{SyncOutcome, SYNC_BRANCH};
+    use super::SyncOutcome;
     use crate::{Archive, CheckpointKind, Error};
 
     fn run_git(directory: &Path, args: &[&str]) {
@@ -390,7 +386,7 @@ mod tests {
 
     fn clone_archive(remote: &Path, destination: &Path) -> Archive {
         let status = Command::new("git")
-            .args(["clone", "--quiet", "--branch", SYNC_BRANCH])
+            .args(["clone", "--quiet", "--branch", "carta"])
             .arg(remote)
             .arg(destination)
             .status()

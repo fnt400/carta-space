@@ -59,6 +59,7 @@ Search Archive
 Document History / Work History
 Trash / Show Trash
 Export Document or Work
+Sync Now / Sync Settings
 Cheatsheet / Manual
 
 Right Alt / AltGr is never a LEAP key."#,
@@ -152,7 +153,19 @@ Markdown export preserves authored structure. PDF export is a publication path b
 Packaging an Archive as .cat is distinct from Document/Work export and preserves the portable Archive representation and its required history."#,
     },
     HelpDocument {
-        title: "11. Keyboard and terminal notes",
+        title: "11. Synchronization",
+        body: r#"Synchronization is optional and local-first. Carta always saves and checkpoints locally; a network or authentication failure does not disable writing.
+
+Sync Settings configures one Git remote URL for the current device. The URL lives in the local Git configuration and is not part of the portable Archive. Git and SSH handle authentication; Carta does not store remote credentials.
+
+WARNING: synchronization is not encrypted in v0.1. Anyone who can read the remote can read authored text, metadata, and Git history, including historical text no longer present in current Documents.
+
+Carta attempts synchronization at startup when the Archive is clean, after checkpoints, periodically while an editable Archive is clean, and on normal Quit. Sync Now performs an immediate checkpoint when necessary and then synchronizes.
+
+Carta uses fetch, Archive-identity validation, fast-forward or a normal three-way merge, then push. It does not normally rebase or force-push. If Git cannot merge diverged histories cleanly, Carta leaves the working tree untouched, preserves both histories, reports a sync conflict, and pauses synchronization until the histories are reconciled."#,
+    },
+    HelpDocument {
+        title: "12. Keyboard and terminal notes",
         body: r#"Carta Space relies on terminals that can distinguish physical modifier keys and press/release events.
 
 Left Control and Left Alt are the two LEAP keys. Right Alt/AltGr is reserved for normal international text entry and is never LEAP. Right Control is the Carta command modifier.

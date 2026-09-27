@@ -1,6 +1,6 @@
 #[cfg(not(test))]
 use arboard::Clipboard;
-use carta_core::{Archive, LeapDirection};
+use carta_core::{Archive, LeapDirection, SyncOutcome};
 use carta_tui::app::{AppMode, View};
 use carta_tui::editor::{visual_ranges, Cursor};
 use carta_tui::help::{documents as help_documents, HelpKind};
@@ -151,10 +151,22 @@ fn run() -> Result<(), Box<dyn Error>> {
             load_last_archive(&state)?.ok_or("no last Archive; pass a path or use --create PATH")?
         }
     };
-    let archive = if args.create {
+    let mut archive = if args.create {
         Archive::create(&path)?
     } else {
         Archive::open(&path)?
+    };
+    let startup_sync_status = if archive.is_dirty()? {
+        None
+    } else {
+        match archive.sync() {
+            Ok(report) if report.outcome() == SyncOutcome::Conflict => Some(
+                "Sync conflict · local and remote histories preserved; synchronization paused"
+                    .to_owned(),
+            ),
+            Ok(_) => None,
+            Err(error) => Some(format!("Sync unavailable: {error}")),
+        }
     };
     let canonical = archive
         .root()
@@ -164,9 +176,16 @@ fn run() -> Result<(), Box<dyn Error>> {
     let session = load_session(&state, archive.metadata().archive_id())?;
     let archive_id = archive.metadata().archive_id();
     let mut app = App::open(archive, session.as_ref(), Instant::now())?;
+    if let Some(status) = startup_sync_status {
+        app.status = status;
+    }
     let mut terminal = TerminalGuard::enter()?;
     if !terminal.enhancements {
-        app.status = "Compatibility keyboard mode: use palette LEAP commands".into();
+        if !app.status.is_empty() {
+            app.status.push_str(" · ");
+        }
+        app.status
+            .push_str("Compatibility keyboard mode: use palette LEAP commands");
     }
     let mut dispatcher = Dispatcher::default();
     let mut last_session_save = Instant::now();

@@ -5,7 +5,7 @@ use crate::session::{Position, SavedView, Session};
 use carta_core::{
     Archive, CartaLinkTarget, CheckpointKind, Conflict, ConflictChoice, DocumentId,
     DocumentTextRegion, LeapDirection, LeapPosition, LeapRuntime, LeapSession, PdfExportOptions,
-    Volume, WorkId, WorkRestoreOptions,
+    SyncOutcome, Volume, WorkId, WorkRestoreOptions,
 };
 use chrono::{Datelike, Local};
 use std::collections::BTreeMap;
@@ -67,6 +67,7 @@ pub enum PromptAction {
     ExportWorkPdf,
     Package,
     Checkpoint,
+    SyncRemote,
     ConfirmRestoreDocument,
     ConfirmRestoreDocumentVersion,
     ConfirmRestoreWork,
@@ -189,6 +190,8 @@ pub enum Command {
     ExportWorkPdf,
     Package,
     CreateCheckpoint,
+    SyncNow,
+    SyncSettings,
     InsertDateTime,
     LeapForward,
     LeapBackward,
@@ -252,6 +255,8 @@ impl Command {
             Self::ExportWorkPdf => "Export Work as PDF…",
             Self::Package => "Package Archive…",
             Self::CreateCheckpoint => "Create Checkpoint…",
+            Self::SyncNow => "Sync Now",
+            Self::SyncSettings => "Sync Settings…",
             Self::InsertDateTime => "Insert Current Date and Time",
             Self::LeapForward => "LEAP Forward…",
             Self::LeapBackward => "LEAP Backward…",
@@ -274,8 +279,11 @@ impl Command {
 pub struct Scheduler {
     last_edit: Option<Instant>,
     last_checkpoint: Instant,
+    last_sync: Instant,
     autosave_after: Duration,
     checkpoint_after: Duration,
+    sync_after: Duration,
+    sync_pending: bool,
 }
 
 impl Scheduler {
@@ -283,8 +291,11 @@ impl Scheduler {
         Self {
             last_edit: None,
             last_checkpoint: now,
+            last_sync: now,
             autosave_after: Duration::from_secs(1),
             checkpoint_after: Duration::from_secs(600),
+            sync_after: Duration::from_secs(180),
+            sync_pending: false,
         }
     }
     pub fn edited(&mut self, now: Instant) {
@@ -304,6 +315,16 @@ impl Scheduler {
     }
     pub fn checkpointed(&mut self, now: Instant) {
         self.last_checkpoint = now;
+    }
+    pub fn sync_due(&self, now: Instant) -> bool {
+        self.sync_pending || now.duration_since(self.last_sync) >= self.sync_after
+    }
+    pub fn sync_pending(&mut self) {
+        self.sync_pending = true;
+    }
+    pub fn sync_attempted(&mut self, now: Instant) {
+        self.last_sync = now;
+        self.sync_pending = false;
     }
 }
 
@@ -493,6 +514,8 @@ impl App {
             Import,
             Package,
             CreateCheckpoint,
+            SyncNow,
+            SyncSettings,
             Back,
             Forward,
             Cheatsheet,
@@ -623,8 +646,7 @@ impl App {
                 let target = self
                     .archive
                     .split_document_at(source, self.editor.cursor().byte)?;
-                self.archive
-                    .checkpoint(CheckpointKind::Structural, Some("Split Document"))?;
+                self.checkpoint(CheckpointKind::Structural, Some("Split Document"))?;
                 self.reload_view(None)?;
                 self.open_document(target, false)?;
                 self.status = "Split Document".into();
@@ -729,6 +751,8 @@ impl App {
             }
             Package => self.prompt("Package .cat path", PromptAction::Package),
             CreateCheckpoint => self.prompt("Checkpoint note (optional)", PromptAction::Checkpoint),
+            SyncNow => self.sync_now(true)?,
+            SyncSettings => self.open_sync_settings()?,
             InsertDateTime => {
                 let timestamp = Local::now().format("%Y-%m-%d %H:%M").to_string();
                 if self.cat_insert(&timestamp) {
@@ -840,8 +864,18 @@ impl App {
             }
             PromptAction::Checkpoint => {
                 self.autosave()?;
-                self.archive
-                    .checkpoint(CheckpointKind::Manual, Some(&input))?;
+                self.checkpoint(CheckpointKind::Manual, Some(&input))?;
+            }
+            PromptAction::SyncRemote => {
+                let remote = input.trim();
+                if remote.is_empty() {
+                    self.archive.clear_sync_remote()?;
+                    self.scheduler.sync_attempted(Instant::now());
+                    self.status = "Synchronization disabled".into();
+                } else {
+                    self.archive.set_sync_remote(remote)?;
+                    self.sync_now(true)?;
+                }
             }
             PromptAction::ConfirmRestoreDocument => {
                 if input == "RESTORE" {
@@ -896,7 +930,7 @@ impl App {
                         .checkpoint()
                         .id()
                         .clone();
-                    self.archive.checkpoint(
+                    self.checkpoint(
                         CheckpointKind::Automatic,
                         Some("Saved current state before Work History restore"),
                     )?;
@@ -1107,8 +1141,17 @@ impl App {
         }
         if self.scheduler.checkpoint_due(now) {
             self.autosave()?;
-            self.archive.checkpoint(CheckpointKind::Automatic, None)?;
+            self.checkpoint(CheckpointKind::Automatic, None)?;
             self.scheduler.checkpointed(now);
+        }
+        if self.scheduler.sync_due(now)
+            && matches!(self.mode, AppMode::Editing)
+            && matches!(self.view, View::Chronological(_) | View::Work(_))
+            && self.conflicts.is_empty()
+            && !self.editor.is_dirty()
+            && !self.archive.is_dirty()?
+        {
+            self.sync_now(false)?;
         }
         Ok(())
     }
@@ -1154,7 +1197,7 @@ impl App {
                     .find(|region| region.document == id)
                     .is_some_and(|region| !region.text.trim().is_empty())
             }) {
-                self.archive.checkpoint(
+                self.checkpoint(
                     CheckpointKind::Structural,
                     Some("Document became persistent"),
                 )?;
@@ -1823,8 +1866,111 @@ impl App {
     }
     fn structural(&mut self, note: &str) -> AppResult {
         self.autosave()?;
-        self.archive
-            .checkpoint(CheckpointKind::Structural, Some(note))?;
+        self.checkpoint(CheckpointKind::Structural, Some(note))?;
+        Ok(())
+    }
+
+    fn checkpoint(
+        &mut self,
+        kind: CheckpointKind,
+        note: Option<&str>,
+    ) -> AppResult<Option<carta_core::Checkpoint>> {
+        let checkpoint = self.archive.checkpoint(kind, note)?;
+        if checkpoint.is_some() {
+            self.scheduler.sync_pending();
+        }
+        Ok(checkpoint)
+    }
+
+    fn open_sync_settings(&mut self) -> AppResult {
+        let remote = self.archive.sync_remote()?.unwrap_or_default();
+        self.prompt_prefilled_with_details(
+            "Sync remote URL (blank disables)",
+            remote,
+            vec![
+                "WARNING: synchronization is not encrypted.".to_owned(),
+                "Anyone with access to the remote can read authored text, metadata, and Git history."
+                    .to_owned(),
+                "Git history may contain text that was removed from the current Documents."
+                    .to_owned(),
+                "Authentication is handled by Git/SSH; Carta does not store credentials."
+                    .to_owned(),
+            ],
+            PromptAction::SyncRemote,
+        );
+        Ok(())
+    }
+
+    fn sync_now(&mut self, include_current: bool) -> AppResult {
+        if include_current {
+            self.autosave()?;
+            if self.archive.is_dirty()? {
+                self.checkpoint(
+                    CheckpointKind::Automatic,
+                    Some("Prepared synchronization"),
+                )?;
+            }
+        }
+
+        let current_document = self.editor.current_document();
+        let cursor_byte = self.editor.cursor().byte;
+        let attempted = Instant::now();
+        let result = self.archive.sync();
+        self.scheduler.sync_attempted(attempted);
+
+        match result {
+            Ok(report) => match report.outcome() {
+                SyncOutcome::Disabled => {
+                    self.status = "Synchronization is not configured".into();
+                }
+                SyncOutcome::Synced => {
+                    self.status = "Synced".into();
+                }
+                SyncOutcome::Published => {
+                    self.status = "Synced · local changes uploaded".into();
+                }
+                SyncOutcome::UpdatedFromRemote => {
+                    self.reload_after_sync(current_document, cursor_byte)?;
+                    self.status = "Synced · remote changes applied".into();
+                }
+                SyncOutcome::Merged => {
+                    self.reload_after_sync(current_document, cursor_byte)?;
+                    self.status = "Synced · local and remote changes merged".into();
+                }
+                SyncOutcome::Conflict => {
+                    self.status =
+                        "Sync conflict · local and remote histories preserved; synchronization paused"
+                            .into();
+                }
+            },
+            Err(error) => {
+                self.status = format!("Sync unavailable: {error}");
+            }
+        }
+        Ok(())
+    }
+
+    fn reload_after_sync(&mut self, document: Option<DocumentId>, byte: usize) -> AppResult {
+        if let View::Work(work) = self.view {
+            if self.archive.work(work).is_none() {
+                self.view = View::Chronological(current_volume());
+            }
+        } else if !matches!(self.view, View::Chronological(_)) {
+            self.view = View::Chronological(current_volume());
+        }
+
+        self.reload_view(None)?;
+        if let Some(document) = document {
+            if let Some(region) = self
+                .editor
+                .regions()
+                .iter()
+                .position(|region| region.document == document)
+            {
+                let byte = byte.min(self.editor.regions()[region].text.len());
+                self.editor.set_cursor(Cursor { region, byte }, false);
+            }
+        }
         Ok(())
     }
     fn change_month(&mut self, delta: i32) -> AppResult {
@@ -1853,6 +1999,23 @@ impl App {
             input,
             cursor,
             details: Vec::new(),
+            action,
+        };
+    }
+
+    fn prompt_prefilled_with_details(
+        &mut self,
+        title: &str,
+        input: String,
+        details: Vec<String>,
+        action: PromptAction,
+    ) {
+        let cursor = input.len();
+        self.mode = AppMode::Prompt {
+            title: title.into(),
+            input,
+            cursor,
+            details,
             action,
         };
     }
@@ -2090,7 +2253,7 @@ impl App {
         };
         let revision = self.history.get(selected).ok_or("no historical revision")?;
         let checkpoint = revision.checkpoint().id().clone();
-        self.archive.checkpoint(
+        self.checkpoint(
             CheckpointKind::Automatic,
             Some("Saved current state before History restore"),
         )?;
@@ -2276,7 +2439,7 @@ impl App {
                 self.archive.resolve_work_conflict(conflict.id(), choice)?;
             }
         }
-        self.archive.checkpoint(
+        self.checkpoint(
             CheckpointKind::Structural,
             Some("Resolved external divergence"),
         )?;
@@ -2337,8 +2500,7 @@ impl App {
             .selected_trashed_document()
             .ok_or("select a trashed Document; Works cannot be wiped")?;
         self.autosave()?;
-        self.archive
-            .checkpoint(CheckpointKind::Structural, Some("Prepared Wipe"))?;
+        self.checkpoint(CheckpointKind::Structural, Some("Prepared Wipe"))?;
         let plan = self.archive.plan_wipe_document(id)?;
         let token = plan.confirmation_token().to_owned();
         let guarantee = plan.guarantee().to_owned();
@@ -2392,7 +2554,8 @@ impl App {
     }
     fn finish_quit(&mut self) -> AppResult {
         self.autosave()?;
-        self.archive.checkpoint(CheckpointKind::Quit, None)?;
+        self.checkpoint(CheckpointKind::Quit, None)?;
+        let _ = self.archive.sync();
         self.quit = true;
         Ok(())
     }
@@ -2467,7 +2630,7 @@ impl App {
         }
         if let View::Work(work) = &view {
             if ensure_work_color(&mut self.archive, *work)? {
-                self.archive.checkpoint(
+                self.checkpoint(
                     CheckpointKind::Structural,
                     Some("Assigned persistent Work color"),
                 )?;
@@ -2745,6 +2908,20 @@ fn sanitize_filename(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sync_scheduler_runs_after_checkpoint_and_periodically() {
+        let now = Instant::now();
+        let mut scheduler = Scheduler::new(now);
+        assert!(!scheduler.sync_due(now));
+
+        scheduler.sync_pending();
+        assert!(scheduler.sync_due(now));
+
+        scheduler.sync_attempted(now);
+        assert!(!scheduler.sync_due(now + Duration::from_secs(179)));
+        assert!(scheduler.sync_due(now + Duration::from_secs(180)));
+    }
     #[test]
     fn export_filename_is_short_and_free_of_punctuation() {
         assert_eq!(
