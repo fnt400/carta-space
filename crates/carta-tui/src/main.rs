@@ -1923,12 +1923,16 @@ mod tests {
 
         assert_eq!(displayed, text);
         let theme = markdown_theme();
-        assert!(rendered.spans.iter().any(|span| span.style == theme.heading));
-        assert!(rendered.spans.iter().any(|span| span.style == theme.strong));
-        assert!(rendered.spans.iter().any(|span| span.style == theme.emphasis));
-        assert!(rendered.spans.iter().any(|span| span.style == theme.quote));
-        assert!(rendered.spans.iter().any(|span| span.style == theme.code));
-        assert!(rendered.spans.iter().any(|span| span.style == theme.link));
+        for expected in [
+            theme.heading.fg,
+            theme.strong.fg,
+            theme.emphasis.fg,
+            theme.quote.fg,
+            theme.code.fg,
+            theme.link.fg,
+        ] {
+            assert!(rendered.spans.iter().any(|span| span.style.fg == expected));
+        }
     }
 
     #[test]
