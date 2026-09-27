@@ -47,7 +47,6 @@ OpenCode is normally responsible for operations that require the real local envi
 - keyboard-event probes;
 - terminal compatibility checks;
 - filesystem/Git/Distrobox-dependent checks;
-- Pandoc/LaTeX and other external-tool verification;
 - reporting exact logs, backtraces, commands, and outcomes.
 
 Unless a task explicitly authorizes edits, OpenCode must not modify repository files. If verification exposes a defect, it reports the defect and stops; the fix returns to ChatGPT.
