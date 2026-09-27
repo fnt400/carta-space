@@ -75,6 +75,8 @@ const MANUAL: &[HelpDocument] = &[
 
 Authored text is Markdown. Structure is expressed semantically rather than by direct typography. Document boundaries, Work membership, history, and other structural information are not encoded as decorative Markdown.
 
+The TUI keeps the Markdown source visible but highlights CommonMark structure such as headings, emphasis, strong emphasis, quotations, code, and links. Highlighting is presentation only and never changes authored text.
+
 The interface deliberately keeps technology quiet. The command palette exposes power on demand; ordinary writing should remain visually sparse."#,
     },
     HelpDocument {
