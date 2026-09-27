@@ -1417,6 +1417,17 @@ impl App {
         }
     }
 
+    fn cursor_document_is_locked(&self, cursor: Cursor) -> bool {
+        self.editor
+            .regions()
+            .get(cursor.region)
+            .is_none_or(|region| {
+                self.archive
+                    .document_is_locked(region.document)
+                    .unwrap_or(true)
+            })
+    }
+
     pub fn cat_insert(&mut self, value: &str) -> bool {
         if self.block_current_document_edit() {
             return false;
@@ -1668,6 +1679,12 @@ impl App {
         self.editor.set_cursor_preserving_highlight(destination);
 
         if had_highlight {
+            if self.cursor_document_is_locked(destination) {
+                self.status = "Destination Document is locked".into();
+                self.last_leap_span = None;
+                self.cat_erase_forward = true;
+                return true;
+            }
             let previous_highlight = self.editor.cat_highlight();
             if self.editor.move_cat_highlight_to(destination) {
                 self.edited(Instant::now());
@@ -1837,6 +1854,13 @@ impl App {
                 self.cat_span_fixed = None;
                 self.cat_erase_forward = true;
             } else if had_highlight && !palette {
+                if self.cursor_document_is_locked(destination) {
+                    self.status = "Destination Document is locked".into();
+                    self.last_leap_span = None;
+                    self.cat_erase_forward = true;
+                    self.mode = AppMode::Editing;
+                    return;
+                }
                 let previous_highlight = self.editor.cat_highlight();
                 if self.editor.move_cat_highlight_to(destination) {
                     self.edited(Instant::now());
@@ -2206,7 +2230,11 @@ impl App {
         }
         for work in self.archive.works() {
             choices.push(Choice {
-                label: work.title().into(),
+                label: if work.locked() {
+                    format!("{} [LOCKED]", work.title())
+                } else {
+                    work.title().into()
+                },
                 value: format!("work:{}", work.id()),
             });
         }
@@ -2228,6 +2256,9 @@ impl App {
             escape_markdown_link_label(&label)
         );
         let replaced_highlight = self.editor.cat_highlight().is_some();
+        if replaced_highlight && self.block_current_document_edit() {
+            return Ok(());
+        }
         let changed = if replaced_highlight {
             self.editor.replace_cat_highlight(&link)
         } else {

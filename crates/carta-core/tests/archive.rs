@@ -1410,3 +1410,22 @@ fn work_lock_makes_member_documents_effectively_read_only() {
     archive.edit_document(first, "changed").unwrap();
     assert_eq!(archive.read_document(first).unwrap().content(), "changed");
 }
+
+
+#[test]
+fn unchanged_locked_document_does_not_block_other_document_saves() {
+    let (_temporary, mut archive) = create_archive();
+    let locked = archive.create_document("locked").unwrap();
+    let writable = archive.create_document("before").unwrap();
+    archive.set_document_locked(locked, true).unwrap();
+
+    archive.edit_document(locked, "locked").unwrap();
+    archive.edit_document(writable, "after").unwrap();
+
+    assert_eq!(archive.read_document(locked).unwrap().content(), "locked");
+    assert_eq!(archive.read_document(writable).unwrap().content(), "after");
+    assert!(matches!(
+        archive.edit_document(locked, "changed"),
+        Err(Error::DocumentLocked(id)) if id == locked
+    ));
+}

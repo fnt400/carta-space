@@ -318,7 +318,6 @@ impl Archive {
     }
 
     pub fn edit_document(&mut self, id: DocumentId, content: &str) -> Result<(), Error> {
-        self.ensure_document_unlocked(id)?;
         let info = self.documents.get(&id).ok_or(Error::MissingDocument(id))?;
         let path = info.path.join("content.md");
         let content = normalize_line_endings(content).into_bytes();
@@ -341,6 +340,10 @@ impl Archive {
             let conflict = self.preserve_document_conflict(id, &content, &external, false)?;
             return Err(Error::ConflictPreserved(conflict));
         }
+        if content == info.content_bytes {
+            return Ok(());
+        }
+        self.ensure_document_unlocked(id)?;
         atomic_replace(&path, &content)?;
         self.documents
             .get_mut(&id)
