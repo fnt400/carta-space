@@ -7,6 +7,7 @@ mod history;
 mod package;
 mod pdf;
 mod retrieval;
+mod sync;
 mod transaction;
 mod trash;
 mod validation;
@@ -29,6 +30,7 @@ pub use retrieval::{
     Backlink, DocumentTextRegion, LeapDirection, LeapMatch, LeapPosition, LeapRuntime, LeapSession,
     SearchResult,
 };
+pub use sync::{SyncOutcome, SyncReport};
 pub use trash::{
     DocumentTrashImpact, TrashInventory, TrashedDocument, TrashedWork, WipePlan, WipeReport,
     WorkMembership,

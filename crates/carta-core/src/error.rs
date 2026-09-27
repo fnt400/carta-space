@@ -138,6 +138,18 @@ pub enum Error {
         stderr: String,
     },
 
+    #[error("synchronization requires an Archive with no uncheckpointed changes")]
+    SyncRequiresCleanArchive,
+
+    #[error("the configured sync remote contains branches but no Carta sync branch")]
+    SyncRemoteNotEmpty,
+
+    #[error("sync remote belongs to Archive {remote}, not local Archive {local}")]
+    SyncArchiveMismatch { local: String, remote: String },
+
+    #[error("sync remote contains invalid Carta metadata: {0}")]
+    InvalidSyncRemote(String),
+
     #[error("invalid checkpoint identifier: {0}")]
     InvalidCheckpointId(String),
 
