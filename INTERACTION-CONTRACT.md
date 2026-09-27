@@ -823,11 +823,61 @@ The implementation mechanism is deliberately unspecified.
 
 ---
 
-## 16. Deferred features
+## 16. Synchronization
+
+### 16.1 Optional single Git remote
+
+Synchronization is optional. A device may configure at most one synchronization remote for an Archive.
+
+The remote URL is device-local Git configuration. It is not canonical Archive content. Portable `.cat` packaging MUST omit the Carta synchronization remote while preserving the repository history and other required Git metadata.
+
+Remote authentication and credentials are delegated to Git, SSH, and the operating system. Carta does not define or store a separate remote account or credential format.
+
+Before a remote is enabled or changed, Carta MUST state clearly that v0.1 synchronization is **not encrypted**. Anyone with read access to the remote may read authored text, Archive metadata, and Git history, including historical text no longer present in the current Documents.
+
+### 16.2 Local-first behavior
+
+Saving and checkpoint creation are local operations and MUST NOT depend on network availability.
+
+When a remote is configured, Carta SHOULD attempt synchronization:
+
+- at startup when the Archive has no uncheckpointed local changes;
+- soon after a new checkpoint;
+- periodically while the Archive is open, editable, and clean;
+- on explicit `Sync Now`;
+- during normal Quit on a best-effort basis.
+
+A synchronization, network, authentication, or remote error MUST NOT prevent further local editing, local checkpoints, or normal Quit.
+
+`Sync Now` first autosaves and checkpoints current local changes when necessary.
+
+### 16.3 Integration
+
+Normal synchronization is:
+
+1. fetch the dedicated Carta remote history;
+2. verify that the remote `archive_id` matches the local Archive;
+3. fast-forward when only one history advanced;
+4. otherwise perform a normal three-way merge when Git can do so cleanly;
+5. push the resulting history.
+
+Normal synchronization MUST NOT use rebase or force-push.
+
+An empty remote may be initialized from the local Archive. A non-empty remote that is not already a synchronization remote for the same Archive MUST NOT be silently overwritten or adopted.
+
+### 16.4 Synchronization conflicts
+
+If local and remote histories diverge and Git cannot merge them cleanly, Carta MUST NOT write Git conflict markers into canonical Documents or silently choose one side.
+
+The current working tree remains unchanged and both histories remain recoverable. Carta reports the conflict rather than treating the synchronization as successful.
+
+---
+
+## 17. Deferred features
 
 The following are explicitly outside v0.1 interaction scope:
 
-- synchronization;
+- interactive synchronization-conflict resolution;
 - collaboration;
 - semantic/vector search;
 - saved Views;

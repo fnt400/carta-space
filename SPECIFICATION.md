@@ -537,6 +537,8 @@ A frontend SHOULD create a checkpoint when cleanly closing an active session if 
 
 Before exporting a portable `.cat` package, a writer MUST ensure that the packaged Git history contains a commit representing the packaged current state.
 
+Device-local Git configuration is not canonical Archive content. In particular, synchronization remotes and credentials MUST NOT be required for archive reconstruction and SHOULD NOT be included in a portable package.
+
 ### 14.5 Readers
 
 A read-only implementation MAY ignore `.git/` and still read current Documents and Works.
