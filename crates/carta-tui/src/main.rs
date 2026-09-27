@@ -1002,6 +1002,12 @@ fn draw_editor(frame: &mut ratatui::Frame<'_>, app: &mut App, area: Rect) {
     } else {
         Style::default().bg(Color::DarkGray).fg(Color::White)
     };
+    let markdown_ranges: Vec<_> = app
+        .editor
+        .regions()
+        .iter()
+        .map(|region| markdown_style_ranges(&region.text))
+        .collect();
     let mut rendered = vec![Line::raw(String::new()); top_padding];
     rendered.extend(
         lines
@@ -1013,7 +1019,7 @@ fn draw_editor(frame: &mut ratatui::Frame<'_>, app: &mut App, area: Rect) {
                     styled_line(
                         line,
                         region,
-                        &app.editor.regions()[region].text,
+                        &markdown_ranges[region],
                         selection,
                         selection_style,
                     )
@@ -1318,7 +1324,7 @@ fn markdown_style(syntax: MarkdownSyntax) -> Style {
 fn styled_line(
     line: &VisualLine,
     region: usize,
-    region_text: &str,
+    style_ranges: &[MarkdownStyleRange],
     selection: Option<(Cursor, Cursor)>,
     selection_style: Style,
 ) -> Line<'static> {
@@ -1340,12 +1346,12 @@ fn styled_line(
         .clamp(line.start, line.end);
         (selected_start < selected_end).then_some(selected_start..selected_end)
     });
-    let style_ranges: Vec<_> = markdown_style_ranges(region_text)
-        .into_iter()
+    let line_style_ranges: Vec<_> = style_ranges
+        .iter()
         .filter(|range| range.start < line.end && line.start < range.end)
         .collect();
 
-    if selected_range.is_none() && style_ranges.is_empty() {
+    if selected_range.is_none() && line_style_ranges.is_empty() {
         return Line::raw(line.text.clone());
     }
 
@@ -1353,7 +1359,7 @@ fn styled_line(
     if let Some(range) = &selected_range {
         boundaries.extend([range.start, range.end]);
     }
-    for range in &style_ranges {
+    for range in &line_style_ranges {
         boundaries.extend([
             range.start.clamp(line.start, line.end),
             range.end.clamp(line.start, line.end),
@@ -1380,7 +1386,7 @@ fn styled_line(
             }
             let mut style = Style::default();
             for syntax in syntax_priority {
-                if style_ranges.iter().any(|range| {
+                if line_style_ranges.iter().any(|range| {
                     range.syntax == syntax && range.start < end && start < range.end
                 }) {
                     style = style.patch(markdown_style(syntax));
@@ -1914,7 +1920,8 @@ mod tests {
             text: text.to_owned(),
         };
 
-        let rendered = styled_line(&line, 0, text, None, Style::default());
+        let ranges = markdown_style_ranges(text);
+        let rendered = styled_line(&line, 0, &ranges, None, Style::default());
         let displayed = rendered
             .spans
             .iter()
