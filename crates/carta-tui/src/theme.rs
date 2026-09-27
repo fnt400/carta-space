@@ -73,7 +73,7 @@ fn parse_color(value: &str) -> Option<Color> {
 
 fn parse_rgb(value: &str) -> Option<Color> {
     let hex = value.strip_prefix('#')?;
-    if hex.len() != 6 {
+    if hex.len() != 6 || !hex.is_ascii() {
         return None;
     }
     let red = u8::from_str_radix(&hex[0..2], 16).ok()?;
