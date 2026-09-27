@@ -227,16 +227,20 @@ The TUI uses a minimal one-line status bar.
 
 Examples:
 
-- Chronological: `2026-09-25 · Document label · September 2026 · 7/18`
-- Work: `2026-09-25 · Document label · Romanzo · 3/12`
+- Chronological left side: `2026-09-25 · Document label · 2026-09 · 7/18`; right side: `Chronological`
+- Work left side: `2026-09-25 · Document label · 3/12`; right side: `Romanzo`
 - Search: `Search: bernanos · 4 results`
 - History: `History · Document label · 2026-09-25 14:20`
 
 The status bar follows the Document under the cursor.
 
-Chronological View keeps the neutral gray status bar and shows the active Document's Work memberships at the right edge, up to two names plus an ellipsis when more exist.
+In editable views, the view context is right-aligned: Chronological View shows `Chronological`, while Work View shows the active Work title. Chronological View does not repeat Work memberships in the status bar; memberships remain visible in each Document's generated separator.
 
-Work View uses the Work's persistent muted accent color as the status-bar background. The frontend chooses light or dark foreground text according to contrast. Colors may repeat across Works; their purpose is rapid visual distinction, not identity.
+Transient status messages temporarily replace the normal left-side status content and expire automatically after at most ten seconds. The right-aligned editable-view context remains visible while space permits.
+
+Chronological View keeps the neutral gray status bar.
+
+Work View uses the Work's persistent accent color as the status-bar background. The reference palette deliberately uses clearly differentiated hues, and the frontend chooses light or dark foreground text according to contrast. Colors may repeat across Works; their purpose is rapid visual distinction, not identity.
 
 Color MUST NOT be the only indicator of context.
 
@@ -510,7 +514,7 @@ The initial list is ordered by most recent access/use, using disposable device-l
 
 Each Work may carry a persistent `color` presentation hint in `work.json`.
 
-The reference TUI automatically assigns a muted color when a Work has none and saves that choice so the same Work keeps the same visual accent across sessions. It prefers underused colors from a small palette but does not require global uniqueness.
+The reference TUI automatically assigns a visually distinct accent color when a Work has none and saves that choice so the same Work keeps the same visual accent across sessions. It prefers underused colors from a small palette but does not require global uniqueness. Older default muted colors remain valid metadata; the TUI may render those legacy defaults with a stronger equivalent accent.
 
 ---
 
