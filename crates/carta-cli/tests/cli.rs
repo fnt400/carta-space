@@ -29,6 +29,27 @@ fn create_validate_and_inspect_have_scriptable_success_output() {
 }
 
 #[test]
+fn commands_default_to_xdg_data_archive() {
+    let temporary = tempfile::tempdir().unwrap();
+    let xdg_data_home = temporary.path().join("xdg-data");
+    let archive = xdg_data_home.join("carta/archive");
+
+    Command::cargo_bin("carta")
+        .unwrap()
+        .args(["create", archive.to_str().unwrap()])
+        .assert()
+        .success();
+
+    Command::cargo_bin("carta")
+        .unwrap()
+        .env("XDG_DATA_HOME", &xdg_data_home)
+        .args(["inspect"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("documents\t0"));
+}
+
+#[test]
 fn invalid_archive_and_usage_errors_are_nonzero() {
     let temporary = tempfile::tempdir().unwrap();
     fs::write(temporary.path().join("mimetype"), b"wrong").unwrap();
