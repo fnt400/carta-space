@@ -61,6 +61,7 @@ Collapse View / Expand View
 Open Work / Add to Work / Remove from Work
 Lock/Unlock Document / Lock/Unlock Work
 Search Archive
+Go to Start of View / Go to End of View
 Document History / Work History
 Trash / Show Trash
 Export Document or Work
