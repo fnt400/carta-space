@@ -64,6 +64,10 @@ impl DocumentInfo {
     pub fn metadata(&self) -> &DocumentMetadata {
         &self.metadata
     }
+
+    pub fn locked(&self) -> bool {
+        self.metadata.locked()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -83,6 +87,10 @@ impl Document {
 
     pub fn content(&self) -> &str {
         &self.content
+    }
+
+    pub fn locked(&self) -> bool {
+        self.metadata.locked()
     }
 
     /// Returns the human-facing label defined by the v0.1 interaction contract.

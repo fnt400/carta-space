@@ -173,6 +173,25 @@ impl DocumentMetadata {
     pub fn extensions(&self) -> &JsonExtensions {
         &self.extensions
     }
+
+    pub fn locked(&self) -> bool {
+        self.extensions
+            .get("locked")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    }
+
+    pub fn with_locked(&self, locked: bool) -> Self {
+        let mut metadata = self.clone();
+        if locked {
+            metadata
+                .extensions
+                .insert("locked".to_owned(), Value::Bool(true));
+        } else {
+            metadata.extensions.remove("locked");
+        }
+        metadata
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -238,6 +257,25 @@ impl WorkMetadata {
 
     pub fn color(&self) -> Option<&str> {
         self.extensions.get("color").and_then(Value::as_str)
+    }
+
+    pub fn locked(&self) -> bool {
+        self.extensions
+            .get("locked")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    }
+
+    pub fn with_locked(&self, locked: bool) -> Self {
+        let mut metadata = self.clone();
+        if locked {
+            metadata
+                .extensions
+                .insert("locked".to_owned(), Value::Bool(true));
+        } else {
+            metadata.extensions.remove("locked");
+        }
+        metadata
     }
 
     pub fn with_color(&self, color: Option<String>) -> Self {

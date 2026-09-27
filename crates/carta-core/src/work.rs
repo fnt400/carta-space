@@ -65,6 +65,10 @@ impl Work {
         self.metadata.color()
     }
 
+    pub fn locked(&self) -> bool {
+        self.metadata.locked()
+    }
+
     pub fn documents(&self) -> &[carta_format::DocumentId] {
         self.metadata.documents()
     }

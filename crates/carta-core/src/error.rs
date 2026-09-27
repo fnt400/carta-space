@@ -82,6 +82,12 @@ pub enum Error {
     #[error("work does not exist: {0}")]
     MissingWork(WorkId),
 
+    #[error("document is locked: {0}")]
+    DocumentLocked(DocumentId),
+
+    #[error("work is locked: {0}")]
+    WorkLocked(WorkId),
+
     #[error("canonical file changed outside this loaded Archive: {0}")]
     ExternalChange(PathBuf),
 
