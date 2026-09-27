@@ -530,6 +530,8 @@ Users should not need to type Carta UUIDs.
 
 If text is selected, it becomes the visible link label. Otherwise Carta uses the Document's derived label or the Work name.
 
+In the TUI, the complete Markdown source span of a link is rendered in light cyan. This is presentation only: the canonical Markdown text is unchanged.
+
 ### 8.2 Open Link
 
 When the cursor is inside a Markdown link, the contextual palette exposes `Open Link`.
