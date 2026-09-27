@@ -3241,4 +3241,19 @@ mod tests {
             app.trash.as_ref().unwrap().documents()[0].created()
         )));
     }
+
+    #[test]
+    fn locked_document_is_visible_in_status_and_separator() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let document = app.editor.current_document().unwrap();
+        assert!(app.editor.insert("locked"));
+        app.autosave().unwrap();
+        app.archive.set_document_locked(document, true).unwrap();
+
+        assert!(status_line(&app).contains("[LOCK DOC]"));
+        assert!(chronological_separator(&app, document, 80).contains("[LOCKED]"));
+    }
+
 }

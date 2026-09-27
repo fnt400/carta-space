@@ -4204,4 +4204,52 @@ mod tests {
             "first second"
         );
     }
+
+    #[test]
+    fn document_lock_command_blocks_normal_editing_until_unlock() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let document = app.current_document().unwrap();
+
+        assert!(app.cat_insert("locked text"));
+        app.autosave().unwrap();
+        app.execute(Command::LockDocument).unwrap();
+
+        assert!(app.archive.document_is_explicitly_locked(document).unwrap());
+        assert!(!app.cat_insert("x"));
+        assert_eq!(app.status, "Document is locked");
+        assert!(!app.commands().contains(&Command::Undo));
+
+        app.execute(Command::UnlockDocument).unwrap();
+        assert!(!app.archive.document_is_locked(document).unwrap());
+        assert!(app.cat_insert("x"));
+    }
+
+    #[test]
+    fn locked_work_is_marked_in_selector_and_locks_member_document() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let document = app.current_document().unwrap();
+        let work = app
+            .archive
+            .create_work("Protected".into(), vec![document])
+            .unwrap();
+        app.switch_view(View::Work(work), None, false).unwrap();
+
+        app.execute(Command::LockWork).unwrap();
+        assert!(app.archive.work_is_locked(work).unwrap());
+        assert!(app.archive.document_is_locked(document).unwrap());
+        assert!(!app.cat_insert("x"));
+
+        app.select_works(SelectAction::OpenWork, false);
+        let AppMode::Selector { choices, .. } = &app.mode else {
+            panic!("expected Work selector")
+        };
+        assert!(choices
+            .iter()
+            .any(|choice| choice.label == "Protected [LOCKED]"));
+    }
+
 }
