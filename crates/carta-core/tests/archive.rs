@@ -74,7 +74,10 @@ fn open_does_not_recreate_a_missing_root_with_tracked_content() {
     fs::remove_dir_all(root.join("volumes")).unwrap();
     drop(archive);
 
-    assert!(matches!(Archive::open(&root), Err(Error::InvalidArchive(_))));
+    assert!(matches!(
+        Archive::open(&root),
+        Err(Error::InvalidArchive(_))
+    ));
     assert!(!root.join("volumes").exists());
 }
 

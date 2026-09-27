@@ -1922,10 +1922,7 @@ impl App {
                 return Ok(());
             }
             if self.archive.is_dirty()? {
-                self.checkpoint(
-                    CheckpointKind::Automatic,
-                    Some("Prepared synchronization"),
-                )?;
+                self.checkpoint(CheckpointKind::Automatic, Some("Prepared synchronization"))?;
             }
         }
 

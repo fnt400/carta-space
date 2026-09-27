@@ -52,11 +52,7 @@ impl Archive {
     }
 }
 
-fn write_package(
-    root: &Path,
-    destination: &Path,
-    strip_sync_remote: bool,
-) -> Result<usize, Error> {
+fn write_package(root: &Path, destination: &Path, strip_sync_remote: bool) -> Result<usize, Error> {
     let file = File::options()
         .write(true)
         .create_new(true)
@@ -91,13 +87,7 @@ fn write_package(
 
     let mut count = 1;
     for path in entries {
-        count += append_path(
-            &mut zip,
-            root,
-            &path,
-            destination,
-            strip_sync_remote,
-        )?;
+        count += append_path(&mut zip, root, &path, destination, strip_sync_remote)?;
     }
     let file = zip
         .finish()
@@ -161,8 +151,7 @@ fn append_path(
 
 fn packaged_git_config(root: &Path, source: &Path) -> Result<Vec<u8>, Error> {
     let bytes = fs::read(source).map_err(|error| Error::io(source, error))?;
-    let mut temporary =
-        tempfile::NamedTempFile::new().map_err(|error| Error::io(source, error))?;
+    let mut temporary = tempfile::NamedTempFile::new().map_err(|error| Error::io(source, error))?;
     temporary
         .write_all(&bytes)
         .map_err(|error| Error::io(temporary.path(), error))?;

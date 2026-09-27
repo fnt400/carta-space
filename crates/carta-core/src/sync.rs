@@ -203,7 +203,11 @@ fn validate_remote_archive(archive: &Archive) -> Result<(), Error> {
 }
 
 fn current_head(root: &Path) -> Result<String, Error> {
-    required_git_text(root, "read local sync head", &["rev-parse", "--verify", "HEAD"])
+    required_git_text(
+        root,
+        "read local sync head",
+        &["rev-parse", "--verify", "HEAD"],
+    )
 }
 
 fn current_tracking_head(root: &Path) -> Result<String, Error> {
@@ -215,10 +219,7 @@ fn current_tracking_head(root: &Path) -> Result<String, Error> {
 }
 
 fn is_ancestor(root: &Path, ancestor: &str, descendant: &str) -> Result<bool, Error> {
-    let output = raw_git_output(
-        root,
-        &["merge-base", "--is-ancestor", ancestor, descendant],
-    )?;
+    let output = raw_git_output(root, &["merge-base", "--is-ancestor", ancestor, descendant])?;
     match output.status.code() {
         Some(0) => Ok(true),
         Some(1) => Ok(false),
@@ -299,11 +300,7 @@ fn push_head(root: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-fn required_git_text(
-    root: &Path,
-    operation: &'static str,
-    args: &[&str],
-) -> Result<String, Error> {
+fn required_git_text(root: &Path, operation: &'static str, args: &[&str]) -> Result<String, Error> {
     let output = crate::history::git_output(root, operation, args)?;
     let text = text_output(output, operation)?;
     let value = text.trim();
@@ -393,9 +390,7 @@ mod tests {
             .unwrap();
         assert!(status.success());
         let archive = Archive::open(destination).unwrap();
-        archive
-            .set_sync_remote(remote.to_str().unwrap())
-            .unwrap();
+        archive.set_sync_remote(remote.to_str().unwrap()).unwrap();
         archive
     }
 
@@ -404,13 +399,8 @@ mod tests {
         let temporary = tempfile::tempdir().unwrap();
         let archive = Archive::create(temporary.path().join("archive")).unwrap();
         let remote = bare_remote(temporary.path());
-        archive
-            .set_sync_remote(remote.to_str().unwrap())
-            .unwrap();
-        assert_eq!(
-            archive.sync_remote().unwrap().as_deref(),
-            remote.to_str()
-        );
+        archive.set_sync_remote(remote.to_str().unwrap()).unwrap();
+        assert_eq!(archive.sync_remote().unwrap().as_deref(), remote.to_str());
         assert!(archive.clear_sync_remote().unwrap());
         assert_eq!(archive.sync_remote().unwrap(), None);
         assert!(!archive.clear_sync_remote().unwrap());
@@ -421,9 +411,7 @@ mod tests {
         let temporary = tempfile::tempdir().unwrap();
         let remote = bare_remote(temporary.path());
         let mut first = Archive::create(temporary.path().join("first")).unwrap();
-        first
-            .set_sync_remote(remote.to_str().unwrap())
-            .unwrap();
+        first.set_sync_remote(remote.to_str().unwrap()).unwrap();
         assert_eq!(first.sync().unwrap().outcome(), SyncOutcome::Published);
 
         let mut second = clone_archive(&remote, &temporary.path().join("second"));
@@ -437,7 +425,10 @@ mod tests {
             second.sync().unwrap().outcome(),
             SyncOutcome::UpdatedFromRemote
         );
-        assert_eq!(second.read_document(document).unwrap().content(), "from first");
+        assert_eq!(
+            second.read_document(document).unwrap().content(),
+            "from first"
+        );
         assert_eq!(second.sync().unwrap().outcome(), SyncOutcome::Synced);
     }
 
@@ -446,9 +437,7 @@ mod tests {
         let temporary = tempfile::tempdir().unwrap();
         let remote = bare_remote(temporary.path());
         let mut first = Archive::create(temporary.path().join("first")).unwrap();
-        first
-            .set_sync_remote(remote.to_str().unwrap())
-            .unwrap();
+        first.set_sync_remote(remote.to_str().unwrap()).unwrap();
         first.sync().unwrap();
         let mut second = clone_archive(&remote, &temporary.path().join("second"));
 
@@ -464,7 +453,10 @@ mod tests {
 
         first.sync().unwrap();
         assert_eq!(second.sync().unwrap().outcome(), SyncOutcome::Merged);
-        assert_eq!(second.read_document(first_document).unwrap().content(), "first");
+        assert_eq!(
+            second.read_document(first_document).unwrap().content(),
+            "first"
+        );
         assert_eq!(
             second.read_document(second_document).unwrap().content(),
             "second"
@@ -480,9 +472,7 @@ mod tests {
         first
             .checkpoint(CheckpointKind::Structural, Some("base document"))
             .unwrap();
-        first
-            .set_sync_remote(remote.to_str().unwrap())
-            .unwrap();
+        first.set_sync_remote(remote.to_str().unwrap()).unwrap();
         first.sync().unwrap();
         let mut second = clone_archive(&remote, &temporary.path().join("second"));
 
@@ -510,15 +500,11 @@ mod tests {
         let remote = bare_remote(temporary.path());
 
         let mut first = Archive::create(temporary.path().join("first")).unwrap();
-        first
-            .set_sync_remote(remote.to_str().unwrap())
-            .unwrap();
+        first.set_sync_remote(remote.to_str().unwrap()).unwrap();
         first.sync().unwrap();
 
         let mut other = Archive::create(temporary.path().join("other")).unwrap();
-        other
-            .set_sync_remote(remote.to_str().unwrap())
-            .unwrap();
+        other.set_sync_remote(remote.to_str().unwrap()).unwrap();
         let error = other.sync().unwrap_err();
         assert!(matches!(error, Error::SyncArchiveMismatch { .. }));
     }
@@ -553,9 +539,7 @@ mod tests {
         run_git(&seed, &["push", "--quiet", "origin", "main"]);
 
         let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
-        archive
-            .set_sync_remote(remote.to_str().unwrap())
-            .unwrap();
+        archive.set_sync_remote(remote.to_str().unwrap()).unwrap();
         assert!(matches!(archive.sync(), Err(Error::SyncRemoteNotEmpty)));
     }
 }
