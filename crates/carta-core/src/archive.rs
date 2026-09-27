@@ -81,6 +81,7 @@ impl Archive {
         crate::package::cleanup_registered_temporaries(&root)?;
         crate::transaction::recover(&root)?;
         recover_creation_staging(&root)?;
+        recover_git_omitted_empty_roots(&root)?;
         let scanned = scan_archive_with_recovery_documents(
             &root,
             crate::conflict::missing_document_infos(&root)?,
@@ -933,6 +934,27 @@ impl Archive {
     pub(crate) fn ensure_work_current(&self, work: &Work) -> Result<(), Error> {
         ensure_unchanged(&work.path.join("work.json"), &work.metadata_bytes)
     }
+}
+
+fn recover_git_omitted_empty_roots(root: &Path) -> Result<(), Error> {
+    for name in ["volumes", "works"] {
+        let path = root.join(name);
+        match fs::symlink_metadata(&path) {
+            Ok(_) => continue,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(Error::io(&path, error)),
+        }
+
+        let output = crate::history::git_output(
+            root,
+            "inspect missing Archive root",
+            &["ls-tree", "-r", "--name-only", "HEAD", "--", name],
+        )?;
+        if output.stdout.is_empty() {
+            fs::create_dir(&path).map_err(|error| Error::io(&path, error))?;
+        }
+    }
+    Ok(())
 }
 
 fn ensure_unchanged(path: &Path, expected: &[u8]) -> Result<(), Error> {

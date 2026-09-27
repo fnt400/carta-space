@@ -42,6 +42,43 @@ fn creates_opens_and_validates_a_minimal_archive() {
 }
 
 #[test]
+fn open_recovers_empty_structural_roots_omitted_by_git_clone() {
+    let temporary = tempfile::tempdir().unwrap();
+    let source = Archive::create(temporary.path().join("source")).unwrap();
+    let clone = temporary.path().join("clone");
+
+    let status = Command::new("git")
+        .args(["clone", "--quiet"])
+        .arg(source.root())
+        .arg(&clone)
+        .status()
+        .unwrap();
+    assert!(status.success());
+    assert!(!clone.join("volumes").exists());
+    assert!(!clone.join("works").exists());
+
+    let cloned = Archive::open(&clone).unwrap();
+    assert!(cloned.root().join("volumes").is_dir());
+    assert!(cloned.root().join("works").is_dir());
+    assert!(!cloned.is_dirty().unwrap());
+}
+
+#[test]
+fn open_does_not_recreate_a_missing_root_with_tracked_content() {
+    let (_temporary, mut archive) = create_archive();
+    archive.create_document("tracked").unwrap();
+    archive
+        .checkpoint(CheckpointKind::Structural, Some("tracked document"))
+        .unwrap();
+    let root = archive.root().to_path_buf();
+    fs::remove_dir_all(root.join("volumes")).unwrap();
+    drop(archive);
+
+    assert!(matches!(Archive::open(&root), Err(Error::InvalidArchive(_))));
+    assert!(!root.join("volumes").exists());
+}
+
+#[test]
 fn rejects_a_fake_git_directory() {
     let (_temporary, archive) = create_archive();
     let git_directory = archive.root().join(".git");

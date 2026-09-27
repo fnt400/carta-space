@@ -160,6 +160,8 @@ A minimal populated Archive may resemble:
 
 Implementations MUST NOT require filenames chosen by users for Documents or Works.
 
+Git does not represent empty directories. A writable implementation opening a Git checkout MAY recreate a missing empty `volumes/` or `works/` root only when the current `HEAD` contains no tracked entry beneath that root. A missing root that has tracked descendants in `HEAD` MUST be treated as invalid current state rather than silently reconstructed.
+
 ---
 
 ## 5. The `mimetype` file
