@@ -45,12 +45,16 @@ impl Session {
 
 pub fn data_root() -> io::Result<PathBuf> {
     if let Some(path) = std::env::var_os("XDG_DATA_HOME") {
-        if !path.is_empty() {
-            return Ok(PathBuf::from(path).join("carta"));
+        let path = PathBuf::from(path);
+        if path.is_absolute() {
+            return Ok(path.join("carta"));
         }
     }
     let home = std::env::var_os("HOME").ok_or_else(|| {
-        io::Error::new(io::ErrorKind::NotFound, "HOME and XDG_DATA_HOME are unset")
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            "HOME is unset and XDG_DATA_HOME is not an absolute path",
+        )
     })?;
     Ok(PathBuf::from(home).join(".local/share/carta"))
 }
@@ -60,20 +64,22 @@ pub fn default_archive_path() -> io::Result<PathBuf> {
 }
 
 pub fn migrate_legacy_state(root: &Path) -> io::Result<()> {
-    let legacy = legacy_state_root()?;
+    let Some(legacy) = legacy_state_root() else {
+        return Ok(());
+    };
     migrate_legacy_state_from(&legacy, root)
 }
 
-fn legacy_state_root() -> io::Result<PathBuf> {
+fn legacy_state_root() -> Option<PathBuf> {
     if let Some(path) = std::env::var_os("XDG_STATE_HOME") {
-        if !path.is_empty() {
-            return Ok(PathBuf::from(path).join("carta-space"));
+        let path = PathBuf::from(path);
+        if path.is_absolute() {
+            return Some(path.join("carta-space"));
         }
     }
-    let home = std::env::var_os("HOME").ok_or_else(|| {
-        io::Error::new(io::ErrorKind::NotFound, "HOME and XDG_STATE_HOME are unset")
-    })?;
-    Ok(PathBuf::from(home).join(".local/state/carta-space"))
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .map(|home| home.join(".local/state/carta-space"))
 }
 
 fn migrate_legacy_state_from(legacy: &Path, root: &Path) -> io::Result<()> {
