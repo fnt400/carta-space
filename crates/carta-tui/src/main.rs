@@ -1449,20 +1449,24 @@ fn parse_rgb(color: &str) -> Option<(u8, u8, u8)> {
 }
 
 fn lock_status(app: &App) -> String {
+    if !matches!(app.view, View::Chronological(_) | View::Work(_)) {
+        return String::new();
+    }
+
     let mut locks = Vec::new();
     if let Some(document) = app.editor.current_document() {
-        let explicit = app
+        if app
             .archive
             .document_is_explicitly_locked(document)
-            .unwrap_or(true);
-        if explicit {
+            .unwrap_or(false)
+        {
             locks.push("[LOCK DOC]");
-        } else if app.archive.document_is_locked(document).unwrap_or(true) {
+        } else if app.archive.document_is_locked(document).unwrap_or(false) {
             locks.push("[LOCKED BY WORK]");
         }
     }
     if let View::Work(work) = &app.view {
-        if app.archive.work_is_locked(*work).unwrap_or(true) {
+        if app.archive.work_is_locked(*work).unwrap_or(false) {
             locks.push("[LOCK WORK]");
         }
     }
@@ -3240,6 +3244,23 @@ mod tests {
         assert!(trash.starts_with(&date_only(
             app.trash.as_ref().unwrap().documents()[0].created()
         )));
+    }
+
+    #[test]
+    fn specialized_views_ignore_stale_editor_lock_state() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let document = app.editor.current_document().unwrap();
+        assert!(app.editor.insert("trash me"));
+        app.autosave().unwrap();
+
+        app.archive.trash_document(document).unwrap();
+        app.trash = Some(app.archive.trash_inventory().unwrap());
+        app.view = View::Trash { selected: 0 };
+
+        assert_eq!(lock_status(&app), "");
+        assert!(!status_line(&app).contains("[LOCK"));
     }
 
     #[test]
