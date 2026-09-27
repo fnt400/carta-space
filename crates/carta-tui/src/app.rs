@@ -1135,6 +1135,9 @@ impl App {
     }
 
     pub fn tick(&mut self, now: Instant) -> AppResult {
+        if self.quit {
+            return Ok(());
+        }
         if self.scheduler.autosave_due(now, self.editor.is_dirty()) {
             self.autosave()?;
         }
@@ -3008,6 +3011,26 @@ mod tests {
         let position = app.session().position.unwrap();
         assert_eq!(position.document, app.editor.current_document().unwrap());
         assert_eq!(position.byte, 3);
+    }
+
+    #[test]
+    fn tick_after_quit_does_not_run_scheduled_work() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let now = Instant::now();
+        let mut app = App::open(archive, None, now).unwrap();
+
+        assert!(app.editor.insert("abcdef"));
+        app.editor.set_cursor(Cursor { region: 0, byte: 3 }, false);
+        app.scheduler.sync_pending();
+        app.quit = true;
+
+        let before = app.session();
+        app.tick(now + Duration::from_secs(600)).unwrap();
+        let after = app.session();
+
+        assert_eq!(after, before);
+        assert!(app.scheduler.sync_pending);
     }
 
     #[test]
