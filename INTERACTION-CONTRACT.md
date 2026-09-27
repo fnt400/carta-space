@@ -758,9 +758,7 @@ Input must be valid UTF-8; UTF-8 BOM is accepted and stripped. CRLF is normalize
 v0.1 provides:
 
 - `Export Document as Markdown`;
-- `Export Document as PDF`;
-- `Export Work as Markdown`;
-- `Export Work as PDF`.
+- `Export Work as Markdown`.
 
 Work export commands are visible only in a Work context.
 
@@ -768,7 +766,7 @@ Markdown export contains authored text, not Carta UUIDs or administrative metada
 
 Work Markdown export concatenates component Documents in Work order without UI boundary separators.
 
-PDF export is a derived publishing operation implemented through Pandoc and an external PDF engine; LuaLaTeX is the initial preferred default. Carta v0.1 does not implement its own layout engine.
+Built-in PDF export is intentionally deferred beyond v0.1. Markdown export remains the publication interchange path for this release.
 
 Carta proposes a short filesystem-safe filename from the Document label or Work name. The proposed stem is at most 40 characters, keeps letters and digits, replaces runs of punctuation/whitespace with a single `-`, and falls back to `document` when no usable name remains.
 
