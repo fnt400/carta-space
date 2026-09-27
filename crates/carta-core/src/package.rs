@@ -35,10 +35,11 @@ impl Archive {
         Archive::validate(&self.root)?;
         let destination = safe_export_destination(&self.root, destination.as_ref())?;
         let checkpoint_created = crate::history::create_package_checkpoint(&self.root)?.is_some();
+        let strip_sync_remote = self.sync_remote()?.is_some();
 
         let temporary = temporary_sibling(&destination, "package")?;
         let mut guard = TemporaryFile::register(&self.root, temporary.clone())?;
-        let entries = write_package(&self.root, &temporary)?;
+        let entries = write_package(&self.root, &temporary, strip_sync_remote)?;
         validate_package(&temporary)?;
         replace_destination(&temporary, &destination)?;
         guard.finish()?;
@@ -51,7 +52,11 @@ impl Archive {
     }
 }
 
-fn write_package(root: &Path, destination: &Path) -> Result<usize, Error> {
+fn write_package(
+    root: &Path,
+    destination: &Path,
+    strip_sync_remote: bool,
+) -> Result<usize, Error> {
     let file = File::options()
         .write(true)
         .create_new(true)
@@ -86,7 +91,13 @@ fn write_package(root: &Path, destination: &Path) -> Result<usize, Error> {
 
     let mut count = 1;
     for path in entries {
-        count += append_path(&mut zip, root, &path, destination)?;
+        count += append_path(
+            &mut zip,
+            root,
+            &path,
+            destination,
+            strip_sync_remote,
+        )?;
     }
     let file = zip
         .finish()
@@ -101,6 +112,7 @@ fn append_path(
     root: &Path,
     path: &Path,
     package: &Path,
+    strip_sync_remote: bool,
 ) -> Result<usize, Error> {
     if is_transient(path, root) {
         return Ok(0);
@@ -126,18 +138,54 @@ fn append_path(
         children.sort_by(|left, right| left.file_name().cmp(&right.file_name()));
         let mut count = 1;
         for child in children {
-            count += append_path(zip, root, &child, package)?;
+            count += append_path(zip, root, &child, package, strip_sync_remote)?;
         }
         Ok(count)
     } else if metadata.is_file() {
+        let is_git_config = name == ".git/config";
         zip.start_file(name, options)
             .map_err(|error| Error::zip(package, error))?;
-        let mut input = File::open(path).map_err(|error| Error::io(path, error))?;
-        std::io::copy(&mut input, zip).map_err(|error| Error::io(path, error))?;
+        if strip_sync_remote && is_git_config {
+            let config = packaged_git_config(root, path)?;
+            zip.write_all(&config)
+                .map_err(|error| Error::io(package, error))?;
+        } else {
+            let mut input = File::open(path).map_err(|error| Error::io(path, error))?;
+            std::io::copy(&mut input, zip).map_err(|error| Error::io(path, error))?;
+        }
         Ok(1)
     } else {
         Err(Error::UnsafeDestination(path.to_path_buf()))
     }
+}
+
+fn packaged_git_config(root: &Path, source: &Path) -> Result<Vec<u8>, Error> {
+    let bytes = fs::read(source).map_err(|error| Error::io(source, error))?;
+    let mut temporary =
+        tempfile::NamedTempFile::new().map_err(|error| Error::io(source, error))?;
+    temporary
+        .write_all(&bytes)
+        .map_err(|error| Error::io(temporary.path(), error))?;
+    temporary
+        .as_file()
+        .sync_all()
+        .map_err(|error| Error::io(temporary.path(), error))?;
+    let temporary_path = temporary
+        .path()
+        .to_str()
+        .ok_or_else(|| Error::NonUtf8TemporaryPath(temporary.path().to_path_buf()))?;
+    crate::history::git_output(
+        root,
+        "remove device-local sync remote from portable package",
+        &[
+            "config",
+            "--file",
+            temporary_path,
+            "--remove-section",
+            "remote.carta-sync",
+        ],
+    )?;
+    fs::read(temporary.path()).map_err(|error| Error::io(temporary.path(), error))
 }
 
 fn validate_package(path: &Path) -> Result<(), Error> {

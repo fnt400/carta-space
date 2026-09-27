@@ -16,6 +16,9 @@ fn package_is_ordered_valid_complete_and_checkpoints_current_state() {
     let (temporary, mut archive) = create_archive();
     let document = archive.create_document("current authored state").unwrap();
     archive
+        .set_sync_remote("ssh://example.invalid/carta.git")
+        .unwrap();
+    archive
         .checkpoint(CheckpointKind::Manual, Some("older state"))
         .unwrap();
     archive
@@ -32,6 +35,10 @@ fn package_is_ordered_valid_complete_and_checkpoints_current_state() {
     let destination = temporary.path().join("portable.cat");
     let report = archive.package(&destination).unwrap();
     assert!(report.checkpoint_created());
+    assert_eq!(
+        archive.sync_remote().unwrap().as_deref(),
+        Some("ssh://example.invalid/carta.git")
+    );
 
     let mut zip = ZipArchive::new(fs::File::open(&destination).unwrap()).unwrap();
     let first = zip.by_index(0).unwrap();
@@ -54,6 +61,7 @@ fn package_is_ordered_valid_complete_and_checkpoints_current_state() {
     zip.extract(unpacked.path()).unwrap();
     Archive::validate(unpacked.path()).unwrap();
     let unpacked_archive = Archive::open(unpacked.path()).unwrap();
+    assert_eq!(unpacked_archive.sync_remote().unwrap(), None);
     assert_eq!(
         unpacked_archive.read_document(document).unwrap().content(),
         "packaged current state"
