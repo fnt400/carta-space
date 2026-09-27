@@ -5,7 +5,7 @@ use carta_tui::app::{AppMode, View};
 use carta_tui::editor::{visual_ranges, Cursor};
 use carta_tui::help::{documents as help_documents, HelpKind};
 use carta_tui::session::{
-    load_last_archive, load_session, save_last_archive, save_session, state_root,
+    data_root, default_archive_path, load_session, migrate_legacy_state, save_session,
 };
 use carta_tui::App;
 use chrono::{Datelike, Local, Weekday};
@@ -38,7 +38,7 @@ use unicode_width::UnicodeWidthChar;
 #[derive(Parser)]
 #[command(name = "carta-tui", version, about = "Carta Space writing environment")]
 struct Args {
-    /// Archive directory. Without it, the device-local last Archive is resumed.
+    /// Archive directory. Without it, use the XDG Carta data archive.
     path: Option<PathBuf>,
     /// Create the Archive at PATH before opening it.
     #[arg(long, requires = "path")]
@@ -144,12 +144,11 @@ fn main() {
 
 fn run() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
-    let state = state_root()?;
+    let data = data_root()?;
+    migrate_legacy_state(&data)?;
     let path = match args.path {
         Some(path) => path,
-        None => {
-            load_last_archive(&state)?.ok_or("no last Archive; pass a path or use --create PATH")?
-        }
+        None => default_archive_path()?,
     };
     let mut archive = if args.create {
         Archive::create(&path)?
@@ -168,12 +167,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             Err(error) => Some(format!("Sync unavailable: {error}")),
         }
     };
-    let canonical = archive
-        .root()
-        .canonicalize()
-        .unwrap_or_else(|_| archive.root().to_path_buf());
-    save_last_archive(&state, &canonical)?;
-    let session = load_session(&state, archive.metadata().archive_id())?;
+    let session = load_session(&data, archive.metadata().archive_id())?;
     let archive_id = archive.metadata().archive_id();
     let mut app = App::open(archive, session.as_ref(), Instant::now())?;
     if let Some(status) = startup_sync_status {
@@ -210,11 +204,11 @@ fn run() -> Result<(), Box<dyn Error>> {
             app.status = error.to_string();
         }
         if last_session_save.elapsed() >= Duration::from_secs(1) {
-            save_session(&state, archive_id, &app.session())?;
+            save_session(&data, archive_id, &app.session())?;
             last_session_save = Instant::now();
         }
     }
-    save_session(&state, archive_id, &app.session())?;
+    save_session(&data, archive_id, &app.session())?;
     let _ = app.archive.sync();
     Ok(())
 }
