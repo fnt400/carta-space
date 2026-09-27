@@ -347,6 +347,28 @@ fn handle_key(
 
     if dispatcher.right_control_held
         && key.modifiers.contains(KeyModifiers::CONTROL)
+        && matches!(key.code, KeyCode::Char('b' | 'B' | 'i' | 'I'))
+    {
+        dispatcher.pending_leap = None;
+        if matches!(app.mode, AppMode::Editing)
+            && matches!(app.view, View::Chronological(_) | View::Work(_))
+            && !app.collapsed
+        {
+            let marker = if matches!(key.code, KeyCode::Char('b' | 'B')) {
+                "**"
+            } else {
+                "*"
+            };
+            if app.insert_markdown_pair(marker) {
+                app.edited(Instant::now());
+                app.status.clear();
+            }
+        }
+        return Ok(());
+    }
+
+    if dispatcher.right_control_held
+        && key.modifiers.contains(KeyModifiers::CONTROL)
         && matches!(key.code, KeyCode::Char('w' | 'W' | 'l' | 'L'))
     {
         dispatcher.pending_leap = None;
@@ -2766,6 +2788,62 @@ mod tests {
         )
         .unwrap();
         assert_eq!(app.editor.current_text(), Some("ab"));
+    }
+
+    #[test]
+    fn right_control_b_inserts_bold_markers_around_point() {
+        let (_temporary, mut app) = app_with_documents(&["ab"], false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 1 }, false);
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('b'), KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(app.editor.current_text(), Some("a****b"));
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 3 });
+    }
+
+    #[test]
+    fn right_control_i_inserts_italic_markers_around_point() {
+        let (_temporary, mut app) = app_with_documents(&["ab"], false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 1 }, false);
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('i'), KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(app.editor.current_text(), Some("a**b"));
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 2 });
     }
 
     #[test]
