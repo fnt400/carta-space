@@ -709,10 +709,7 @@ fn handle_normal(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
             app.cat_insert(&c.to_string())
         }
         KeyCode::Enter => app.cat_insert_newline(),
-        KeyCode::Tab if shift => {
-            app.cat_navigation();
-            app.editor.indent_less()
-        }
+        KeyCode::Tab if shift => app.cat_indent_less(),
         KeyCode::Tab => app.cat_insert("    "),
         KeyCode::Backspace => app.cat_backspace(),
         KeyCode::Delete => app.cat_erase(),
@@ -1037,9 +1034,18 @@ fn visual_lines(app: &App, width: usize) -> Vec<VisualLine> {
                 )));
                 out.push(generated_line(String::new()));
             }
-            View::Work(_) if region_index > 0 => {
-                for text in [String::new(), "─".repeat(width), String::new()] {
-                    out.push(generated_line(text));
+            View::Work(_) => {
+                let locked = app
+                    .archive
+                    .document_is_locked(region.document)
+                    .unwrap_or(true);
+                if region_index > 0 {
+                    out.push(generated_line(String::new()));
+                    out.push(generated_line(work_separator(width, locked)));
+                    out.push(generated_line(String::new()));
+                } else if locked {
+                    out.push(generated_line(work_separator(width, true)));
+                    out.push(generated_line(String::new()));
                 }
             }
             _ => {}
@@ -1070,6 +1076,17 @@ fn generated_line(text: String) -> VisualLine {
     }
 }
 
+fn work_separator(width: usize, locked: bool) -> String {
+    if !locked {
+        return "─".repeat(width);
+    }
+    let prefix = "── [LOCKED] ";
+    if display_width(prefix) >= width {
+        return truncate_display(prefix, width, false);
+    }
+    format!("{prefix}{}", "─".repeat(width - display_width(prefix)))
+}
+
 fn chronological_separator(app: &App, document: carta_core::DocumentId, width: usize) -> String {
     if width == 0 {
         return String::new();
@@ -1082,7 +1099,11 @@ fn chronological_separator(app: &App, document: carta_core::DocumentId, width: u
             || "senza data".to_owned(),
             |info| italian_date(info.created()),
         );
-    let prefix = format!("── {date} ");
+    let prefix = if app.archive.document_is_locked(document).unwrap_or(true) {
+        format!("── [LOCKED] {date} ")
+    } else {
+        format!("── {date} ")
+    };
     if display_width(&prefix) >= width {
         return truncate_display(&prefix, width, false);
     }
@@ -1427,11 +1448,37 @@ fn parse_rgb(color: &str) -> Option<(u8, u8, u8)> {
     ))
 }
 
-fn status_line(app: &App) -> String {
-    if !app.status.is_empty() {
-        return app.status.clone();
+fn lock_status(app: &App) -> String {
+    let mut locks = Vec::new();
+    if let Some(document) = app.editor.current_document() {
+        let explicit = app
+            .archive
+            .document_is_explicitly_locked(document)
+            .unwrap_or(true);
+        if explicit {
+            locks.push("[LOCK DOC]");
+        } else if app.archive.document_is_locked(document).unwrap_or(true) {
+            locks.push("[LOCKED BY WORK]");
+        }
     }
-    match &app.view {
+    if let View::Work(work) = &app.view {
+        if app.archive.work_is_locked(*work).unwrap_or(true) {
+            locks.push("[LOCK WORK]");
+        }
+    }
+    locks.join(" ")
+}
+
+fn status_line(app: &App) -> String {
+    let lock = lock_status(app);
+    if !app.status.is_empty() {
+        return if lock.is_empty() {
+            app.status.clone()
+        } else {
+            format!("{lock} · {}", app.status)
+        };
+    }
+    let base = match &app.view {
         View::Chronological(v) => {
             format!(
                 "{} · {} · {:04}-{:02} · {}",
@@ -1529,6 +1576,11 @@ fn status_line(app: &App) -> String {
                 list_position(*selected, documents.len())
             )
         }
+    };
+    if lock.is_empty() {
+        base
+    } else {
+        format!("{lock} · {base}")
     }
 }
 fn current_label(app: &App) -> String {
