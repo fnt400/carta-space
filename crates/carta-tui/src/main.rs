@@ -3107,10 +3107,12 @@ mod tests {
     }
 
     #[test]
-    fn leap_enter_moves_to_visual_line_edge_and_release_is_inert() {
+    fn leap_enter_without_lf_rebounds_and_release_is_inert() {
         let (_temporary, mut app) = app_with_documents(&["abcdefghij"], false);
         app.editor.set_cursor(Cursor { region: 0, byte: 7 }, false);
+        let original = app.editor.current_text().unwrap().to_owned();
         let mut dispatcher = Dispatcher::default();
+
         handle_key(
             &mut app,
             &mut dispatcher,
@@ -3128,7 +3130,15 @@ mod tests {
             true,
         )
         .unwrap();
-        assert_eq!(app.editor.cursor().byte, 0);
+
+        let AppMode::Leap { session, .. } = &app.mode else {
+            panic!("expected active LEAP")
+        };
+        assert_eq!(session.query(), "\n");
+        assert!(session.current_match().is_none());
+        assert_eq!(app.editor.cursor().byte, 7);
+        assert_eq!(app.editor.current_text(), Some(original.as_str()));
+
         handle_key(
             &mut app,
             &mut dispatcher,
@@ -3140,7 +3150,10 @@ mod tests {
             true,
         )
         .unwrap();
+
         assert!(matches!(app.mode, AppMode::Editing));
+        assert_eq!(app.editor.cursor().byte, 7);
+        assert_eq!(app.editor.current_text(), Some(original.as_str()));
     }
 
     #[test]
