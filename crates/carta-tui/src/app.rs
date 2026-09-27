@@ -2557,7 +2557,6 @@ impl App {
     fn finish_quit(&mut self) -> AppResult {
         self.autosave()?;
         self.checkpoint(CheckpointKind::Quit, None)?;
-        let _ = self.archive.sync();
         self.quit = true;
         Ok(())
     }
@@ -2993,6 +2992,22 @@ mod tests {
         let resumed = App::open(reopened, Some(&session), now).unwrap();
         assert_eq!(resumed.archive.documents().count(), count);
         assert_eq!(resumed.editor.cursor().byte, "résumé".len());
+    }
+
+    #[test]
+    fn quit_preserves_the_current_session_cursor() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        assert!(app.editor.insert("abcdef"));
+        app.editor.set_cursor(Cursor { region: 0, byte: 3 }, false);
+
+        app.execute(Command::Quit).unwrap();
+
+        assert!(app.quit);
+        let position = app.session().position.unwrap();
+        assert_eq!(position.document, app.editor.current_document().unwrap());
+        assert_eq!(position.byte, 3);
     }
 
     #[test]
