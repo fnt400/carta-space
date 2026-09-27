@@ -440,7 +440,7 @@ Historical recovery across sessions belongs to History.
 
 v0.1 edits Markdown source directly. There is no WYSIWYG editing mode.
 
-Future frontends may render headings, emphasis, links, or other syntax more richly without changing canonical Markdown.
+The reference TUI applies syntax highlighting to the authored CommonMark source while still showing the source literally. Headings, emphasis, strong emphasis, block quotations, code, links, and images may receive distinct presentation styles; no Markdown characters are hidden or rewritten. Colors are frontend theme settings, never canonical document data.
 
 ### 6.5 Wrapping and indentation
 
@@ -530,7 +530,7 @@ Users should not need to type Carta UUIDs.
 
 If text is selected, it becomes the visible link label. Otherwise Carta uses the Document's derived label or the Work name.
 
-In the TUI, the complete Markdown source span of a link is rendered in light cyan. This is presentation only: the canonical Markdown text is unchanged.
+In the TUI, the complete Markdown source span of a link uses the configured Markdown link style. This is presentation only: the canonical Markdown text is unchanged.
 
 ### 8.2 Open Link
 
