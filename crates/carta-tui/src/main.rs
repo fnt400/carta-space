@@ -1229,7 +1229,7 @@ fn styled_line(
     region_text: &str,
     selection: Option<(Cursor, Cursor)>,
     selection_style: Style,
-) -> Line<'_> {
+) -> Line<'static> {
     let selected_range = selection.and_then(|(start, end)| {
         if region < start.region || region > end.region {
             return None;
