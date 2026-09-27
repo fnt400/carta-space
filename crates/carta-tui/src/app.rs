@@ -1771,7 +1771,7 @@ impl App {
                     cursor.region.checked_sub(1)?
                 };
                 (region < self.editor.regions().len()).then_some(Cursor { region, byte: 0 })
-            },
+            }
         }
     }
 
