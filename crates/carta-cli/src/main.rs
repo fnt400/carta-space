@@ -3,7 +3,7 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-use carta_core::{Archive, CheckpointKind, DocumentId, PdfExportOptions, ValidationErrors, WorkId};
+use carta_core::{Archive, CheckpointKind, DocumentId, ValidationErrors, WorkId};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
 #[derive(Debug, Parser)]
@@ -62,32 +62,6 @@ struct ExportArgs {
 enum ExportCommand {
     MarkdownDocument { document: DocumentId },
     MarkdownWork { work: WorkId },
-    PdfDocument(PdfDocumentArgs),
-    PdfWork(PdfWorkArgs),
-}
-
-#[derive(Debug, Args)]
-struct PdfDocumentArgs {
-    document: DocumentId,
-    destination: PathBuf,
-    #[command(flatten)]
-    renderer: RendererArgs,
-}
-
-#[derive(Debug, Args)]
-struct PdfWorkArgs {
-    work: WorkId,
-    destination: PathBuf,
-    #[command(flatten)]
-    renderer: RendererArgs,
-}
-
-#[derive(Debug, Args)]
-struct RendererArgs {
-    #[arg(long, default_value = "pandoc")]
-    pandoc: PathBuf,
-    #[arg(long, default_value = "lualatex")]
-    pdf_engine: String,
 }
 
 #[derive(Debug, Args)]
@@ -293,16 +267,6 @@ fn run(cli: Cli) -> Result<(), Box<dyn StdError>> {
             ExportCommand::MarkdownWork { work } => {
                 write_stdout(archive.export_work_markdown(work)?.as_bytes())?;
             }
-            ExportCommand::PdfDocument(args) => archive.export_document_pdf_with(
-                args.document,
-                args.destination,
-                &PdfExportOptions::new(args.renderer.pandoc, args.renderer.pdf_engine),
-            )?,
-            ExportCommand::PdfWork(args) => archive.export_work_pdf_with(
-                args.work,
-                args.destination,
-                &PdfExportOptions::new(args.renderer.pandoc, args.renderer.pdf_engine),
-            )?,
         },
         Command::Package { destination } => {
             let report = archive.package(destination)?;
