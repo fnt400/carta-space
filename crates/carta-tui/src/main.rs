@@ -443,7 +443,7 @@ fn handle_key(
                 }
                 (LeapDirection::Backward, KeyCode::PageUp)
                 | (LeapDirection::Forward, KeyCode::PageDown) => {
-                    app.leap_view_boundary(pending.direction);
+                    app.leap_document_start(pending.direction);
                     true
                 }
                 _ => false,
@@ -2564,8 +2564,9 @@ mod tests {
     }
 
     #[test]
-    fn view_boundary_leap_again_does_not_fall_back_to_old_text_query() {
-        let (_temporary, mut app) = app_with_documents(&["target", "middle", "target"], true);
+    fn document_start_leap_again_does_not_fall_back_to_old_text_query() {
+        let (_temporary, mut app) =
+            app_with_documents(&["target", "middle", "third", "target"], true);
         app.start_leap(LeapDirection::Forward, true);
         app.leap_input("target");
         app.end_leap();
@@ -2573,16 +2574,18 @@ mod tests {
 
         app.editor.set_cursor(Cursor { region: 1, byte: 1 }, false);
         app.cat_navigation();
-        app.leap_view_boundary(LeapDirection::Forward);
-        let at_end = app.editor.cursor();
+        app.leap_document_start(LeapDirection::Forward);
+        assert_eq!(app.editor.cursor(), Cursor { region: 2, byte: 0 });
 
         app.leap_again(LeapDirection::Forward);
+        assert_eq!(app.editor.cursor(), Cursor { region: 3, byte: 0 });
 
-        assert_eq!(app.editor.cursor(), at_end);
+        app.leap_again(LeapDirection::Forward);
+        assert_eq!(app.editor.cursor(), Cursor { region: 3, byte: 0 });
     }
 
     #[test]
-    fn cat_boundary_leaps_target_document_and_view_edges() {
+    fn cat_boundary_leaps_target_document_edges_and_adjacent_document_starts() {
         let (_temporary, mut app) = app_with_documents(&["abc", "def", "ghi"], true);
 
         let cases = [
@@ -2601,18 +2604,18 @@ mod tests {
                 Cursor { region: 1, byte: 3 },
             ),
             (
-                Cursor { region: 1, byte: 1 },
+                Cursor { region: 2, byte: 1 },
                 ModifierKeyCode::LeftControl,
                 KeyModifiers::CONTROL,
                 KeyCode::PageUp,
-                Cursor { region: 0, byte: 0 },
+                Cursor { region: 1, byte: 0 },
             ),
             (
                 Cursor { region: 1, byte: 1 },
                 ModifierKeyCode::LeftAlt,
                 KeyModifiers::ALT,
                 KeyCode::PageDown,
-                Cursor { region: 2, byte: 3 },
+                Cursor { region: 2, byte: 0 },
             ),
         ];
 
