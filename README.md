@@ -179,9 +179,9 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace
 ```
 
-The v0.1 interaction contract now fixes startup/resume behavior, LEAP semantics, the contextual dmenu-like command palette, editing and clipboard behavior, Chronological/Work/Search Views, Work operations, links/backlinks, History, Trash/Wipe, import/export, autosave/checkpoints, recovery, and structural atomicity. Implementation work should follow `INTERACTION-CONTRACT.md` rather than inventing missing UI semantics.
+The v0.1 interaction contract now fixes startup/resume behavior, LEAP semantics, the contextual dmenu-like command palette, editing and clipboard behavior, Chronological/Work/Search Views, Work operations, links/backlinks, History, Trash/Wipe, import/export, autosave/checkpoints, Git synchronization, recovery, and structural atomicity. Implementation work should follow `INTERACTION-CONTRACT.md` rather than inventing missing UI semantics.
 
-Features such as images, bibliographies, tags, semantic search, synchronization, collaboration, and AI assistance remain intentionally deferred until real use demonstrates a need for them.
+Features such as images, bibliographies, tags, semantic search, collaboration, AI assistance, and interactive synchronization-conflict resolution remain intentionally deferred until real use demonstrates a need for them.
 
 The working rule is:
 
