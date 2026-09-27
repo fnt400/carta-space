@@ -203,6 +203,9 @@ fn run() -> Result<(), Box<dyn Error>> {
                 }
             }
         }
+        if app.quit {
+            break;
+        }
         if let Err(error) = app.tick(Instant::now()) {
             app.status = error.to_string();
         }
