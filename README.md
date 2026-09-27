@@ -100,6 +100,12 @@ A Carta Space archive is also a Git repository. Git is an implementation-indepen
 
 Current content remains readable without Git. Git provides automatic historical reconstruction.
 
+## TUI Markdown highlighting
+
+The TUI shows canonical CommonMark source literally while applying syntax colors to headings, emphasis, strong emphasis, block quotations, inline/fenced code, links, and images. Default colors use the terminal ANSI palette rather than fixed RGB values.
+
+The Markdown palette can be overridden with `CARTA_MD_HEADING_COLOR`, `CARTA_MD_EMPHASIS_COLOR`, `CARTA_MD_STRONG_COLOR`, `CARTA_MD_QUOTE_COLOR`, `CARTA_MD_CODE_COLOR`, and `CARTA_MD_LINK_COLOR`. Values may be ANSI color names such as `light-blue` or `cyan`, or `#RRGGBB`.
+
 ## Trash, Restore, and Wipe
 
 `carta-core` implements recoverable Trash without a canonical `trash/` directory. The Trash view is derived from current state and retained Git history. Trashing a Document reports every current Work membership and inbound Carta link, removes the structural Work references and active Document together, leaves authored Markdown links unchanged, and creates an immediate structural checkpoint. Documents restore with their original identity, creation time, Volume, and content immediately before Trash, but without former Work memberships. Works restore with their original identity and order; restoring required trashed Documents needs explicit consent, and an active title conflict requires an explicit unique replacement title.
