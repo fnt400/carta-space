@@ -1921,6 +1921,17 @@ mod tests {
         };
 
         let ranges = markdown_style_ranges(text);
+        for expected in [
+            MarkdownSyntax::Heading,
+            MarkdownSyntax::Strong,
+            MarkdownSyntax::Emphasis,
+            MarkdownSyntax::Quote,
+            MarkdownSyntax::Code,
+            MarkdownSyntax::Link,
+        ] {
+            assert!(ranges.iter().any(|range| range.syntax == expected));
+        }
+
         let rendered = styled_line(&line, 0, &ranges, None, Style::default());
         let displayed = rendered
             .spans
