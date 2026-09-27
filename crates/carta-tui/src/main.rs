@@ -341,6 +341,21 @@ fn handle_key(
 
     if dispatcher.right_control_held
         && key.modifiers.contains(KeyModifiers::CONTROL)
+        && matches!(key.code, KeyCode::Char('w' | 'W' | 'l' | 'L'))
+    {
+        dispatcher.pending_leap = None;
+        if matches!(app.mode, AppMode::Editing) {
+            match key.code {
+                KeyCode::Char('w' | 'W') => app.execute(carta_tui::Command::OpenWork)?,
+                KeyCode::Char('l' | 'L') => app.activate_link_shortcut()?,
+                _ => unreachable!(),
+            }
+        }
+        return Ok(());
+    }
+
+    if dispatcher.right_control_held
+        && key.modifiers.contains(KeyModifiers::CONTROL)
         && matches!(key.code, KeyCode::Char('z' | 'Z' | 'r' | 'R'))
     {
         dispatcher.pending_leap = None;
@@ -2551,6 +2566,92 @@ mod tests {
         )
         .unwrap();
         assert_eq!(app.editor.current_text(), Some("ab"));
+    }
+
+    #[test]
+    fn right_control_w_opens_work_selector() {
+        let (_temporary, mut app) = app_with_documents(&["a"], true);
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            app.mode,
+            AppMode::Selector {
+                action: carta_tui::app::SelectAction::OpenWork,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn right_control_l_inserts_or_opens_link_at_point() {
+        let (_temporary, mut app) = app_with_documents(&["plain"], false);
+        let mut dispatcher = Dispatcher::default();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('l'), KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
+        assert!(matches!(
+            app.mode,
+            AppMode::Selector {
+                action: carta_tui::app::SelectAction::InsertLink,
+                ..
+            }
+        ));
+
+        let (_temporary, mut app) = app_with_documents(&["[site](https://example.com)"], false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 2 }, false);
+        let mut dispatcher = Dispatcher::default();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('l'), KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
+
+        assert!(matches!(app.mode, AppMode::Editing));
+        assert_eq!(app.status, "External links are not executed by this build");
     }
 
     #[test]
