@@ -162,6 +162,8 @@ pub enum Command {
     RenameWork,
     OpenWork,
     OpenChronologicalView,
+    GoToStartOfView,
+    GoToEndOfView,
     CollapseView,
     ExpandView,
     ShowMemberships,
@@ -229,6 +231,8 @@ impl Command {
             Self::RenameWork => "Rename Work…",
             Self::OpenWork => "Open Work…",
             Self::OpenChronologicalView => "Open Chronological View",
+            Self::GoToStartOfView => "Go to Start of View",
+            Self::GoToEndOfView => "Go to End of View",
             Self::CollapseView => "Collapse View",
             Self::ExpandView => "Expand View",
             Self::ShowMemberships => "Show Memberships",
@@ -548,6 +552,7 @@ impl App {
             ]);
         }
         if editable && has_doc {
+            commands.extend([GoToStartOfView, GoToEndOfView]);
             commands.push(if self.collapsed {
                 ExpandView
             } else {
@@ -715,6 +720,25 @@ impl App {
             RenameWork => self.prompt("New Work name", PromptAction::RenameWork),
             OpenWork => self.select_works(SelectAction::OpenWork, false),
             OpenChronologicalView => self.open_chronological_view()?,
+            GoToStartOfView => {
+                if !self.editor.regions().is_empty() {
+                    self.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+                    self.cat_navigation();
+                }
+            }
+            GoToEndOfView => {
+                if let Some((region, byte)) = self
+                    .editor
+                    .regions()
+                    .iter()
+                    .enumerate()
+                    .next_back()
+                    .map(|(region, value)| (region, value.text.len()))
+                {
+                    self.editor.set_cursor(Cursor { region, byte }, false);
+                    self.cat_navigation();
+                }
+            }
             CollapseView => {
                 self.autosave_for_destructive()?;
                 self.collapsed = true;
@@ -3073,6 +3097,51 @@ fn sanitize_filename(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn palette_commands_go_to_start_and_end_of_view() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let first = archive.create_document("first").unwrap();
+        let second = archive.create_document("second").unwrap();
+        archive
+            .checkpoint(CheckpointKind::Structural, Some("Two Documents"))
+            .unwrap();
+        let volume = archive
+            .documents()
+            .find(|info| info.id() == first)
+            .unwrap()
+            .volume();
+        let mut app = App::open(
+            archive,
+            Some(&Session {
+                view: SavedView::Chronological {
+                    year: volume.year(),
+                    month: volume.month(),
+                },
+                position: Some(Position {
+                    document: first,
+                    byte: 2,
+                    scroll: 0,
+                }),
+                work_positions: BTreeMap::new(),
+                work_mru: Vec::new(),
+            }),
+            Instant::now(),
+        )
+        .unwrap();
+
+        assert!(app.commands().contains(&Command::GoToStartOfView));
+        assert!(app.commands().contains(&Command::GoToEndOfView));
+
+        app.execute(Command::GoToEndOfView).unwrap();
+        assert_eq!(app.editor.current_document(), Some(second));
+        assert_eq!(app.editor.cursor().byte, "second".len());
+
+        app.execute(Command::GoToStartOfView).unwrap();
+        assert_eq!(app.editor.current_document(), Some(first));
+        assert_eq!(app.editor.cursor().byte, 0);
+    }
 
     #[test]
     fn sync_now_does_not_checkpoint_a_provisional_document() {
