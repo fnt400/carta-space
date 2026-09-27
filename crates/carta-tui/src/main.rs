@@ -22,7 +22,9 @@ use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, supports_keyboard_enhancement, EnterAlternateScreen,
     LeaveAlternateScreen,
 };
-use pulldown_cmark::{Event as MarkdownEvent, Parser as MarkdownParser, Tag as MarkdownTag, TagEnd as MarkdownTagEnd};
+use pulldown_cmark::{
+    Event as MarkdownEvent, Parser as MarkdownParser, Tag as MarkdownTag, TagEnd as MarkdownTagEnd,
+};
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -1386,9 +1388,10 @@ fn styled_line(
             }
             let mut style = Style::default();
             for syntax in syntax_priority {
-                if line_style_ranges.iter().any(|range| {
-                    range.syntax == syntax && range.start < end && start < range.end
-                }) {
+                if line_style_ranges
+                    .iter()
+                    .any(|range| range.syntax == syntax && range.start < end && start < range.end)
+                {
                     style = style.patch(markdown_style(syntax));
                 }
             }
