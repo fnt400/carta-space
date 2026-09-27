@@ -577,7 +577,7 @@ impl App {
                 InsertDateTime,
                 Trash,
                 ExportDocumentMarkdown,
-                        ]);
+            ]);
         }
         if editable && !doc_locked && self.editor.can_undo() {
             commands.push(Undo);
@@ -600,7 +600,7 @@ impl App {
                 MoveLater,
                 MoveAfter,
                 ExportWorkMarkdown,
-                        ]);
+            ]);
         }
         if has_doc && self.link_under_cursor().is_some() {
             commands.push(OpenLink);
