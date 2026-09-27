@@ -172,12 +172,16 @@ impl From<CheckpointType> for CheckpointKind {
 
 fn default_archive_path() -> io::Result<PathBuf> {
     if let Some(path) = std::env::var_os("XDG_DATA_HOME") {
-        if !path.is_empty() {
-            return Ok(PathBuf::from(path).join("carta/archive"));
+        let path = PathBuf::from(path);
+        if path.is_absolute() {
+            return Ok(path.join("carta/archive"));
         }
     }
     let home = std::env::var_os("HOME").ok_or_else(|| {
-        io::Error::new(io::ErrorKind::NotFound, "HOME and XDG_DATA_HOME are unset")
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            "HOME is unset and XDG_DATA_HOME is not an absolute path",
+        )
     })?;
     Ok(PathBuf::from(home).join(".local/share/carta/archive"))
 }
