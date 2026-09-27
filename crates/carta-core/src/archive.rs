@@ -178,6 +178,7 @@ impl Archive {
         source: DocumentId,
         byte_offset: usize,
     ) -> Result<DocumentId, Error> {
+        self.ensure_document_unlocked(source)?;
         let original = self.read_document(source)?.content().to_owned();
         if !original.is_char_boundary(byte_offset) {
             return Err(Error::InvalidByteBoundary {
@@ -317,6 +318,7 @@ impl Archive {
     }
 
     pub fn edit_document(&mut self, id: DocumentId, content: &str) -> Result<(), Error> {
+        self.ensure_document_unlocked(id)?;
         let info = self.documents.get(&id).ok_or(Error::MissingDocument(id))?;
         let path = info.path.join("content.md");
         let content = normalize_line_endings(content).into_bytes();
@@ -495,6 +497,7 @@ impl Archive {
         label: &str,
         before_publish: impl FnOnce(&mut Self, &Path) -> Result<(), Error>,
     ) -> Result<DocumentId, Error> {
+        self.ensure_document_unlocked(source)?;
         let original = self.read_document(source)?.content().to_owned();
         let mut content = original.clone();
         if !content.is_char_boundary(byte_offset) {
@@ -584,6 +587,7 @@ impl Archive {
         work: WorkId,
         after: Option<DocumentId>,
     ) -> Result<DocumentId, Error> {
+        self.ensure_work_unlocked(work)?;
         let id = DocumentId::new_v7();
         let created = Timestamp::now_local();
         let volume = Volume::from_timestamp(created).ok_or(Error::InvalidVolumeDate(created))?;
@@ -657,6 +661,73 @@ impl Archive {
 
     pub fn work(&self, id: WorkId) -> Option<&Work> {
         self.works.get(&id)
+    }
+
+    pub fn document_is_explicitly_locked(&self, id: DocumentId) -> Result<bool, Error> {
+        Ok(self
+            .documents
+            .get(&id)
+            .ok_or(Error::MissingDocument(id))?
+            .locked())
+    }
+
+    pub fn document_is_locked(&self, id: DocumentId) -> Result<bool, Error> {
+        if self.document_is_explicitly_locked(id)? {
+            return Ok(true);
+        }
+        Ok(self
+            .works
+            .values()
+            .any(|work| work.locked() && work.documents().contains(&id)))
+    }
+
+    pub fn work_is_locked(&self, id: WorkId) -> Result<bool, Error> {
+        Ok(self.works.get(&id).ok_or(Error::MissingWork(id))?.locked())
+    }
+
+    pub fn set_document_locked(&mut self, id: DocumentId, locked: bool) -> Result<(), Error> {
+        let info = self.documents.get(&id).ok_or(Error::MissingDocument(id))?;
+        self.ensure_document_current(info)?;
+        let metadata = info.metadata.with_locked(locked);
+        let path = info.path.join("meta.json");
+        let mut bytes = Vec::new();
+        metadata
+            .write_to(&mut bytes)
+            .map_err(|error| Error::format(&path, error))?;
+        atomic_replace(&path, &bytes)?;
+        let info = self
+            .documents
+            .get_mut(&id)
+            .expect("document was checked above");
+        info.metadata = metadata;
+        info.metadata_bytes = bytes;
+        Ok(())
+    }
+
+    pub fn set_work_locked(&mut self, id: WorkId, locked: bool) -> Result<(), Error> {
+        let metadata = self
+            .works
+            .get(&id)
+            .ok_or(Error::MissingWork(id))?
+            .metadata
+            .with_locked(locked);
+        self.replace_work(id, metadata)
+    }
+
+    pub(crate) fn ensure_document_unlocked(&self, id: DocumentId) -> Result<(), Error> {
+        if self.document_is_locked(id)? {
+            Err(Error::DocumentLocked(id))
+        } else {
+            Ok(())
+        }
+    }
+
+    pub(crate) fn ensure_work_unlocked(&self, id: WorkId) -> Result<(), Error> {
+        if self.work_is_locked(id)? {
+            Err(Error::WorkLocked(id))
+        } else {
+            Ok(())
+        }
     }
 
     pub fn work_title_conflict(&self, title: &str, except: Option<WorkId>) -> Option<WorkId> {
@@ -737,6 +808,7 @@ impl Archive {
     }
 
     pub fn rename_work(&mut self, id: WorkId, title: String) -> Result<(), Error> {
+        self.ensure_work_unlocked(id)?;
         let title_key = work_title_key(&title);
         if let Some(existing) = self
             .works
@@ -762,6 +834,7 @@ impl Archive {
         work: WorkId,
         document: DocumentId,
     ) -> Result<(), Error> {
+        self.ensure_work_unlocked(work)?;
         if !self.documents.contains_key(&document) {
             return Err(Error::MissingDocument(document));
         }
@@ -783,6 +856,7 @@ impl Archive {
         work: WorkId,
         document: DocumentId,
     ) -> Result<(), Error> {
+        self.ensure_work_unlocked(work)?;
         let current = self.works.get(&work).ok_or(Error::MissingWork(work))?;
         let mut documents = current.documents().to_vec();
         let Some(index) = documents
@@ -823,6 +897,7 @@ impl Archive {
         document: DocumentId,
         after: Option<DocumentId>,
     ) -> Result<(), Error> {
+        self.ensure_work_unlocked(work)?;
         let current = self.works.get(&work).ok_or(Error::MissingWork(work))?;
         let mut documents = current.documents().to_vec();
         let Some(index) = documents
@@ -908,6 +983,7 @@ impl Archive {
         document: DocumentId,
         destination: impl FnOnce(usize, usize) -> Option<usize>,
     ) -> Result<bool, Error> {
+        self.ensure_work_unlocked(work)?;
         let current = self.works.get(&work).ok_or(Error::MissingWork(work))?;
         let mut documents = current.documents().to_vec();
         let Some(index) = documents

@@ -158,6 +158,9 @@ impl Archive {
         let Conflict::Document(conflict) = read_conflict_or_missing(&path, id)? else {
             return Err(Error::MissingConflict(id.to_owned()));
         };
+        if self.documents.contains_key(&conflict.document) {
+            self.ensure_document_unlocked(conflict.document)?;
+        }
         let directory = self.root.join(&conflict.canonical_directory);
         let canonical = directory.join("content.md");
         let current = fs::read(&canonical);
@@ -247,6 +250,9 @@ impl Archive {
         let Conflict::Work(conflict) = read_conflict_or_missing(&path, id)? else {
             return Err(Error::MissingConflict(id.to_owned()));
         };
+        if self.works.contains_key(&conflict.work) {
+            self.ensure_work_unlocked(conflict.work)?;
+        }
         let canonical = self.root.join(&conflict.canonical_file);
         let current = fs::read(&canonical);
         let current_matches = match current {

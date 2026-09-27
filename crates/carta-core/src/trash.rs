@@ -209,6 +209,7 @@ impl Archive {
     }
 
     pub fn trash_document(&mut self, document: DocumentId) -> Result<Checkpoint, Error> {
+        self.ensure_document_unlocked(document)?;
         let impact = self.document_trash_impact(document)?;
         let info = self
             .documents
@@ -295,6 +296,7 @@ impl Archive {
     }
 
     pub fn trash_work(&mut self, work: WorkId) -> Result<Checkpoint, Error> {
+        self.ensure_work_unlocked(work)?;
         let current = self.works.get(&work).ok_or(Error::MissingWork(work))?;
         self.ensure_work_current(current)?;
         let path = current.path.clone();

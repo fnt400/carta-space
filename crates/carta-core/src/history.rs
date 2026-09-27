@@ -220,6 +220,7 @@ impl Archive {
         id: DocumentId,
         checkpoint: &CheckpointId,
     ) -> Result<Checkpoint, Error> {
+        self.ensure_document_unlocked(id)?;
         self.require_clean_restore()?;
         let historical = read_document_at(&self.root, id, checkpoint)?;
         let info = self.documents.get(&id).ok_or(Error::MissingDocument(id))?;
@@ -309,8 +310,15 @@ impl Archive {
         checkpoint: &CheckpointId,
         options: WorkRestoreOptions,
     ) -> Result<Checkpoint, Error> {
+        self.ensure_work_unlocked(id)?;
         self.require_clean_restore()?;
         let snapshot = read_work_snapshot(&self.root, id, checkpoint)?;
+        for document in &snapshot.documents {
+            let document_id = document.metadata().id();
+            if self.documents.contains_key(&document_id) {
+                self.ensure_document_unlocked(document_id)?;
+            }
+        }
         let current_work = self.works.get(&id).ok_or(Error::MissingWork(id))?;
         self.ensure_work_current(current_work)?;
 
