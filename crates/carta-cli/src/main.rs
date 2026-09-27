@@ -14,8 +14,9 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 )]
 struct Cli {
     /// Archive working directory used by commands other than create.
-    #[arg(short, long, global = true, default_value = ".")]
-    archive: PathBuf,
+    /// Defaults to $XDG_DATA_HOME/carta/archive (or ~/.local/share/carta/archive).
+    #[arg(short, long, global = true)]
+    archive: Option<PathBuf>,
     #[command(subcommand)]
     command: Command,
 }
@@ -169,6 +170,18 @@ impl From<CheckpointType> for CheckpointKind {
     }
 }
 
+fn default_archive_path() -> io::Result<PathBuf> {
+    if let Some(path) = std::env::var_os("XDG_DATA_HOME") {
+        if !path.is_empty() {
+            return Ok(PathBuf::from(path).join("carta/archive"));
+        }
+    }
+    let home = std::env::var_os("HOME").ok_or_else(|| {
+        io::Error::new(io::ErrorKind::NotFound, "HOME and XDG_DATA_HOME are unset")
+    })?;
+    Ok(PathBuf::from(home).join(".local/share/carta/archive"))
+}
+
 fn main() {
     if let Err(error) = run(Cli::parse()) {
         eprintln!("carta: {error}");
@@ -182,8 +195,14 @@ fn run(cli: Cli) -> Result<(), Box<dyn StdError>> {
         println!("{}", archive.root().display());
         return Ok(());
     }
+
+    let archive_path = match cli.archive {
+        Some(path) => path,
+        None => default_archive_path()?,
+    };
+
     if matches!(&cli.command, Command::Validate) {
-        return match Archive::validate(&cli.archive) {
+        return match Archive::validate(&archive_path) {
             Ok(()) => {
                 println!("valid");
                 Ok(())
@@ -195,7 +214,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn StdError>> {
         };
     }
 
-    let mut archive = Archive::open(&cli.archive)?;
+    let mut archive = Archive::open(&archive_path)?;
     match cli.command {
         Command::Create { .. } | Command::Validate => unreachable!(),
         Command::Inspect => {
