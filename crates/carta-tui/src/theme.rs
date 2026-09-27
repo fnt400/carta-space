@@ -45,7 +45,7 @@ fn theme_color(variable: &str, fallback: Color) -> Color {
 }
 
 fn parse_color(value: &str) -> Option<Color> {
-    let normalized = value.trim().to_ascii_lowercase().replace(['_', ' '], "-");
+    let normalized = value\n        .trim()\n        .to_ascii_lowercase()\n        .replace('_', "-")\n        .replace(' ', "-");
     match normalized.as_str() {
         "black" => Some(Color::Black),
         "red" => Some(Color::Red),
