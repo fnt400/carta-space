@@ -1393,13 +1393,7 @@ fn draw_mode(frame: &mut ratatui::Frame<'_>, app: &App) {
 
 fn rendered_status_line(app: &App, width: usize) -> String {
     let left = status_line(app);
-    if !app.status.is_empty() || !matches!(app.view, View::Chronological(_)) {
-        return truncate_display(&left, width, true);
-    }
-    let right = app
-        .editor
-        .current_document()
-        .map_or_else(String::new, |document| membership_summary(app, document));
+    let right = status_view_label(app);
     if right.is_empty() {
         return truncate_display(&left, width, true);
     }
@@ -1414,6 +1408,17 @@ fn rendered_status_line(app: &App, width: usize) -> String {
     format!("{left}{}{right}", " ".repeat(padding))
 }
 
+fn status_view_label(app: &App) -> String {
+    match &app.view {
+        View::Chronological(_) => "Chronological".to_owned(),
+        View::Work(work) => app
+            .archive
+            .work(*work)
+            .map_or_else(|| "Work".to_owned(), |work| work.title().to_owned()),
+        _ => String::new(),
+    }
+}
+
 fn status_style(app: &App) -> Style {
     let View::Work(work) = &app.view else {
         return Style::default().bg(Color::DarkGray).fg(Color::White);
@@ -1421,6 +1426,7 @@ fn status_style(app: &App) -> Style {
     let Some(color) = app.archive.work(*work).and_then(|work| work.color()) else {
         return Style::default().bg(Color::DarkGray).fg(Color::White);
     };
+    let color = emphasized_work_color(color);
     let Some((red, green, blue)) = parse_rgb(color) else {
         return Style::default().bg(Color::DarkGray).fg(Color::White);
     };
@@ -1434,6 +1440,20 @@ fn status_style(app: &App) -> Style {
     Style::default()
         .bg(Color::Rgb(red, green, blue))
         .fg(foreground)
+}
+
+fn emphasized_work_color(color: &str) -> &str {
+    match color.to_ascii_uppercase().as_str() {
+        "#667A75" => "#236B61",
+        "#6D7487" => "#3F5794",
+        "#806F6A" => "#9A4F32",
+        "#756A80" => "#704B91",
+        "#A9B39B" => "#5F7B2D",
+        "#B2A596" => "#9A6B2F",
+        "#9FAAB5" => "#3D748C",
+        "#A99EAE" => "#8A4F78",
+        _ => color,
+    }
 }
 
 fn parse_rgb(color: &str) -> Option<(u8, u8, u8)> {
@@ -1493,11 +1513,10 @@ fn status_line(app: &App) -> String {
                 current_position(app)
             )
         }
-        View::Work(id) => format!(
-            "{} · {} · {} · {}",
+        View::Work(_) => format!(
+            "{} · {} · {}",
             current_document_date(app),
             current_label(app),
-            app.archive.work(*id).map_or("Work", |w| w.title()),
             current_position(app)
         ),
         View::Search { query, selected } => {
@@ -1781,9 +1800,10 @@ mod tests {
 
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
         let status = rendered_status_line(&app, 80);
-        assert!(
-            status.ends_with("Appunti - Cinema - …") || status.ends_with("Cinema - Appunti - …")
-        );
+        assert!(status.ends_with("Chronological"));
+        assert!(!status.contains("Appunti"));
+        assert!(!status.contains("Cinema"));
+        assert!(!status.contains("Terzo"));
     }
 
     #[test]
@@ -1801,7 +1821,7 @@ mod tests {
     }
 
     #[test]
-    fn work_status_uses_persisted_color_with_contrasting_text() {
+    fn work_status_uses_distinct_persisted_color_with_contrasting_text() {
         let (_temporary, mut app) = app_with_documents(&["text"], true);
         let View::Work(work) = &app.view else {
             panic!("expected Work View")
@@ -1817,9 +1837,31 @@ mod tests {
         app.archive
             .set_work_color(work, Some("#667A75".into()))
             .unwrap();
-        let dark = status_style(&app);
-        assert_eq!(dark.bg, Some(Color::Rgb(102, 122, 117)));
-        assert_eq!(dark.fg, Some(Color::White));
+        let legacy = status_style(&app);
+        assert_eq!(legacy.bg, Some(Color::Rgb(35, 107, 97)));
+        assert_eq!(legacy.fg, Some(Color::White));
+
+        app.archive
+            .set_work_color(work, Some("#3F5794".into()))
+            .unwrap();
+        let current = status_style(&app);
+        assert_eq!(current.bg, Some(Color::Rgb(63, 87, 148)));
+        assert_eq!(current.fg, Some(Color::White));
+    }
+
+    #[test]
+    fn editable_view_name_is_right_aligned_in_status_bar() {
+        let (_temporary, chronological) = app_with_documents(&["text"], false);
+        let chronological_status = rendered_status_line(&chronological, 80);
+        assert!(chronological_status.ends_with("Chronological"));
+
+        let (_temporary, work) = app_with_documents(&["text"], true);
+        let View::Work(work_id) = work.view else {
+            panic!("expected Work View")
+        };
+        let title = work.archive.work(work_id).unwrap().title();
+        let work_status = rendered_status_line(&work, 80);
+        assert!(work_status.ends_with(title));
     }
 
     #[test]
