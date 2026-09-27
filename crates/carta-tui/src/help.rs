@@ -157,7 +157,7 @@ Trash is recoverable structural deletion. Wipe is the explicit permanent-removal
         title: "10. Export and publication",
         body: r#"Export is publication, not the normal writing workflow. Document and Work exports are always written under $HOME/Downloads. The directory is created automatically if necessary; the export prompt asks only for a filename.
 
-Markdown export preserves authored structure. PDF export is a publication path built from the same structural content.
+Markdown export preserves authored structure. Built-in PDF publication is intentionally deferred beyond v0.1; external tools can consume the Markdown export when needed.
 
 Packaging an Archive as .cat is distinct from Document/Work export and preserves the portable Archive representation and its required history."#,
     },
