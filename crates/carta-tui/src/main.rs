@@ -2816,6 +2816,9 @@ mod tests {
 
         assert_eq!(app.editor.current_text(), Some("a****b"));
         assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 3 });
+
+        app.execute(carta_tui::Command::Undo).unwrap();
+        assert_eq!(app.editor.current_text(), Some("ab"));
     }
 
     #[test]
