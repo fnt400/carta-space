@@ -29,8 +29,8 @@ Left Ctrl + Enter           Add LF to backward LEAP pattern
 Left Alt + Enter            Add LF to forward LEAP pattern
 Left Ctrl + Home            LEAP to start of current Document
 Left Alt + End              LEAP to end of current Document
-Left Ctrl + PageUp          LEAP to start of current View
-Left Alt + PageDown         LEAP to end of current View
+Left Ctrl + PageUp          LEAP to start of previous Document
+Left Alt + PageDown         LEAP to start of next Document
 Right Ctrl + Left Alt       Leap Again forward
 Right Ctrl + Left Ctrl      Leap Again backward
 
@@ -109,13 +109,13 @@ Enter while a physical LEAP is held is normal pattern input for the authored LF 
 
 With a Cat highlight active, the text remains in place while the LEAP query and Leap Again choose a destination; the move occurs only when the physical LEAP key is released.
 
-LeftCtrl+Home and LeftAlt+End LEAP to the beginning and end of the current Document. LeftCtrl+PageUp and LeftAlt+PageDown LEAP to the beginning and end of the current View."#,
+LeftCtrl+Home and LeftAlt+End LEAP to the beginning and end of the current Document. LeftCtrl+PageUp LEAPs to the beginning of the previous Document; LeftAlt+PageDown LEAPs to the beginning of the next Document."#,
     },
     HelpDocument {
         title: "5. Leap Again and Cat highlight",
         body: r#"RightCtrl+LeftAlt repeats the last LEAP forward; RightCtrl+LeftCtrl repeats it backward.
 
-During an active physical LEAP, pressing Right Control performs Leap Again without changing the original LEAP origin. This applies to text patterns, including patterns containing LF entered with Enter, and to structural LEAPs using Home/End or PageUp/PageDown. Right Control can be pressed repeatedly to reach later matches or structural boundaries. Pressing the opposite LEAP key while the first remains held highlights the interval from the original origin through the final reachable target.
+During an active physical LEAP, pressing Right Control performs Leap Again without changing the original LEAP origin. This applies to text patterns, including patterns containing LF entered with Enter, and to structural LEAPs using Home/End or PageUp/PageDown. For PageUp/PageDown, repeated Right Control continues through successive Document starts. Pressing the opposite LEAP key while the first remains held highlights the interval from the original origin through the final reachable target.
 
 After releasing the LEAP key, RightCtrl+LeftAlt or RightCtrl+LeftCtrl repeats the most recently used text or structural LEAP in the requested direction. A structural LEAP replaces an older text pattern for Leap Again.
 
