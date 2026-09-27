@@ -453,7 +453,7 @@ A dedicated writing device with a keyboard and simple display is therefore a nat
 
 **Decision:** During the current v0.1 cycle, repository design, source changes, documentation changes, code review, and Git commits are normally performed in the design/implementation layer (ChatGPT). OpenCode is normally used as a local verification agent for builds, formatters, linters, automated tests, runtime reproduction, TUI behavior, keyboard/terminal behavior, filesystem behavior, and Distrobox-dependent checks.
 
-**Why:** Most Carta Space changes can be specified and implemented directly from repository state without consuming a second coding agent's context. Local execution remains valuable because the reference TUI depends on a real terminal, keyboard protocol, filesystem, Git installation, Pandoc/LaTeX toolchain, and NixOS/Distrobox environment that are not available to the design/implementation layer.
+**Why:** Most Carta Space changes can be specified and implemented directly from repository state without consuming a second coding agent's context. Local execution remains valuable because the reference TUI depends on a real terminal, keyboard protocol, filesystem, Git installation, and NixOS/Distrobox environment that are not available to the design/implementation layer.
 
 **Consequence:** The default loop is user/dogfooding -> ChatGPT implementation and commit -> local fast-forward pull -> OpenCode verification without edits -> ChatGPT review and follow-up commit if needed. OpenCode may edit files only when a task explicitly grants that responsibility. This workflow does not change Carta archive semantics.
 
