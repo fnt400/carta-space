@@ -801,6 +801,7 @@ impl Archive {
     }
 
     pub fn set_work_color(&mut self, id: WorkId, color: Option<String>) -> Result<(), Error> {
+        self.ensure_work_unlocked(id)?;
         let metadata = self
             .works
             .get(&id)

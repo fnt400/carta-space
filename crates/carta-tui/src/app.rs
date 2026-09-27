@@ -2938,6 +2938,9 @@ fn ensure_work_colors(archive: &mut Archive) -> AppResult<bool> {
 }
 
 fn ensure_work_color(archive: &mut Archive, work: WorkId) -> AppResult<bool> {
+    if archive.work(work).is_some_and(|work| work.locked()) {
+        return Ok(false);
+    }
     if archive.work(work).and_then(|work| work.color()).is_some() {
         return Ok(false);
     }
