@@ -1,6 +1,6 @@
 #[cfg(not(test))]
 use arboard::Clipboard;
-use carta_core::{Archive, LeapDirection, SyncOutcome};
+use carta_core::{extract_markdown_links, Archive, LeapDirection, SyncOutcome};
 use carta_tui::app::{AppMode, View};
 use carta_tui::editor::{visual_ranges, Cursor};
 use carta_tui::help::{documents as help_documents, HelpKind};
@@ -1006,7 +1006,13 @@ fn draw_editor(frame: &mut ratatui::Frame<'_>, app: &mut App, area: Rect) {
             .take(height.saturating_sub(top_padding))
             .map(|line| {
                 if let Some(region) = line.region {
-                    styled_line(line, region, selection, selection_style)
+                    styled_line(
+                        line,
+                        region,
+                        &app.editor.regions()[region].text,
+                        selection,
+                        selection_style,
+                    )
                 } else {
                     Line::styled(line.text.clone(), Style::default().fg(Color::DarkGray))
                 }
@@ -1220,38 +1226,80 @@ fn truncate_display(text: &str, max_width: usize, ellipsis: bool) -> String {
 fn styled_line(
     line: &VisualLine,
     region: usize,
+    region_text: &str,
     selection: Option<(Cursor, Cursor)>,
     selection_style: Style,
 ) -> Line<'_> {
-    let Some((start, end)) = selection else {
+    let selected_range = selection.and_then(|(start, end)| {
+        if region < start.region || region > end.region {
+            return None;
+        }
+        let selected_start = if region == start.region {
+            start.byte
+        } else {
+            0
+        }
+        .clamp(line.start, line.end);
+        let selected_end = if region == end.region {
+            end.byte
+        } else {
+            usize::MAX
+        }
+        .clamp(line.start, line.end);
+        (selected_start < selected_end).then_some(selected_start..selected_end)
+    });
+    let link_ranges: Vec<_> = extract_markdown_links(region_text)
+        .into_iter()
+        .map(|link| link.source_range())
+        .filter(|range| range.start < line.end && line.start < range.end)
+        .collect();
+
+    if selected_range.is_none() && link_ranges.is_empty() {
         return Line::raw(line.text.clone());
-    };
-    if region < start.region || region > end.region {
-        return Line::raw(line.text.clone());
     }
-    let selected_start = if region == start.region {
-        start.byte
-    } else {
-        0
+
+    let mut boundaries = vec![line.start, line.end];
+    if let Some(range) = &selected_range {
+        boundaries.extend([range.start, range.end]);
     }
-    .clamp(line.start, line.end);
-    let selected_end = if region == end.region {
-        end.byte
-    } else {
-        usize::MAX
+    for range in &link_ranges {
+        boundaries.extend([
+            range.start.clamp(line.start, line.end),
+            range.end.clamp(line.start, line.end),
+        ]);
     }
-    .clamp(line.start, line.end);
-    if selected_start >= selected_end {
-        return Line::raw(line.text.clone());
-    }
-    let text = &line.text;
-    let a = selected_start - line.start;
-    let b = selected_end - line.start;
-    Line::from(vec![
-        Span::raw(text[..a].to_owned()),
-        Span::styled(text[a..b].to_owned(), selection_style),
-        Span::raw(text[b..].to_owned()),
-    ])
+    boundaries.sort_unstable();
+    boundaries.dedup();
+
+    let spans = boundaries
+        .windows(2)
+        .filter_map(|window| {
+            let start = window[0];
+            let end = window[1];
+            if start == end {
+                return None;
+            }
+            let mut style = Style::default();
+            if link_ranges
+                .iter()
+                .any(|range| range.start < end && start < range.end)
+            {
+                style = style.fg(Color::LightCyan);
+            }
+            if selected_range
+                .as_ref()
+                .is_some_and(|range| range.start < end && start < range.end)
+            {
+                style = style.patch(selection_style);
+            }
+            Some(Span::styled(
+                line.text[start - line.start..end - line.start].to_owned(),
+                style,
+            ))
+        })
+        .collect::<Vec<_>>();
+
+    Line::from(spans)
 }
 
 fn draw_list(
@@ -1754,6 +1802,29 @@ mod tests {
         assert_eq!(next_char_boundary(text, 1), 3);
         assert_eq!(previous_char_boundary(text, 3), 1);
         assert_eq!(previous_char_boundary(text, 1), 0);
+    }
+
+    #[test]
+    fn markdown_links_are_rendered_light_cyan_without_changing_text() {
+        let text = "before [Carta](carta:doc:01999999-9999-7999-8999-999999999999) after";
+        let line = VisualLine {
+            region: Some(0),
+            start: 0,
+            end: text.len(),
+            text: text.to_owned(),
+        };
+
+        let rendered = styled_line(&line, 0, text, None, Style::default());
+        let displayed = rendered
+            .spans
+            .iter()
+            .map(|span| span.content.as_ref())
+            .collect::<String>();
+
+        assert_eq!(displayed, text);
+        assert!(rendered.spans.iter().any(|span| {
+            span.content.starts_with("[Carta](") && span.style.fg == Some(Color::LightCyan)
+        }));
     }
 
     #[test]
