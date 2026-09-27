@@ -263,6 +263,8 @@ The reference TUI also uses Right Control as the Carta command modifier:
 
 - `RightCtrl+Z` = Undo;
 - `RightCtrl+R` = Redo;
+- `RightCtrl+B` = insert `**` before and after point, leaving point between the marker pairs;
+- `RightCtrl+I` = insert `*` before and after point, leaving point between the markers;
 - `RightCtrl+W` = `Open Work…`;
 - `RightCtrl+L` = `Insert Link…` when point is not on a link, otherwise `Open Link`.
 
@@ -399,7 +401,7 @@ Explicitly assigned Ctrl chords take precedence over the physical Control-key LE
 
 Other direct shortcuts should be added only after real use demonstrates a need.
 
-`Undo` and `Redo` are contextual command-palette commands and also have the direct RightCtrl+Z / RightCtrl+R bindings. They are available in editable Views when the session-local editor history can apply them. `Open Work…` and the contextual Insert/Open Link action also have the direct RightCtrl+W / RightCtrl+L bindings.
+`Undo` and `Redo` are contextual command-palette commands and also have the direct RightCtrl+Z / RightCtrl+R bindings. They are available in editable Views when the session-local editor history can apply them. RightCtrl+B / RightCtrl+I insert Markdown strong/emphasis marker pairs at point. `Open Work…` and the contextual Insert/Open Link action also have the direct RightCtrl+W / RightCtrl+L bindings.
 
 ---
 
@@ -441,6 +443,8 @@ Historical recovery across sessions belongs to History.
 v0.1 edits Markdown source directly. There is no WYSIWYG editing mode.
 
 The reference TUI applies syntax highlighting to the authored CommonMark source while still showing the source literally. Headings, emphasis, strong emphasis, block quotations, code, links, and images may receive distinct presentation styles; no Markdown characters are hidden or rewritten. Colors are frontend theme settings, never canonical document data.
+
+`RightCtrl+B` and `RightCtrl+I` are source-editing conveniences. They insert balanced CommonMark strong/emphasis markers at point and leave the cursor between them; the insertion is one undoable edit. Carta does not define an underline shortcut because CommonMark has no underline syntax.
 
 ### 6.5 Wrapping and indentation
 
