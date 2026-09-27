@@ -21,6 +21,8 @@ Right Ctrl                  Carta command modifier
 Right Ctrl + Z              Undo
 Right Ctrl + R              Redo
 Right Ctrl + C              Cat COPY when highlighted; otherwise paste system clipboard
+Right Ctrl + W              Open Work
+Right Ctrl + L              Insert Link; Open Link when point is on a link
 Left Ctrl + Enter           Add LF to backward LEAP pattern
 Left Alt + Enter            Add LF to forward LEAP pattern
 Left Ctrl + Home            LEAP to start of current Document
@@ -126,6 +128,8 @@ Creating a Cat highlight also copies its text to the system clipboard. Clipboard
     HelpDocument {
         title: "7. Undo, redo and structural commands",
         body: r#"RightCtrl+Z performs Undo and RightCtrl+R performs Redo. Undo/Redo operate on the current in-memory editing history.
+
+RightCtrl+W opens the Work selector. RightCtrl+L inserts a link at point, or opens the existing link when point is already inside one.
 
 Structural commands are explicit because they change more than ordinary text. Examples include New Document, Split Document at Point, Work membership changes, Work reordering, Trash, restore operations, and Wipe.
 
