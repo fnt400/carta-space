@@ -21,6 +21,8 @@ Right Ctrl                  Carta command modifier
 Right Ctrl + Z              Undo
 Right Ctrl + R              Redo
 Right Ctrl + C              Cat COPY when highlighted; otherwise paste system clipboard
+Right Ctrl + B              Insert Markdown bold markers (**|**)
+Right Ctrl + I              Insert Markdown italic markers (*|*)
 Right Ctrl + W              Open Work
 Right Ctrl + L              Insert Link; Open Link when point is on a link
 Left Ctrl + Enter           Add LF to backward LEAP pattern
