@@ -1392,20 +1392,30 @@ fn draw_mode(frame: &mut ratatui::Frame<'_>, app: &App) {
 }
 
 fn rendered_status_line(app: &App, width: usize) -> String {
+    if width == 0 {
+        return String::new();
+    }
+    if width == 1 {
+        return " ".to_owned();
+    }
+
+    let inner_width = width - 2;
     let left = status_line(app);
     let right = status_view_label(app);
     if right.is_empty() {
-        return truncate_display(&left, width, true);
+        let left = truncate_display(&left, inner_width, true);
+        let padding = inner_width.saturating_sub(display_width(&left));
+        return format!(" {left}{} ", " ".repeat(padding));
     }
 
-    let right = truncate_display(&right, width.saturating_sub(1), true);
+    let right = truncate_display(&right, inner_width.saturating_sub(1), true);
     let right_width = display_width(&right);
-    let left_budget = width.saturating_sub(right_width.saturating_add(1));
+    let left_budget = inner_width.saturating_sub(right_width.saturating_add(1));
     let left = truncate_display(&left, left_budget, true);
-    let padding = width
+    let padding = inner_width
         .saturating_sub(display_width(&left))
         .saturating_sub(right_width);
-    format!("{left}{}{right}", " ".repeat(padding))
+    format!(" {left}{}{right} ", " ".repeat(padding))
 }
 
 fn status_view_label(app: &App) -> String {
@@ -1800,7 +1810,9 @@ mod tests {
 
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
         let status = rendered_status_line(&app, 80);
-        assert!(status.ends_with("Chronological"));
+        assert!(status.starts_with(' '));
+        assert!(status.ends_with("Chronological "));
+        assert_eq!(display_width(&status), 80);
         assert!(!status.contains("Appunti"));
         assert!(!status.contains("Cinema"));
         assert!(!status.contains("Terzo"));
@@ -1853,7 +1865,9 @@ mod tests {
     fn editable_view_name_is_right_aligned_in_status_bar() {
         let (_temporary, chronological) = app_with_documents(&["text"], false);
         let chronological_status = rendered_status_line(&chronological, 80);
-        assert!(chronological_status.ends_with("Chronological"));
+        assert!(chronological_status.starts_with(' '));
+        assert!(chronological_status.ends_with("Chronological "));
+        assert_eq!(display_width(&chronological_status), 80);
 
         let (_temporary, work) = app_with_documents(&["text"], true);
         let View::Work(work_id) = &work.view else {
@@ -1861,7 +1875,9 @@ mod tests {
         };
         let title = work.archive.work(*work_id).unwrap().title();
         let work_status = rendered_status_line(&work, 80);
-        assert!(work_status.ends_with(title));
+        assert!(work_status.starts_with(' '));
+        assert!(work_status.ends_with(&format!("{title} ")));
+        assert_eq!(display_width(&work_status), 80);
     }
 
     #[test]
