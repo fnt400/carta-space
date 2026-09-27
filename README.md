@@ -120,7 +120,7 @@ Document and Work PDF exports stream their exact Markdown export to Pandoc and a
 
 ## Command line
 
-The `carta` binary uses `--archive <path>` (default `.`) and has a noninteractive, scriptable command surface:
+The `carta` binary uses `--archive <path>` and has a noninteractive, scriptable command surface. Without `--archive`, it opens `$XDG_DATA_HOME/carta/archive` (or `~/.local/share/carta/archive` when `XDG_DATA_HOME` is unset):
 
 ```text
 carta create <path>
@@ -142,7 +142,7 @@ Markdown exports are written exactly to standard output. PDF and package destina
 
 ## Terminal interface
 
-`carta-tui` is the writing-first full-screen frontend. Pass an Archive directory explicitly, create one with `--create`, or omit the path to resume the device-local last Archive:
+`carta-tui` is the writing-first full-screen frontend. Pass an Archive directory explicitly, create one with `--create`, or omit the path to open the deterministic XDG default Archive at `$XDG_DATA_HOME/carta/archive` (or `~/.local/share/carta/archive`):
 
 ```bash
 carta-tui /path/to/archive
@@ -150,7 +150,7 @@ carta-tui --create /path/to/new-archive
 carta-tui
 ```
 
-Session and last-Archive state is stored under `$XDG_STATE_HOME/carta-space` (or `~/.local/state/carta-space`), never inside the Archive. A new Archive or an Archive without session state opens directly into a provisional empty Document in the current month.
+Device-local session state is stored alongside the default Archive root under `$XDG_DATA_HOME/carta` (or `~/.local/share/carta`), but outside the `archive/` Git working tree; session files are named `session-<archive-id>.json`. On startup, the TUI migrates legacy session files from `$XDG_STATE_HOME/carta-space` (or `~/.local/state/carta-space`) and discards the obsolete `last-archive.json`. A new Archive or an Archive without session state opens directly into a provisional empty Document in the current month.
 
 The default surface is an editable, soft-wrapped monthly Chronological View or continuous Work View. Generated separator lines protect Document boundaries. `Esc` opens the contextual command palette; direct shortcuts are limited to physical left/right Control LEAP on capable terminals. Undo and redo are contextual palette commands. Copy, Cut, and Paste remain terminal-emulator operations. PDF export requires Pandoc and LuaLaTeX as described above.
 
