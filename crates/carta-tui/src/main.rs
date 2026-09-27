@@ -1,6 +1,8 @@
+mod theme;
+
 #[cfg(not(test))]
 use arboard::Clipboard;
-use carta_core::{extract_markdown_links, Archive, LeapDirection, SyncOutcome};
+use carta_core::{Archive, LeapDirection, SyncOutcome};
 use carta_tui::app::{AppMode, View};
 use carta_tui::editor::{visual_ranges, Cursor};
 use carta_tui::help::{documents as help_documents, HelpKind};
@@ -20,6 +22,7 @@ use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, supports_keyboard_enhancement, EnterAlternateScreen,
     LeaveAlternateScreen,
 };
+use pulldown_cmark::{Event as MarkdownEvent, Parser as MarkdownParser, Tag as MarkdownTag, TagEnd as MarkdownTagEnd};
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -33,6 +36,7 @@ use std::panic::{self, AssertUnwindSafe};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use theme::markdown_theme;
 use unicode_width::UnicodeWidthChar;
 
 #[derive(Parser)]
@@ -1223,6 +1227,94 @@ fn truncate_display(text: &str, max_width: usize, ellipsis: bool) -> String {
     result
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MarkdownSyntax {
+    Quote,
+    Heading,
+    Emphasis,
+    Strong,
+    Link,
+    Code,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct MarkdownStyleRange {
+    start: usize,
+    end: usize,
+    syntax: MarkdownSyntax,
+}
+
+fn markdown_style_ranges(markdown: &str) -> Vec<MarkdownStyleRange> {
+    let mut active = Vec::new();
+    let mut ranges = Vec::new();
+
+    for (event, source) in MarkdownParser::new(markdown).into_offset_iter() {
+        match event {
+            MarkdownEvent::Start(tag) => {
+                if let Some(syntax) = markdown_start_syntax(&tag) {
+                    active.push((syntax, source.start));
+                }
+            }
+            MarkdownEvent::End(tag) => {
+                if let Some(syntax) = markdown_end_syntax(tag) {
+                    if let Some(position) = active.iter().rposition(|(kind, _)| *kind == syntax) {
+                        let (_, start) = active.remove(position);
+                        ranges.push(MarkdownStyleRange {
+                            start,
+                            end: source.end,
+                            syntax,
+                        });
+                    }
+                }
+            }
+            MarkdownEvent::Code(_) => ranges.push(MarkdownStyleRange {
+                start: source.start,
+                end: source.end,
+                syntax: MarkdownSyntax::Code,
+            }),
+            _ => {}
+        }
+    }
+
+    ranges
+}
+
+fn markdown_start_syntax(tag: &MarkdownTag<'_>) -> Option<MarkdownSyntax> {
+    match tag {
+        MarkdownTag::BlockQuote(_) => Some(MarkdownSyntax::Quote),
+        MarkdownTag::Heading { .. } => Some(MarkdownSyntax::Heading),
+        MarkdownTag::Emphasis => Some(MarkdownSyntax::Emphasis),
+        MarkdownTag::Strong => Some(MarkdownSyntax::Strong),
+        MarkdownTag::Link { .. } | MarkdownTag::Image { .. } => Some(MarkdownSyntax::Link),
+        MarkdownTag::CodeBlock(_) => Some(MarkdownSyntax::Code),
+        _ => None,
+    }
+}
+
+fn markdown_end_syntax(tag: MarkdownTagEnd) -> Option<MarkdownSyntax> {
+    match tag {
+        MarkdownTagEnd::BlockQuote(_) => Some(MarkdownSyntax::Quote),
+        MarkdownTagEnd::Heading(_) => Some(MarkdownSyntax::Heading),
+        MarkdownTagEnd::Emphasis => Some(MarkdownSyntax::Emphasis),
+        MarkdownTagEnd::Strong => Some(MarkdownSyntax::Strong),
+        MarkdownTagEnd::Link | MarkdownTagEnd::Image => Some(MarkdownSyntax::Link),
+        MarkdownTagEnd::CodeBlock => Some(MarkdownSyntax::Code),
+        _ => None,
+    }
+}
+
+fn markdown_style(syntax: MarkdownSyntax) -> Style {
+    let theme = markdown_theme();
+    match syntax {
+        MarkdownSyntax::Quote => theme.quote,
+        MarkdownSyntax::Heading => theme.heading,
+        MarkdownSyntax::Emphasis => theme.emphasis,
+        MarkdownSyntax::Strong => theme.strong,
+        MarkdownSyntax::Link => theme.link,
+        MarkdownSyntax::Code => theme.code,
+    }
+}
+
 fn styled_line(
     line: &VisualLine,
     region: usize,
@@ -1248,13 +1340,12 @@ fn styled_line(
         .clamp(line.start, line.end);
         (selected_start < selected_end).then_some(selected_start..selected_end)
     });
-    let link_ranges: Vec<_> = extract_markdown_links(region_text)
+    let style_ranges: Vec<_> = markdown_style_ranges(region_text)
         .into_iter()
-        .map(|link| link.source_range())
         .filter(|range| range.start < line.end && line.start < range.end)
         .collect();
 
-    if selected_range.is_none() && link_ranges.is_empty() {
+    if selected_range.is_none() && style_ranges.is_empty() {
         return Line::raw(line.text.clone());
     }
 
@@ -1262,7 +1353,7 @@ fn styled_line(
     if let Some(range) = &selected_range {
         boundaries.extend([range.start, range.end]);
     }
-    for range in &link_ranges {
+    for range in &style_ranges {
         boundaries.extend([
             range.start.clamp(line.start, line.end),
             range.end.clamp(line.start, line.end),
@@ -1271,6 +1362,14 @@ fn styled_line(
     boundaries.sort_unstable();
     boundaries.dedup();
 
+    let syntax_priority = [
+        MarkdownSyntax::Quote,
+        MarkdownSyntax::Heading,
+        MarkdownSyntax::Emphasis,
+        MarkdownSyntax::Strong,
+        MarkdownSyntax::Link,
+        MarkdownSyntax::Code,
+    ];
     let spans = boundaries
         .windows(2)
         .filter_map(|window| {
@@ -1280,11 +1379,12 @@ fn styled_line(
                 return None;
             }
             let mut style = Style::default();
-            if link_ranges
-                .iter()
-                .any(|range| range.start < end && start < range.end)
-            {
-                style = style.fg(Color::LightCyan);
+            for syntax in syntax_priority {
+                if style_ranges.iter().any(|range| {
+                    range.syntax == syntax && range.start < end && start < range.end
+                }) {
+                    style = style.patch(markdown_style(syntax));
+                }
             }
             if selected_range
                 .as_ref()
@@ -1805,8 +1905,8 @@ mod tests {
     }
 
     #[test]
-    fn markdown_links_are_rendered_light_cyan_without_changing_text() {
-        let text = "before [Carta](carta:doc:01999999-9999-7999-8999-999999999999) after";
+    fn markdown_syntax_is_highlighted_without_changing_text() {
+        let text = "# Heading with **strong** and *emphasis*\n> quote with `code` and [Carta](carta:doc:01999999-9999-7999-8999-999999999999)";
         let line = VisualLine {
             region: Some(0),
             start: 0,
@@ -1822,9 +1922,13 @@ mod tests {
             .collect::<String>();
 
         assert_eq!(displayed, text);
-        assert!(rendered.spans.iter().any(|span| {
-            span.content.starts_with("[Carta](") && span.style.fg == Some(Color::LightCyan)
-        }));
+        let theme = markdown_theme();
+        assert!(rendered.spans.iter().any(|span| span.style == theme.heading));
+        assert!(rendered.spans.iter().any(|span| span.style == theme.strong));
+        assert!(rendered.spans.iter().any(|span| span.style == theme.emphasis));
+        assert!(rendered.spans.iter().any(|span| span.style == theme.quote));
+        assert!(rendered.spans.iter().any(|span| span.style == theme.code));
+        assert!(rendered.spans.iter().any(|span| span.style == theme.link));
     }
 
     #[test]
