@@ -5,7 +5,6 @@ mod document;
 mod error;
 mod history;
 mod package;
-mod pdf;
 mod retrieval;
 mod sync;
 mod transaction;
@@ -25,7 +24,6 @@ pub use history::{
     WorkRestoreOptions, WorkSnapshot,
 };
 pub use package::PackageReport;
-pub use pdf::PdfExportOptions;
 pub use retrieval::{
     Backlink, DocumentTextRegion, LeapDirection, LeapMatch, LeapPosition, LeapRuntime, LeapSession,
     SearchResult,
