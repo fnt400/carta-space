@@ -335,7 +335,7 @@ impl Scheduler {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum StructuralLeap {
     DocumentBoundary,
-    ViewBoundary,
+    DocumentStart,
 }
 
 pub struct App {
@@ -1763,7 +1763,15 @@ impl App {
                     None
                 }
             }
-            StructuralLeap::ViewBoundary => self.editor.view_boundary_cursor(forward),
+            StructuralLeap::DocumentStart => {
+                let cursor = self.editor.cursor();
+                let region = if forward {
+                    cursor.region.checked_add(1)?
+                } else {
+                    cursor.region.checked_sub(1)?
+                };
+                (region < self.editor.regions().len()).then_some(Cursor { region, byte: 0 })
+            },
         }
     }
 
@@ -1786,9 +1794,9 @@ impl App {
         self.perform_structural_leap(StructuralLeap::DocumentBoundary, direction, false, false);
     }
 
-    pub fn leap_view_boundary(&mut self, direction: LeapDirection) {
-        self.remember_structural_leap(StructuralLeap::ViewBoundary);
-        self.perform_structural_leap(StructuralLeap::ViewBoundary, direction, false, false);
+    pub fn leap_document_start(&mut self, direction: LeapDirection) {
+        self.remember_structural_leap(StructuralLeap::DocumentStart);
+        self.perform_structural_leap(StructuralLeap::DocumentStart, direction, false, false);
     }
 
     pub fn leap_again_active_structural(&mut self, direction: LeapDirection) -> bool {
