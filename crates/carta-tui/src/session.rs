@@ -98,7 +98,9 @@ fn migrate_legacy_state_from(legacy: &Path, root: &Path) -> io::Result<()> {
             continue;
         };
 
-        if name_str.starts_with("session-") && name_str.ends_with(".json") {
+        if name_str.starts_with("session-")
+            && (name_str.ends_with(".json") || name_str.ends_with(".tmp"))
+        {
             let target = root.join(&name);
             if !target.exists() {
                 fs::copy(entry.path(), &target)?;
@@ -172,10 +174,12 @@ mod tests {
             r#"{"path":"/tmp/obsolete"}"#,
         )
         .unwrap();
+        fs::write(legacy.join("session-stale.tmp"), b"stale").unwrap();
 
         migrate_legacy_state_from(&legacy, &root).unwrap();
 
         assert_eq!(load_session(&root, id).unwrap(), Some(session));
+        assert_eq!(fs::read(root.join("session-stale.tmp")).unwrap(), b"stale");
         assert!(!legacy.join(format!("session-{id}.json")).exists());
         assert!(!legacy.join("last-archive.json").exists());
         assert!(!legacy.exists());
