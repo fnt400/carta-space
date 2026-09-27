@@ -78,6 +78,7 @@ The guiding interaction rule is:
 - Keep UI, storage format, and core behavior cleanly separated.
 - Prefer small, explicit interfaces between crates.
 - Avoid introducing hidden global state when a clear domain object or explicit dependency is possible.
+- Use one deterministic Carta XDG data root: `$XDG_DATA_HOME/carta`, falling back to `~/.local/share/carta`. The default Archive is `archive/` below that root; device-local session sidecars live below the same root but outside the Archive Git working tree. An explicit startup/archive path may override the default; do not reintroduce a last-used Archive pointer.
 
 The working rule is:
 
