@@ -57,22 +57,6 @@ pub enum Error {
     #[error("portable package validation failed: {0}")]
     InvalidPackage(String),
 
-    #[error("Pandoc is unavailable at {program}: {source}")]
-    PandocUnavailable {
-        program: PathBuf,
-        #[source]
-        source: std::io::Error,
-    },
-
-    #[error("Pandoc PDF export failed with status {status}: {stderr}")]
-    PdfExportFailed {
-        status: std::process::ExitStatus,
-        stderr: String,
-    },
-
-    #[error("Pandoc reported success but did not produce a regular PDF file")]
-    PdfOutputMissing,
-
     #[error("timestamp cannot be represented as a YYYY/MM volume: {0}")]
     InvalidVolumeDate(carta_format::Timestamp),
 
