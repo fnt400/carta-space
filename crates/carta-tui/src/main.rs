@@ -1856,10 +1856,10 @@ mod tests {
         assert!(chronological_status.ends_with("Chronological"));
 
         let (_temporary, work) = app_with_documents(&["text"], true);
-        let View::Work(work_id) = work.view else {
+        let View::Work(work_id) = &work.view else {
             panic!("expected Work View")
         };
-        let title = work.archive.work(work_id).unwrap().title();
+        let title = work.archive.work(*work_id).unwrap().title();
         let work_status = rendered_status_line(&work, 80);
         assert!(work_status.ends_with(title));
     }
