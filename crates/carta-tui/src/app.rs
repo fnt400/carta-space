@@ -1426,6 +1426,26 @@ impl App {
         true
     }
 
+    pub fn insert_markdown_pair(&mut self, marker: &str) -> bool {
+        if self.block_current_document_edit() {
+            return false;
+        }
+        let pair = format!("{marker}{marker}");
+        if !self.editor.insert(&pair) {
+            return false;
+        }
+        let after = self.editor.cursor();
+        self.editor.set_cursor(
+            Cursor {
+                region: after.region,
+                byte: after.byte.saturating_sub(marker.len()),
+            },
+            false,
+        );
+        self.cat_navigation();
+        true
+    }
+
     pub fn cat_insert_newline(&mut self) -> bool {
         if self.block_current_document_edit() {
             return false;
