@@ -513,8 +513,8 @@ impl App {
         let editable = matches!(self.view, View::Chronological(_) | View::Work(_));
         let has_doc = self.editor.current_document().is_some();
         let doc_locked = self.current_document_is_locked();
-        let work_locked = match self.view {
-            View::Work(id) => self.archive.work_is_locked(id).unwrap_or(true),
+        let work_locked = match &self.view {
+            View::Work(id) => self.archive.work_is_locked(*id).unwrap_or(true),
             _ => false,
         };
         let mut commands = vec![

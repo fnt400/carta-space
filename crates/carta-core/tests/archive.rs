@@ -1400,6 +1400,10 @@ fn work_lock_makes_member_documents_effectively_read_only() {
         archive.add_document_to_work(work, second),
         Err(Error::WorkLocked(id)) if id == work
     ));
+    assert!(matches!(
+        archive.set_work_color(work, Some("#667A75".to_owned())),
+        Err(Error::WorkLocked(id)) if id == work
+    ));
 
     archive.set_document_locked(first, true).unwrap();
     archive.set_work_locked(work, false).unwrap();
