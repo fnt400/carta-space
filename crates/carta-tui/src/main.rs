@@ -2650,7 +2650,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(matches!(app.mode, AppMode::Editing));
+        assert!(matches!(&app.mode, AppMode::Editing));
         assert_eq!(app.status, "External links are not executed by this build");
     }
 
