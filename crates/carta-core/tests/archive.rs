@@ -1350,3 +1350,63 @@ fn reopen_removes_partial_restore_or_new_work_document_owned_paths() {
     assert!(!target_path.exists());
     assert!(!restore_staging.exists());
 }
+
+
+#[test]
+fn document_lock_persists_and_blocks_content_changes() {
+    let (_temporary, mut archive) = create_archive();
+    let document = archive.create_document("original").unwrap();
+
+    archive.set_document_locked(document, true).unwrap();
+    assert!(archive.document_is_explicitly_locked(document).unwrap());
+    assert!(archive.document_is_locked(document).unwrap());
+    assert!(matches!(
+        archive.edit_document(document, "changed"),
+        Err(Error::DocumentLocked(id)) if id == document
+    ));
+
+    let mut reopened = Archive::open(archive.root()).unwrap();
+    assert!(reopened.document_is_explicitly_locked(document).unwrap());
+    assert_eq!(reopened.read_document(document).unwrap().content(), "original");
+
+    reopened.set_document_locked(document, false).unwrap();
+    reopened.edit_document(document, "changed").unwrap();
+    assert!(!reopened.document_is_locked(document).unwrap());
+    assert_eq!(reopened.read_document(document).unwrap().content(), "changed");
+}
+
+#[test]
+fn work_lock_makes_member_documents_effectively_read_only() {
+    let (_temporary, mut archive) = create_archive();
+    let first = archive.create_document("first").unwrap();
+    let second = archive.create_document("second").unwrap();
+    let work = archive
+        .create_work("Locked work".to_owned(), vec![first])
+        .unwrap();
+
+    archive.set_work_locked(work, true).unwrap();
+    assert!(archive.work_is_locked(work).unwrap());
+    assert!(archive.document_is_locked(first).unwrap());
+    assert!(!archive.document_is_locked(second).unwrap());
+    assert!(matches!(
+        archive.edit_document(first, "changed"),
+        Err(Error::DocumentLocked(id)) if id == first
+    ));
+    assert!(matches!(
+        archive.rename_work(work, "Renamed".to_owned()),
+        Err(Error::WorkLocked(id)) if id == work
+    ));
+    assert!(matches!(
+        archive.add_document_to_work(work, second),
+        Err(Error::WorkLocked(id)) if id == work
+    ));
+
+    archive.set_document_locked(first, true).unwrap();
+    archive.set_work_locked(work, false).unwrap();
+    assert!(!archive.work_is_locked(work).unwrap());
+    assert!(archive.document_is_locked(first).unwrap());
+
+    archive.set_document_locked(first, false).unwrap();
+    archive.edit_document(first, "changed").unwrap();
+    assert_eq!(archive.read_document(first).unwrap().content(), "changed");
+}
