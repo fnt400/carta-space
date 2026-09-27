@@ -33,7 +33,7 @@ If an Archive has no previous session, Carta creates a new provisional Document 
 
 A Carta process opens one Archive at a time.
 
-If Carta is launched without an explicit path, it SHOULD reopen the last Archive used on that device. If no Archive is known, the frontend may offer only the minimal choices needed to create or open one.
+If Carta is launched without an explicit path, the reference TUI opens the deterministic default Archive at `$XDG_DATA_HOME/carta/archive`, falling back to `~/.local/share/carta/archive` when `XDG_DATA_HOME` is unset. An explicit startup path overrides this default; Carta does not choose an Archive from a last-used pointer.
 
 `Create Archive…` asks only for a name/location, initializes the archive and Git history, then opens a new provisional Document. There is no setup wizard.
 
@@ -41,7 +41,7 @@ If Carta is launched without an explicit path, it SHOULD reopen the last Archive
 
 Cursor positions, scroll positions, the last View, per-Work resume positions, most-recently-used ordering, palette state, and similar UI conveniences are device-local, disposable, non-canonical state.
 
-They MUST NOT be required to reconstruct authored content or Work structure and SHOULD NOT be versioned in the Archive Git history.
+They MUST NOT be required to reconstruct authored content or Work structure and SHOULD NOT be versioned in the Archive Git history. The reference TUI stores this state under the same Carta XDG data root, `$XDG_DATA_HOME/carta` (fallback `~/.local/share/carta`), outside the `archive/` Git working tree.
 
 ---
 
