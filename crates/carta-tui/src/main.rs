@@ -2637,6 +2637,19 @@ mod tests {
     }
 
     #[test]
+    fn document_start_leap_does_not_wrap_at_view_edges() {
+        let (_temporary, mut app) = app_with_documents(&["first", "second"], true);
+
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        app.leap_document_start(LeapDirection::Backward);
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 0 });
+
+        app.editor.set_cursor(Cursor { region: 1, byte: 3 }, false);
+        app.leap_document_start(LeapDirection::Forward);
+        assert_eq!(app.editor.cursor(), Cursor { region: 1, byte: 3 });
+    }
+
+    #[test]
     fn cat_boundary_leaps_target_document_edges_and_adjacent_document_starts() {
         let (_temporary, mut app) = app_with_documents(&["abc", "def", "ghi"], true);
 
