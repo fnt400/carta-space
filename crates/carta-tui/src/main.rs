@@ -2564,6 +2564,58 @@ mod tests {
     }
 
     #[test]
+    fn active_page_down_leap_again_advances_through_document_starts() {
+        let (_temporary, mut app) =
+            app_with_documents(&["first", "second", "third", "fourth"], true);
+        app.editor.set_cursor(Cursor { region: 0, byte: 2 }, false);
+        app.cat_navigation();
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::PageDown, KeyModifiers::ALT),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.cursor(), Cursor { region: 1, byte: 0 });
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL | KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.cursor(), Cursor { region: 2, byte: 0 });
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL | KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.cursor(), Cursor { region: 3, byte: 0 });
+    }
+
+    #[test]
     fn document_start_leap_again_does_not_fall_back_to_old_text_query() {
         let (_temporary, mut app) =
             app_with_documents(&["target", "middle", "third", "target"], true);
