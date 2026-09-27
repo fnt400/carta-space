@@ -596,21 +596,6 @@ impl CompositeEditor {
         })
     }
 
-    pub fn view_boundary_cursor(&self, forward: bool) -> Option<Cursor> {
-        if self.regions.is_empty() {
-            return None;
-        }
-        if forward {
-            let region = self.regions.len() - 1;
-            Some(Cursor {
-                region,
-                byte: self.regions[region].text.len(),
-            })
-        } else {
-            Some(Cursor { region: 0, byte: 0 })
-        }
-    }
-
     pub fn visual_boundary_cursor(&self, width: usize, forward: bool) -> Option<Cursor> {
         let region = self.regions.get(self.cursor.region)?;
         let ranges = visual_ranges(&region.text, width.max(1));
