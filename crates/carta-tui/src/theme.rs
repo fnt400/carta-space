@@ -48,8 +48,7 @@ fn parse_color(value: &str) -> Option<Color> {
     let normalized = value
         .trim()
         .to_ascii_lowercase()
-        .replace('_', "-")
-        .replace(' ', "-");
+        .replace(['_', ' '], "-");
     match normalized.as_str() {
         "black" => Some(Color::Black),
         "red" => Some(Color::Red),
