@@ -2365,6 +2365,21 @@ impl App {
         self.load_search_editor()?;
         Ok(())
     }
+    pub fn activate_link_shortcut(&mut self) -> AppResult {
+        if !matches!(self.mode, AppMode::Editing)
+            || !matches!(self.view, View::Chronological(_) | View::Work(_))
+            || self.collapsed
+            || self.editor.current_document().is_none()
+        {
+            return Ok(());
+        }
+        if self.link_under_cursor().is_some() {
+            self.open_link()
+        } else {
+            self.select_links()
+        }
+    }
+
     fn open_link(&mut self) -> AppResult {
         let Some(link) = self.link_under_cursor() else {
             return Ok(());
