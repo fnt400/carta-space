@@ -2222,7 +2222,7 @@ mod tests {
     }
 
     #[test]
-    fn modification_date_view_orders_recent_edits_first_and_has_distinct_status() {
+    fn modification_date_view_orders_oldest_to_newest_and_has_distinct_status() {
         let (_temporary, mut app) = app_with_documents(&["first", "second"], false);
         let creation_style = status_style(&app);
         let first = app.editor.regions()[0].document;
@@ -2232,7 +2232,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(app.view, View::ModificationDate);
-        assert_eq!(app.editor.regions()[0].document, first);
+        assert_eq!(app.editor.regions().last().unwrap().document, first);
         assert!(rendered_status_line(&app, 80).ends_with("Modification Date "));
         assert_ne!(status_style(&app).bg, creation_style.bg);
     }

@@ -977,7 +977,7 @@ impl Archive {
 
     pub fn modification_date_order(&self) -> Vec<DocumentId> {
         let mut documents: Vec<_> = self.documents.values().collect();
-        documents.sort_by_key(|document| std::cmp::Reverse((document.modified(), document.id())));
+        documents.sort_by_key(|document| (document.modified(), document.id()));
         documents.into_iter().map(DocumentInfo::id).collect()
     }
 
@@ -1465,7 +1465,7 @@ mod tests {
             .create_document_with(second, second_created, "second")
             .unwrap();
 
-        assert_eq!(archive.modification_date_order(), vec![second, first]);
+        assert_eq!(archive.modification_date_order(), vec![first, second]);
         assert_eq!(
             archive.documents.get(&first).unwrap().modified(),
             first_created
@@ -1473,11 +1473,11 @@ mod tests {
 
         archive.edit_document(first, "first edited").unwrap();
 
-        assert_eq!(archive.modification_date_order()[0], first);
+        assert_eq!(archive.modification_date_order(), vec![second, first]);
         assert!(archive.documents.get(&first).unwrap().modified() > second_created);
 
         let reopened = Archive::open(archive.root()).unwrap();
-        assert_eq!(reopened.modification_date_order()[0], first);
+        assert_eq!(reopened.modification_date_order(), vec![second, first]);
         assert!(reopened.documents.get(&first).unwrap().modified() > second_created);
     }
 

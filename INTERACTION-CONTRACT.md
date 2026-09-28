@@ -188,7 +188,7 @@ The user can move to adjacent months or use a command such as `Go to Month…`.
 
 Modification Date View spans all active Documents in the Archive.
 
-Documents appear from most recently modified to least recently modified. The ordering key is the effective modification timestamp: the canonical `modified` timestamp when present, otherwise the immutable `created` timestamp for older or never-edited Documents.
+Documents appear from least recently modified to most recently modified. The ordering key is the effective modification timestamp: the canonical `modified` timestamp when present, otherwise the immutable `created` timestamp for older or never-edited Documents.
 
 A successful authored-content save that changes a Document updates `modified`. Merely changing View, moving through a Work, changing lock state, or saving identical content does not.
 

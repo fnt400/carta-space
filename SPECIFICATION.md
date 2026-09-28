@@ -474,7 +474,7 @@ Creation Date View orders Documents from oldest to newest by the explicit `creat
 
 A frontend MAY provide larger creation-time ranges spanning several Volumes.
 
-A frontend MAY provide Modification Date View across active Documents. When provided, it orders Documents from most recently modified to least recently modified by the effective modification timestamp defined in section 8.4.
+A frontend MAY provide Modification Date View across active Documents. When provided, it orders Documents from least recently modified to most recently modified by the effective modification timestamp defined in section 8.4.
 
 A frontend MAY provide other derived Views, including search-result Views, relationship or backlink Views, and history-oriented Views.
 
