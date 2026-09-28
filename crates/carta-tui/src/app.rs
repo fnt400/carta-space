@@ -604,10 +604,7 @@ impl App {
         if matches!(self.view, View::CreationDate(_)) {
             commands.extend([PreviousMonth, NextMonth, GoToMonth]);
         }
-        if matches!(
-            self.view,
-            View::CreationDate(_) | View::ModificationDate | View::Work(_)
-        ) {
+        if matches!(self.view, View::CreationDate(_) | View::Work(_)) {
             commands.push(OpenModificationDateView);
         }
         if matches!(self.view, View::ModificationDate) {
@@ -2002,7 +1999,12 @@ impl App {
         } else {
             let id = self.archive.create_document("")?;
             self.provisional = Some(id);
-            self.switch_view(View::CreationDate(current_volume()), Some((id, 0)), false)?;
+            let view = if matches!(self.view, View::ModificationDate) {
+                View::ModificationDate
+            } else {
+                View::CreationDate(current_volume())
+            };
+            self.switch_view(view, Some((id, 0)), false)?;
         }
         Ok(())
     }
@@ -2792,7 +2794,10 @@ impl App {
         }
     }
     fn open_document(&mut self, id: DocumentId, navigation: bool) -> AppResult {
-        if matches!(self.view, View::CreationDate(_) | View::Work(_)) {
+        if matches!(
+            self.view,
+            View::CreationDate(_) | View::ModificationDate | View::Work(_)
+        ) {
             if let Some(index) = self.editor.regions().iter().position(|r| r.document == id) {
                 if navigation {
                     self.push_navigation();

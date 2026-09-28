@@ -96,7 +96,7 @@ Split Document at Point is the explicit structural exception. Text before the cu
 
 The editor normally keeps the cursor about two thirds of the way down the screen. Blank screen space is allowed above or below the available text; this is presentation only and never changes Document content.
 
-Collapse View turns a Chronological or Work View into a read-only navigation overview showing only the first three visual rows of each Document. Up/PageUp and Down/PageDown move between Documents. Enter, or Expand View from the palette, returns to normal editing on the selected Document."#,
+Collapse View turns a Creation Date, Modification Date, or Work View into a read-only navigation overview showing only the first three visual rows of each Document. Up/PageUp and Down/PageDown move between Documents. Enter, or Expand View from the palette, returns to normal editing on the selected Document."#,
     },
     HelpDocument {
         title: "4. LEAP",
