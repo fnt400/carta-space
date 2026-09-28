@@ -86,6 +86,7 @@ A Document has:
 
 - a stable UUIDv7 identifier;
 - an immutable creation timestamp;
+- an effective last-modification timestamp, represented by optional `modified` metadata with `created` as its fallback;
 - a CommonMark body.
 
 ### 3.3 Volume
@@ -330,7 +331,15 @@ Carta Space Draft 0.1 defines no Markdown extensions.
 
 Unknown members MUST be preserved when a frontend rewrites the object.
 
-### 8.4 `locked` (optional)
+### 8.4 `modified` (optional)
+
+A Document MAY contain a `modified` RFC 3339 timestamp. When absent, the effective modification timestamp is `created`.
+
+A Writer that successfully changes authored Document body content MUST update `modified` to the time of that save. Rewriting identical body content, changing lock state, or changing Work membership MUST NOT by itself update `modified`.
+
+This field is optional for backward compatibility with Draft 0.1 Archives created before modification tracking was introduced.
+
+### 8.5 `locked` (optional)
 
 A Document MAY contain a `locked` Boolean member. `true` means that authored content and structural operations that would alter the Document are locked until an explicit unlock operation. An absent member or `false` means that the Document has no own lock.
 
@@ -457,17 +466,17 @@ The exact appearance of boundaries is not specified by the archive format.
 
 ---
 
-## 12. Chronological View
+## 12. Creation Date and Modification Date Views
 
-A frontend SHOULD be capable of presenting the Documents of a Volume in creation order.
+A frontend SHOULD be capable of presenting the Documents of a Volume in Creation Date View.
 
-The ordering key SHOULD be the Document `created` timestamp.
+Creation Date View orders Documents from oldest to newest by the explicit `created` timestamp. UUIDv7 ordering MAY be used as an implementation aid but MUST NOT replace `created` as the semantic creation timestamp.
 
-UUIDv7 ordering MAY be used as an implementation aid but MUST NOT replace the explicit `created` value as the semantic creation timestamp.
+A frontend MAY provide larger creation-time ranges spanning several Volumes.
 
-A frontend MAY provide larger temporal views, including ranges spanning several Volumes.
+A frontend MAY provide Modification Date View across active Documents. When provided, it orders Documents from most recently modified to least recently modified by the effective modification timestamp defined in section 8.4.
 
-A frontend MAY provide other derived Views, including search-result Views, relationship or backlink Views, history-oriented Views, and Views selected by creation or modification time.
+A frontend MAY provide other derived Views, including search-result Views, relationship or backlink Views, and history-oriented Views.
 
 A derived View MUST NOT require duplication of canonical Document bodies. Loss of a View-specific cache or index MUST NOT cause loss of authored or structural Archive data.
 

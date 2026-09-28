@@ -64,7 +64,7 @@ Retrodated creation is not supported in v0.1.
 
 When invoked inside a Work View, `New Document` also inserts the new Document immediately after the current Document in that Work.
 
-When invoked outside a Work View, it creates a neutral Document with no Work membership and takes the user to the current month's Chronological View.
+When invoked outside a Work View, it creates a neutral Document with no Work membership. From Modification Date View the new Document remains in that View; from other non-Work contexts Carta takes the user to the current month's Creation Date View.
 
 ### 2.2 Provisional empty Documents
 
@@ -134,7 +134,7 @@ A linked Document does not automatically inherit the current Work, even when the
 `Lock Work` stores a persistent lock on the Work itself. While locked:
 
 - Work title, membership, ordering, Trash, history restore, and other Work mutations are rejected;
-- every active Document referenced by that Work is effectively read-only everywhere, including Chronological View and other Work Views.
+- every active Document referenced by that Work is effectively read-only everywhere, including Creation Date View and other Work Views.
 
 Document lock and Work lock are independent. `Unlock Work` removes only the Work lock and MUST NOT remove a Document's own lock. `Unlock Document` removes only the Document's own lock; the Document remains read-only if it still belongs to any locked Work.
 
@@ -150,17 +150,19 @@ Lock state is canonical Archive metadata and therefore follows the Archive acros
 
 v0.1 implements these primary Views:
 
-- Chronological View;
+- Creation Date View;
+- Modification Date View;
 - Work View;
 - Search Results View.
 
 History, Trash, and built-in Help are specialized read-only interfaces/views. Help content belongs to the frontend and is not stored as authored Archive Documents.
 
-There is no Single Document View in v0.1. A Document is normally reached in either its chronological context or a Work context.
+There is no Single Document View in v0.1. A Document is normally reached in a Creation Date, Modification Date, or Work context.
 
 ### 3.2 Editability
 
-- Chronological View: editable.
+- Creation Date View: editable.
+- Modification Date View: editable.
 - Work View: editable.
 - Search Results View: not directly editable.
 - History: read-only except explicit restore/duplication operations.
@@ -169,27 +171,37 @@ There is no Single Document View in v0.1. A Document is normally reached in eith
 
 When a target Document is already contained by the current editable View, navigation SHOULD preserve that View and jump to the target.
 
-Otherwise a Document target opens in the Chronological View of its Volume.
+Otherwise a Document target opens in the Creation Date View of its Volume.
 
-### 3.3 Chronological View
+### 3.3 Creation Date View
 
 The natural scope is one monthly Volume.
 
-By default Carta opens the current month, unless local session state records a different recent chronological position.
+By default Carta opens the current month, unless local session state records a different recent Creation Date position.
 
 Documents appear from oldest to newest by `created`.
 
 The user can move to adjacent months or use a command such as `Go to Month…`.
 
-### 3.4 Work View
+### 3.4 Modification Date View
+
+Modification Date View spans all active Documents in the Archive.
+
+Documents appear from most recently modified to least recently modified. The ordering key is the effective modification timestamp: the canonical `modified` timestamp when present, otherwise the immutable `created` timestamp for older or never-edited Documents.
+
+A successful authored-content save that changes a Document updates `modified`. Merely changing View, moving through a Work, changing lock state, or saving identical content does not.
+
+The projection is recomputed when Modification Date View is opened or reloaded. Carta does not reorder the active editor underneath the cursor after every autosave; this avoids a Document jumping to another position while it is being edited.
+
+### 3.5 Work View
 
 A Work View presents its component Documents in explicit Work order as a continuous editable surface.
 
 Each Work remembers its last local cursor/scroll position when possible.
 
-### 3.5 Collapse and expand
+### 3.6 Collapse and expand
 
-`Collapse View` is available in editable Chronological and Work Views. It is a read-only navigation mode that shows only the first three visual rows of each Document while retaining generated boundaries and metadata.
+`Collapse View` is available in editable Creation Date, Modification Date, and Work Views. It is a read-only navigation mode that shows only the first three visual rows of each Document while retaining generated boundaries and metadata.
 
 While collapsed:
 
@@ -200,17 +212,17 @@ While collapsed:
 
 `Expand View` restores the normal continuous editable surface. Collapse state is device-local UI state and never changes canonical content.
 
-### 3.6 Writing position
+### 3.7 Writing position
 
 In normal editable Views, the TUI keeps the cursor approximately two thirds of the way down the writing area. It MAY render empty screen space above the first available line or below the last available line to preserve that writing position.
 
 This padding is presentation only. It MUST NOT insert whitespace or line breaks into authored text.
 
-### 3.7 Document boundaries
+### 3.8 Document boundaries
 
 In multi-Document editable Views, boundaries are generated UI rather than authored text. A Work View uses one generated blank line, a simple continuous separator line, and one generated blank line between Documents.
 
-A Chronological View gives every Document a generated metadata separator. The separator includes the Document creation date and up to two Work memberships; if more memberships exist, an ellipsis indicates the remainder. The date uses the system local timezone and a compact human-readable form such as `ven 25 set 2026`. A blank generated row separates the metadata line from authored text and from the preceding Document.
+Creation Date View and Modification Date View give every Document a generated metadata separator. The Creation Date separator shows the Document creation date; the Modification Date separator shows its effective modification date. Both include up to two Work memberships; if more memberships exist, an ellipsis indicates the remainder. Dates use the system local timezone and a compact human-readable form such as `ven 25 set 2026`. A blank generated row separates the metadata line from authored text and from the preceding Document.
 
 The separator is generated UI:
 
@@ -223,24 +235,27 @@ The cursor may cross boundaries.
 
 Cat highlights never cross Document boundaries. A highlighted block may nevertheless be moved to a destination in another Document of the same editable View; generated separators remain outside authored text and are never moved, copied, or erased.
 
-### 3.8 Status bar
+### 3.9 Status bar
 
 The TUI uses a minimal one-line status bar.
 
 Examples:
 
-- Chronological left side: `2026-09-25 · Document label · 2026-09 · 7/18`; right side: `Chronological`
+- Creation Date left side: `2026-09-25 · Document label · 2026-09 · 7/18`; right side: `Creation Date`
+- Modification Date left side: `2026-09-28 · Document label · 3/42`; right side: `Modification Date`
 - Work left side: `2026-09-25 · Document label · 3/12`; right side: `Romanzo`
 - Search: `Search: bernanos · 4 results`
 - History: `History · Document label · 2026-09-25 14:20`
 
 The status bar follows the Document under the cursor.
 
-In editable views, the view context is right-aligned: Chronological View shows `Chronological`, while Work View shows the active Work title. Chronological View does not repeat Work memberships in the status bar; memberships remain visible in each Document's generated separator.
+In editable views, the view context is right-aligned: Creation Date View shows `Creation Date`, Modification Date View shows `Modification Date`, and Work View shows the active Work title. Date Views do not repeat Work memberships in the status bar; memberships remain visible in each Document's generated separator.
 
 Transient status messages temporarily replace the normal left-side status content and expire automatically after at most ten seconds. The right-aligned editable-view context remains visible while space permits.
 
-Chronological View keeps the neutral gray status bar.
+Creation Date View keeps the neutral gray status bar.
+
+Modification Date View uses a distinct configurable status-bar color; the reference TUI defaults to blue and permits frontend theme overrides.
 
 Work View uses the Work's persistent accent color as the status-bar background. The reference palette deliberately uses clearly differentiated hues, and the frontend chooses light or dark foreground text according to contrast. Colors may repeat across Works; their purpose is rapid visual distinction, not identity.
 
@@ -452,7 +467,7 @@ The reference TUI applies syntax highlighting to the authored CommonMark source 
 
 ### 6.5 Wrapping and indentation
 
-Soft wrap is visual only. Carta does not automatically hard-wrap authored lines. In editable Chronological and Work Views, the writing surface is centered and at most 80 terminal columns wide, or the available width when the terminal is narrower. Cursor movement and wrapping use that same visual width.
+Soft wrap is visual only. Carta does not automatically hard-wrap authored lines. In editable Creation Date, Modification Date, and Work Views, the writing surface is centered and at most 80 terminal columns wide, or the available width when the terminal is narrower. Cursor movement and wrapping use that same visual width.
 
 The normal viewport keeps the active cursor near two thirds of the available writing height as described in §3.6.
 
@@ -547,7 +562,7 @@ When the cursor is inside a Markdown link, the contextual palette exposes `Open 
 For Carta links:
 
 - a target already in the current View is opened in that View;
-- another Document opens in its Volume's Chronological View;
+- another Document opens in its Volume's Creation Date View;
 - a Work opens in its Work View at the locally remembered position.
 
 For external links, v0.1 may delegate `http`, `https`, and `mailto` to the operating system. Unknown URI schemes are not executed automatically.
@@ -601,7 +616,7 @@ A match cannot cross Document boundaries.
 
 Results are grouped by Document, with one result entry per Document, showing label, date, and useful context. Documents are ordered newest first.
 
-Opening a result navigates to the matching occurrence in the target Document's Chronological View.
+Opening a result navigates to the matching occurrence in the target Document's Creation Date View.
 
 The Search Results View remains in navigation history, so `Back` returns to the same result-list position.
 

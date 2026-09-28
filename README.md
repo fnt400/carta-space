@@ -81,7 +81,7 @@ Some of those capabilities might later be implemented as extensions, but none be
 
 ## Documents, Volumes, Works
 
-A **Document** is the basic persistent unit. It may be a short note, a letter, an essay, or a chapter.
+A **Document** is the basic persistent unit. It may be a short note, a letter, an essay, or a chapter. Its creation time is immutable; Carta also records the last successful authored-content modification, with creation time as the fallback for Documents that have never been edited.
 
 A **Volume** is an automatic chronological partition. A document created in September 2026 belongs permanently to the `2026/09` volume. Editing it later does not move it.
 
@@ -158,7 +158,7 @@ Device-local session state is stored alongside the default Archive root under `$
 
 If the default Archive does not exist, the TUI offers a minimal first-run choice: create an empty Archive, import an existing Git Archive, or quit. Git import asks for the repository URL and explicitly clones the reserved `carta` branch, so it does not depend on the remote repository's default branch or `HEAD`. The clone is validated in a temporary sibling directory before it replaces the missing default path, and the remote is configured as Carta's synchronization remote. Existing paths are never overwritten by this flow. A new Archive or an Archive without session state opens directly into a provisional empty Document in the current month.
 
-The default surface is an editable, soft-wrapped monthly Chronological View or continuous Work View. Generated separator lines protect Document boundaries. `Esc` opens the contextual command palette. On capable terminals, physical Left Ctrl/Left Alt provide LEAP and Right Ctrl is the Carta command modifier: RightCtrl+Z/R handle undo/redo, RightCtrl+C performs Cat COPY or clipboard paste, RightCtrl+W opens the Work selector, and RightCtrl+L inserts or opens a link at point. Copy, Cut, and Paste otherwise remain terminal-emulator operations.
+The default surface is an editable, soft-wrapped monthly Creation Date View or continuous Work View. A separate Modification Date View spans all active Documents and orders them from most recently modified to least recently modified. Generated separator lines protect Document boundaries. `Esc` opens the contextual command palette. On capable terminals, physical Left Ctrl/Left Alt provide LEAP and Right Ctrl is the Carta command modifier: RightCtrl+Z/R handle undo/redo, RightCtrl+C performs Cat COPY or clipboard paste, RightCtrl+W opens the Work selector, and RightCtrl+L inserts or opens a link at point. Copy, Cut, and Paste otherwise remain terminal-emulator operations.
 
 If canonical Document content or Work structure changes externally while the TUI has a divergent local edit, `carta-core` durably preserves both variants under `.git/carta-conflicts/` before refusing the write. The TUI opens a read-only Conflicts view where the user explicitly chooses the current local or external variant. For Documents, the non-selected variant may optionally be preserved as a new neutral Document; Work resolution never creates a second Work automatically. These records are device-local recovery state, are excluded from portable packages, and are scrubbed when their Document is Wiped.
 
@@ -185,7 +185,7 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace
 ```
 
-The v0.1 interaction contract now fixes startup/resume behavior, LEAP semantics, the contextual dmenu-like command palette, editing and clipboard behavior, Chronological/Work/Search Views, Work operations, links/backlinks, History, Trash/Wipe, import/export, autosave/checkpoints, Git synchronization, recovery, and structural atomicity. Implementation work should follow `INTERACTION-CONTRACT.md` rather than inventing missing UI semantics.
+The v0.1 interaction contract now fixes startup/resume behavior, LEAP semantics, the contextual dmenu-like command palette, editing and clipboard behavior, Creation Date/Modification Date/Work/Search Views, Work operations, links/backlinks, History, Trash/Wipe, import/export, autosave/checkpoints, Git synchronization, recovery, and structural atomicity. Implementation work should follow `INTERACTION-CONTRACT.md` rather than inventing missing UI semantics.
 
 Features such as images, bibliographies, tags, semantic search, collaboration, AI assistance, and interactive synchronization-conflict resolution remain intentionally deferred until real use demonstrates a need for them.
 
