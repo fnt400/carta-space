@@ -37,6 +37,18 @@ pub fn markdown_theme() -> &'static MarkdownTheme {
     THEME.get_or_init(MarkdownTheme::from_environment)
 }
 
+pub fn modification_date_status_style() -> Style {
+    Style::default()
+        .bg(theme_color(
+            "CARTA_MODIFICATION_DATE_STATUS_COLOR",
+            Color::Blue,
+        ))
+        .fg(theme_color(
+            "CARTA_MODIFICATION_DATE_STATUS_TEXT_COLOR",
+            Color::White,
+        ))
+}
+
 fn theme_color(variable: &str, fallback: Color) -> Color {
     env::var(variable)
         .ok()

@@ -86,13 +86,13 @@ The interface deliberately keeps technology quiet. The command palette exposes p
         title: "2. Documents and boundaries",
         body: r#"A Document is the basic authored unit. It has an immutable UUID and creation timestamp but no separate title field. Its visible label comes from the first heading or first non-empty line.
 
-Chronological and Work Views concatenate several Documents. Their boundaries are generated UI: they are not Markdown, cannot be selected as authored text, and cannot be erased by normal editing.
+Creation Date, Modification Date, and Work Views concatenate several Documents. Their boundaries are generated UI: they are not Markdown, cannot be selected as authored text, and cannot be erased by normal editing.
 
 Split Document at Point is the explicit structural exception. Text before the cursor remains in the original Document; text from the cursor onward becomes a new Document with a new UUID and a timestamp immediately after the original. Every Work containing the source inserts the new Document immediately after it."#,
     },
     HelpDocument {
         title: "3. Views and navigation",
-        body: r#"Chronological View presents one monthly Volume in creation order. Work View presents the Documents of one Work in explicit Work order.
+        body: r#"Creation Date View presents one monthly Volume in creation order. Modification Date View presents all Documents in the Archive, ordered from most recently modified to least recently modified. Work View presents the Documents of one Work in explicit Work order.
 
 The editor normally keeps the cursor about two thirds of the way down the screen. Blank screen space is allowed above or below the available text; this is presentation only and never changes Document content.
 
@@ -148,7 +148,7 @@ New Document inside a Work is inserted after the current Document. Add to Work s
 
 A Document may belong to several Works. Splitting such a Document inserts the new second half after the source in every Work that contains it.
 
-Lock Document makes that Document read-only until Unlock Document. Lock Work freezes Work structure and makes every member Document read-only everywhere it is opened, including Chronological View or another Work. Unlock Work removes only the Work lock; an individually locked Document remains locked. Locked Documents are marked on their generated separator and in the status bar. Locked Works are marked in the status bar and Work selector."#,
+Lock Document makes that Document read-only until Unlock Document. Lock Work freezes Work structure and makes every member Document read-only everywhere it is opened, including Creation Date View or another Work. Unlock Work removes only the Work lock; an individually locked Document remains locked. Locked Documents are marked on their generated separator and in the status bar. Locked Works are marked in the status bar and Work selector."#,
     },
     HelpDocument {
         title: "9. Search, history and trash",

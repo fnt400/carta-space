@@ -414,7 +414,10 @@ fn handle_key(
     {
         dispatcher.pending_leap = None;
         if matches!(app.mode, AppMode::Editing)
-            && matches!(app.view, View::Chronological(_) | View::Work(_))
+            && matches!(
+                app.view,
+                View::CreationDate(_) | View::ModificationDate | View::Work(_)
+            )
             && !app.collapsed
         {
             let marker = if matches!(key.code, KeyCode::Char('b' | 'B')) {
@@ -451,7 +454,10 @@ fn handle_key(
     {
         dispatcher.pending_leap = None;
         if matches!(app.mode, AppMode::Editing)
-            && matches!(app.view, View::Chronological(_) | View::Work(_))
+            && matches!(
+                app.view,
+                View::CreationDate(_) | View::ModificationDate | View::Work(_)
+            )
             && !app.collapsed
         {
             let command = if matches!(key.code, KeyCode::Char('z' | 'Z')) {
@@ -470,7 +476,10 @@ fn handle_key(
     {
         dispatcher.pending_leap = None;
         if matches!(app.mode, AppMode::Editing)
-            && matches!(app.view, View::Chronological(_) | View::Work(_))
+            && matches!(
+                app.view,
+                View::CreationDate(_) | View::ModificationDate | View::Work(_)
+            )
             && !app.collapsed
         {
             if app.editor.cat_highlight().is_some() {
@@ -525,7 +534,10 @@ fn handle_key(
             || (dispatcher.pending_leap.is_none() && dispatcher.active_leap.is_none()))
     {
         let editable = matches!(app.mode, AppMode::Editing)
-            && matches!(app.view, View::Chronological(_) | View::Work(_));
+            && matches!(
+                app.view,
+                View::CreationDate(_) | View::ModificationDate | View::Work(_)
+            );
         match key.code {
             KeyCode::PageUp if !key.modifiers.contains(KeyModifiers::SHIFT) => {
                 dispatcher.pending_leap = None;
@@ -873,7 +885,9 @@ fn draw(frame: &mut ratatui::Frame<'_>, app: &mut App) {
         .constraints([Constraint::Min(1), Constraint::Length(1)])
         .split(frame.area());
     match &app.view {
-        View::Chronological(_) | View::Work(_) => draw_editor(frame, app, editor_rect(chunks[0])),
+        View::CreationDate(_) | View::ModificationDate | View::Work(_) => {
+            draw_editor(frame, app, editor_rect(chunks[0]))
+        }
         View::Search { query, selected } => {
             let items: Vec<_> = app
                 .search_results
@@ -1141,14 +1155,27 @@ fn visual_lines(app: &App, width: usize) -> Vec<VisualLine> {
     let mut out = Vec::new();
     for (region_index, region) in app.editor.regions().iter().enumerate() {
         match &app.view {
-            View::Chronological(_) => {
+            View::CreationDate(_) => {
                 if region_index > 0 {
                     out.push(generated_line(String::new()));
                 }
-                out.push(generated_line(chronological_separator(
+                out.push(generated_line(date_view_separator(
                     app,
                     region.document,
                     width,
+                    false,
+                )));
+                out.push(generated_line(String::new()));
+            }
+            View::ModificationDate => {
+                if region_index > 0 {
+                    out.push(generated_line(String::new()));
+                }
+                out.push(generated_line(date_view_separator(
+                    app,
+                    region.document,
+                    width,
+                    true,
                 )));
                 out.push(generated_line(String::new()));
             }
@@ -1205,7 +1232,12 @@ fn work_separator(width: usize, locked: bool) -> String {
     format!("{prefix}{}", "─".repeat(width - display_width(prefix)))
 }
 
-fn chronological_separator(app: &App, document: carta_core::DocumentId, width: usize) -> String {
+fn date_view_separator(
+    app: &App,
+    document: carta_core::DocumentId,
+    width: usize,
+    modified: bool,
+) -> String {
     if width == 0 {
         return String::new();
     }
@@ -1215,7 +1247,13 @@ fn chronological_separator(app: &App, document: carta_core::DocumentId, width: u
         .find(|info| info.id() == document)
         .map_or_else(
             || "senza data".to_owned(),
-            |info| italian_date(info.created()),
+            |info| {
+                italian_date(if modified {
+                    info.modified()
+                } else {
+                    info.created()
+                })
+            },
         );
     let prefix = if app.archive.document_is_locked(document).unwrap_or(true) {
         format!("── [LOCKED] {date} ")
@@ -1677,7 +1715,8 @@ fn rendered_status_line(app: &App, width: usize) -> String {
 
 fn status_view_label(app: &App) -> String {
     match &app.view {
-        View::Chronological(_) => "Chronological".to_owned(),
+        View::CreationDate(_) => "Creation Date".to_owned(),
+        View::ModificationDate => "Modification Date".to_owned(),
         View::Work(work) => app
             .archive
             .work(*work)
@@ -1687,6 +1726,9 @@ fn status_view_label(app: &App) -> String {
 }
 
 fn status_style(app: &App) -> Style {
+    if matches!(app.view, View::ModificationDate) {
+        return theme::modification_date_status_style();
+    }
     let View::Work(work) = &app.view else {
         return Style::default().bg(Color::DarkGray).fg(Color::White);
     };
@@ -1736,7 +1778,10 @@ fn parse_rgb(color: &str) -> Option<(u8, u8, u8)> {
 }
 
 fn lock_status(app: &App) -> String {
-    if !matches!(app.view, View::Chronological(_) | View::Work(_)) {
+    if !matches!(
+                app.view,
+                View::CreationDate(_) | View::ModificationDate | View::Work(_)
+            ) {
         return String::new();
     }
 
@@ -1770,7 +1815,7 @@ fn status_line(app: &App) -> String {
         };
     }
     let base = match &app.view {
-        View::Chronological(v) => {
+        View::CreationDate(v) => {
             format!(
                 "{} · {} · {:04}-{:02} · {}",
                 current_document_date(app),
@@ -1780,6 +1825,12 @@ fn status_line(app: &App) -> String {
                 current_position(app)
             )
         }
+        View::ModificationDate => format!(
+            "{} · {} · {}",
+            current_document_modified_date(app),
+            current_label(app),
+            current_position(app)
+        ),
         View::Work(_) => format!(
             "{} · {} · {}",
             current_document_date(app),
@@ -1888,6 +1939,15 @@ fn current_document_date(app: &App) -> String {
             |document| date_only(document.created()),
         )
 }
+fn current_document_modified_date(app: &App) -> String {
+    app.editor
+        .current_document()
+        .and_then(|id| app.archive.documents().find(|document| document.id() == id))
+        .map_or_else(
+            || "No date".to_owned(),
+            |document| date_only(document.modified()),
+        )
+}
 fn current_position(app: &App) -> String {
     if app.editor.regions().is_empty() {
         "0/0".to_owned()
@@ -1960,7 +2020,7 @@ mod tests {
             carta_tui::session::SavedView::Work { id }
         } else {
             let volume = archive.documents().next().unwrap().volume();
-            carta_tui::session::SavedView::Chronological {
+            carta_tui::session::SavedView::CreationDate {
                 year: volume.year(),
                 month: volume.month(),
             }
@@ -2111,7 +2171,7 @@ mod tests {
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
         let status = rendered_status_line(&app, 80);
         assert!(status.starts_with(' '));
-        assert!(status.ends_with("Chronological "));
+        assert!(status.ends_with("Creation Date "));
         assert_eq!(display_width(&status), 80);
         assert!(!status.contains("Appunti"));
         assert!(!status.contains("Cinema"));
@@ -2162,11 +2222,27 @@ mod tests {
     }
 
     #[test]
+    fn modification_date_view_orders_recent_edits_first_and_has_distinct_status() {
+        let (_temporary, mut app) = app_with_documents(&["first", "second"], false);
+        let creation_style = status_style(&app);
+        let first = app.editor.regions()[0].document;
+
+        app.archive.edit_document(first, "first edited").unwrap();
+        app.execute(carta_tui::Command::OpenModificationDateView)
+            .unwrap();
+
+        assert_eq!(app.view, View::ModificationDate);
+        assert_eq!(app.editor.regions()[0].document, first);
+        assert!(rendered_status_line(&app, 80).ends_with("Modification Date "));
+        assert_ne!(status_style(&app).bg, creation_style.bg);
+    }
+
+    #[test]
     fn editable_view_name_is_right_aligned_in_status_bar() {
         let (_temporary, chronological) = app_with_documents(&["text"], false);
         let chronological_status = rendered_status_line(&chronological, 80);
         assert!(chronological_status.starts_with(' '));
-        assert!(chronological_status.ends_with("Chronological "));
+        assert!(chronological_status.ends_with("Creation Date "));
         assert_eq!(display_width(&chronological_status), 80);
 
         let (_temporary, work) = app_with_documents(&["text"], true);
@@ -3846,6 +3922,6 @@ mod tests {
         app.archive.set_document_locked(document, true).unwrap();
 
         assert!(status_line(&app).contains("[LOCK DOC]"));
-        assert!(chronological_separator(&app, document, 80).contains("[LOCKED]"));
+        assert!(date_view_separator(&app, document, 80, false).contains("[LOCKED]"));
     }
 }

@@ -23,7 +23,8 @@ const WORK_COLOR_PALETTE: [&str; 8] = [
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum View {
-    Chronological(Volume),
+    CreationDate(Volume),
+    ModificationDate,
     Work(WorkId),
     Search {
         query: String,
@@ -161,7 +162,8 @@ pub enum Command {
     CreateWork,
     RenameWork,
     OpenWork,
-    OpenChronologicalView,
+    OpenCreationDateView,
+    OpenModificationDateView,
     GoToStartOfView,
     GoToEndOfView,
     CollapseView,
@@ -230,7 +232,8 @@ impl Command {
             Self::CreateWork => "Create Work…",
             Self::RenameWork => "Rename Work…",
             Self::OpenWork => "Open Work…",
-            Self::OpenChronologicalView => "Open Chronological View",
+            Self::OpenCreationDateView => "Open Creation Date View",
+            Self::OpenModificationDateView => "Open Modification Date View",
             Self::GoToStartOfView => "Go to Start of View",
             Self::GoToEndOfView => "Go to End of View",
             Self::CollapseView => "Collapse View",
@@ -391,9 +394,10 @@ impl App {
                 query: query.clone(),
                 selected: *selected,
             },
-            Some(SavedView::Chronological { year, month }) => {
-                View::Chronological(Volume::new(*year, *month).unwrap_or(current))
+            Some(SavedView::CreationDate { year, month }) => {
+                View::CreationDate(Volume::new(*year, *month).unwrap_or(current))
             }
+            Some(SavedView::ModificationDate) => View::ModificationDate,
             _ => {
                 let id = archive.create_document("")?;
                 provisional = Some(id);
@@ -402,14 +406,14 @@ impl App {
                     byte: 0,
                     scroll: 0,
                 });
-                View::Chronological(current)
+                View::CreationDate(current)
             }
         };
-        if matches!(&view, View::Chronological(volume) if archive.chronological_month(*volume).is_empty())
+        if matches!(&view, View::CreationDate(volume) if archive.chronological_month(*volume).is_empty())
         {
             let id = archive.create_document("")?;
             provisional = Some(id);
-            view = View::Chronological(current);
+            view = View::CreationDate(current);
             position = Some(Position {
                 document: id,
                 byte: 0,
@@ -488,10 +492,11 @@ impl App {
         });
         let view = match self.view {
             View::Work(id) => SavedView::Work { id },
-            View::Chronological(v) => SavedView::Chronological {
+            View::CreationDate(v) => SavedView::CreationDate {
                 year: v.year(),
                 month: v.month(),
             },
+            View::ModificationDate => SavedView::ModificationDate,
             View::Search {
                 ref query,
                 selected,
@@ -499,7 +504,7 @@ impl App {
                 query: query.clone(),
                 selected,
             },
-            _ => SavedView::Chronological {
+            _ => SavedView::CreationDate {
                 year: current_volume().year(),
                 month: current_volume().month(),
             },
@@ -514,7 +519,10 @@ impl App {
 
     pub fn commands(&self) -> Vec<Command> {
         use Command::*;
-        let editable = matches!(self.view, View::Chronological(_) | View::Work(_));
+        let editable = matches!(
+            self.view,
+            View::CreationDate(_) | View::ModificationDate | View::Work(_)
+        );
         let has_doc = self.editor.current_document().is_some();
         let doc_locked = self.current_document_is_locked();
         let work_locked = match &self.view {
@@ -541,7 +549,10 @@ impl App {
         ];
         if matches!(
             self.view,
-            View::Chronological(_) | View::Work(_) | View::Search { .. }
+            View::CreationDate(_)
+                | View::ModificationDate
+                | View::Work(_)
+                | View::Search { .. }
         ) && !self.editor.regions().is_empty()
         {
             commands.extend([
@@ -590,13 +601,22 @@ impl App {
         if editable && !doc_locked && self.editor.can_redo() {
             commands.push(Redo);
         }
-        if matches!(self.view, View::Chronological(_)) {
+        if matches!(self.view, View::CreationDate(_)) {
             commands.extend([PreviousMonth, NextMonth, GoToMonth]);
+        }
+        if matches!(
+            self.view,
+            View::CreationDate(_) | View::ModificationDate | View::Work(_)
+        ) {
+            commands.push(OpenModificationDateView);
+        }
+        if matches!(self.view, View::ModificationDate) {
+            commands.push(OpenCreationDateView);
         }
         if matches!(self.view, View::Work(_)) {
             commands.push(if work_locked { UnlockWork } else { LockWork });
             commands.extend([
-                OpenChronologicalView,
+                OpenCreationDateView,
                 RenameWork,
                 TrashWork,
                 WorkHistory,
@@ -719,7 +739,8 @@ impl App {
             CreateWork => self.prompt("Work name", PromptAction::CreateWork),
             RenameWork => self.prompt("New Work name", PromptAction::RenameWork),
             OpenWork => self.select_works(SelectAction::OpenWork, false),
-            OpenChronologicalView => self.open_chronological_view()?,
+            OpenCreationDateView => self.open_creation_date_view()?,
+            OpenModificationDateView => self.open_modification_date_view()?,
             GoToStartOfView => {
                 if !self.editor.regions().is_empty() {
                     self.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
@@ -866,7 +887,7 @@ impl App {
             PromptAction::Search => self.search(&input)?,
             PromptAction::GoToMonth => {
                 let volume = parse_month(&input).ok_or("month must be YYYY-MM")?;
-                self.switch_view(View::Chronological(volume), None, false)?;
+                self.switch_view(View::CreationDate(volume), None, false)?;
             }
             PromptAction::CreateWork => {
                 let id = self.archive.create_empty_work(input)?;
@@ -1041,7 +1062,7 @@ impl App {
             ConfirmAction::TrashWork(work) => {
                 self.autosave_for_destructive()?;
                 self.archive.trash_work(work)?;
-                self.switch_view(View::Chronological(current_volume()), None, false)?;
+                self.switch_view(View::CreationDate(current_volume()), None, false)?;
             }
         }
         Ok(())
@@ -1193,7 +1214,10 @@ impl App {
         }
         if self.scheduler.sync_due(now)
             && matches!(self.mode, AppMode::Editing)
-            && matches!(self.view, View::Chronological(_) | View::Work(_))
+            && matches!(
+                self.view,
+                View::CreationDate(_) | View::ModificationDate | View::Work(_)
+            )
             && self.conflicts.is_empty()
             && !self.editor.is_dirty()
             && !self.archive.is_dirty()?
@@ -1978,11 +2002,19 @@ impl App {
         } else {
             let id = self.archive.create_document("")?;
             self.provisional = Some(id);
-            self.switch_view(View::Chronological(current_volume()), Some((id, 0)), false)?;
+            self.switch_view(View::CreationDate(current_volume()), Some((id, 0)), false)?;
         }
         Ok(())
     }
-    fn open_chronological_view(&mut self) -> AppResult {
+    fn open_modification_date_view(&mut self) -> AppResult {
+        let target = self
+            .editor
+            .current_document()
+            .map(|document| (document, self.editor.cursor().byte));
+        self.switch_view(View::ModificationDate, target, true)
+    }
+
+    fn open_creation_date_view(&mut self) -> AppResult {
         let (volume, target) = match self.editor.current_document() {
             Some(document) => {
                 let volume = self
@@ -1998,9 +2030,9 @@ impl App {
         if self.archive.chronological_month(volume).is_empty() {
             let document = self.archive.create_document("")?;
             self.provisional = Some(document);
-            self.switch_view(View::Chronological(volume), Some((document, 0)), true)
+            self.switch_view(View::CreationDate(volume), Some((document, 0)), true)
         } else {
-            self.switch_view(View::Chronological(volume), target, true)
+            self.switch_view(View::CreationDate(volume), target, true)
         }
     }
     fn move_work(&mut self, earlier: bool) -> AppResult {
@@ -2114,10 +2146,10 @@ impl App {
     fn reload_after_sync(&mut self, document: Option<DocumentId>, byte: usize) -> AppResult {
         if let View::Work(work) = self.view {
             if self.archive.work(work).is_none() {
-                self.view = View::Chronological(current_volume());
+                self.view = View::CreationDate(current_volume());
             }
-        } else if !matches!(self.view, View::Chronological(_)) {
-            self.view = View::Chronological(current_volume());
+        } else if !matches!(self.view, View::CreationDate(_) | View::ModificationDate) {
+            self.view = View::CreationDate(current_volume());
         }
 
         self.reload_view(None)?;
@@ -2135,13 +2167,13 @@ impl App {
         Ok(())
     }
     fn change_month(&mut self, delta: i32) -> AppResult {
-        let View::Chronological(v) = self.view else {
+        let View::CreationDate(v) = self.view else {
             return Ok(());
         };
         let total = i32::from(v.year()) * 12 + i32::from(v.month()) - 1 + delta;
         let volume = Volume::new((total / 12) as u16, (total % 12 + 1) as u8)
             .ok_or("month is outside supported range")?;
-        self.switch_view(View::Chronological(volume), None, false)
+        self.switch_view(View::CreationDate(volume), None, false)
     }
     fn prompt(&mut self, title: &str, action: PromptAction) {
         self.mode = AppMode::Prompt {
@@ -2373,7 +2405,10 @@ impl App {
     }
     pub fn activate_link_shortcut(&mut self) -> AppResult {
         if !matches!(self.mode, AppMode::Editing)
-            || !matches!(self.view, View::Chronological(_) | View::Work(_))
+            || !matches!(
+                self.view,
+                View::CreationDate(_) | View::ModificationDate | View::Work(_)
+            )
             || self.collapsed
             || self.editor.current_document().is_none()
         {
@@ -2632,7 +2667,7 @@ impl App {
         )?;
         self.conflicts = self.archive.conflicts()?;
         if self.conflicts.is_empty() {
-            self.switch_view(View::Chronological(current_volume()), None, false)?;
+            self.switch_view(View::CreationDate(current_volume()), None, false)?;
         } else {
             self.view = View::Conflicts {
                 selected: selected.min(self.conflicts.len() - 1),
@@ -2737,7 +2772,7 @@ impl App {
     }
     fn reload_after_removal(&mut self) -> AppResult {
         self.archive.refresh()?;
-        self.switch_view(View::Chronological(current_volume()), None, false)
+        self.switch_view(View::CreationDate(current_volume()), None, false)
     }
     fn finish_quit(&mut self) -> AppResult {
         self.autosave()?;
@@ -2757,7 +2792,7 @@ impl App {
         }
     }
     fn open_document(&mut self, id: DocumentId, navigation: bool) -> AppResult {
-        if matches!(self.view, View::Chronological(_) | View::Work(_)) {
+        if matches!(self.view, View::CreationDate(_) | View::Work(_)) {
             if let Some(index) = self.editor.regions().iter().position(|r| r.document == id) {
                 if navigation {
                     self.push_navigation();
@@ -2778,7 +2813,7 @@ impl App {
             .find(|d| d.id() == id)
             .ok_or("missing Document")?
             .volume();
-        self.switch_view(View::Chronological(volume), Some((id, 0)), navigation)
+        self.switch_view(View::CreationDate(volume), Some((id, 0)), navigation)
     }
     fn open_help(&mut self, kind: HelpKind) -> AppResult {
         self.autosave()?;
@@ -2925,7 +2960,10 @@ fn load_editor(
                 }
             })
             .collect(),
-        View::Chronological(v) => load_document_regions(archive, archive.chronological_month(*v))?,
+        View::CreationDate(v) => load_document_regions(archive, archive.chronological_month(*v))?,
+        View::ModificationDate => {
+            load_document_regions(archive, archive.modification_date_order())?
+        }
         View::Work(id) => load_document_regions(
             archive,
             archive
@@ -3115,7 +3153,7 @@ mod tests {
         let mut app = App::open(
             archive,
             Some(&Session {
-                view: SavedView::Chronological {
+                view: SavedView::CreationDate {
                     year: volume.year(),
                     month: volume.month(),
                 },
@@ -3308,7 +3346,7 @@ mod tests {
         let archive = Archive::create(temporary.path().join("archive")).unwrap();
         let stale_document = DocumentId::new_v7();
         let session = Session {
-            view: SavedView::Chronological {
+            view: SavedView::CreationDate {
                 year: current_volume().year(),
                 month: current_volume().month(),
             },
@@ -3353,7 +3391,7 @@ mod tests {
 
         let app = App::open(archive, Some(&session), Instant::now()).unwrap();
 
-        assert_eq!(app.view, View::Chronological(current_volume()));
+        assert_eq!(app.view, View::CreationDate(current_volume()));
         let document = app.editor.current_document().unwrap();
         assert_eq!(
             app.archive
@@ -3686,7 +3724,7 @@ mod tests {
         let mut app = App::open(
             archive,
             Some(&Session {
-                view: SavedView::Chronological {
+                view: SavedView::CreationDate {
                     year: volume.year(),
                     month: volume.month(),
                 },
@@ -3766,7 +3804,7 @@ mod tests {
         let mut app = App::open(
             archive,
             Some(&Session {
-                view: SavedView::Chronological {
+                view: SavedView::CreationDate {
                     year: volume.year(),
                     month: volume.month(),
                 },
@@ -4188,7 +4226,7 @@ mod tests {
         app.switch_view(View::Work(work), Some((document, "document ".len())), false)
             .unwrap();
 
-        app.execute(Command::OpenChronologicalView).unwrap();
+        app.execute(Command::OpenCreationDateView).unwrap();
 
         let volume = app
             .archive
@@ -4196,7 +4234,7 @@ mod tests {
             .find(|info| info.id() == document)
             .unwrap()
             .volume();
-        assert_eq!(app.view, View::Chronological(volume));
+        assert_eq!(app.view, View::CreationDate(volume));
         assert_eq!(app.editor.current_document(), Some(document));
         assert_eq!(app.editor.cursor().byte, "document ".len());
     }
@@ -4214,9 +4252,9 @@ mod tests {
         };
         let mut app = App::open(archive, Some(&session), Instant::now()).unwrap();
 
-        app.execute(Command::OpenChronologicalView).unwrap();
+        app.execute(Command::OpenCreationDateView).unwrap();
 
-        assert_eq!(app.view, View::Chronological(current_volume()));
+        assert_eq!(app.view, View::CreationDate(current_volume()));
         assert_eq!(app.editor.regions().len(), 1);
         assert!(app.editor.insert("writable"));
     }
@@ -4268,12 +4306,12 @@ mod tests {
             .unwrap();
         app.switch_view(View::Work(work), None, false).unwrap();
 
-        app.execute(Command::OpenChronologicalView).unwrap();
+        app.execute(Command::OpenCreationDateView).unwrap();
         app.execute(Command::Back).unwrap();
         assert_eq!(app.view, View::Work(work));
         app.execute(Command::Forward).unwrap();
 
-        assert!(matches!(app.view, View::Chronological(_)));
+        assert!(matches!(app.view, View::CreationDate(_)));
         assert_eq!(app.editor.current_document(), Some(document));
     }
 

@@ -7,7 +7,9 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SavedView {
-    Chronological { year: u16, month: u8 },
+    #[serde(alias = "Chronological")]
+    CreationDate { year: u16, month: u8 },
+    ModificationDate,
     Work { id: WorkId },
     Search { query: String, selected: usize },
 }
@@ -32,7 +34,7 @@ pub struct Session {
 impl Session {
     pub fn new(volume: Volume) -> Self {
         Self {
-            view: SavedView::Chronological {
+            view: SavedView::CreationDate {
                 year: volume.year(),
                 month: volume.month(),
             },
@@ -148,6 +150,19 @@ fn write_json<T: Serialize>(path: &Path, value: &T) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legacy_chronological_session_name_is_accepted() {
+        let json = r#"{"view":{"Chronological":{"year":2026,"month":9}},"position":null}"#;
+        let session: Session = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            session.view,
+            SavedView::CreationDate {
+                year: 2026,
+                month: 9
+            }
+        );
+    }
 
     #[test]
     fn session_round_trips_in_data_root() {
