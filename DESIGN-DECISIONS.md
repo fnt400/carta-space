@@ -304,7 +304,7 @@ A graphical frontend remains a possible future frontend, not a competing core im
 
 **Decision:** A View is a runtime projection over canonical Archive state. Draft 0.1 does not introduce a persistent View object or a `views/` directory.
 
-**Why:** Chronological View and Work View already demonstrate that the same Documents can be presented through different intellectual or temporal organizations without copying them. Generalizing this principle permits future search-result, backlink, history, and semantic-search Views without adding another canonical storage hierarchy.
+**Why:** Creation Date View, Modification Date View, and Work View already demonstrate that the same Documents can be presented through different intellectual or temporal organizations without copying them. Generalizing this principle permits future search-result, backlink, history, and semantic-search Views without adding another canonical storage hierarchy.
 
 **Constraint:** A View must not become the only owner of authored Document content. Persistence of user-defined Views, if later required, needs an explicit format decision rather than an accidental frontend convention.
 
