@@ -53,7 +53,7 @@ sudo apt-get install -y --no-install-recommends \
     build-essential \
     ca-certificates \
     cargo \
-    clippy \
+    rust-clippy \
     git \
     gnupg \
     libwayland-dev \
