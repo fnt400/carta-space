@@ -38,7 +38,7 @@ if box_exists; then
     printf 'Riutilizzo la Distrobox esistente: %s\n' "$BOX_NAME"
 else
     printf 'Creo la Distrobox %s da %s\n' "$BOX_NAME" "$BOX_IMAGE"
-    distrobox create --yes --name "$BOX_NAME" --image "$BOX_IMAGE"
+    distrobox create --yes --no-entry --name "$BOX_NAME" --image "$BOX_IMAGE"
 fi
 
 printf 'Configuro ambiente di sviluppo, locale e fuso orario...\n'
