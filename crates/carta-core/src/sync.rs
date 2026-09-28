@@ -88,9 +88,10 @@ impl Archive {
         }
 
         let result = (|| {
-            let archive = Self::open(&staging)?;
-            archive.set_sync_remote(url)?;
-            drop(archive);
+            {
+                let archive = Self::open(&staging)?;
+                archive.set_sync_remote(url)?;
+            }
 
             fs::rename(&staging, destination).map_err(|error| Error::io(destination, error))?;
             match Self::open(destination) {
@@ -496,6 +497,18 @@ mod tests {
             .unwrap();
         assert!(branch.status.success());
         assert_eq!(String::from_utf8_lossy(&branch.stdout).trim(), "carta");
+    }
+
+    #[test]
+    fn failed_clone_sync_remote_leaves_destination_absent() {
+        let temporary = tempfile::tempdir().unwrap();
+        let remote = bare_remote(temporary.path());
+        let destination = temporary.path().join("imported");
+
+        let error = Archive::clone_sync_remote(remote.to_str().unwrap(), &destination).unwrap_err();
+
+        assert!(matches!(error, Error::GitCloneFailed { .. }));
+        assert!(!destination.exists());
     }
 
     #[test]
