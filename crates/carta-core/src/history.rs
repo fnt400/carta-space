@@ -235,15 +235,13 @@ impl Archive {
                 relative_path(&self.root, &metadata_path)?.into(),
             ],
         )?;
-        let operation = self
-            .edit_document(id, historical.content())
-            .and_then(|()| {
-                require_checkpoint(
-                    &self.root,
-                    CheckpointKind::Structural,
-                    Some("Restored a Document version"),
-                )
-            });
+        let operation = self.edit_document(id, historical.content()).and_then(|()| {
+            require_checkpoint(
+                &self.root,
+                CheckpointKind::Structural,
+                Some("Restored a Document version"),
+            )
+        });
         match operation {
             Ok(created) => {
                 transaction.commit()?;

@@ -8,10 +8,18 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SavedView {
     #[serde(alias = "Chronological")]
-    CreationDate { year: u16, month: u8 },
+    CreationDate {
+        year: u16,
+        month: u8,
+    },
     ModificationDate,
-    Work { id: WorkId },
-    Search { query: String, selected: usize },
+    Work {
+        id: WorkId,
+    },
+    Search {
+        query: String,
+        selected: usize,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

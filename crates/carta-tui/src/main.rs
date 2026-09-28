@@ -1779,9 +1779,9 @@ fn parse_rgb(color: &str) -> Option<(u8, u8, u8)> {
 
 fn lock_status(app: &App) -> String {
     if !matches!(
-                app.view,
-                View::CreationDate(_) | View::ModificationDate | View::Work(_)
-            ) {
+        app.view,
+        View::CreationDate(_) | View::ModificationDate | View::Work(_)
+    ) {
         return String::new();
     }
 

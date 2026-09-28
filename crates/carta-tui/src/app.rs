@@ -549,10 +549,7 @@ impl App {
         ];
         if matches!(
             self.view,
-            View::CreationDate(_)
-                | View::ModificationDate
-                | View::Work(_)
-                | View::Search { .. }
+            View::CreationDate(_) | View::ModificationDate | View::Work(_) | View::Search { .. }
         ) && !self.editor.regions().is_empty()
         {
             commands.extend([
