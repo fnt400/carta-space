@@ -121,6 +121,9 @@ pub enum Error {
         status: std::process::ExitStatus,
     },
 
+    #[error("Git clone failed while importing a Carta Archive with status {status}")]
+    GitCloneFailed { status: std::process::ExitStatus },
+
     #[error("Git failed while attempting to {operation} with status {status}: {stderr}")]
     GitCommandFailed {
         operation: &'static str,

@@ -1,8 +1,9 @@
+use std::fs;
 use std::io::Cursor;
 use std::path::Path;
-use std::process::Output;
+use std::process::{Command, Output, Stdio};
 
-use carta_format::ArchiveMetadata;
+use carta_format::{ArchiveId, ArchiveMetadata};
 
 use crate::{Archive, Error};
 
@@ -37,6 +38,76 @@ impl SyncReport {
 }
 
 impl Archive {
+    pub fn clone_sync_remote(
+        url: &str,
+        destination: impl AsRef<Path>,
+    ) -> Result<Self, Error> {
+        let destination = destination.as_ref();
+        match fs::symlink_metadata(destination) {
+            Ok(_) => return Err(Error::AlreadyExists(destination.to_path_buf())),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(Error::io(destination, error)),
+        }
+
+        let url = url.trim();
+        if url.is_empty() {
+            return Err(Error::InvalidSyncRemote(
+                "remote repository URL is empty".to_owned(),
+            ));
+        }
+
+        let parent = destination
+            .parent()
+            .filter(|path| !path.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        let staging = parent.join(format!(".carta-clone-{}", ArchiveId::new_v7()));
+
+        let status = Command::new("git")
+            .args([
+                "clone",
+                "--branch",
+                "carta",
+                "--single-branch",
+                "--origin",
+                SYNC_REMOTE,
+                "--",
+            ])
+            .arg(url)
+            .arg(&staging)
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .status()
+            .map_err(|source| Error::GitUnavailable {
+                path: destination.to_path_buf(),
+                source,
+            })?;
+        if !status.success() {
+            let _ = fs::remove_dir_all(&staging);
+            return Err(Error::GitCloneFailed { status });
+        }
+
+        let result = (|| {
+            let archive = Self::open(&staging)?;
+            archive.set_sync_remote(url)?;
+            drop(archive);
+
+            fs::rename(&staging, destination).map_err(|error| Error::io(destination, error))?;
+            match Self::open(destination) {
+                Ok(archive) => Ok(archive),
+                Err(error) => {
+                    let _ = fs::rename(destination, &staging);
+                    Err(error)
+                }
+            }
+        })();
+
+        if result.is_err() {
+            let _ = fs::remove_dir_all(&staging);
+        }
+        result
+    }
+
     pub fn sync_remote(&self) -> Result<Option<String>, Error> {
         optional_git_text(
             &self.root,
@@ -392,6 +463,39 @@ mod tests {
         let archive = Archive::open(destination).unwrap();
         archive.set_sync_remote(remote.to_str().unwrap()).unwrap();
         archive
+    }
+
+    #[test]
+    fn clone_sync_remote_uses_carta_branch_even_when_remote_head_is_unborn() {
+        let temporary = tempfile::tempdir().unwrap();
+        let remote = bare_remote(temporary.path());
+
+        let mut source = Archive::create(temporary.path().join("source")).unwrap();
+        let document = source.create_document("remote document").unwrap();
+        source
+            .checkpoint(CheckpointKind::Structural, Some("remote document"))
+            .unwrap();
+        source.set_sync_remote(remote.to_str().unwrap()).unwrap();
+        source.sync().unwrap();
+
+        let imported_path = temporary.path().join("imported");
+        let imported =
+            Archive::clone_sync_remote(remote.to_str().unwrap(), &imported_path).unwrap();
+
+        assert_eq!(
+            imported.read_document(document).unwrap().content(),
+            "remote document"
+        );
+        assert_eq!(imported.sync_remote().unwrap().as_deref(), remote.to_str());
+        assert!(imported_path.join("carta.json").is_file());
+
+        let branch = Command::new("git")
+            .current_dir(&imported_path)
+            .args(["branch", "--show-current"])
+            .output()
+            .unwrap();
+        assert!(branch.status.success());
+        assert_eq!(String::from_utf8_lossy(&branch.stdout).trim(), "carta");
     }
 
     #[test]

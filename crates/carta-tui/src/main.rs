@@ -33,9 +33,10 @@ use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragra
 use ratatui::Terminal;
 use std::backtrace::Backtrace;
 use std::error::Error;
-use std::io::{self, Stdout};
+use std::fs;
+use std::io::{self, Stdout, Write};
 use std::panic::{self, AssertUnwindSafe};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use theme::markdown_theme;
@@ -151,13 +152,21 @@ fn main() {
 fn run() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
     let data = data_root()?;
+    fs::create_dir_all(&data)?;
     migrate_legacy_state(&data)?;
+
+    let explicit_path = args.path.is_some();
     let path = match args.path {
         Some(path) => path,
         None => default_archive_path()?,
     };
     let mut archive = if args.create {
         Archive::create(&path)?
+    } else if !explicit_path && path_is_missing(&path)? {
+        let Some(archive) = initialize_default_archive(&path)? else {
+            return Ok(());
+        };
+        archive
     } else {
         Archive::open(&path)?
     };
@@ -217,6 +226,60 @@ fn run() -> Result<(), Box<dyn Error>> {
     save_session(&data, archive_id, &app.session())?;
     let _ = app.archive.sync();
     Ok(())
+}
+
+fn path_is_missing(path: &Path) -> io::Result<bool> {
+    match fs::symlink_metadata(path) {
+        Ok(_) => Ok(false),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(true),
+        Err(error) => Err(error),
+    }
+}
+
+fn initialize_default_archive(path: &Path) -> Result<Option<Archive>, Box<dyn Error>> {
+    println!("No Carta Space Archive was found at {}.", path.display());
+
+    loop {
+        println!();
+        println!("1) Create an empty Archive");
+        println!("2) Import a Git Archive");
+        println!("q) Quit");
+        print!("Choice: ");
+        io::stdout().flush()?;
+
+        let mut choice = String::new();
+        if io::stdin().read_line(&mut choice)? == 0 {
+            return Ok(None);
+        }
+
+        match choice.trim().to_ascii_lowercase().as_str() {
+            "1" | "c" | "create" => return Ok(Some(Archive::create(path)?)),
+            "2" | "i" | "import" => {
+                print!("Git repository URL: ");
+                io::stdout().flush()?;
+
+                let mut url = String::new();
+                if io::stdin().read_line(&mut url)? == 0 {
+                    return Ok(None);
+                }
+                let url = url.trim();
+                if url.is_empty() {
+                    println!("Repository URL cannot be empty.");
+                    continue;
+                }
+
+                match Archive::clone_sync_remote(url, path) {
+                    Ok(archive) => return Ok(Some(archive)),
+                    Err(error) => {
+                        eprintln!("Import failed: {error}");
+                        eprintln!("The destination was left unchanged.");
+                    }
+                }
+            }
+            "q" | "quit" => return Ok(None),
+            _ => println!("Choose 1, 2, or q."),
+        }
+    }
 }
 
 #[derive(Default)]

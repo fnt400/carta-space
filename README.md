@@ -154,7 +154,9 @@ carta-tui --create /path/to/new-archive
 carta-tui
 ```
 
-Device-local session state is stored alongside the default Archive root under `$XDG_DATA_HOME/carta` (or `~/.local/share/carta`), but outside the `archive/` Git working tree; session files are named `session-<archive-id>.json`. On startup, the TUI migrates legacy session files from `$XDG_STATE_HOME/carta-space` (or `~/.local/state/carta-space`) and discards the obsolete `last-archive.json`. A new Archive or an Archive without session state opens directly into a provisional empty Document in the current month.
+Device-local session state is stored alongside the default Archive root under `$XDG_DATA_HOME/carta` (or `~/.local/share/carta`), but outside the `archive/` Git working tree; session files are named `session-<archive-id>.json`. On startup, the TUI migrates legacy session files from `$XDG_STATE_HOME/carta-space` (or `~/.local/state/carta-space`) and discards the obsolete `last-archive.json`.
+
+If the default Archive does not exist, the TUI offers a minimal first-run choice: create an empty Archive, import an existing Git Archive, or quit. Git import asks for the repository URL and explicitly clones the reserved `carta` branch, so it does not depend on the remote repository's default branch or `HEAD`. The clone is validated in a temporary sibling directory before it replaces the missing default path, and the remote is configured as Carta's synchronization remote. Existing paths are never overwritten by this flow. A new Archive or an Archive without session state opens directly into a provisional empty Document in the current month.
 
 The default surface is an editable, soft-wrapped monthly Chronological View or continuous Work View. Generated separator lines protect Document boundaries. `Esc` opens the contextual command palette. On capable terminals, physical Left Ctrl/Left Alt provide LEAP and Right Ctrl is the Carta command modifier: RightCtrl+Z/R handle undo/redo, RightCtrl+C performs Cat COPY or clipboard paste, RightCtrl+W opens the Work selector, and RightCtrl+L inserts or opens a link at point. Copy, Cut, and Paste otherwise remain terminal-emulator operations.
 

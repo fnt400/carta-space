@@ -35,7 +35,9 @@ A Carta process opens one Archive at a time.
 
 If Carta is launched without an explicit path, the reference TUI opens the deterministic default Archive at `$XDG_DATA_HOME/carta/archive`, falling back to `~/.local/share/carta/archive` when `XDG_DATA_HOME` is unset. An explicit startup path overrides this default; Carta does not choose an Archive from a last-used pointer.
 
-`Create Archive…` asks only for a name/location, initializes the archive and Git history, then opens a new provisional Document. There is no setup wizard.
+If that default Archive path does not yet exist, the reference TUI asks whether to create a new empty Archive or import an existing Carta Archive from a Git repository. Git import asks only for the repository URL, explicitly clones the reserved `carta` branch regardless of the remote repository's default `HEAD`, configures that repository as the device-local Carta synchronization remote, validates the cloned Archive, and only then publishes it at the default path. A failed import MUST NOT leave a partial Archive at the default path. The user may also cancel and exit. An existing path that is not a valid Archive MUST NOT be overwritten by this first-run flow.
+
+`Create Archive…` asks only for a name/location, initializes the archive and Git history, then opens a new provisional Document. The missing-default-Archive choice is a one-time initialization prompt, not a general setup wizard.
 
 ### 1.3 Device-local UI state
 
