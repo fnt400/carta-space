@@ -38,10 +38,7 @@ impl SyncReport {
 }
 
 impl Archive {
-    pub fn clone_sync_remote(
-        url: &str,
-        destination: impl AsRef<Path>,
-    ) -> Result<Self, Error> {
+    pub fn clone_sync_remote(url: &str, destination: impl AsRef<Path>) -> Result<Self, Error> {
         let destination = destination.as_ref();
         match fs::symlink_metadata(destination) {
             Ok(_) => return Err(Error::AlreadyExists(destination.to_path_buf())),
