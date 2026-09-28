@@ -139,6 +139,8 @@ impl ArchiveMetadata {
 pub struct DocumentMetadata {
     id: DocumentId,
     created: Timestamp,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    modified: Option<Timestamp>,
     #[serde(flatten)]
     extensions: JsonExtensions,
 }
@@ -148,6 +150,7 @@ impl DocumentMetadata {
         Self {
             id,
             created,
+            modified: None,
             extensions: JsonExtensions::new(),
         }
     }
@@ -168,6 +171,16 @@ impl DocumentMetadata {
 
     pub fn created(&self) -> Timestamp {
         self.created
+    }
+
+    pub fn modified(&self) -> Timestamp {
+        self.modified.unwrap_or(self.created)
+    }
+
+    pub fn with_modified(&self, modified: Timestamp) -> Self {
+        let mut metadata = self.clone();
+        metadata.modified = Some(modified);
+        metadata
     }
 
     pub fn extensions(&self) -> &JsonExtensions {

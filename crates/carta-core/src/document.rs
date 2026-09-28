@@ -53,6 +53,10 @@ impl DocumentInfo {
         self.metadata.created()
     }
 
+    pub fn modified(&self) -> Timestamp {
+        self.metadata.modified()
+    }
+
     pub fn volume(&self) -> Volume {
         self.volume
     }
@@ -87,6 +91,10 @@ impl Document {
 
     pub fn content(&self) -> &str {
         &self.content
+    }
+
+    pub fn modified(&self) -> Timestamp {
+        self.metadata.modified()
     }
 
     pub fn locked(&self) -> bool {

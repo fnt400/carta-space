@@ -320,13 +320,14 @@ impl Archive {
     pub fn edit_document(&mut self, id: DocumentId, content: &str) -> Result<(), Error> {
         let info = self.documents.get(&id).ok_or(Error::MissingDocument(id))?;
         let path = info.path.join("content.md");
+        let metadata_path = info.path.join("meta.json");
         let content = normalize_line_endings(content).into_bytes();
-        if !info.path.join("meta.json").is_file() {
+        if !metadata_path.is_file() {
             let conflict =
                 self.preserve_document_conflict(id, &content, &info.content_bytes, true)?;
             return Err(Error::ConflictPreserved(conflict));
         }
-        ensure_unchanged(&info.path.join("meta.json"), &info.metadata_bytes)?;
+        ensure_unchanged(&metadata_path, &info.metadata_bytes)?;
         let external = match fs::read(&path) {
             Ok(external) => external,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -344,11 +345,31 @@ impl Archive {
             return Ok(());
         }
         self.ensure_document_unlocked(id)?;
+
+        let metadata = info.metadata.with_modified(Timestamp::now_local());
+        let mut metadata_bytes = Vec::new();
+        metadata
+            .write_to(&mut metadata_bytes)
+            .map_err(|error| Error::format(&metadata_path, error))?;
+
         atomic_replace(&path, &content)?;
-        self.documents
+        if let Err(operation) = atomic_replace(&metadata_path, &metadata_bytes) {
+            return match atomic_replace(&path, &info.content_bytes) {
+                Ok(()) => Err(operation),
+                Err(rollback) => Err(Error::StructuralRollbackFailed {
+                    operation: Box::new(operation),
+                    rollback: Box::new(rollback),
+                }),
+            };
+        }
+
+        let info = self
+            .documents
             .get_mut(&id)
-            .expect("document was checked above")
-            .content_bytes = content;
+            .expect("document was checked above");
+        info.metadata = metadata;
+        info.metadata_bytes = metadata_bytes;
+        info.content_bytes = content;
         Ok(())
     }
 
@@ -952,6 +973,14 @@ impl Archive {
         documents.into_iter().map(DocumentInfo::id).collect()
     }
 
+    pub fn modification_date_order(&self) -> Vec<DocumentId> {
+        let mut documents: Vec<_> = self.documents.values().collect();
+        documents.sort_by_key(|document| {
+            std::cmp::Reverse((document.modified(), document.id()))
+        });
+        documents.into_iter().map(DocumentInfo::id).collect()
+    }
+
     pub fn work_projection(&self, id: WorkId) -> Result<WorkProjection, Error> {
         let work = self.works.get(&id).ok_or(Error::MissingWork(id))?;
         Ok(WorkProjection::new(id, work.documents()))
@@ -1418,6 +1447,36 @@ impl Drop for CleanupDirectory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
+
+    #[test]
+    fn modification_date_order_uses_persisted_modification_time() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let first = DocumentId::new_v7();
+        let second = DocumentId::new_v7();
+        let first_created = Timestamp::from_str("2020-01-01T10:00:00+00:00").unwrap();
+        let second_created = Timestamp::from_str("2020-01-02T10:00:00+00:00").unwrap();
+
+        archive
+            .create_document_with(first, first_created, "first")
+            .unwrap();
+        archive
+            .create_document_with(second, second_created, "second")
+            .unwrap();
+
+        assert_eq!(archive.modification_date_order(), vec![second, first]);
+        assert_eq!(archive.documents.get(&first).unwrap().modified(), first_created);
+
+        archive.edit_document(first, "first edited").unwrap();
+
+        assert_eq!(archive.modification_date_order()[0], first);
+        assert!(archive.documents.get(&first).unwrap().modified() > second_created);
+
+        let reopened = Archive::open(archive.root()).unwrap();
+        assert_eq!(reopened.modification_date_order()[0], first);
+        assert!(reopened.documents.get(&first).unwrap().modified() > second_created);
+    }
 
     #[test]
     fn linked_document_rolls_back_source_if_target_publication_fails() {
