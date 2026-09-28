@@ -226,18 +226,24 @@ impl Archive {
         let info = self.documents.get(&id).ok_or(Error::MissingDocument(id))?;
         self.ensure_document_current(info)?;
         let path = info.path.join("content.md");
+        let metadata_path = info.path.join("meta.json");
         let transaction = crate::transaction::Transaction::begin(
             &self.root,
             "Saved state before Document History restore",
-            [relative_path(&self.root, &path)?.into()],
+            [
+                relative_path(&self.root, &path)?.into(),
+                relative_path(&self.root, &metadata_path)?.into(),
+            ],
         )?;
-        let operation = atomic_replace(&path, historical.content().as_bytes()).and_then(|()| {
-            require_checkpoint(
-                &self.root,
-                CheckpointKind::Structural,
-                Some("Restored a Document version"),
-            )
-        });
+        let operation = self
+            .edit_document(id, historical.content())
+            .and_then(|()| {
+                require_checkpoint(
+                    &self.root,
+                    CheckpointKind::Structural,
+                    Some("Restored a Document version"),
+                )
+            });
         match operation {
             Ok(created) => {
                 transaction.commit()?;
@@ -358,6 +364,7 @@ impl Archive {
         for document in &snapshot.documents {
             if let Some(current) = self.documents.get(&document.metadata().id()) {
                 cleanup.push(relative_path(&self.root, &current.path.join("content.md"))?.into());
+                cleanup.push(relative_path(&self.root, &current.path.join("meta.json"))?.into());
             } else {
                 let volume = crate::Volume::from_timestamp(document.metadata().created())
                     .ok_or(Error::InvalidVolumeDate(document.metadata().created()))?;
@@ -378,10 +385,8 @@ impl Archive {
         let restore = (|| {
             for document in &snapshot.documents {
                 let document_id = document.metadata().id();
-                if let Some(current) = self.documents.get(&document_id) {
-                    self.ensure_document_current(current)?;
-                    let path = current.path.join("content.md");
-                    atomic_replace(&path, document.content().as_bytes())?;
+                if self.documents.contains_key(&document_id) {
+                    self.edit_document(document_id, document.content())?;
                 } else {
                     let volume = crate::Volume::from_timestamp(document.metadata().created())
                         .ok_or(Error::InvalidVolumeDate(document.metadata().created()))?;

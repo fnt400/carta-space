@@ -96,6 +96,7 @@ Later headings are internal document structure, not the Document title.
 - authored content from the cursor onward moves to a new Document;
 - the new Document receives a new UUID;
 - its `created` timestamp is the smallest representable timestamp after the original Document's immutable creation timestamp;
+- its `modified` timestamp records the current split operation time, so Modification Date View treats the newly created second half as newly modified;
 - every Work containing the source inserts the new Document immediately after the source, preserving composition order;
 - the command leaves the cursor at the beginning of the new Document.
 

@@ -220,6 +220,7 @@ impl Archive {
             info_relative(&self.root, &destination)?,
             info_relative(&self.root, &staging)?,
             info_relative(&self.root, &source_info.path.join("content.md"))?,
+            info_relative(&self.root, &source_info.path.join("meta.json"))?,
         ];
         for work in &memberships {
             owned.push(info_relative(
@@ -238,7 +239,7 @@ impl Archive {
             "Saved state before Split Document",
             owned,
         )?;
-        let metadata = DocumentMetadata::new(target, created);
+        let metadata = DocumentMetadata::new(target, created).with_modified(Timestamp::now_local());
         let (before, after) = original.split_at(byte_offset);
         let operation = (|| {
             self.edit_document(source, before)?;
@@ -556,6 +557,7 @@ impl Archive {
                 destination_relative,
                 staging_relative,
                 info_relative(&self.root, &self.documents[&source].path.join("content.md"))?,
+                info_relative(&self.root, &self.documents[&source].path.join("meta.json"))?,
             ],
         )?;
         let metadata = DocumentMetadata::new(target, created);
