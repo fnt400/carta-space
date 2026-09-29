@@ -6,5 +6,5 @@ set -euo pipefail
 
 exec distrobox enter carta-dev -- bash -lc '
   cd "$HOME/software/git/carta-space"
-  exec cargo run --quiet -p carta-tui -- "$@"
+  exec cargo run -p carta-tui -- "$@"
 ' bash "$@"
