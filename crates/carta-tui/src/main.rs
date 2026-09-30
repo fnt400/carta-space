@@ -1557,7 +1557,7 @@ fn initialize_system_locale() {
     // SAFETY: setlocale reads the process environment when passed an empty C string.
     // Carta calls this once during startup, before the input thread is created.
     unsafe {
-        libc::setlocale(libc::LC_TIME, b"\0".as_ptr().cast());
+        libc::setlocale(libc::LC_TIME, c"".as_ptr());
     }
 }
 
@@ -1577,13 +1577,13 @@ fn system_date_time(timestamp: carta_core::Timestamp) -> String {
     tm.tm_isdst = -1;
 
     let mut buffer = [0 as libc::c_char; 128];
-    let format = b"%a %x %H:%M\0";
+    let format = c"%a %x %H:%M";
     // SAFETY: buffer is writable; format is NUL-terminated; tm remains valid.
     let written = unsafe {
         libc::strftime(
             buffer.as_mut_ptr(),
             buffer.len(),
-            format.as_ptr().cast(),
+            format.as_ptr(),
             &tm,
         )
     };
