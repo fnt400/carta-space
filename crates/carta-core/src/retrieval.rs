@@ -390,15 +390,16 @@ fn compile_leap_pattern(query: &str) -> Vec<LeapPatternChar> {
         .chars()
         .map(|character| {
             let (base, marks) = decomposed_pattern_char(character);
+            let uppercase = character.is_uppercase();
             LeapPatternChar {
                 base,
                 marks,
-                folded_base: if character.is_uppercase() {
+                folded_base: if uppercase {
                     String::new()
                 } else {
                     folded_char(base)
                 },
-                uppercase: character.is_uppercase(),
+                uppercase,
             }
         })
         .collect()
@@ -450,7 +451,7 @@ fn cat_leap_char_matches(pattern: &LeapPatternChar, text: char) -> bool {
 
 fn decomposed_pattern_char(character: char) -> (char, String) {
     let mut encoded = [0_u8; 4];
-    let value = character.encode_utf8(&mut encoded);
+    let value: &str = character.encode_utf8(&mut encoded);
     let mut base = None;
     let mut marks = String::new();
     for decomposed in value.nfd() {
@@ -465,8 +466,8 @@ fn decomposed_pattern_char(character: char) -> (char, String) {
 
 fn decomposed_base(character: char) -> char {
     let mut encoded = [0_u8; 4];
-    character
-        .encode_utf8(&mut encoded)
+    let value: &str = character.encode_utf8(&mut encoded);
+    value
         .nfd()
         .find(|decomposed| !is_combining_mark(*decomposed))
         .unwrap_or(character)
@@ -474,24 +475,22 @@ fn decomposed_base(character: char) -> char {
 
 fn marks_match(expected: &str, character: char) -> bool {
     let mut encoded = [0_u8; 4];
-    expected.chars().eq(
-        character
-            .encode_utf8(&mut encoded)
-            .nfd()
-            .filter(|decomposed| is_combining_mark(*decomposed)),
-    )
+    let value: &str = character.encode_utf8(&mut encoded);
+    expected
+        .chars()
+        .eq(value.nfd().filter(|decomposed| is_combining_mark(*decomposed)))
 }
 
 fn folded_char(character: char) -> String {
     let mut encoded = [0_u8; 4];
-    character.encode_utf8(&mut encoded).case_fold().collect()
+    let value: &str = character.encode_utf8(&mut encoded);
+    value.case_fold().collect()
 }
 
 fn folded_char_matches(expected: &str, character: char) -> bool {
     let mut encoded = [0_u8; 4];
-    expected
-        .chars()
-        .eq(character.encode_utf8(&mut encoded).case_fold())
+    let value: &str = character.encode_utf8(&mut encoded);
+    expected.chars().eq(value.case_fold())
 }
 
 #[cfg(test)]
@@ -542,7 +541,8 @@ fn folded_with_boundaries(value: &str) -> (String, Vec<(usize, usize)>) {
     for (start, character) in value.char_indices() {
         let end = start + character.len_utf8();
         let mut encoded = [0_u8; 4];
-        output.extend(character.encode_utf8(&mut encoded).case_fold());
+        let value: &str = character.encode_utf8(&mut encoded);
+        output.extend(value.case_fold());
         if let Some((folded, original)) = boundaries.last_mut() {
             if *folded == output.len() {
                 *original = end;
