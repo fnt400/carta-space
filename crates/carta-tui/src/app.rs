@@ -198,6 +198,8 @@ pub enum Command {
     CreateCheckpoint,
     SyncNow,
     SyncSettings,
+    EnablePortableKeyboardMode,
+    DisablePortableKeyboardMode,
     InsertDateTime,
     LeapForward,
     LeapBackward,
@@ -268,6 +270,8 @@ impl Command {
             Self::CreateCheckpoint => "Create Checkpoint…",
             Self::SyncNow => "Sync Now",
             Self::SyncSettings => "Sync Settings…",
+            Self::EnablePortableKeyboardMode => "Enable Portable Keyboard Mode",
+            Self::DisablePortableKeyboardMode => "Disable Portable Keyboard Mode",
             Self::InsertDateTime => "Insert Current Date and Time",
             Self::LeapForward => "LEAP Forward…",
             Self::LeapBackward => "LEAP Backward…",
@@ -363,6 +367,7 @@ pub struct App {
     pub scheduler: Scheduler,
     pub leap: LeapRuntime,
     pub quit: bool,
+    portable_keyboard_mode: bool,
     remembered_structural_leap: Option<StructuralLeap>,
     last_leap_span: Option<(Cursor, Cursor)>,
     cat_span_fixed: Option<Cursor>,
@@ -469,6 +474,7 @@ impl App {
             scheduler: Scheduler::new(now),
             leap: LeapRuntime::default(),
             quit: false,
+            portable_keyboard_mode: false,
             remembered_structural_leap: None,
             last_leap_span: None,
             cat_span_fixed: None,
@@ -547,6 +553,11 @@ impl App {
             Quit,
             ShowConflicts,
         ];
+        commands.push(if self.portable_keyboard_mode {
+            DisablePortableKeyboardMode
+        } else {
+            EnablePortableKeyboardMode
+        });
         if matches!(
             self.view,
             View::CreationDate(_) | View::ModificationDate | View::Work(_) | View::Search { .. }
@@ -650,6 +661,11 @@ impl App {
             .filter(|c| palette::matches(query, c.label()))
             .collect()
     }
+
+    pub fn portable_keyboard_mode(&self) -> bool {
+        self.portable_keyboard_mode
+    }
+
     pub fn open_palette(&mut self) {
         self.mode = AppMode::Palette {
             query: String::new(),
@@ -827,6 +843,16 @@ impl App {
             CreateCheckpoint => self.prompt("Checkpoint note (optional)", PromptAction::Checkpoint),
             SyncNow => self.sync_now(true)?,
             SyncSettings => self.open_sync_settings()?,
+            EnablePortableKeyboardMode => {
+                self.portable_keyboard_mode = true;
+                self.status =
+                    "Portable keyboard mode enabled: C-b = LEAP backward, C-f = LEAP forward"
+                        .into();
+            }
+            DisablePortableKeyboardMode => {
+                self.portable_keyboard_mode = false;
+                self.status = "Portable keyboard mode disabled".into();
+            }
             InsertDateTime => {
                 let timestamp = Local::now().format("%Y-%m-%d %H:%M").to_string();
                 if self.cat_insert(&timestamp) {
@@ -3137,6 +3163,34 @@ fn sanitize_filename(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn palette_toggles_portable_keyboard_mode() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        archive.create_document("portable").unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+
+        assert!(!app.portable_keyboard_mode());
+        assert!(app
+            .commands()
+            .contains(&Command::EnablePortableKeyboardMode));
+        assert!(!app
+            .commands()
+            .contains(&Command::DisablePortableKeyboardMode));
+
+        app.execute(Command::EnablePortableKeyboardMode).unwrap();
+        assert!(app.portable_keyboard_mode());
+        assert!(app
+            .commands()
+            .contains(&Command::DisablePortableKeyboardMode));
+        assert!(!app
+            .commands()
+            .contains(&Command::EnablePortableKeyboardMode));
+
+        app.execute(Command::DisablePortableKeyboardMode).unwrap();
+        assert!(!app.portable_keyboard_mode());
+    }
 
     #[test]
     fn palette_commands_go_to_start_and_end_of_view() {

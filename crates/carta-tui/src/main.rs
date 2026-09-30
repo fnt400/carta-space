@@ -194,7 +194,9 @@ fn run() -> Result<(), Box<dyn Error>> {
             app.status.push_str(" · ");
         }
         app.status
-            .push_str("Compatibility keyboard mode: use palette LEAP commands");
+            .push_str(
+                "Compatibility keyboard mode: enable Portable Keyboard Mode from the palette",
+            );
     }
     let mut dispatcher = Dispatcher::default();
     let mut last_session_save = Instant::now();
@@ -502,6 +504,29 @@ fn handle_key(
                 }
             }
         }
+        return Ok(());
+    }
+
+    if app.portable_keyboard_mode()
+        && !dispatcher.right_control_held
+        && key.kind == KeyEventKind::Press
+        && key.modifiers.contains(KeyModifiers::CONTROL)
+        && matches!(key.code, KeyCode::Char('b' | 'B' | 'f' | 'F'))
+        && matches!(app.mode, AppMode::Editing)
+        && matches!(
+            app.view,
+            View::CreationDate(_) | View::ModificationDate | View::Work(_) | View::Search { .. }
+        )
+        && !app.editor.regions().is_empty()
+    {
+        dispatcher.pending_leap = None;
+        dispatcher.active_leap = None;
+        let direction = if matches!(key.code, KeyCode::Char('b' | 'B')) {
+            LeapDirection::Backward
+        } else {
+            LeapDirection::Forward
+        };
+        app.start_leap(direction, true);
         return Ok(());
     }
 
@@ -3329,6 +3354,77 @@ mod tests {
             assert!(matches!(app.mode, AppMode::Editing));
             assert_eq!(app.leap.remembered_query(), Some("alpha"));
         }
+    }
+
+    #[test]
+    fn portable_keyboard_mode_maps_control_b_and_f_to_palette_leap() {
+        let (_temporary, mut app) = app_with_documents(&["alpha beta gamma"], false);
+        let mut dispatcher = Dispatcher::default();
+        app.execute(carta_tui::Command::EnablePortableKeyboardMode)
+            .unwrap();
+
+        app.editor.set_cursor(
+            Cursor {
+                region: 0,
+                byte: "alpha beta gamma".len(),
+            },
+            false,
+        );
+        app.cat_navigation();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('b'), KeyModifiers::CONTROL),
+            false,
+        )
+        .unwrap();
+        assert!(matches!(app.mode, AppMode::Leap { palette: true, .. }));
+        for character in "alpha".chars() {
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE),
+                false,
+            )
+            .unwrap();
+        }
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+            false,
+        )
+        .unwrap();
+        assert!(matches!(app.mode, AppMode::Editing));
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 0 });
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
+            false,
+        )
+        .unwrap();
+        assert!(matches!(app.mode, AppMode::Leap { palette: true, .. }));
+        for character in "gamma".chars() {
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE),
+                false,
+            )
+            .unwrap();
+        }
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+            false,
+        )
+        .unwrap();
+        assert!(matches!(app.mode, AppMode::Editing));
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 11 });
     }
 
     #[test]

@@ -297,6 +297,8 @@ If the terminal cannot distinguish the required physical modifier keys and their
 
 `LEAP Forward…` and `LEAP Backward…` provide a transient incremental query using the normal LEAP matching semantics and end on explicit confirmation or cancellation. This compatibility mode does not change normal momentary LEAP semantics on capable terminals.
 
+The reference TUI also exposes `Enable Portable Keyboard Mode` / `Disable Portable Keyboard Mode` in the command palette. Portable Keyboard Mode is off by default and is runtime-local. When enabled, `Ctrl+B` starts the same transient backward LEAP used by the palette and `Ctrl+F` starts the corresponding forward LEAP; the user types the incremental pattern and presses Enter to finish. These bindings are a frontend fallback for terminal chains that cannot preserve physical modifier press/release events and do not alter native physical LEAP semantics.
+
 ### 4.2 Scope
 
 Normal LEAP searches the current View.

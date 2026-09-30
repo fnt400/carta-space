@@ -33,6 +33,9 @@ Left Ctrl + PageUp          LEAP to start of previous Document
 Left Alt + PageDown         LEAP to start of next Document
 Right Ctrl + Left Alt       Leap Again forward
 Right Ctrl + Left Ctrl      Leap Again backward
+Portable Keyboard Mode      Enable/disable from the command palette
+Ctrl+B (portable mode)      Start sticky LEAP backward; Enter confirms
+Ctrl+F (portable mode)      Start sticky LEAP forward; Enter confirms
 
 CAT HIGHLIGHT
 
@@ -184,7 +187,9 @@ Carta uses fetch, Archive-identity validation, fast-forward or a normal three-wa
 
 Left Control and Left Alt are the two LEAP keys. Right Alt/AltGr is reserved for normal international text entry and is never LEAP. Right Control is the Carta command modifier.
 
-When enhanced keyboard reporting is unavailable, Carta remains usable in compatibility mode and exposes LEAP commands through the command palette."#,
+When enhanced keyboard reporting is unavailable, Carta remains usable in compatibility mode and exposes LEAP commands through the command palette.
+
+For terminals that cannot deliver physical modifier press/release events, enable Portable Keyboard Mode from the palette. While it is enabled, Ctrl+B starts a sticky backward LEAP and Ctrl+F starts a sticky forward LEAP; type the pattern and press Enter to finish. Portable Keyboard Mode is off by default and does not replace the native physical LEAP bindings."#,
     },
 ];
 
