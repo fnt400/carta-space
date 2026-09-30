@@ -3331,7 +3331,7 @@ mod tests {
 
         app.execute(Command::GoToEndOfView).unwrap();
         assert_eq!(app.editor.current_document(), Some(second));
-        assert_eq!(app.editor.cursor().byte, "second".len());
+        assert_eq!(app.editor.cursor().byte, "second\n".len());
 
         app.execute(Command::GoToStartOfView).unwrap();
         assert_eq!(app.editor.current_document(), Some(first));
@@ -4643,7 +4643,8 @@ mod tests {
         app.execute(Command::InsertDateTime).unwrap();
 
         let text = app.editor.current_text().unwrap();
-        assert_eq!(text.len(), 16);
+        assert_eq!(text.len(), 17);
+        assert!(text.ends_with('\n'));
         assert_eq!(&text[4..5], "-");
         assert_eq!(&text[7..8], "-");
         assert_eq!(&text[10..11], " ");
