@@ -72,6 +72,10 @@ impl DocumentInfo {
     pub fn locked(&self) -> bool {
         self.metadata.locked()
     }
+
+    pub fn derived_label(&self, content: &str) -> String {
+        crate::content::document_label(content, self.metadata.created())
+    }
 }
 
 #[derive(Debug, Clone)]
