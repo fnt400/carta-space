@@ -64,7 +64,7 @@ fn package_is_ordered_valid_complete_and_checkpoints_current_state() {
     assert_eq!(unpacked_archive.sync_remote().unwrap(), None);
     assert_eq!(
         unpacked_archive.read_document(document).unwrap().content(),
-        "packaged current state"
+        "packaged current state\n"
     );
     assert!(!unpacked_archive.is_dirty().unwrap());
     assert!(unpacked_archive.history().unwrap().len() >= 3);
