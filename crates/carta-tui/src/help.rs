@@ -151,7 +151,7 @@ Structural commands are explicit because they change more than ordinary text. Ex
 
 Generated boundaries cannot be changed by Backspace, Delete, typing, or Cat highlight operations.
 
-Every Document keeps one final LF so that an empty line is always available at its end. Carta restores that LF automatically if an edit would remove it. The final LF is real Document content and therefore participates normally in LEAP searches; Document boundaries themselves still add no synthetic LF."#,
+Every Document keeps at least one final LF so that an empty line is always available at its end. Carta restores a final LF automatically if an edit would remove it. The final LF is real Document content and therefore participates normally in LEAP searches; Document boundaries themselves still add no synthetic LF."#,
     },
     HelpDocument {
         title: "8. Works",
