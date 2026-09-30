@@ -49,7 +49,10 @@ fn document_divergence_preserves_both_variants_and_resolves_explicitly() {
         .resolve_document_conflict(&conflict_id, ConflictChoice::Local, true)
         .unwrap()
         .unwrap();
-    assert_eq!(archive.read_document(document).unwrap().content(), "local\n");
+    assert_eq!(
+        archive.read_document(document).unwrap().content(),
+        "local\n"
+    );
     assert_eq!(
         archive.read_document(preserved).unwrap().content(),
         "external\n"

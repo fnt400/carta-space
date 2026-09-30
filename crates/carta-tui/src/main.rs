@@ -2415,9 +2415,7 @@ mod tests {
 
         let timestamp = carta_core::Timestamp::from_str("2026-09-25T12:00:00+02:00").unwrap();
         let local = timestamp.as_datetime().with_timezone(&Local);
-        assert!(italian_date(timestamp).ends_with(
-            &local.format("%Y %H:%M").to_string()
-        ));
+        assert!(italian_date(timestamp).ends_with(&local.format("%Y %H:%M").to_string()));
 
         let (_temporary, mut app) = app_with_documents(&["first", "second"], false);
         let document = app.editor.regions()[0].document;
@@ -3413,10 +3411,7 @@ mod tests {
         assert!(!emergency_kill_event(&press, &mut right_control_held));
         assert!(right_control_held);
 
-        let kill = Event::Key(KeyEvent::new(
-            KeyCode::Char('g'),
-            KeyModifiers::CONTROL,
-        ));
+        let kill = Event::Key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL));
         assert!(emergency_kill_event(&kill, &mut right_control_held));
 
         let release = Event::Key(KeyEvent::new_with_kind(

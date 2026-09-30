@@ -817,11 +817,7 @@ impl App {
                     .volume();
                 self.archive.remove_document_from_work(work, document)?;
                 self.structural("Removed Document from Work")?;
-                self.switch_view(
-                    View::CreationDate(volume),
-                    Some((document, byte)),
-                    false,
-                )?;
+                self.switch_view(View::CreationDate(volume), Some((document, byte)), false)?;
                 self.work_positions.remove(&work);
             }
             MoveEarlier => self.move_work(true)?,
@@ -1804,7 +1800,7 @@ impl App {
             }
             let previous_highlight = self.editor.cat_highlight();
             if self.editor.move_cat_highlight_to(destination) {
-                    self.editor.ensure_all_trailing_newlines();
+                self.editor.ensure_all_trailing_newlines();
                 self.edited(Instant::now());
                 self.status = "Moved highlighted text".into();
                 self.cat_span_fixed = None;
@@ -3602,7 +3598,10 @@ mod tests {
         app.autosave().unwrap();
 
         let document = app.editor.current_document().unwrap();
-        assert_eq!(app.archive.read_document(document).unwrap().content(), "x\n");
+        assert_eq!(
+            app.archive.read_document(document).unwrap().content(),
+            "x\n"
+        );
         assert!(app.provisional.is_none());
     }
 
@@ -3680,9 +3679,7 @@ mod tests {
         let temporary = tempfile::tempdir().unwrap();
         let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
         let document = archive.create_document("abcdef").unwrap();
-        let work = archive
-            .create_work("Work".into(), vec![document])
-            .unwrap();
+        let work = archive.create_work("Work".into(), vec![document]).unwrap();
         let session = Session {
             view: SavedView::Work { id: work },
             position: Some(Position {
@@ -3701,7 +3698,12 @@ mod tests {
         assert_eq!(app.view, View::CreationDate(volume));
         assert_eq!(app.editor.current_document(), Some(document));
         assert_eq!(app.editor.cursor().byte, 4);
-        assert!(!app.archive.work(work).unwrap().documents().contains(&document));
+        assert!(!app
+            .archive
+            .work(work)
+            .unwrap()
+            .documents()
+            .contains(&document));
     }
 
     #[test]
@@ -4177,7 +4179,10 @@ mod tests {
             app.archive.read_document(second).unwrap().content(),
             "second durable\n"
         );
-        assert_eq!(app.archive.read_document(first).unwrap().content(), "first\n");
+        assert_eq!(
+            app.archive.read_document(first).unwrap().content(),
+            "first\n"
+        );
         assert!(app.editor.is_dirty());
     }
 

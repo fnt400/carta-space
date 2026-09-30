@@ -813,8 +813,7 @@ pub(crate) fn write_restored_document(
         fs::write(&metadata_path, metadata).map_err(|error| Error::io(&metadata_path, error))?;
         let content_path = staging.join("content.md");
         let content = crate::archive::normalize_document_content(document.content());
-        fs::write(&content_path, content)
-            .map_err(|error| Error::io(&content_path, error))?;
+        fs::write(&content_path, content).map_err(|error| Error::io(&content_path, error))?;
         fs::rename(&staging, destination).map_err(|error| Error::io(destination, error))
     })();
     if result.is_err() {

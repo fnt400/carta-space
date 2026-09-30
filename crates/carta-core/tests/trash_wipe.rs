@@ -121,7 +121,10 @@ fn work_trash_restore_requires_document_consent_and_is_atomic() {
     archive.restore_trashed_work(work, true, None).unwrap();
     assert_eq!(archive.work(work).unwrap().title(), "Recoverable");
     assert_eq!(archive.work(work).unwrap().documents(), &[document]);
-    assert_eq!(archive.read_document(document).unwrap().content(), "member\n");
+    assert_eq!(
+        archive.read_document(document).unwrap().content(),
+        "member\n"
+    );
     assert!(!archive.is_dirty().unwrap());
 }
 

@@ -661,7 +661,10 @@ fn recovers_complete_unambiguous_document_staging_and_preserves_resources() {
     fs::rename(&destination, &staging).unwrap();
 
     let recovered = Archive::open(archive.root()).unwrap();
-    assert_eq!(recovered.read_document(document).unwrap().content(), "body\n");
+    assert_eq!(
+        recovered.read_document(document).unwrap().content(),
+        "body\n"
+    );
     assert_eq!(
         fs::read_to_string(destination.join("future-resource")).unwrap(),
         "keep"
@@ -881,7 +884,10 @@ fn historical_work_snapshot_and_restore_are_integral() {
         archive.work(work).unwrap().metadata().extensions()["future"],
         serde_json::json!({"generation": "current"})
     );
-    assert_eq!(archive.read_document(first).unwrap().content(), "first old\n");
+    assert_eq!(
+        archive.read_document(first).unwrap().content(),
+        "first old\n"
+    );
     assert_eq!(
         archive.read_document(second).unwrap().content(),
         "second old\n"
@@ -1161,7 +1167,10 @@ fn reopen_rolls_back_interrupted_new_linked_document() {
     drop(archive);
 
     let recovered = Archive::open(&root).unwrap();
-    assert_eq!(recovered.read_document(source).unwrap().content(), "source\n");
+    assert_eq!(
+        recovered.read_document(source).unwrap().content(),
+        "source\n"
+    );
     assert!(!target_path.exists());
 }
 
@@ -1431,7 +1440,10 @@ fn unchanged_locked_document_does_not_block_other_document_saves() {
     archive.edit_document(writable, "after").unwrap();
 
     assert_eq!(archive.read_document(locked).unwrap().content(), "locked\n");
-    assert_eq!(archive.read_document(writable).unwrap().content(), "after\n");
+    assert_eq!(
+        archive.read_document(writable).unwrap().content(),
+        "after\n"
+    );
     assert!(matches!(
         archive.edit_document(locked, "changed"),
         Err(Error::DocumentLocked(id)) if id == locked
