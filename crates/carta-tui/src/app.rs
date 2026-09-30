@@ -4,8 +4,7 @@ use crate::palette;
 use crate::session::{Position, SavedView, Session};
 use carta_core::{
     Archive, CartaLinkTarget, CheckpointKind, Conflict, ConflictChoice, DocumentId, LeapDirection,
-    LeapPosition, LeapRuntime, LeapSession, SyncOutcome, Volume,
-    WorkId, WorkRestoreOptions,
+    LeapPosition, LeapRuntime, LeapSession, SyncOutcome, Volume, WorkId, WorkRestoreOptions,
 };
 use chrono::{Datelike, Local};
 use std::collections::BTreeMap;

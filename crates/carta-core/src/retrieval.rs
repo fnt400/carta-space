@@ -434,18 +434,17 @@ fn leap_ranges_forward<'a>(
     text: &'a str,
     pattern: &'a [LeapPatternChar],
 ) -> impl Iterator<Item = Range<usize>> + 'a {
-    text.char_indices().filter_map(move |(start, _)| {
-        match_pattern_at(text, start, pattern).map(|end| start..end)
-    })
+    text.char_indices()
+        .filter_map(move |(start, _)| match_pattern_at(text, start, pattern).map(|end| start..end))
 }
 
 fn leap_ranges_backward<'a>(
     text: &'a str,
     pattern: &'a [LeapPatternChar],
 ) -> impl Iterator<Item = Range<usize>> + 'a {
-    text.char_indices().rev().filter_map(move |(start, _)| {
-        match_pattern_at(text, start, pattern).map(|end| start..end)
-    })
+    text.char_indices()
+        .rev()
+        .filter_map(move |(start, _)| match_pattern_at(text, start, pattern).map(|end| start..end))
 }
 
 fn match_pattern_at(text: &str, start: usize, pattern: &[LeapPatternChar]) -> Option<usize> {
@@ -501,9 +500,9 @@ fn decomposed_base(character: char) -> char {
 fn marks_match(expected: &str, character: char) -> bool {
     let mut encoded = [0_u8; 4];
     let value: &str = character.encode_utf8(&mut encoded);
-    expected
-        .chars()
-        .eq(value.nfd().filter(|decomposed| is_combining_mark(*decomposed)))
+    expected.chars().eq(value
+        .nfd()
+        .filter(|decomposed| is_combining_mark(*decomposed)))
 }
 
 fn folded_char(character: char) -> String {

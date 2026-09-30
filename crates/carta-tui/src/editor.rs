@@ -202,11 +202,9 @@ impl CompositeEditor {
             && value != "\n"
             && single_character;
         let continues_typing = coalescible
-            && self
-                .typing_run
-                .is_some_and(|(run_document, next_byte)| {
-                    run_document == document && next_byte == self.cursor.byte
-                });
+            && self.typing_run.is_some_and(|(run_document, next_byte)| {
+                run_document == document && next_byte == self.cursor.byte
+            });
         if !continues_typing {
             self.record();
         }
@@ -759,19 +757,14 @@ impl CompositeEditor {
     fn swap_history(&mut self, undo: bool) -> bool {
         self.typing_run = None;
         let snapshot = {
-            let source = if undo {
-                &mut self.undo
-            } else {
-                &mut self.redo
-            };
+            let source = if undo { &mut self.undo } else { &mut self.redo };
             let Some(snapshot) = source.pop() else {
                 return false;
             };
             snapshot
         };
-        let current = self.snapshot_for_documents(
-            snapshot.documents.iter().map(|state| state.document),
-        );
+        let current =
+            self.snapshot_for_documents(snapshot.documents.iter().map(|state| state.document));
         if undo {
             self.redo.push(current);
         } else {
@@ -813,10 +806,7 @@ impl CompositeEditor {
         self.redo.clear();
     }
 
-    fn snapshot_for_documents(
-        &self,
-        documents: impl IntoIterator<Item = DocumentId>,
-    ) -> Snapshot {
+    fn snapshot_for_documents(&self, documents: impl IntoIterator<Item = DocumentId>) -> Snapshot {
         let mut saved = Vec::new();
         for document in documents {
             if saved
@@ -1191,7 +1181,10 @@ mod tests {
                     text: "target".into(),
                 },
             ],
-            Cursor { region: 0, byte: 10 },
+            Cursor {
+                region: 0,
+                byte: 10,
+            },
         );
         assert!(e.set_cat_highlight(
             Cursor { region: 0, byte: 6 },

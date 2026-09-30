@@ -1401,19 +1401,16 @@ fn date_view_separator(
     if width == 0 {
         return String::new();
     }
-    let date = app
-        .archive
-        .document_info(document)
-        .map_or_else(
-            || "senza data".to_owned(),
-            |info| {
-                italian_date(if modified {
-                    info.modified()
-                } else {
-                    info.created()
-                })
-            },
-        );
+    let date = app.archive.document_info(document).map_or_else(
+        || "senza data".to_owned(),
+        |info| {
+            italian_date(if modified {
+                info.modified()
+            } else {
+                info.created()
+            })
+        },
+    );
     let prefix = if metadata.locked {
         format!("── [LOCKED] {date} ")
     } else {
@@ -4321,7 +4318,9 @@ mod tests {
 
         assert!(status_line(&app).contains("[LOCK DOC]"));
         let metadata = view_document_metadata(&app);
-        assert!(date_view_separator(&app, document, &metadata[&document], 80, false)
-            .contains("[LOCKED]"));
+        assert!(
+            date_view_separator(&app, document, &metadata[&document], 80, false)
+                .contains("[LOCKED]")
+        );
     }
 }
