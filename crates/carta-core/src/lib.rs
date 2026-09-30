@@ -26,7 +26,7 @@ pub use history::{
 pub use package::PackageReport;
 pub use retrieval::{
     Backlink, DocumentTextRegion, LeapDirection, LeapMatch, LeapPosition, LeapRuntime, LeapSession,
-    SearchResult,
+    LeapTextRegion, SearchResult,
 };
 pub use sync::{SyncOutcome, SyncReport};
 pub use trash::{
