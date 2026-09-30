@@ -105,6 +105,21 @@ impl<'a> DocumentTextRegion<'a> {
     }
 }
 
+pub trait LeapTextRegion {
+    fn document(&self) -> DocumentId;
+    fn text(&self) -> &str;
+}
+
+impl LeapTextRegion for DocumentTextRegion<'_> {
+    fn document(&self) -> DocumentId {
+        self.document
+    }
+
+    fn text(&self) -> &str {
+        self.text
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LeapDirection {
     Forward,
@@ -178,11 +193,11 @@ impl LeapSession {
         }
     }
 
-    pub fn with_query(
+    pub fn with_query<R: LeapTextRegion>(
         direction: LeapDirection,
         origin: LeapPosition,
         query: impl Into<String>,
-        regions: &[DocumentTextRegion<'_>],
+        regions: &[R],
     ) -> Self {
         let mut session = Self::new(direction, origin);
         session.query = query.into();
@@ -190,12 +205,12 @@ impl LeapSession {
         session
     }
 
-    pub fn push_str(&mut self, value: &str, regions: &[DocumentTextRegion<'_>]) {
+    pub fn push_str<R: LeapTextRegion>(&mut self, value: &str, regions: &[R]) {
         self.query.push_str(value);
         self.update(regions);
     }
 
-    pub fn backspace(&mut self, regions: &[DocumentTextRegion<'_>]) -> bool {
+    pub fn backspace<R: LeapTextRegion>(&mut self, regions: &[R]) -> bool {
         let Some((index, _)) = self.query.char_indices().next_back() else {
             return false;
         };
@@ -226,7 +241,7 @@ impl LeapSession {
             .map_or(self.origin, LeapMatch::position)
     }
 
-    pub fn repeat(&mut self, regions: &[DocumentTextRegion<'_>]) -> bool {
+    pub fn repeat<R: LeapTextRegion>(&mut self, regions: &[R]) -> bool {
         if self.query.is_empty() {
             return false;
         }
@@ -241,7 +256,7 @@ impl LeapSession {
         true
     }
 
-    fn update(&mut self, regions: &[DocumentTextRegion<'_>]) {
+    fn update<R: LeapTextRegion>(&mut self, regions: &[R]) {
         self.current = if self.query.is_empty() {
             None
         } else {
@@ -267,11 +282,11 @@ impl LeapRuntime {
         self.remembered_query.as_deref()
     }
 
-    pub fn leap_again(
+    pub fn leap_again<R: LeapTextRegion>(
         &self,
         direction: LeapDirection,
         origin: LeapPosition,
-        regions: &[DocumentTextRegion<'_>],
+        regions: &[R],
     ) -> Option<LeapMatch> {
         leap_match(
             regions,
@@ -291,8 +306,8 @@ pub(crate) fn literal_match(text: &str, query: &str) -> Option<Range<usize>> {
     first_folded_match(text, &query)
 }
 
-fn leap_match(
-    regions: &[DocumentTextRegion<'_>],
+fn leap_match<R: LeapTextRegion>(
+    regions: &[R],
     origin: LeapPosition,
     query: &str,
     direction: LeapDirection,
@@ -301,7 +316,7 @@ fn leap_match(
     if query.is_empty() || origin.region >= regions.len() {
         return None;
     }
-    let origin_text = regions[origin.region].text;
+    let origin_text = regions[origin.region].text();
     if origin.byte_offset > origin_text.len() || !origin_text.is_char_boundary(origin.byte_offset) {
         return None;
     }
@@ -319,22 +334,22 @@ fn leap_match(
                 } else {
                     0
                 };
-                if let Some(range) = leap_ranges_forward(region.text, &pattern).find(|range| {
+                if let Some(range) = leap_ranges_forward(region.text(), &pattern).find(|range| {
                     range.start >= minimum
                         && (include_origin
                             || index != origin.region
                             || range.start != origin.byte_offset)
                 }) {
-                    return Some(make_leap_match(*region, index, range, false));
+                    return Some(make_leap_match(region.document(), index, range, false));
                 }
             }
             for (index, region) in regions.iter().enumerate().take(origin.region + 1) {
-                if let Some(range) = leap_ranges_forward(region.text, &pattern).find(|range| {
+                if let Some(range) = leap_ranges_forward(region.text(), &pattern).find(|range| {
                     index < origin.region
                         || range.start < origin.byte_offset
                         || (!include_origin && range.start == origin.byte_offset)
                 }) {
-                    return Some(make_leap_match(*region, index, range, true));
+                    return Some(make_leap_match(region.document(), index, range, true));
                 }
             }
         }
@@ -345,17 +360,27 @@ fn leap_match(
                 } else {
                     regions[index].text.len()
                 };
-                if let Some(range) = leap_ranges_backward(regions[index].text, &pattern)
+                if let Some(range) = leap_ranges_backward(regions[index].text(), &pattern)
                     .find(|range| range.start < maximum)
                 {
-                    return Some(make_leap_match(regions[index], index, range, false));
+                    return Some(make_leap_match(
+                        regions[index].document(),
+                        index,
+                        range,
+                        false,
+                    ));
                 }
             }
             for index in (origin.region..regions.len()).rev() {
-                if let Some(range) = leap_ranges_backward(regions[index].text, &pattern)
+                if let Some(range) = leap_ranges_backward(regions[index].text(), &pattern)
                     .find(|range| index > origin.region || range.start >= origin.byte_offset)
                 {
-                    return Some(make_leap_match(regions[index], index, range, true));
+                    return Some(make_leap_match(
+                        regions[index].document(),
+                        index,
+                        range,
+                        true,
+                    ));
                 }
             }
         }
@@ -364,13 +389,13 @@ fn leap_match(
 }
 
 fn make_leap_match(
-    region: DocumentTextRegion<'_>,
+    document: DocumentId,
     index: usize,
     range: Range<usize>,
     wrapped: bool,
 ) -> LeapMatch {
     LeapMatch {
-        document: region.document,
+        document,
         position: LeapPosition::new(index, range.start),
         range,
         wrapped,
