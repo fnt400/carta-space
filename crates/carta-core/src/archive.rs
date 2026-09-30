@@ -1526,7 +1526,7 @@ mod tests {
                     .join("content.md")
             )
             .unwrap(),
-            "source"
+            "source\n"
         );
         assert!(!archive.root().join(".git/carta-transaction.json").exists());
         Archive::validate(archive.root()).unwrap();
