@@ -111,6 +111,10 @@ impl Archive {
         self.documents.values()
     }
 
+    pub fn document_info(&self, id: DocumentId) -> Option<&DocumentInfo> {
+        self.documents.get(&id)
+    }
+
     pub fn works(&self) -> impl Iterator<Item = &Work> {
         self.works.values()
     }
