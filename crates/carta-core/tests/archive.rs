@@ -200,6 +200,25 @@ fn rejects_noncanonical_external_line_endings() {
 }
 
 #[test]
+fn rejects_document_without_canonical_trailing_lf() {
+    let (_temporary, mut archive) = create_archive();
+    let document = archive.create_document("body").unwrap();
+    let path = archive
+        .documents()
+        .find(|info| info.id() == document)
+        .unwrap()
+        .path()
+        .join("content.md");
+    fs::write(path, b"body").unwrap();
+
+    let errors = Archive::validate(archive.root()).unwrap_err();
+    assert!(errors
+        .issues()
+        .iter()
+        .any(|issue| matches!(issue.kind(), ValidationIssueKind::NonCanonicalLineEndings)));
+}
+
+#[test]
 fn rejects_a_new_work_with_a_missing_document() {
     let (_temporary, mut archive) = create_archive();
     let missing = DocumentId::from_str("01890f3e-70a9-7cc3-98c4-dc0c0c073990").unwrap();
