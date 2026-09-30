@@ -234,7 +234,7 @@ fn imports_utf8_bytes_neutrally_and_exports_exact_markdown() {
         .unwrap();
     assert_eq!(
         archive.export_document_markdown(imported).unwrap(),
-        "# Kept\n[pasted](carta:doc:literal)\nfinal"
+        "# Kept\n[pasted](carta:doc:literal)\nfinal\n"
     );
     assert!(archive.memberships(imported).unwrap().is_empty());
     assert!(matches!(
@@ -248,6 +248,6 @@ fn imports_utf8_bytes_neutrally_and_exports_exact_markdown() {
         .unwrap();
     assert_eq!(
         archive.export_work_markdown(work).unwrap(),
-        "\nSecond body# Kept\n[pasted](carta:doc:literal)\nfinal"
+        "\nSecond body\n# Kept\n[pasted](carta:doc:literal)\nfinal\n"
     );
 }
