@@ -788,6 +788,10 @@ fn handle_key(
                     } else {
                         app.leap_again_active_structural(active.direction);
                     }
+                } else if let Some(pending) = dispatcher.pending_leap.take() {
+                    dispatcher.suppressed_leap_releases =
+                        dispatcher.suppressed_leap_releases.saturating_add(1);
+                    app.leap_again(pending.direction);
                 }
                 return Ok(());
             }
@@ -3281,6 +3285,69 @@ mod tests {
         )
         .unwrap();
         assert_eq!(app.editor.cursor().byte, 4);
+    }
+
+    #[test]
+    fn leap_key_then_right_control_performs_leap_again() {
+        for (key, modifiers, start, expected) in [
+            (
+                ModifierKeyCode::LeftAlt,
+                KeyModifiers::ALT,
+                0,
+                4,
+            ),
+            (
+                ModifierKeyCode::LeftControl,
+                KeyModifiers::CONTROL,
+                8,
+                4,
+            ),
+        ] {
+            let (_temporary, mut app) = app_with_documents(&["one one one"], false);
+            let mut dispatcher = Dispatcher::default();
+
+            app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+            app.start_leap(LeapDirection::Forward, true);
+            app.leap_input("one");
+            app.end_leap();
+
+            app.editor.set_cursor(Cursor { region: 0, byte: start }, false);
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new(KeyCode::Modifier(key), modifiers),
+                true,
+            )
+            .unwrap();
+            assert!(dispatcher.pending_leap.is_some());
+
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new(
+                    KeyCode::Modifier(ModifierKeyCode::RightControl),
+                    KeyModifiers::CONTROL | modifiers,
+                ),
+                true,
+            )
+            .unwrap();
+
+            assert!(dispatcher.pending_leap.is_none());
+            assert_eq!(app.editor.cursor().byte, expected);
+
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new_with_kind(
+                    KeyCode::Modifier(key),
+                    KeyModifiers::CONTROL,
+                    KeyEventKind::Release,
+                ),
+                true,
+            )
+            .unwrap();
+            assert_eq!(app.editor.cursor().byte, expected);
+        }
     }
 
     #[test]
