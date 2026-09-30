@@ -121,10 +121,15 @@ impl Archive {
 
     pub fn read_document(&self, id: DocumentId) -> Result<Document, Error> {
         let info = self.documents.get(&id).ok_or(Error::MissingDocument(id))?;
-        self.ensure_document_current(info)?;
+        ensure_unchanged(&info.path.join("meta.json"), &info.metadata_bytes)?;
         let content_path = info.path.join("content.md");
-        let content =
-            fs::read_to_string(&content_path).map_err(|error| Error::io(&content_path, error))?;
+        let content_bytes = read_unchanged(&content_path, &info.content_bytes)?;
+        let content = String::from_utf8(content_bytes).map_err(|error| {
+            Error::io(
+                &content_path,
+                std::io::Error::new(std::io::ErrorKind::InvalidData, error),
+            )
+        })?;
         Ok(Document::new(info.metadata.clone(), content))
     }
 
@@ -1076,12 +1081,16 @@ fn recover_git_omitted_empty_roots(root: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-fn ensure_unchanged(path: &Path, expected: &[u8]) -> Result<(), Error> {
+fn read_unchanged(path: &Path, expected: &[u8]) -> Result<Vec<u8>, Error> {
     let current = fs::read(path).map_err(|error| Error::io(path, error))?;
     if current != expected {
         return Err(Error::ExternalChange(path.to_path_buf()));
     }
-    Ok(())
+    Ok(current)
+}
+
+fn ensure_unchanged(path: &Path, expected: &[u8]) -> Result<(), Error> {
+    read_unchanged(path, expected).map(|_| ())
 }
 
 fn info_relative(root: &Path, path: &Path) -> Result<PathBuf, Error> {
