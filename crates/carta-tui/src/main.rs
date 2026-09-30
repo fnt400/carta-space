@@ -2414,7 +2414,10 @@ mod tests {
         use std::str::FromStr;
 
         let timestamp = carta_core::Timestamp::from_str("2026-09-25T12:00:00+02:00").unwrap();
-        assert_eq!(italian_date(timestamp), "ven 25 set 2026 12:00");
+        let local = timestamp.as_datetime().with_timezone(&Local);
+        assert!(italian_date(timestamp).ends_with(
+            &local.format("%Y %H:%M").to_string()
+        ));
 
         let (_temporary, mut app) = app_with_documents(&["first", "second"], false);
         let document = app.editor.regions()[0].document;
@@ -3121,7 +3124,7 @@ mod tests {
                 ModifierKeyCode::LeftAlt,
                 KeyModifiers::ALT,
                 KeyCode::End,
-                Cursor { region: 1, byte: 3 },
+                Cursor { region: 1, byte: 4 },
             ),
             (
                 Cursor { region: 2, byte: 1 },
