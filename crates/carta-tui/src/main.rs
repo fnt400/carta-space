@@ -2347,7 +2347,7 @@ mod tests {
         assert!(lines[boundary].text(&app).is_empty());
         assert_eq!(lines[boundary + 1].text(&app), "─".repeat(80));
         assert!(lines[boundary + 2].text(&app).is_empty());
-        assert_eq!(app.editor.regions()[0].text, first);
+        assert_eq!(app.editor.regions()[0].text, format!("{first}\n"));
     }
 
     #[test]
@@ -2521,13 +2521,13 @@ mod tests {
         app.editor.set_cursor(Cursor { region: 0, byte: 2 }, false);
         app.cat_navigation();
         dispatch(&mut app, KeyCode::Backspace, KeyModifiers::NONE);
-        assert_eq!(app.editor.current_text(), Some("acd"));
+        assert_eq!(app.editor.current_text(), Some("acd\n"));
         assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 1 });
 
         app.editor.set_cursor(Cursor { region: 0, byte: 1 }, false);
         app.cat_navigation();
         dispatch(&mut app, KeyCode::Delete, KeyModifiers::NONE);
-        assert_eq!(app.editor.current_text(), Some("ad"));
+        assert_eq!(app.editor.current_text(), Some("ad\n"));
         assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 1 });
     }
 
@@ -2544,7 +2544,7 @@ mod tests {
 
         dispatch(&mut app, KeyCode::Backspace, KeyModifiers::NONE);
 
-        assert_eq!(app.editor.current_text(), Some("alpha "));
+        assert_eq!(app.editor.current_text(), Some("alpha \n"));
         assert!(app.editor.cat_highlight().is_none());
     }
 
@@ -2650,7 +2650,7 @@ mod tests {
     }
 
     #[test]
-    fn leap_enter_crosses_documents_and_wraps_without_synthetic_lf() {
+    fn leap_enter_finds_trailing_newlines_and_wraps_without_synthetic_boundaries() {
         let (_temporary, mut app) = app_with_documents(&["first", "second\nline", "third"], true);
         let original: Vec<_> = app
             .editor
@@ -2679,7 +2679,7 @@ mod tests {
             true,
         )
         .unwrap();
-        assert_eq!(app.editor.cursor(), Cursor { region: 1, byte: 6 });
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 5 });
         let AppMode::Leap { session, .. } = &app.mode else {
             panic!("expected active LEAP")
         };
@@ -2697,7 +2697,7 @@ mod tests {
         )
         .unwrap();
 
-        app.editor.set_cursor(Cursor { region: 2, byte: 5 }, false);
+        app.editor.set_cursor(Cursor { region: 2, byte: 6 }, false);
         app.cat_navigation();
         handle_key(
             &mut app,
@@ -2716,7 +2716,7 @@ mod tests {
             true,
         )
         .unwrap();
-        assert_eq!(app.editor.cursor(), Cursor { region: 1, byte: 6 });
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 5 });
         let AppMode::Leap { session, .. } = &app.mode else {
             panic!("expected active LEAP")
         };
@@ -2760,7 +2760,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 3 });
-        assert_eq!(app.editor.current_text(), Some("one\ntwo\nthree"));
+        assert_eq!(app.editor.current_text(), Some("one\ntwo\nthree\n"));
         assert_eq!(app.editor.selected_text().as_deref(), Some("two"));
 
         handle_key(
@@ -2775,7 +2775,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(app.editor.current_text(), Some("onetwo\n\nthree"));
+        assert_eq!(app.editor.current_text(), Some("onetwo\n\nthree\n"));
         assert_eq!(app.editor.selected_text().as_deref(), Some("two"));
     }
 
@@ -2860,7 +2860,7 @@ mod tests {
     #[test]
     fn enter_leap_highlight_does_not_cross_document_boundary() {
         let (_temporary, mut app) = app_with_documents(&["a", "b\nc"], true);
-        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        app.editor.set_cursor(Cursor { region: 0, byte: 2 }, false);
         app.cat_navigation();
         let mut dispatcher = Dispatcher::default();
 
@@ -3222,7 +3222,7 @@ mod tests {
         let (_temporary, mut app) = app_with_documents(&["a"], false);
         app.editor.set_cursor(Cursor { region: 0, byte: 1 }, false);
         assert!(app.cat_insert("b"));
-        assert_eq!(app.editor.current_text(), Some("ab"));
+        assert_eq!(app.editor.current_text(), Some("ab\n"));
 
         let mut dispatcher = Dispatcher::default();
         handle_key(
@@ -3242,7 +3242,7 @@ mod tests {
             true,
         )
         .unwrap();
-        assert_eq!(app.editor.current_text(), Some("a"));
+        assert_eq!(app.editor.current_text(), Some("a\n"));
 
         handle_key(
             &mut app,
@@ -3251,7 +3251,7 @@ mod tests {
             true,
         )
         .unwrap();
-        assert_eq!(app.editor.current_text(), Some("ab"));
+        assert_eq!(app.editor.current_text(), Some("ab\n"));
     }
 
     #[test]
@@ -3278,11 +3278,11 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(app.editor.current_text(), Some("a****b"));
+        assert_eq!(app.editor.current_text(), Some("a****b\n"));
         assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 3 });
 
         app.execute(carta_tui::Command::Undo).unwrap();
-        assert_eq!(app.editor.current_text(), Some("ab"));
+        assert_eq!(app.editor.current_text(), Some("ab\n"));
     }
 
     #[test]
@@ -3309,7 +3309,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(app.editor.current_text(), Some("a**b"));
+        assert_eq!(app.editor.current_text(), Some("a**b\n"));
         assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 2 });
     }
 
@@ -3484,7 +3484,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(app.editor.regions()[0].text, "alpha betabeta");
+        assert_eq!(app.editor.regions()[0].text, "alpha betabeta\n");
         assert_eq!(app.editor.selected_text().as_deref(), Some("beta"));
     }
 
@@ -3516,7 +3516,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(app.editor.regions()[0].text, "outside\ntextalpha beta");
+        assert_eq!(app.editor.regions()[0].text, "outside\ntextalpha beta\n");
         assert!(app.editor.cat_highlight().is_none());
     }
 
@@ -3536,8 +3536,8 @@ mod tests {
         app.leap_input("target");
         app.end_leap();
 
-        assert_eq!(app.editor.regions()[0].text, "alpha ");
-        assert_eq!(app.editor.regions()[1].text, "betatarget");
+        assert_eq!(app.editor.regions()[0].text, "alpha \n");
+        assert_eq!(app.editor.regions()[1].text, "betatarget\n");
         assert_eq!(app.editor.selected_text().as_deref(), Some("beta"));
     }
 
@@ -3548,7 +3548,7 @@ mod tests {
         dispatch(&mut app, KeyCode::Home, KeyModifiers::CONTROL);
         assert_eq!(app.editor.cursor(), Cursor { region: 1, byte: 0 });
         dispatch(&mut app, KeyCode::End, KeyModifiers::CONTROL);
-        assert_eq!(app.editor.cursor(), Cursor { region: 1, byte: 6 });
+        assert_eq!(app.editor.cursor(), Cursor { region: 1, byte: 7 });
     }
 
     #[test]
@@ -4092,7 +4092,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(app.editor.regions()[0].text, "palpha beta");
+        assert_eq!(app.editor.regions()[0].text, "palpha beta\n");
         assert!(matches!(app.mode, AppMode::Editing));
     }
 
@@ -4327,11 +4327,11 @@ mod tests {
             true,
         )
         .unwrap();
-        assert_eq!(app.editor.current_text(), Some("@"));
+        assert_eq!(app.editor.current_text(), Some("@\n"));
     }
 
     #[test]
-    fn leap_enter_without_lf_rebounds_and_release_is_inert() {
+    fn leap_enter_without_double_lf_rebounds_and_release_is_inert() {
         let (_temporary, mut app) = app_with_documents(&["abcdefghij"], false);
         app.editor.set_cursor(Cursor { region: 0, byte: 7 }, false);
         let original = app.editor.current_text().unwrap().to_owned();
@@ -4354,11 +4354,18 @@ mod tests {
             true,
         )
         .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
 
         let AppMode::Leap { session, .. } = &app.mode else {
             panic!("expected active LEAP")
         };
-        assert_eq!(session.query(), "\n");
+        assert_eq!(session.query(), "\n\n");
         assert!(session.current_match().is_none());
         assert_eq!(app.editor.cursor().byte, 7);
         assert_eq!(app.editor.current_text(), Some(original.as_str()));
@@ -4386,7 +4393,7 @@ mod tests {
         dispatch(&mut app, KeyCode::Char('A'), KeyModifiers::NONE);
         dispatch(&mut app, KeyCode::Char('!'), KeyModifiers::NONE);
         dispatch(&mut app, KeyCode::Char('É'), KeyModifiers::NONE);
-        assert_eq!(app.editor.regions()[0].text, "A!É");
+        assert_eq!(app.editor.regions()[0].text, "A!É\n");
     }
 
     #[test]
