@@ -1512,7 +1512,7 @@ fn date_view_separator(
         return String::new();
     }
     let date = app.archive.document_info(document).map_or_else(
-        || "senza data".to_owned(),
+        || "—".to_owned(),
         |info| {
             system_date_time(if modified {
                 info.modified()
