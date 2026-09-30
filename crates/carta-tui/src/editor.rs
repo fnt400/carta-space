@@ -270,7 +270,8 @@ impl CompositeEditor {
         let Some((start, end)) = self.cat_highlight else {
             return false;
         };
-        self.record();
+        let document = self.regions[start.region].document;
+        self.record_documents([document]);
         self.regions[start.region]
             .text
             .replace_range(start.byte..end.byte, value);
@@ -281,7 +282,7 @@ impl CompositeEditor {
         self.anchor = None;
         self.cat_highlight = None;
         self.preferred_column = None;
-        self.mark_current_dirty();
+        self.mark_document_dirty(document);
         true
     }
 
@@ -289,13 +290,14 @@ impl CompositeEditor {
         let Some((start, end)) = self.cat_highlight else {
             return false;
         };
-        self.record();
+        let document = self.regions[start.region].document;
+        self.record_documents([document]);
         self.regions[start.region].text.drain(start.byte..end.byte);
         self.cursor = start;
         self.anchor = None;
         self.cat_highlight = None;
         self.preferred_column = None;
-        self.mark_current_dirty();
+        self.mark_document_dirty(document);
         true
     }
 
@@ -307,7 +309,8 @@ impl CompositeEditor {
         if copy.is_empty() {
             return false;
         }
-        self.record();
+        let document = self.regions[start.region].document;
+        self.record_documents([document]);
         self.regions[start.region].text.insert_str(end.byte, &copy);
         let copy_start = Cursor {
             region: start.region,
@@ -321,7 +324,7 @@ impl CompositeEditor {
         self.anchor = None;
         self.cat_highlight = Some((copy_start, copy_end));
         self.preferred_column = None;
-        self.mark_current_dirty();
+        self.mark_document_dirty(document);
         true
     }
 
