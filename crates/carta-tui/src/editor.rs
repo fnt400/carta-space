@@ -1,5 +1,6 @@
 use carta_core::DocumentId;
 use std::cmp::Ordering;
+use std::collections::BTreeSet;
 use unicode_width::UnicodeWidthChar;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -15,8 +16,14 @@ pub struct Cursor {
 }
 
 #[derive(Debug, Clone)]
+struct DocumentSnapshot {
+    document: DocumentId,
+    text: String,
+}
+
+#[derive(Debug, Clone)]
 struct Snapshot {
-    regions: Vec<Region>,
+    documents: Vec<DocumentSnapshot>,
     cursor: Cursor,
     cat_highlight: Option<(Cursor, Cursor)>,
 }
@@ -30,7 +37,7 @@ pub struct CompositeEditor {
     preferred_column: Option<usize>,
     undo: Vec<Snapshot>,
     redo: Vec<Snapshot>,
-    dirty: bool,
+    dirty_documents: BTreeSet<DocumentId>,
 }
 
 impl CompositeEditor {
@@ -43,7 +50,7 @@ impl CompositeEditor {
             preferred_column: None,
             undo: Vec::new(),
             redo: Vec::new(),
-            dirty: false,
+            dirty_documents: BTreeSet::new(),
         };
         editor.clamp_cursor();
         editor
@@ -59,25 +66,29 @@ impl CompositeEditor {
         self.anchor
     }
     pub fn is_dirty(&self) -> bool {
-        self.dirty
+        !self.dirty_documents.is_empty()
+    }
+    pub fn dirty_documents(&self) -> impl Iterator<Item = DocumentId> + '_ {
+        self.dirty_documents.iter().copied()
     }
     pub fn mark_saved(&mut self) {
-        self.dirty = false;
+        self.dirty_documents.clear();
     }
     pub fn scrub_document(&mut self, document: DocumentId) {
         self.regions.retain(|region| region.document != document);
         self.undo.retain(|snapshot| {
             !snapshot
-                .regions
+                .documents
                 .iter()
-                .any(|region| region.document == document)
+                .any(|state| state.document == document)
         });
         self.redo.retain(|snapshot| {
             !snapshot
-                .regions
+                .documents
                 .iter()
-                .any(|region| region.document == document)
+                .any(|state| state.document == document)
         });
+        self.dirty_documents.remove(&document);
         self.anchor = None;
         self.cat_highlight = None;
         self.cursor = Cursor { region: 0, byte: 0 };
@@ -270,7 +281,7 @@ impl CompositeEditor {
         self.anchor = None;
         self.cat_highlight = None;
         self.preferred_column = None;
-        self.dirty = true;
+        self.mark_current_dirty();
         true
     }
 
@@ -284,7 +295,7 @@ impl CompositeEditor {
         self.anchor = None;
         self.cat_highlight = None;
         self.preferred_column = None;
-        self.dirty = true;
+        self.mark_current_dirty();
         true
     }
 
@@ -310,7 +321,7 @@ impl CompositeEditor {
         self.anchor = None;
         self.cat_highlight = Some((copy_start, copy_end));
         self.preferred_column = None;
-        self.dirty = true;
+        self.mark_current_dirty();
         true
     }
 
@@ -339,7 +350,9 @@ impl CompositeEditor {
         if moved.is_empty() {
             return false;
         }
-        self.record();
+        let source_document = self.regions[start.region].document;
+        let target_document = self.regions[destination.region].document;
+        self.record_documents([source_document, target_document]);
         self.regions[start.region].text.drain(start.byte..end.byte);
         let removed_len = end.byte - start.byte;
         let insertion_byte = if destination.region == start.region && destination.byte > end.byte {
@@ -362,7 +375,8 @@ impl CompositeEditor {
         self.anchor = None;
         self.cat_highlight = Some((moved_start, moved_end));
         self.preferred_column = None;
-        self.dirty = true;
+        self.mark_document_dirty(source_document);
+        self.mark_document_dirty(target_document);
         true
     }
 
@@ -701,44 +715,105 @@ impl CompositeEditor {
     }
 
     fn swap_history(&mut self, undo: bool) -> bool {
-        let source = if undo { &mut self.undo } else { &mut self.redo };
-        let Some(snapshot) = source.pop() else {
-            return false;
+        let snapshot = {
+            let source = if undo {
+                &mut self.undo
+            } else {
+                &mut self.redo
+            };
+            let Some(snapshot) = source.pop() else {
+                return false;
+            };
+            snapshot
         };
-        let current = Snapshot {
-            regions: self.regions.clone(),
-            cursor: self.cursor,
-            cat_highlight: self.cat_highlight,
-        };
+        let current = self.snapshot_for_documents(
+            snapshot.documents.iter().map(|state| state.document),
+        );
         if undo {
             self.redo.push(current);
         } else {
             self.undo.push(current);
         }
-        self.regions = snapshot.regions;
+        for state in snapshot.documents {
+            if let Some(region) = self
+                .regions
+                .iter_mut()
+                .find(|region| region.document == state.document)
+            {
+                region.text = state.text;
+                self.dirty_documents.insert(state.document);
+            }
+        }
         self.cursor = snapshot.cursor;
         self.anchor = None;
         self.cat_highlight = snapshot.cat_highlight;
-        self.dirty = true;
+        self.preferred_column = None;
         true
     }
 
     fn record(&mut self) {
-        self.undo.push(Snapshot {
-            regions: self.regions.clone(),
-            cursor: self.cursor,
-            cat_highlight: self.cat_highlight,
-        });
+        if let Some(document) = self.current_document() {
+            self.record_documents([document]);
+        }
+    }
+
+    fn record_documents<const N: usize>(&mut self, documents: [DocumentId; N]) {
+        let snapshot = self.snapshot_for_documents(documents);
+        if snapshot.documents.is_empty() {
+            return;
+        }
+        self.undo.push(snapshot);
         if self.undo.len() > 200 {
             self.undo.remove(0);
         }
         self.redo.clear();
     }
+
+    fn snapshot_for_documents(
+        &self,
+        documents: impl IntoIterator<Item = DocumentId>,
+    ) -> Snapshot {
+        let mut saved = Vec::new();
+        for document in documents {
+            if saved
+                .iter()
+                .any(|state: &DocumentSnapshot| state.document == document)
+            {
+                continue;
+            }
+            if let Some(region) = self
+                .regions
+                .iter()
+                .find(|region| region.document == document)
+            {
+                saved.push(DocumentSnapshot {
+                    document,
+                    text: region.text.clone(),
+                });
+            }
+        }
+        Snapshot {
+            documents: saved,
+            cursor: self.cursor,
+            cat_highlight: self.cat_highlight,
+        }
+    }
+
+    fn mark_document_dirty(&mut self, document: DocumentId) {
+        self.dirty_documents.insert(document);
+    }
+
+    fn mark_current_dirty(&mut self) {
+        if let Some(document) = self.current_document() {
+            self.mark_document_dirty(document);
+        }
+    }
+
     fn changed(&mut self) {
         self.anchor = None;
         self.cat_highlight = None;
         self.preferred_column = None;
-        self.dirty = true;
+        self.mark_current_dirty();
     }
     fn conventional_selection(&self) -> Option<(Cursor, Cursor)> {
         let anchor = self.anchor?;
@@ -992,6 +1067,71 @@ mod tests {
         let mut e = editor();
         assert!(!e.set_cat_highlight(Cursor { region: 0, byte: 0 }, Cursor { region: 1, byte: 0 },));
         assert!(e.cat_highlight().is_none());
+    }
+
+    #[test]
+    fn undo_snapshots_only_the_documents_touched_by_an_edit() {
+        let first = id();
+        let second = id();
+        let untouched = "x".repeat(100_000);
+        let mut e = CompositeEditor::new(
+            vec![
+                Region {
+                    document: first,
+                    text: "alpha".into(),
+                },
+                Region {
+                    document: second,
+                    text: untouched.clone(),
+                },
+            ],
+            Cursor { region: 0, byte: 5 },
+        );
+
+        assert!(e.insert("!"));
+
+        assert_eq!(e.undo.len(), 1);
+        assert_eq!(e.undo[0].documents.len(), 1);
+        assert_eq!(e.undo[0].documents[0].document, first);
+        assert_eq!(e.undo[0].documents[0].text, "alpha");
+        assert_eq!(e.regions()[1].text, untouched);
+        assert_eq!(e.dirty_documents().collect::<Vec<_>>(), vec![first]);
+    }
+
+    #[test]
+    fn moving_cat_highlight_snapshots_and_marks_both_documents() {
+        let first = id();
+        let second = id();
+        let mut e = CompositeEditor::new(
+            vec![
+                Region {
+                    document: first,
+                    text: "alpha beta".into(),
+                },
+                Region {
+                    document: second,
+                    text: "target".into(),
+                },
+            ],
+            Cursor { region: 0, byte: 10 },
+        );
+        assert!(e.set_cat_highlight(
+            Cursor { region: 0, byte: 6 },
+            Cursor {
+                region: 0,
+                byte: 10,
+            },
+        ));
+
+        assert!(e.move_cat_highlight_to(Cursor { region: 1, byte: 0 }));
+
+        assert_eq!(e.undo.len(), 1);
+        assert_eq!(e.undo[0].documents.len(), 2);
+        assert!(e.dirty_documents.contains(&first));
+        assert!(e.dirty_documents.contains(&second));
+        assert!(e.undo());
+        assert_eq!(e.regions()[0].text, "alpha beta");
+        assert_eq!(e.regions()[1].text, "target");
     }
 
     #[test]
