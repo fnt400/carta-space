@@ -781,7 +781,10 @@ fn handle_key(
 
     match &mut app.mode {
         AppMode::Leap { .. } => match key.code {
-            KeyCode::Char(c) => app.leap_input(&c.to_string()),
+            KeyCode::Char(c) => {
+                let mut encoded = [0_u8; 4];
+                app.leap_input(c.encode_utf8(&mut encoded));
+            }
             KeyCode::Backspace => app.leap_backspace(),
             KeyCode::Enter => {
                 if matches!(app.mode, AppMode::Leap { palette: true, .. }) {
@@ -921,7 +924,8 @@ fn handle_normal(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
     let page = usize::from(height.saturating_sub(2).max(1));
     let changed = match key.code {
         KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-            app.cat_insert(&c.to_string())
+            let mut encoded = [0_u8; 4];
+            app.cat_insert(c.encode_utf8(&mut encoded))
         }
         KeyCode::Enter => app.cat_insert_newline(),
         KeyCode::Tab if shift => app.cat_indent_less(),
