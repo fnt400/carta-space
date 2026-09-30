@@ -87,6 +87,21 @@ impl CompositeEditor {
         self.dirty_documents.clear();
         self.typing_run = None;
     }
+    pub fn ensure_current_trailing_newline(&mut self) {
+        if let Some(region) = self.regions.get_mut(self.cursor.region) {
+            if !region.text.ends_with('\n') {
+                region.text.push('\n');
+            }
+        }
+    }
+
+    pub fn ensure_all_trailing_newlines(&mut self) {
+        for region in &mut self.regions {
+            if !region.text.ends_with('\n') {
+                region.text.push('\n');
+            }
+        }
+    }
     pub fn scrub_document(&mut self, document: DocumentId) {
         self.regions.retain(|region| region.document != document);
         self.undo.retain(|snapshot| {
