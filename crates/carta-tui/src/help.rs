@@ -21,6 +21,8 @@ Right Ctrl                  Carta command modifier
 Right Ctrl + Z              Undo
 Right Ctrl + R              Redo
 Right Ctrl + C              Cat COPY when highlighted; otherwise paste system clipboard
+Right Ctrl + N              New Document
+Right Ctrl + G              Emergency kill switch (no final save/checkpoint/sync)
 Right Ctrl + B              Insert Markdown bold markers (**|**)
 Right Ctrl + I              Insert Markdown italic markers (*|*)
 Right Ctrl + W              Open Work
@@ -74,6 +76,7 @@ Export Document or Work
 Sync Now / Sync Settings
 Cheatsheet / Manual
 
+Esc leaves Cheatsheet/Manual and returns to the previous View.
 Right Alt / AltGr is never a LEAP key."#,
 }];
 
@@ -140,7 +143,9 @@ Creating a Cat highlight also copies its text to the system clipboard. Clipboard
         title: "7. Undo, redo and structural commands",
         body: r#"RightCtrl+Z performs Undo and RightCtrl+R performs Redo. Undo/Redo operate on the current in-memory editing history. Consecutive character typing is grouped into a single undo step until navigation, another edit type, or autosave closes that typing run.
 
-RightCtrl+W opens the Work selector. RightCtrl+L inserts a link at point, or opens the existing link when point is already inside one.
+RightCtrl+W opens the Work selector. RightCtrl+L inserts a link at point, or opens the existing link when point is already inside one. RightCtrl+N creates a new Document.
+
+RightCtrl+G is an emergency kill switch. It requests immediate application exit without the normal final autosave, checkpoint, session save, or sync. It is intended only for recovery when Carta is still processing keyboard events but normal shutdown is unsafe or stuck; no in-process keybinding can interrupt a thread that has stopped servicing terminal events.
 
 Structural commands are explicit because they change more than ordinary text. Examples include New Document, Split Document at Point, Work membership changes, Work reordering, Trash, restore operations, and Wipe.
 
