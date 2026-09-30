@@ -1311,7 +1311,8 @@ fn remove_abandoned_linked_staging(path: &Path) -> Result<(), Error> {
                 Some("content.md" | "meta.json")
             )
         })
-        || !fs::read(path.join("content.md")).is_ok_and(|content| content.is_empty())
+        || !fs::read(path.join("content.md"))
+            .is_ok_and(|content| content.iter().all(|byte| byte.is_ascii_whitespace()))
     {
         return Ok(());
     }
