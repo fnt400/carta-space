@@ -3841,7 +3841,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             app.editor.current_text().unwrap(),
-            format!("[A \\[label\\] \\\\ ok](carta:doc:{target})")
+            format!("[A \\[label\\] \\\\ ok](carta:doc:{target})\n")
         );
 
         let length = app.editor.current_text().unwrap().len();
