@@ -3290,18 +3290,8 @@ mod tests {
     #[test]
     fn leap_key_then_right_control_performs_leap_again() {
         for (key, modifiers, start, expected) in [
-            (
-                ModifierKeyCode::LeftAlt,
-                KeyModifiers::ALT,
-                0,
-                4,
-            ),
-            (
-                ModifierKeyCode::LeftControl,
-                KeyModifiers::CONTROL,
-                8,
-                4,
-            ),
+            (ModifierKeyCode::LeftAlt, KeyModifiers::ALT, 0, 4),
+            (ModifierKeyCode::LeftControl, KeyModifiers::CONTROL, 8, 4),
         ] {
             let (_temporary, mut app) = app_with_documents(&["one one one"], false);
             let mut dispatcher = Dispatcher::default();
@@ -3311,7 +3301,13 @@ mod tests {
             app.leap_input("one");
             app.end_leap();
 
-            app.editor.set_cursor(Cursor { region: 0, byte: start }, false);
+            app.editor.set_cursor(
+                Cursor {
+                    region: 0,
+                    byte: start,
+                },
+                false,
+            );
             handle_key(
                 &mut app,
                 &mut dispatcher,
