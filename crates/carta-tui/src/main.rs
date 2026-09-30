@@ -4182,7 +4182,7 @@ mod tests {
         app.trash = Some(app.archive.trash_inventory().unwrap());
         app.view = View::Trash { selected: 0 };
 
-        assert_eq!(lock_status(&app), "");
+        assert_eq!(status_flags(&app), "");
         assert!(!status_line(&app).contains("[LOCK"));
     }
 
