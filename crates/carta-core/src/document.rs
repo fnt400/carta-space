@@ -93,6 +93,10 @@ impl Document {
         &self.content
     }
 
+    pub fn into_content(self) -> String {
+        self.content
+    }
+
     pub fn modified(&self) -> Timestamp {
         self.metadata.modified()
     }
