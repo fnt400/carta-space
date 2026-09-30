@@ -41,7 +41,7 @@ else
     distrobox create --yes --no-entry --name "$BOX_NAME" --image "$BOX_IMAGE"
 fi
 
-printf 'Configuro ambiente di sviluppo, locale e fuso orario...\n'
+printf 'Configuro ambiente di sviluppo e locale...\n'
 
 distrobox enter "$BOX_NAME" -- bash -s <<'EOF'
 set -euo pipefail
@@ -72,11 +72,6 @@ if ! dpkg --compare-versions "$rust_version" ge 1.85; then
     exit 1
 fi
 
-# Fuso orario.
-sudo ln -snf /usr/share/zoneinfo/Europe/Rome /etc/localtime
-printf '%s\n' 'Europe/Rome' | sudo tee /etc/timezone >/dev/null
-sudo dpkg-reconfigure -f noninteractive tzdata >/dev/null
-
 # Locale italiano UTF-8.
 if grep -Eq '^#[[:space:]]*it_IT\.UTF-8[[:space:]]+UTF-8' /etc/locale.gen; then
     sudo sed -i 's/^#[[:space:]]*it_IT\.UTF-8[[:space:]]\+UTF-8/it_IT.UTF-8 UTF-8/' /etc/locale.gen
@@ -90,8 +85,7 @@ printf '\nAmbiente Carta pronto.\n'
 printf 'Rust:   %s\n' "$(rustc --version)"
 printf 'Cargo:  %s\n' "$(cargo --version)"
 printf 'Locale: %s\n' "$(LANG=it_IT.UTF-8 locale charmap)"
-printf 'Zona:   %s\n' "$(cat /etc/timezone)"
-printf 'Ora:    %s\n' "$(TZ=Europe/Rome date '+%Y-%m-%d %H:%M:%S %Z')"
+printf 'Ora container: %s\n' "$(date '+%Y-%m-%d %H:%M:%S %Z %z')"
 EOF
 
 cat <<EOF
