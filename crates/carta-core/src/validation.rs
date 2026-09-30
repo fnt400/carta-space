@@ -347,7 +347,9 @@ impl Scanner {
         match fs::read(path) {
             Ok(bytes) => {
                 match std::str::from_utf8(&bytes) {
-                    Ok(content) if content.contains('\r') => {
+                    Ok(content)
+                        if content.contains('\r') || !content.ends_with('\n') =>
+                    {
                         self.issue(path, ValidationIssueKind::NonCanonicalLineEndings);
                     }
                     Ok(_) => {}
