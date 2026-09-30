@@ -186,6 +186,7 @@ impl Archive {
                 message: "selected Document variant has non-canonical line endings".into(),
             });
         }
+        let selected = crate::archive::normalize_document_content(selected);
         let other = if preserve_other {
             Some(
                 std::str::from_utf8(other).map_err(|error| Error::MalformedConflict {
