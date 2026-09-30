@@ -184,14 +184,29 @@ fn run() -> Result<(), Box<dyn Error>> {
             Err(error) => Some(format!("Sync unavailable: {error}")),
         }
     };
-    let session = load_session(&data, archive.metadata().archive_id())?;
+    let (session, session_fallback_status) =
+        match load_session(&data, archive.metadata().archive_id()) {
+            Ok(session) => (session, None),
+            Err(error) => (
+                None,
+                Some(format!(
+                    "Session state ignored; using Creation Date View: {error}"
+                )),
+            ),
+        };
     let archive_id = archive.metadata().archive_id();
     let host_name = current_host_name();
     let host_settings = load_host_settings(&data, &host_name)?;
     let mut app = App::open(archive, session.as_ref(), Instant::now())?;
     app.set_portable_keyboard_mode(host_settings.portable_keyboard_mode);
-    if let Some(status) = startup_sync_status {
-        app.status = status;
+    for status in [startup_sync_status, session_fallback_status]
+        .into_iter()
+        .flatten()
+    {
+        if !app.status.is_empty() {
+            app.status.push_str(" · ");
+        }
+        app.status.push_str(&status);
     }
     let mut terminal = TerminalGuard::enter()?;
     if !terminal.enhancements {
@@ -259,6 +274,10 @@ fn run() -> Result<(), Box<dyn Error>> {
             last_session_save = Instant::now();
         }
     }
+    if app.kill_switch_triggered() {
+        return Ok(());
+    }
+
     let final_session = app.session();
     if last_saved_session.as_ref() != Some(&final_session) {
         save_session(&data, archive_id, &final_session)?;
@@ -422,6 +441,32 @@ fn handle_key(
         return Ok(());
     }
     if key.kind != KeyEventKind::Press && key.kind != KeyEventKind::Repeat {
+        return Ok(());
+    }
+
+    if dispatcher.right_control_held
+        && key.modifiers.contains(KeyModifiers::CONTROL)
+        && matches!(key.code, KeyCode::Char('g' | 'G'))
+    {
+        dispatcher.pending_leap = None;
+        dispatcher.active_leap = None;
+        app.trigger_kill_switch();
+        return Ok(());
+    }
+
+    if dispatcher.right_control_held
+        && key.modifiers.contains(KeyModifiers::CONTROL)
+        && matches!(key.code, KeyCode::Char('n' | 'N'))
+    {
+        dispatcher.pending_leap = None;
+        if matches!(app.mode, AppMode::Editing)
+            && matches!(
+                app.view,
+                View::CreationDate(_) | View::ModificationDate | View::Work(_)
+            )
+        {
+            app.execute(carta_tui::Command::NewDocument)?;
+        }
         return Ok(());
     }
 
@@ -882,7 +927,11 @@ fn normalize_clipboard_text(text: &str) -> String {
 
 fn handle_normal(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
     if key.code == KeyCode::Esc {
-        app.open_palette();
+        if matches!(app.view, View::Help { .. }) {
+            app.execute(carta_tui::Command::ReturnToPreviousView)?;
+        } else {
+            app.open_palette();
+        }
         return Ok(());
     }
     if matches!(
@@ -1469,7 +1518,12 @@ fn italian_date(timestamp: carta_core::Timestamp) -> String {
         12 => "dic",
         _ => "?",
     };
-    format!("{weekday} {:02} {month} {}", date.day(), date.year())
+    format!(
+        "{weekday} {:02} {month} {} {}",
+        date.day(),
+        date.year(),
+        date.format("%H:%M")
+    )
 }
 
 fn display_width(text: &str) -> usize {
@@ -2301,7 +2355,7 @@ mod tests {
         use std::str::FromStr;
 
         let timestamp = carta_core::Timestamp::from_str("2026-09-25T12:00:00+02:00").unwrap();
-        assert_eq!(italian_date(timestamp), "ven 25 set 2026");
+        assert_eq!(italian_date(timestamp), "ven 25 set 2026 12:00");
 
         let (_temporary, mut app) = app_with_documents(&["first", "second"], false);
         let document = app.editor.regions()[0].document;
@@ -2407,6 +2461,24 @@ mod tests {
         assert_eq!(app.editor.regions().last().unwrap().document, first);
         assert!(rendered_status_line(&app, 80).ends_with("Modification Date "));
         assert_ne!(status_style(&app).bg, creation_style.bg);
+    }
+
+    #[test]
+    fn escape_leaves_cheatsheet_for_previous_view() {
+        let (_temporary, mut app) = app_with_documents(&["a"], false);
+        let previous = app.view.clone();
+        app.execute(carta_tui::Command::Cheatsheet).unwrap();
+        assert!(matches!(
+            app.view,
+            View::Help {
+                kind: HelpKind::Cheatsheet,
+                ..
+            }
+        ));
+
+        dispatch(&mut app, KeyCode::Esc, KeyModifiers::NONE);
+
+        assert_eq!(app.view, previous);
     }
 
     #[test]
@@ -3239,6 +3311,61 @@ mod tests {
 
         assert_eq!(app.editor.current_text(), Some("a**b"));
         assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 2 });
+    }
+
+    #[test]
+    fn right_control_n_creates_a_new_document() {
+        let (_temporary, mut app) = app_with_documents(&["a"], false);
+        let before = app.archive.documents().count();
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('n'), KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(app.archive.documents().count(), before + 1);
+        assert_eq!(app.editor.cursor().byte, 0);
+    }
+
+    #[test]
+    fn right_control_g_triggers_emergency_quit() {
+        let (_temporary, mut app) = app_with_documents(&["a"], false);
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
+
+        assert!(app.quit);
+        assert!(app.kill_switch_triggered());
     }
 
     #[test]
