@@ -188,7 +188,7 @@ impl Archive {
         byte_offset: usize,
     ) -> Result<DocumentId, Error> {
         self.ensure_document_unlocked(source)?;
-        let original = self.read_document(source)?.content().to_owned();
+        let original = self.read_document(source)?.into_content();
         if !original.is_char_boundary(byte_offset) {
             return Err(Error::InvalidByteBoundary {
                 document: source,
@@ -384,7 +384,7 @@ impl Archive {
     }
 
     pub fn duplicate_document(&mut self, source: DocumentId) -> Result<DocumentId, Error> {
-        let content = self.read_document(source)?.content().to_owned();
+        let content = self.read_document(source)?.into_content();
         self.create_document(&content)
     }
 
@@ -394,7 +394,7 @@ impl Archive {
     }
 
     pub fn export_document_markdown(&self, id: DocumentId) -> Result<String, Error> {
-        Ok(self.read_document(id)?.content().to_owned())
+        Ok(self.read_document(id)?.into_content())
     }
 
     pub fn export_work_markdown(&self, id: WorkId) -> Result<String, Error> {
@@ -532,7 +532,7 @@ impl Archive {
         before_publish: impl FnOnce(&mut Self, &Path) -> Result<(), Error>,
     ) -> Result<DocumentId, Error> {
         self.ensure_document_unlocked(source)?;
-        let original = self.read_document(source)?.content().to_owned();
+        let original = self.read_document(source)?.into_content();
         let mut content = original.clone();
         if !content.is_char_boundary(byte_offset) {
             return Err(Error::InvalidByteBoundary {
