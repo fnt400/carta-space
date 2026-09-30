@@ -1579,14 +1579,8 @@ fn system_date_time(timestamp: carta_core::Timestamp) -> String {
     let mut buffer = [0 as libc::c_char; 128];
     let format = c"%a %x %H:%M";
     // SAFETY: buffer is writable; format is NUL-terminated; tm remains valid.
-    let written = unsafe {
-        libc::strftime(
-            buffer.as_mut_ptr(),
-            buffer.len(),
-            format.as_ptr(),
-            &tm,
-        )
-    };
+    let written =
+        unsafe { libc::strftime(buffer.as_mut_ptr(), buffer.len(), format.as_ptr(), &tm) };
     if written == 0 {
         return date.format("%Y-%m-%d %H:%M").to_string();
     }
