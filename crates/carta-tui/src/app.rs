@@ -3045,7 +3045,7 @@ fn load_document_regions(archive: &Archive, documents: Vec<DocumentId>) -> AppRe
         .map(|document| {
             Ok(Region {
                 document,
-                text: archive.read_document(document)?.content().to_owned(),
+                text: archive.read_document(document)?.into_content(),
             })
         })
         .collect()
