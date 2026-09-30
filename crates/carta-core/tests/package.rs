@@ -114,7 +114,7 @@ fn markdown_file_exports_are_atomic_and_reject_archive_destinations() {
         .unwrap();
     assert_eq!(
         fs::read_to_string(&work_destination).unwrap(),
-        "secondfirst\n"
+        "second\nfirst\n"
     );
 
     let inside = archive.root().join("unsafe.md");
