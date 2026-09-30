@@ -11,7 +11,7 @@ use carta_tui::session::{
     migrate_legacy_state, save_host_settings, save_session, HostSettings,
 };
 use carta_tui::App;
-use chrono::{Datelike, Local, Weekday};
+use chrono::{Datelike, Local, Timelike};
 use clap::Parser;
 use crossterm::cursor::{Hide, Show};
 use crossterm::event::{
@@ -35,6 +35,7 @@ use ratatui::Terminal;
 use std::backtrace::Backtrace;
 use std::collections::BTreeMap;
 use std::error::Error;
+use std::ffi::CStr;
 use std::fs;
 use std::io::{self, Stdout, Write};
 use std::panic::{self, AssertUnwindSafe};
@@ -203,6 +204,7 @@ fn main() {
 }
 
 fn run() -> Result<(), Box<dyn Error>> {
+    initialize_system_locale();
     let args = Args::parse();
     let data = data_root()?;
     fs::create_dir_all(&data)?;
@@ -1512,7 +1514,7 @@ fn date_view_separator(
     let date = app.archive.document_info(document).map_or_else(
         || "senza data".to_owned(),
         |info| {
-            italian_date(if modified {
+            system_date_time(if modified {
                 info.modified()
             } else {
                 info.created()
@@ -1551,38 +1553,48 @@ fn membership_summary(titles: &[String]) -> String {
     }
 }
 
-fn italian_date(timestamp: carta_core::Timestamp) -> String {
+fn initialize_system_locale() {
+    // SAFETY: setlocale reads the process environment when passed an empty C string.
+    // Carta calls this once during startup, before the input thread is created.
+    unsafe {
+        libc::setlocale(libc::LC_TIME, b"\0".as_ptr().cast());
+    }
+}
+
+fn system_date_time(timestamp: carta_core::Timestamp) -> String {
     let date = timestamp.as_datetime().with_timezone(&Local);
-    let weekday = match date.weekday() {
-        Weekday::Mon => "lun",
-        Weekday::Tue => "mar",
-        Weekday::Wed => "mer",
-        Weekday::Thu => "gio",
-        Weekday::Fri => "ven",
-        Weekday::Sat => "sab",
-        Weekday::Sun => "dom",
+    // SAFETY: zero is a valid baseline for libc::tm; the fields used by strftime
+    // are populated below before the structure is passed across the FFI boundary.
+    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+    tm.tm_sec = date.second() as libc::c_int;
+    tm.tm_min = date.minute() as libc::c_int;
+    tm.tm_hour = date.hour() as libc::c_int;
+    tm.tm_mday = date.day() as libc::c_int;
+    tm.tm_mon = date.month0() as libc::c_int;
+    tm.tm_year = (date.year() - 1900) as libc::c_int;
+    tm.tm_wday = date.weekday().num_days_from_sunday() as libc::c_int;
+    tm.tm_yday = date.ordinal0() as libc::c_int;
+    tm.tm_isdst = -1;
+
+    let mut buffer = [0 as libc::c_char; 128];
+    let format = b"%a %x %H:%M\0";
+    // SAFETY: buffer is writable; format is NUL-terminated; tm remains valid.
+    let written = unsafe {
+        libc::strftime(
+            buffer.as_mut_ptr(),
+            buffer.len(),
+            format.as_ptr().cast(),
+            &tm,
+        )
     };
-    let month = match date.month() {
-        1 => "gen",
-        2 => "feb",
-        3 => "mar",
-        4 => "apr",
-        5 => "mag",
-        6 => "giu",
-        7 => "lug",
-        8 => "ago",
-        9 => "set",
-        10 => "ott",
-        11 => "nov",
-        12 => "dic",
-        _ => "?",
-    };
-    format!(
-        "{weekday} {:02} {month} {} {}",
-        date.day(),
-        date.year(),
-        date.format("%H:%M")
-    )
+    if written == 0 {
+        return date.format("%Y-%m-%d %H:%M").to_string();
+    }
+
+    // SAFETY: strftime writes a NUL-terminated string when it returns non-zero.
+    unsafe { CStr::from_ptr(buffer.as_ptr()) }
+        .to_string_lossy()
+        .into_owned()
 }
 
 fn display_width(text: &str) -> usize {
@@ -2410,12 +2422,12 @@ mod tests {
     }
 
     #[test]
-    fn chronological_headers_show_italian_date_and_up_to_two_work_memberships() {
+    fn chronological_headers_use_system_date_time_and_up_to_two_work_memberships() {
         use std::str::FromStr;
 
         let timestamp = carta_core::Timestamp::from_str("2026-09-25T12:00:00+02:00").unwrap();
         let local = timestamp.as_datetime().with_timezone(&Local);
-        assert!(italian_date(timestamp).ends_with(&local.format("%Y %H:%M").to_string()));
+        assert!(system_date_time(timestamp).contains(&local.format("%H:%M").to_string()));
 
         let (_temporary, mut app) = app_with_documents(&["first", "second"], false);
         let document = app.editor.regions()[0].document;
