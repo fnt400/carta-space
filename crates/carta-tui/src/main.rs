@@ -33,6 +33,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap};
 use ratatui::Terminal;
 use std::backtrace::Backtrace;
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs;
 use std::io::{self, Stdout, Write};
@@ -205,42 +206,63 @@ fn run() -> Result<(), Box<dyn Error>> {
     }
     let mut dispatcher = Dispatcher::default();
     let mut last_session_save = Instant::now();
+    let mut last_saved_session = session;
+    let mut redraw = true;
 
     while !app.quit {
-        terminal.terminal.draw(|frame| draw(frame, &mut app))?;
+        if redraw {
+            terminal.terminal.draw(|frame| draw(frame, &mut app))?;
+            redraw = false;
+        }
         if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                let portable_before = app.portable_keyboard_mode();
-                if let Err(error) =
-                    handle_key(&mut app, &mut dispatcher, key, terminal.enhancements)
-                {
-                    app.status = error.to_string();
-                    app.mode = AppMode::Editing;
-                    let _ = app.reveal_conflicts();
+            match event::read()? {
+                Event::Key(key) => {
+                    let portable_before = app.portable_keyboard_mode();
+                    if let Err(error) =
+                        handle_key(&mut app, &mut dispatcher, key, terminal.enhancements)
+                    {
+                        app.status = error.to_string();
+                        app.mode = AppMode::Editing;
+                        let _ = app.reveal_conflicts();
+                    }
+                    if app.portable_keyboard_mode() != portable_before {
+                        save_host_settings(
+                            &data,
+                            &host_name,
+                            &HostSettings {
+                                portable_keyboard_mode: app.portable_keyboard_mode(),
+                            },
+                        )?;
+                    }
+                    redraw = true;
                 }
-                if app.portable_keyboard_mode() != portable_before {
-                    save_host_settings(
-                        &data,
-                        &host_name,
-                        &HostSettings {
-                            portable_keyboard_mode: app.portable_keyboard_mode(),
-                        },
-                    )?;
-                }
+                Event::Resize(_, _) => redraw = true,
+                _ => {}
             }
         }
         if app.quit {
             break;
         }
-        if let Err(error) = app.tick(Instant::now()) {
-            app.status = error.to_string();
+        match app.tick(Instant::now()) {
+            Ok(tick_redraw) => redraw |= tick_redraw,
+            Err(error) => {
+                app.status = error.to_string();
+                redraw = true;
+            }
         }
         if last_session_save.elapsed() >= Duration::from_secs(1) {
-            save_session(&data, archive_id, &app.session())?;
+            let current_session = app.session();
+            if last_saved_session.as_ref() != Some(&current_session) {
+                save_session(&data, archive_id, &current_session)?;
+                last_saved_session = Some(current_session);
+            }
             last_session_save = Instant::now();
         }
     }
-    save_session(&data, archive_id, &app.session())?;
+    let final_session = app.session();
+    if last_saved_session.as_ref() != Some(&final_session) {
+        save_session(&data, archive_id, &final_session)?;
+    }
     let _ = app.archive.sync();
     Ok(())
 }
@@ -1142,7 +1164,16 @@ struct VisualLine {
     region: Option<usize>,
     start: usize,
     end: usize,
-    text: String,
+    generated: Option<String>,
+}
+
+impl VisualLine {
+    fn text<'a>(&'a self, app: &'a App) -> &'a str {
+        match self.region {
+            Some(region) => &app.editor.regions()[region].text[self.start..self.end],
+            None => self.generated.as_deref().unwrap_or(""),
+        }
+    }
 }
 
 fn editor_width(terminal_width: u16) -> usize {
@@ -1178,32 +1209,37 @@ fn draw_editor(frame: &mut ratatui::Frame<'_>, app: &mut App, area: Rect) {
     } else {
         Style::default().bg(Color::DarkGray).fg(Color::White)
     };
-    let markdown_ranges: Vec<_> = app
-        .editor
-        .regions()
+    let visible_lines: Vec<_> = lines
         .iter()
-        .map(|region| markdown_style_ranges(&region.text))
+        .skip(app.scroll)
+        .take(height.saturating_sub(top_padding))
         .collect();
+    let mut markdown_ranges = BTreeMap::new();
+    for line in &visible_lines {
+        if let Some(region) = line.region {
+            markdown_ranges
+                .entry(region)
+                .or_insert_with(|| markdown_style_ranges(&app.editor.regions()[region].text));
+        }
+    }
     let mut rendered = vec![Line::raw(String::new()); top_padding];
-    rendered.extend(
-        lines
-            .iter()
-            .skip(app.scroll)
-            .take(height.saturating_sub(top_padding))
-            .map(|line| {
-                if let Some(region) = line.region {
-                    styled_line(
-                        line,
-                        region,
-                        &markdown_ranges[region],
-                        selection,
-                        selection_style,
-                    )
-                } else {
-                    Line::styled(line.text.clone(), Style::default().fg(Color::DarkGray))
-                }
-            }),
-    );
+    rendered.extend(visible_lines.into_iter().map(|line| {
+        if let Some(region) = line.region {
+            styled_line(
+                line,
+                line.text(app),
+                region,
+                &markdown_ranges[&region],
+                selection,
+                selection_style,
+            )
+        } else {
+            Line::styled(
+                line.text(app).to_owned(),
+                Style::default().fg(Color::DarkGray),
+            )
+        }
+    }));
     frame.render_widget(Paragraph::new(rendered), area);
     if matches!(app.mode, AppMode::Editing | AppMode::Leap { .. }) {
         if let Some(line) = lines.get(cursor_line) {
@@ -1280,7 +1316,7 @@ fn visual_lines(app: &App, width: usize) -> Vec<VisualLine> {
                 region: Some(region_index),
                 start,
                 end,
-                text: region.text[start..end].into(),
+                generated: None,
             });
         }
     }
@@ -1292,7 +1328,7 @@ fn generated_line(text: String) -> VisualLine {
         region: None,
         start: 0,
         end: 0,
-        text,
+        generated: Some(text),
     }
 }
 
@@ -1318,8 +1354,7 @@ fn date_view_separator(
     }
     let date = app
         .archive
-        .documents()
-        .find(|info| info.id() == document)
+        .document_info(document)
         .map_or_else(
             || "senza data".to_owned(),
             |info| {
@@ -1523,6 +1558,7 @@ fn markdown_style(syntax: MarkdownSyntax) -> Style {
 
 fn styled_line(
     line: &VisualLine,
+    text: &str,
     region: usize,
     style_ranges: &[MarkdownStyleRange],
     selection: Option<(Cursor, Cursor)>,
@@ -1552,7 +1588,7 @@ fn styled_line(
         .collect();
 
     if selected_range.is_none() && line_style_ranges.is_empty() {
-        return Line::raw(line.text.clone());
+        return Line::raw(text.to_owned());
     }
 
     let mut boundaries = vec![line.start, line.end];
@@ -1600,7 +1636,7 @@ fn styled_line(
                 style = style.patch(selection_style);
             }
             Some(Span::styled(
-                line.text[start - line.start..end - line.start].to_owned(),
+                text[start - line.start..end - line.start].to_owned(),
                 style,
             ))
         })
@@ -2003,15 +2039,24 @@ fn status_line(app: &App) -> String {
     }
 }
 fn current_label(app: &App) -> String {
-    app.editor
-        .current_document()
-        .and_then(|id| app.archive.read_document(id).ok())
-        .map_or_else(|| "Empty View".into(), |d| d.derived_label())
+    app.editor.current_text().map_or_else(
+        || "Empty View".into(),
+        |content| {
+            content
+                .lines()
+                .map(str::trim)
+                .find(|line| !line.is_empty())
+                .map(|line| line.trim_start_matches('#').trim())
+                .filter(|line| !line.is_empty())
+                .unwrap_or("document")
+                .to_owned()
+        },
+    )
 }
 fn current_document_date(app: &App) -> String {
     app.editor
         .current_document()
-        .and_then(|id| app.archive.documents().find(|document| document.id() == id))
+        .and_then(|id| app.archive.document_info(id))
         .map_or_else(
             || "No date".to_owned(),
             |document| date_only(document.created()),
@@ -2020,7 +2065,7 @@ fn current_document_date(app: &App) -> String {
 fn current_document_modified_date(app: &App) -> String {
     app.editor
         .current_document()
-        .and_then(|id| app.archive.documents().find(|document| document.id() == id))
+        .and_then(|id| app.archive.document_info(id))
         .map_or_else(
             || "No date".to_owned(),
             |document| date_only(document.modified()),
@@ -2143,7 +2188,7 @@ mod tests {
             region: Some(0),
             start: 0,
             end: text.len(),
-            text: text.to_owned(),
+            generated: None,
         };
 
         let ranges = markdown_style_ranges(text);
@@ -2158,7 +2203,7 @@ mod tests {
             assert!(ranges.iter().any(|range| range.syntax == expected));
         }
 
-        let rendered = styled_line(&line, 0, &ranges, None, Style::default());
+        let rendered = styled_line(&line, text, 0, &ranges, None, Style::default());
         let displayed = rendered
             .spans
             .iter()
@@ -2202,19 +2247,21 @@ mod tests {
         let first = "word ".repeat(20);
         let (_temporary, app) = app_with_documents(&[first.as_str(), "second"], true);
         let lines = visual_lines(&app, 80);
-        assert!(lines.iter().all(|line| display_width(&line.text) <= 80));
+        assert!(lines
+            .iter()
+            .all(|line| display_width(line.text(&app)) <= 80));
         let boundary = lines
             .windows(3)
             .position(|window| {
                 window[0].region.is_none()
-                    && window[0].text.is_empty()
-                    && window[1].text == "─".repeat(80)
-                    && window[2].text.is_empty()
+                    && window[0].text(&app).is_empty()
+                    && window[1].text(&app) == "─".repeat(80)
+                    && window[2].text(&app).is_empty()
             })
             .unwrap();
-        assert!(lines[boundary].text.is_empty());
-        assert_eq!(lines[boundary + 1].text, "─".repeat(80));
-        assert!(lines[boundary + 2].text.is_empty());
+        assert!(lines[boundary].text(&app).is_empty());
+        assert_eq!(lines[boundary + 1].text(&app), "─".repeat(80));
+        assert!(lines[boundary + 2].text(&app).is_empty());
         assert_eq!(app.editor.regions()[0].text, first);
     }
 
@@ -2240,11 +2287,11 @@ mod tests {
         let lines = visual_lines(&app, 80);
         let header = lines
             .iter()
-            .find(|line| line.region.is_none() && line.text.contains("Cinema"))
+            .find(|line| line.region.is_none() && line.text(&app).contains("Cinema"))
             .expect("chronological metadata separator");
-        assert!(header.text.contains("Appunti"));
-        assert!(header.text.contains('…'));
-        assert!(display_width(&header.text) <= 80);
+        assert!(header.text(&app).contains("Appunti"));
+        assert!(header.text(&app).contains('…'));
+        assert!(display_width(header.text(&app)) <= 80);
 
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
         let status = rendered_status_line(&app, 80);
