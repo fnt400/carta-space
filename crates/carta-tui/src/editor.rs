@@ -38,6 +38,7 @@ pub struct CompositeEditor {
     undo: Vec<Snapshot>,
     redo: Vec<Snapshot>,
     dirty_documents: BTreeSet<DocumentId>,
+    typing_run: Option<(DocumentId, usize)>,
 }
 
 impl CompositeEditor {
@@ -51,6 +52,7 @@ impl CompositeEditor {
             undo: Vec::new(),
             redo: Vec::new(),
             dirty_documents: BTreeSet::new(),
+            typing_run: None,
         };
         editor.clamp_cursor();
         editor
@@ -73,6 +75,7 @@ impl CompositeEditor {
     }
     pub fn mark_saved(&mut self) {
         self.dirty_documents.clear();
+        self.typing_run = None;
     }
     pub fn scrub_document(&mut self, document: DocumentId) {
         self.regions.retain(|region| region.document != document);
@@ -89,6 +92,7 @@ impl CompositeEditor {
                 .any(|state| state.document == document)
         });
         self.dirty_documents.remove(&document);
+        self.typing_run = None;
         self.anchor = None;
         self.cat_highlight = None;
         self.cursor = Cursor { region: 0, byte: 0 };
@@ -104,6 +108,7 @@ impl CompositeEditor {
     }
 
     pub fn set_cursor(&mut self, cursor: Cursor, selecting: bool) {
+        self.typing_run = None;
         self.cat_highlight = None;
         self.begin_selection(selecting);
         self.cursor = cursor;
@@ -113,6 +118,7 @@ impl CompositeEditor {
     }
 
     pub fn set_cursor_preserving_highlight(&mut self, cursor: Cursor) {
+        self.typing_run = None;
         self.cursor = cursor;
         self.clamp_cursor();
         self.preferred_column = None;
@@ -131,6 +137,7 @@ impl CompositeEditor {
     }
 
     pub fn set_cat_highlight(&mut self, start: Cursor, end: Cursor) -> bool {
+        self.typing_run = None;
         if start.region != end.region || start == end {
             return false;
         }
@@ -173,19 +180,31 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return false;
         }
-        if self
-            .conventional_selection()
-            .is_some_and(|(a, b)| a.region != b.region)
-        {
+        let selection = self.conventional_selection();
+        if selection.is_some_and(|(a, b)| a.region != b.region) {
             return false;
         }
-        self.record();
+        let document = self.regions[self.cursor.region].document;
+        let coalescible = selection.is_none()
+            && self.cat_highlight.is_none()
+            && value != "\n"
+            && value.chars().count() == 1;
+        let continues_typing = coalescible
+            && self
+                .typing_run
+                .is_some_and(|(run_document, next_byte)| {
+                    run_document == document && next_byte == self.cursor.byte
+                });
+        if !continues_typing {
+            self.record();
+        }
         self.cat_highlight = None;
         self.delete_selection_inner();
         let region = &mut self.regions[self.cursor.region];
         region.text.insert_str(self.cursor.byte, value);
         self.cursor.byte += value.len();
         self.changed();
+        self.typing_run = coalescible.then_some((document, self.cursor.byte));
         true
     }
 
@@ -416,6 +435,7 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return;
         }
+        self.typing_run = None;
         self.cat_highlight = None;
         self.begin_selection(selecting);
         let text = &self.regions[self.cursor.region].text;
@@ -445,6 +465,7 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return;
         }
+        self.typing_run = None;
         self.cat_highlight = None;
         self.begin_selection(selecting);
         let text = &self.regions[self.cursor.region].text;
@@ -491,6 +512,7 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return;
         }
+        self.typing_run = None;
         self.cat_highlight = None;
         self.begin_selection(selecting);
         let text = &self.regions[self.cursor.region].text;
@@ -529,6 +551,7 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return;
         }
+        self.typing_run = None;
         self.cat_highlight = None;
         self.begin_selection(selecting);
         let text = &self.regions[self.cursor.region].text;
@@ -541,6 +564,7 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return;
         }
+        self.typing_run = None;
         self.cat_highlight = None;
         self.begin_selection(selecting);
         let text = &self.regions[self.cursor.region].text;
@@ -561,6 +585,7 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return;
         }
+        self.typing_run = None;
         self.cat_highlight = None;
         self.begin_selection(selecting);
         let ranges = visual_ranges(&self.regions[self.cursor.region].text, width.max(1));
@@ -718,6 +743,7 @@ impl CompositeEditor {
     }
 
     fn swap_history(&mut self, undo: bool) -> bool {
+        self.typing_run = None;
         let snapshot = {
             let source = if undo {
                 &mut self.undo
@@ -755,6 +781,7 @@ impl CompositeEditor {
     }
 
     fn record(&mut self) {
+        self.typing_run = None;
         if let Some(document) = self.current_document() {
             self.record_documents([document]);
         }
@@ -1070,6 +1097,40 @@ mod tests {
         let mut e = editor();
         assert!(!e.set_cat_highlight(Cursor { region: 0, byte: 0 }, Cursor { region: 1, byte: 0 },));
         assert!(e.cat_highlight().is_none());
+    }
+
+    #[test]
+    fn consecutive_typing_is_one_undo_group_until_save_or_navigation() {
+        let document = id();
+        let mut e = CompositeEditor::new(
+            vec![Region {
+                document,
+                text: String::new(),
+            }],
+            Cursor { region: 0, byte: 0 },
+        );
+
+        assert!(e.insert("a"));
+        assert!(e.insert("é"));
+        assert!(e.insert("b"));
+        assert_eq!(e.undo.len(), 1);
+        assert!(e.undo());
+        assert_eq!(e.current_text(), Some(""));
+        assert!(e.redo());
+        assert_eq!(e.current_text(), Some("aéb"));
+
+        e.mark_saved();
+        assert!(e.insert("c"));
+        assert!(e.insert("d"));
+        assert_eq!(e.undo.len(), 2);
+        assert!(e.undo());
+        assert_eq!(e.current_text(), Some("aéb"));
+
+        e.set_cursor(Cursor { region: 0, byte: 1 }, false);
+        assert!(e.insert("X"));
+        assert_eq!(e.undo.len(), 2);
+        assert!(e.undo());
+        assert_eq!(e.current_text(), Some("aéb"));
     }
 
     #[test]
