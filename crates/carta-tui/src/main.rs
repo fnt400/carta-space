@@ -2043,19 +2043,15 @@ fn status_line(app: &App) -> String {
     }
 }
 fn current_label(app: &App) -> String {
-    app.editor.current_text().map_or_else(
-        || "Empty View".into(),
-        |content| {
-            content
-                .lines()
-                .map(str::trim)
-                .find(|line| !line.is_empty())
-                .map(|line| line.trim_start_matches('#').trim())
-                .filter(|line| !line.is_empty())
-                .unwrap_or("document")
-                .to_owned()
-        },
-    )
+    let Some(document) = app.editor.current_document() else {
+        return "Empty View".into();
+    };
+    let Some(content) = app.editor.current_text() else {
+        return "Empty View".into();
+    };
+    app.archive
+        .document_info(document)
+        .map_or_else(|| "Empty View".into(), |info| info.derived_label(content))
 }
 fn current_document_date(app: &App) -> String {
     app.editor
