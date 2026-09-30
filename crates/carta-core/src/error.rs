@@ -366,7 +366,7 @@ pub enum ValidationIssueKind {
     #[error("content.md is not valid UTF-8")]
     InvalidUtf8,
 
-    #[error("content.md contains non-LF line endings")]
+    #[error("content.md must use LF line endings and end with LF")]
     NonCanonicalLineEndings,
 
     #[error("malformed entry in reserved namespace: {0}")]
