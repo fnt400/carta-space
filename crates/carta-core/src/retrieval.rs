@@ -358,7 +358,7 @@ fn leap_match<R: LeapTextRegion>(
                 let maximum = if index == origin.region {
                     origin.byte_offset
                 } else {
-                    regions[index].text.len()
+                    regions[index].text().len()
                 };
                 if let Some(range) = leap_ranges_backward(regions[index].text(), &pattern)
                     .find(|range| range.start < maximum)
