@@ -1274,14 +1274,9 @@ impl App {
             )
             && self.conflicts.is_empty()
             && !self.editor.is_dirty()
-            && !self.archive.is_dirty()?
         {
-            if self.archive.sync_remote()?.is_some() {
-                self.sync_now(false)?;
-                redraw = true;
-            } else {
-                self.scheduler.sync_attempted(now);
-            }
+            self.sync_now(false)?;
+            redraw = true;
         }
         Ok(redraw)
     }
@@ -2136,13 +2131,13 @@ impl App {
 
     fn sync_now(&mut self, include_current: bool) -> AppResult {
         let attempted = Instant::now();
-        if self.archive.sync_remote()?.is_none() {
-            self.scheduler.sync_attempted(attempted);
-            self.status = "Synchronization is not configured".into();
-            return Ok(());
-        }
 
         if include_current {
+            if self.archive.sync_remote()?.is_none() {
+                self.scheduler.sync_attempted(attempted);
+                self.status = "Synchronization is not configured".into();
+                return Ok(());
+            }
             self.autosave()?;
             if self.provisional.is_some() {
                 self.scheduler.sync_attempted(attempted);
@@ -2162,6 +2157,7 @@ impl App {
 
         match result {
             Ok(report) => match report.outcome() {
+                SyncOutcome::Disabled if !include_current => {}
                 SyncOutcome::Disabled => {
                     self.status = "Synchronization is not configured".into();
                 }
@@ -2185,6 +2181,7 @@ impl App {
                             .into();
                 }
             },
+            Err(carta_core::Error::SyncRequiresCleanArchive) if !include_current => {}
             Err(error) => {
                 self.status = format!("Sync unavailable: {error}");
             }
@@ -3402,6 +3399,26 @@ mod tests {
         let position = app.session().position.unwrap();
         assert_eq!(position.document, app.editor.current_document().unwrap());
         assert_eq!(position.byte, 3);
+    }
+
+    #[test]
+    fn automatic_sync_defers_a_dirty_archive_without_staying_due() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let now = Instant::now();
+        let mut app = App::open(archive, None, now).unwrap();
+        app.archive.set_sync_remote("unused-local-remote").unwrap();
+
+        assert!(app.editor.insert("changed"));
+        app.autosave().unwrap();
+        assert!(app.archive.is_dirty().unwrap());
+        app.scheduler.sync_pending();
+
+        app.tick(now).unwrap();
+
+        assert!(!app.scheduler.sync_pending);
+        assert!(!app.scheduler.sync_due(Instant::now()));
+        assert!(!app.status.starts_with("Sync unavailable:"));
     }
 
     #[test]
