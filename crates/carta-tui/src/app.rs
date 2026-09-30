@@ -366,6 +366,7 @@ pub struct App {
     pub scheduler: Scheduler,
     pub leap: LeapRuntime,
     pub quit: bool,
+    emergency_quit: bool,
     portable_keyboard_mode: bool,
     portable_leap_direction: Option<LeapDirection>,
     remembered_structural_leap: Option<StructuralLeap>,
@@ -403,16 +404,7 @@ impl App {
                 View::CreationDate(Volume::new(*year, *month).unwrap_or(current))
             }
             Some(SavedView::ModificationDate) => View::ModificationDate,
-            _ => {
-                let id = archive.create_document("")?;
-                provisional = Some(id);
-                position = Some(Position {
-                    document: id,
-                    byte: 0,
-                    scroll: 0,
-                });
-                View::CreationDate(current)
-            }
+            _ => default_creation_date_view(&archive, position.as_ref()),
         };
         if matches!(&view, View::CreationDate(volume) if archive.chronological_month(*volume).is_empty())
         {
@@ -474,6 +466,7 @@ impl App {
             scheduler: Scheduler::new(now),
             leap: LeapRuntime::default(),
             quit: false,
+            emergency_quit: false,
             portable_keyboard_mode: false,
             portable_leap_direction: None,
             remembered_structural_leap: None,
@@ -687,6 +680,15 @@ impl App {
         self.leap_again(direction);
     }
 
+    pub fn trigger_kill_switch(&mut self) {
+        self.emergency_quit = true;
+        self.quit = true;
+    }
+
+    pub fn kill_switch_triggered(&self) -> bool {
+        self.emergency_quit
+    }
+
     pub fn open_palette(&mut self) {
         self.mode = AppMode::Palette {
             query: String::new(),
@@ -806,10 +808,21 @@ impl App {
             AddToWork => self.select_works(SelectAction::AddToWork, true),
             RemoveFromWork => {
                 let work = self.current_work()?;
-                let doc = self.current_document()?;
-                self.archive.remove_document_from_work(work, doc)?;
+                let document = self.current_document()?;
+                let byte = self.editor.cursor().byte;
+                let volume = self
+                    .archive
+                    .document_info(document)
+                    .ok_or("missing Document")?
+                    .volume();
+                self.archive.remove_document_from_work(work, document)?;
                 self.structural("Removed Document from Work")?;
-                self.reload_view(None)?;
+                self.switch_view(
+                    View::CreationDate(volume),
+                    Some((document, byte)),
+                    false,
+                )?;
+                self.work_positions.remove(&work);
             }
             MoveEarlier => self.move_work(true)?,
             MoveLater => self.move_work(false)?,
@@ -1107,8 +1120,14 @@ impl App {
         match action {
             ConfirmAction::TrashDocument(document) => {
                 self.autosave_for_destructive()?;
+                let source_view = self.view.clone();
+                let target = self.removal_neighbor(document);
+                let fallback_volume = self
+                    .archive
+                    .document_info(document)
+                    .map_or_else(current_volume, |info| info.volume());
                 self.archive.trash_document(document)?;
-                self.reload_after_removal()?;
+                self.reload_after_removal(source_view, target, fallback_volume)?;
             }
             ConfirmAction::TrashWork(work) => {
                 self.autosave_for_destructive()?;
@@ -2815,9 +2834,43 @@ impl App {
             .and_then(|i| trash.works().get(i))
             .map(|w| w.id())
     }
-    fn reload_after_removal(&mut self) -> AppResult {
+    fn removal_neighbor(&self, document: DocumentId) -> Option<(DocumentId, usize)> {
+        let index = self
+            .editor
+            .regions()
+            .iter()
+            .position(|region| region.document == document)?;
+        if let Some(next) = self.editor.regions().get(index + 1) {
+            return Some((next.document, 0));
+        }
+        index.checked_sub(1).and_then(|previous| {
+            self.editor
+                .regions()
+                .get(previous)
+                .map(|region| (region.document, region.text.len()))
+        })
+    }
+
+    fn reload_after_removal(
+        &mut self,
+        source_view: View,
+        target: Option<(DocumentId, usize)>,
+        fallback_volume: Volume,
+    ) -> AppResult {
         self.archive.refresh()?;
-        self.switch_view(View::CreationDate(current_volume()), None, false)
+        self.collapsed = false;
+        if let Some(target) = target {
+            self.view = source_view;
+            self.reload_view(Some(target))?;
+            if self.editor.current_document() == Some(target.0) {
+                self.forward.clear();
+                return Ok(());
+            }
+        }
+        self.view = View::CreationDate(fallback_volume);
+        self.reload_view(None)?;
+        self.forward.clear();
+        Ok(())
     }
     fn finish_quit(&mut self) -> AppResult {
         self.autosave()?;
@@ -3101,6 +3154,13 @@ fn leap_cursor_position(session: &LeapSession) -> LeapPosition {
     session
         .current_match()
         .map_or(session.origin(), |found| found.position())
+}
+
+fn default_creation_date_view(archive: &Archive, position: Option<&Position>) -> View {
+    let volume = position
+        .and_then(|position| archive.document_info(position.document))
+        .map_or_else(current_volume, |info| info.volume());
+    View::CreationDate(volume)
 }
 
 fn current_volume() -> Volume {
@@ -3564,6 +3624,100 @@ mod tests {
         assert!(app.editor.regions().is_empty());
         assert_eq!(app.archive.documents().count(), 0);
         assert!(app.provisional.is_none());
+    }
+
+    #[test]
+    fn missing_saved_work_falls_back_to_creation_date_without_creating_a_document() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let document = archive.create_document("existing").unwrap();
+        let volume = archive.document_info(document).unwrap().volume();
+        let count = archive.documents().count();
+        let session = Session {
+            view: SavedView::Work {
+                id: WorkId::new_v7(),
+            },
+            position: Some(Position {
+                document,
+                byte: 3,
+                scroll: 0,
+            }),
+            work_positions: BTreeMap::new(),
+            work_mru: Vec::new(),
+        };
+
+        let app = App::open(archive, Some(&session), Instant::now()).unwrap();
+
+        assert_eq!(app.view, View::CreationDate(volume));
+        assert_eq!(app.editor.current_document(), Some(document));
+        assert_eq!(app.editor.cursor().byte, 3);
+        assert_eq!(app.archive.documents().count(), count);
+    }
+
+    #[test]
+    fn removing_document_from_work_keeps_its_cursor_in_creation_date_view() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let document = archive.create_document("abcdef").unwrap();
+        let work = archive
+            .create_work("Work".into(), vec![document])
+            .unwrap();
+        let session = Session {
+            view: SavedView::Work { id: work },
+            position: Some(Position {
+                document,
+                byte: 4,
+                scroll: 0,
+            }),
+            work_positions: BTreeMap::new(),
+            work_mru: Vec::new(),
+        };
+        let mut app = App::open(archive, Some(&session), Instant::now()).unwrap();
+        let volume = app.archive.document_info(document).unwrap().volume();
+
+        app.execute(Command::RemoveFromWork).unwrap();
+
+        assert_eq!(app.view, View::CreationDate(volume));
+        assert_eq!(app.editor.current_document(), Some(document));
+        assert_eq!(app.editor.cursor().byte, 4);
+        assert!(!app.archive.work(work).unwrap().documents().contains(&document));
+    }
+
+    #[test]
+    fn trash_moves_to_next_document_then_to_end_of_previous() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let first = archive.create_document("first").unwrap();
+        let second = archive.create_document("second").unwrap();
+        let third = archive.create_document("third").unwrap();
+        let volume = archive.document_info(first).unwrap().volume();
+        let session = Session {
+            view: SavedView::CreationDate {
+                year: volume.year(),
+                month: volume.month(),
+            },
+            position: Some(Position {
+                document: second,
+                byte: 2,
+                scroll: 0,
+            }),
+            work_positions: BTreeMap::new(),
+            work_mru: Vec::new(),
+        };
+        let mut app = App::open(archive, Some(&session), Instant::now()).unwrap();
+
+        app.prepare_trash().unwrap();
+        app.submit_confirmation(true).unwrap();
+        assert_eq!(app.editor.current_document(), Some(third));
+        assert_eq!(app.editor.cursor().byte, 0);
+
+        app.prepare_trash().unwrap();
+        app.submit_confirmation(true).unwrap();
+        assert_eq!(app.editor.current_document(), Some(first));
+        assert_eq!(
+            app.editor.cursor().byte,
+            app.editor.current_text().unwrap().len()
+        );
     }
 
     #[test]
