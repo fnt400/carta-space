@@ -1242,7 +1242,7 @@ fn recoverable_document(path: &Path, id: DocumentId, volume: Volume) -> bool {
         .and_then(DocumentMetadata::read_from);
     let content = fs::read_to_string(path.join("content.md"));
     matches!(metadata, Ok(metadata) if metadata.id() == id && Volume::from_timestamp(metadata.created()) == Some(volume))
-        && matches!(content, Ok(content) if !content.contains('\r'))
+        && matches!(content, Ok(content) if !content.contains('\r') && content.ends_with('\n'))
 }
 
 fn recoverable_work(path: &Path, id: WorkId) -> Option<WorkMetadata> {
