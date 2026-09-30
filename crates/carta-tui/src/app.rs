@@ -3,8 +3,8 @@ use crate::help::{documents as help_documents, HelpKind};
 use crate::palette;
 use crate::session::{Position, SavedView, Session};
 use carta_core::{
-    Archive, CartaLinkTarget, CheckpointKind, Conflict, ConflictChoice, DocumentId,
-    DocumentTextRegion, LeapDirection, LeapPosition, LeapRuntime, LeapSession, SyncOutcome, Volume,
+    Archive, CartaLinkTarget, CheckpointKind, Conflict, ConflictChoice, DocumentId, LeapDirection,
+    LeapPosition, LeapRuntime, LeapSession, SyncOutcome, Volume,
     WorkId, WorkRestoreOptions,
 };
 use chrono::{Datelike, Local};
@@ -1696,14 +1696,8 @@ impl App {
     }
 
     pub fn leap_input(&mut self, value: &str) {
-        let regions: Vec<_> = self
-            .editor
-            .regions()
-            .iter()
-            .map(|r| DocumentTextRegion::new(r.document, &r.text))
-            .collect();
         if let AppMode::Leap { session, .. } = &mut self.mode {
-            session.push_str(value, &regions);
+            session.push_str(value, self.editor.regions());
             let p = leap_cursor_position(session);
             self.editor.set_cursor_preserving_highlight(Cursor {
                 region: p.region(),
@@ -1716,16 +1710,10 @@ impl App {
     }
 
     pub fn leap_again_active(&mut self) -> bool {
-        let regions: Vec<_> = self
-            .editor
-            .regions()
-            .iter()
-            .map(|r| DocumentTextRegion::new(r.document, &r.text))
-            .collect();
         let AppMode::Leap { session, .. } = &mut self.mode else {
             return false;
         };
-        if !session.repeat(&regions) {
+        if !session.repeat(self.editor.regions()) {
             return false;
         }
         let p = leap_cursor_position(session);
@@ -1740,14 +1728,8 @@ impl App {
     }
 
     pub fn leap_backspace(&mut self) {
-        let regions: Vec<_> = self
-            .editor
-            .regions()
-            .iter()
-            .map(|r| DocumentTextRegion::new(r.document, &r.text))
-            .collect();
         if let AppMode::Leap { session, .. } = &mut self.mode {
-            session.backspace(&regions);
+            session.backspace(self.editor.regions());
             let p = leap_cursor_position(session);
             self.editor.set_cursor_preserving_highlight(Cursor {
                 region: p.region(),
@@ -2033,16 +2015,10 @@ impl App {
 
         let origin = self.editor.cursor();
         self.cat_span_fixed = Some(self.cat_fixed_boundary_for(origin, direction));
-        let regions: Vec<_> = self
-            .editor
-            .regions()
-            .iter()
-            .map(|r| DocumentTextRegion::new(r.document, &r.text))
-            .collect();
         if let Some(found) = self.leap.leap_again(
             direction,
             LeapPosition::new(self.editor.cursor().region, self.editor.cursor().byte),
-            &regions,
+            self.editor.regions(),
         ) {
             let p = found.position();
             let destination = Cursor {
