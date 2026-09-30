@@ -195,10 +195,12 @@ impl CompositeEditor {
             return false;
         }
         let document = self.regions[self.cursor.region].document;
+        let mut inserted_chars = value.chars();
+        let single_character = inserted_chars.next().is_some() && inserted_chars.next().is_none();
         let coalescible = selection.is_none()
             && self.cat_highlight.is_none()
             && value != "\n"
-            && value.chars().count() == 1;
+            && single_character;
         let continues_typing = coalescible
             && self
                 .typing_run
