@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Avvia Carta TUI dentro la distrobox di sviluppo.
 # Gli eventuali argomenti passati allo script vengono inoltrati a carta-tui.
-# Il fuso orario viene ereditato dal sistema host a ogni avvio.
+# Locale e fuso orario vengono ereditati dal sistema host a ogni avvio.
 
 host_timezone() {
     if [[ -n "${TZ:-}" ]]; then
@@ -27,16 +27,20 @@ host_timezone() {
     fi
 }
 
+ENV_ARGS=()
 HOST_TZ="$(host_timezone)"
-
 if [[ -n "$HOST_TZ" ]]; then
-    exec distrobox enter carta-dev -- env TZ="$HOST_TZ" bash -lc '
-      cd "$HOME/software/git/carta-space"
-      exec cargo run -p carta-tui -- "$@"
-    ' bash "$@"
+    ENV_ARGS+=("TZ=$HOST_TZ")
 fi
 
-exec distrobox enter carta-dev -- bash -lc '
+for name in LANG LC_ALL LC_TIME LC_MESSAGES LC_CTYPE; do
+    value="${!name:-}"
+    if [[ -n "$value" ]]; then
+        ENV_ARGS+=("$name=$value")
+    fi
+done
+
+exec distrobox enter carta-dev -- env "${ENV_ARGS[@]}" bash -lc '
   cd "$HOME/software/git/carta-space"
   exec cargo run -p carta-tui -- "$@"
 ' bash "$@"
