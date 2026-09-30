@@ -241,10 +241,7 @@ mod tests {
 
         save_host_settings(dir.path(), "nixosvm", &enabled).unwrap();
 
-        assert_eq!(
-            load_host_settings(dir.path(), "nixosvm").unwrap(),
-            enabled
-        );
+        assert_eq!(load_host_settings(dir.path(), "nixosvm").unwrap(), enabled);
         assert_eq!(
             load_host_settings(dir.path(), "fermi").unwrap(),
             HostSettings::default()
