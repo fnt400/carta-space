@@ -161,7 +161,7 @@ impl Archive {
 
         let metadata = DocumentMetadata::new(id, created);
         write_document_metadata(&staging.join("meta.json"), &metadata)?;
-        let content = normalize_line_endings(content);
+        let content = normalize_document_content(content);
         fs::write(staging.join("content.md"), content.as_bytes())
             .map_err(|error| Error::io(staging.join("content.md"), error))?;
         let metadata_bytes = fs::read(staging.join("meta.json"))
@@ -250,6 +250,7 @@ impl Archive {
         )?;
         let metadata = DocumentMetadata::new(target, created).with_modified(Timestamp::now_local());
         let (before, after) = original.split_at(byte_offset);
+        let after = normalize_document_content(after);
         let operation = (|| {
             self.edit_document(source, before)?;
 
@@ -295,7 +296,7 @@ impl Archive {
                         volume,
                         path: destination,
                         metadata_bytes,
-                        content_bytes: after.as_bytes().to_vec(),
+                        content_bytes: after.into_bytes(),
                     },
                 );
                 transaction.commit()?;
@@ -331,7 +332,7 @@ impl Archive {
         let info = self.documents.get(&id).ok_or(Error::MissingDocument(id))?;
         let path = info.path.join("content.md");
         let metadata_path = info.path.join("meta.json");
-        let content = normalize_line_endings(content).into_bytes();
+        let content = normalize_document_content(content).into_bytes();
         if !metadata_path.is_file() {
             let conflict =
                 self.preserve_document_conflict(id, &content, &info.content_bytes, true)?;
@@ -575,7 +576,7 @@ impl Archive {
             fs::create_dir(&staging).map_err(|error| Error::io(&staging, error))?;
             let mut guard = CleanupLinkedStaging::new(staging.clone());
             write_document_metadata(&staging.join("meta.json"), &metadata)?;
-            fs::write(staging.join("content.md"), b"")
+            fs::write(staging.join("content.md"), b"\n")
                 .map_err(|error| Error::io(staging.join("content.md"), error))?;
             let metadata_bytes = fs::read(staging.join("meta.json"))
                 .map_err(|error| Error::io(staging.join("meta.json"), error))?;
@@ -603,7 +604,7 @@ impl Archive {
                         volume,
                         path: destination,
                         metadata_bytes,
-                        content_bytes: Vec::new(),
+                        content_bytes: b"\n".to_vec(),
                     },
                 );
                 transaction.commit()?;
@@ -669,7 +670,7 @@ impl Archive {
                 &destination.join("meta.json"),
                 &DocumentMetadata::new(id, created),
             )?;
-            fs::write(destination.join("content.md"), b"")
+            fs::write(destination.join("content.md"), b"\n")
                 .map_err(|error| Error::io(destination.join("content.md"), error))?;
             documents.insert(index, id);
             let metadata = current
@@ -1338,8 +1339,12 @@ fn current_work_titles(works: &Path) -> Result<HashSet<String>, Error> {
     Ok(titles)
 }
 
-fn normalize_line_endings(content: &str) -> String {
-    content.replace("\r\n", "\n").replace('\r', "\n")
+pub(crate) fn normalize_document_content(content: &str) -> String {
+    let mut content = content.replace("\r\n", "\n").replace('\r', "\n");
+    if !content.ends_with('\n') {
+        content.push('\n');
+    }
+    content
 }
 
 fn write_archive_metadata(path: &Path, metadata: &ArchiveMetadata) -> Result<(), Error> {
