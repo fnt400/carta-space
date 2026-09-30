@@ -9,6 +9,16 @@ pub struct Region {
     pub text: String,
 }
 
+impl carta_core::LeapTextRegion for Region {
+    fn document(&self) -> DocumentId {
+        self.document
+    }
+
+    fn text(&self) -> &str {
+        &self.text
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Cursor {
     pub region: usize,
