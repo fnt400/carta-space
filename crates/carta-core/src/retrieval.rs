@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::ops::Range;
 
 use carta_format::{DocumentId, Timestamp};
@@ -289,7 +288,7 @@ pub(crate) fn literal_match(text: &str, query: &str) -> Option<Range<usize>> {
     if query.is_empty() {
         return None;
     }
-    all_matches(text, &query).into_iter().next()
+    first_folded_match(text, &query)
 }
 
 fn leap_match(
@@ -307,6 +306,11 @@ fn leap_match(
         return None;
     }
 
+    let pattern = compile_leap_pattern(query);
+    if pattern.is_empty() {
+        return None;
+    }
+
     match direction {
         LeapDirection::Forward => {
             for (index, region) in regions.iter().enumerate().skip(origin.region) {
@@ -315,7 +319,7 @@ fn leap_match(
                 } else {
                     0
                 };
-                if let Some(range) = leap_matches(region.text, query).into_iter().find(|range| {
+                if let Some(range) = leap_ranges_forward(region.text, &pattern).find(|range| {
                     range.start >= minimum
                         && (include_origin
                             || index != origin.region
@@ -325,7 +329,7 @@ fn leap_match(
                 }
             }
             for (index, region) in regions.iter().enumerate().take(origin.region + 1) {
-                if let Some(range) = leap_matches(region.text, query).into_iter().find(|range| {
+                if let Some(range) = leap_ranges_forward(region.text, &pattern).find(|range| {
                     index < origin.region
                         || range.start < origin.byte_offset
                         || (!include_origin && range.start == origin.byte_offset)
@@ -341,18 +345,14 @@ fn leap_match(
                 } else {
                     regions[index].text.len()
                 };
-                if let Some(range) = leap_matches(regions[index].text, query)
-                    .into_iter()
-                    .rev()
+                if let Some(range) = leap_ranges_backward(regions[index].text, &pattern)
                     .find(|range| range.start < maximum)
                 {
                     return Some(make_leap_match(regions[index], index, range, false));
                 }
             }
             for index in (origin.region..regions.len()).rev() {
-                if let Some(range) = leap_matches(regions[index].text, query)
-                    .into_iter()
-                    .rev()
+                if let Some(range) = leap_ranges_backward(regions[index].text, &pattern)
                     .find(|range| index > origin.region || range.start >= origin.byte_offset)
                 {
                     return Some(make_leap_match(regions[index], index, range, true));
@@ -377,75 +377,144 @@ fn make_leap_match(
     }
 }
 
-fn leap_matches(text: &str, query: &str) -> Vec<Range<usize>> {
-    let pattern: Vec<char> = query.chars().collect();
-    if pattern.is_empty() {
-        return Vec::new();
-    }
-
-    let starts: Vec<(usize, char)> = text.char_indices().collect();
-    let mut matches = Vec::new();
-    for start_index in 0..starts.len() {
-        if start_index + pattern.len() > starts.len() {
-            break;
-        }
-        if pattern
-            .iter()
-            .zip(starts[start_index..].iter().map(|(_, character)| character))
-            .all(|(pattern, text)| cat_leap_char_matches(*pattern, *text))
-        {
-            let start = starts[start_index].0;
-            let end_index = start_index + pattern.len();
-            let end = starts.get(end_index).map_or(text.len(), |(byte, _)| *byte);
-            matches.push(start..end);
-        }
-    }
-    matches
+#[derive(Debug, Clone)]
+struct LeapPatternChar {
+    base: char,
+    marks: String,
+    folded_base: String,
+    uppercase: bool,
 }
 
-fn cat_leap_char_matches(pattern: char, text: char) -> bool {
-    let (pattern_base, pattern_marks) = decomposed_char(pattern);
-    let (text_base, text_marks) = decomposed_char(text);
+fn compile_leap_pattern(query: &str) -> Vec<LeapPatternChar> {
+    query
+        .chars()
+        .map(|character| {
+            let (base, marks) = decomposed_pattern_char(character);
+            LeapPatternChar {
+                base,
+                marks,
+                folded_base: if character.is_uppercase() {
+                    String::new()
+                } else {
+                    folded_char(base)
+                },
+                uppercase: character.is_uppercase(),
+            }
+        })
+        .collect()
+}
 
-    if !pattern_marks.is_empty() && pattern_marks != text_marks {
+fn leap_ranges_forward<'a>(
+    text: &'a str,
+    pattern: &'a [LeapPatternChar],
+) -> impl Iterator<Item = Range<usize>> + 'a {
+    text.char_indices().filter_map(move |(start, _)| {
+        match_pattern_at(text, start, pattern).map(|end| start..end)
+    })
+}
+
+fn leap_ranges_backward<'a>(
+    text: &'a str,
+    pattern: &'a [LeapPatternChar],
+) -> impl Iterator<Item = Range<usize>> + 'a {
+    text.char_indices().rev().filter_map(move |(start, _)| {
+        match_pattern_at(text, start, pattern).map(|end| start..end)
+    })
+}
+
+fn match_pattern_at(text: &str, start: usize, pattern: &[LeapPatternChar]) -> Option<usize> {
+    let mut text_chars = text[start..].char_indices();
+    let mut end = start;
+    for pattern_char in pattern {
+        let (relative, text_char) = text_chars.next()?;
+        if !cat_leap_char_matches(pattern_char, text_char) {
+            return None;
+        }
+        end = start + relative + text_char.len_utf8();
+    }
+    Some(end)
+}
+
+fn cat_leap_char_matches(pattern: &LeapPatternChar, text: char) -> bool {
+    let text_base = decomposed_base(text);
+    if !pattern.marks.is_empty() && !marks_match(&pattern.marks, text) {
         return false;
     }
 
-    if pattern.is_uppercase() {
-        pattern_base == text_base && text.is_uppercase()
+    if pattern.uppercase {
+        pattern.base == text_base && text.is_uppercase()
     } else {
-        folded(&pattern_base.to_string()) == folded(&text_base.to_string())
+        folded_char_matches(&pattern.folded_base, text_base)
     }
 }
 
-fn decomposed_char(character: char) -> (char, String) {
-    let decomposed: Vec<char> = character.to_string().nfd().collect();
-    let base = decomposed
-        .iter()
-        .copied()
-        .find(|character| !is_combining_mark(*character))
-        .unwrap_or(character);
-    let marks = decomposed
-        .into_iter()
-        .filter(|character| is_combining_mark(*character))
-        .collect();
-    (base, marks)
+fn decomposed_pattern_char(character: char) -> (char, String) {
+    let mut encoded = [0_u8; 4];
+    let value = character.encode_utf8(&mut encoded);
+    let mut base = None;
+    let mut marks = String::new();
+    for decomposed in value.nfd() {
+        if is_combining_mark(decomposed) {
+            marks.push(decomposed);
+        } else if base.is_none() {
+            base = Some(decomposed);
+        }
+    }
+    (base.unwrap_or(character), marks)
 }
 
-fn all_matches(text: &str, folded_query: &str) -> Vec<Range<usize>> {
+fn decomposed_base(character: char) -> char {
+    let mut encoded = [0_u8; 4];
+    character
+        .encode_utf8(&mut encoded)
+        .nfd()
+        .find(|decomposed| !is_combining_mark(*decomposed))
+        .unwrap_or(character)
+}
+
+fn marks_match(expected: &str, character: char) -> bool {
+    let mut encoded = [0_u8; 4];
+    expected.chars().eq(
+        character
+            .encode_utf8(&mut encoded)
+            .nfd()
+            .filter(|decomposed| is_combining_mark(*decomposed)),
+    )
+}
+
+fn folded_char(character: char) -> String {
+    let mut encoded = [0_u8; 4];
+    character.encode_utf8(&mut encoded).case_fold().collect()
+}
+
+fn folded_char_matches(expected: &str, character: char) -> bool {
+    let mut encoded = [0_u8; 4];
+    expected
+        .chars()
+        .eq(character.encode_utf8(&mut encoded).case_fold())
+}
+
+#[cfg(test)]
+fn leap_matches(text: &str, query: &str) -> Vec<Range<usize>> {
+    let pattern = compile_leap_pattern(query);
+    if pattern.is_empty() {
+        return Vec::new();
+    }
+    leap_ranges_forward(text, &pattern).collect()
+}
+
+fn first_folded_match(text: &str, folded_query: &str) -> Option<Range<usize>> {
     let (folded_text, boundaries) = folded_with_boundaries(text);
-    let mut matches = Vec::new();
     let mut search_from = 0;
     while search_from <= folded_text.len() {
-        let Some(relative) = folded_text[search_from..].find(folded_query) else {
-            break;
-        };
+        let relative = folded_text[search_from..].find(folded_query)?;
         let start = search_from + relative;
         let end = start + folded_query.len();
-        if let (Some(original_start), Some(original_end)) =
-            (boundaries.get(&start), boundaries.get(&end))
-        {
-            matches.push(*original_start..*original_end);
+        if let (Some(original_start), Some(original_end)) = (
+            boundary_at(&boundaries, start),
+            boundary_at(&boundaries, end),
+        ) {
+            return Some(original_start..original_end);
         }
         let advance = folded_text[start..]
             .chars()
@@ -453,22 +522,34 @@ fn all_matches(text: &str, folded_query: &str) -> Vec<Range<usize>> {
             .map_or(1, char::len_utf8);
         search_from = start + advance;
     }
-    matches
+    None
+}
+
+fn boundary_at(boundaries: &[(usize, usize)], offset: usize) -> Option<usize> {
+    boundaries
+        .binary_search_by_key(&offset, |(folded, _)| *folded)
+        .ok()
+        .map(|index| boundaries[index].1)
 }
 
 fn folded(value: &str) -> String {
     value.case_fold().collect()
 }
 
-fn folded_with_boundaries(value: &str) -> (String, BTreeMap<usize, usize>) {
+fn folded_with_boundaries(value: &str) -> (String, Vec<(usize, usize)>) {
     let mut output = String::new();
-    let mut boundaries = BTreeMap::new();
-    boundaries.insert(0, 0);
+    let mut boundaries = vec![(0, 0)];
     for (start, character) in value.char_indices() {
         let end = start + character.len_utf8();
-        let folded_character: String = character.to_string().case_fold().collect();
-        output.push_str(&folded_character);
-        boundaries.insert(output.len(), end);
+        let mut encoded = [0_u8; 4];
+        output.extend(character.encode_utf8(&mut encoded).case_fold());
+        if let Some((folded, original)) = boundaries.last_mut() {
+            if *folded == output.len() {
+                *original = end;
+                continue;
+            }
+        }
+        boundaries.push((output.len(), end));
     }
     (output, boundaries)
 }
@@ -509,5 +590,62 @@ mod cat_leap_tests {
     fn plain_leap_character_matches_accented_text() {
         assert_eq!(leap_matches("a á A Á", "a"), vec![0..1, 2..4, 5..6, 7..9]);
         assert_eq!(leap_matches("a á A Á", "á"), vec![2..4, 7..9]);
+    }
+
+    #[test]
+    fn leap_scanner_preserves_wrap_and_backward_search() {
+        let first = DocumentId::new_v7();
+        let second = DocumentId::new_v7();
+        let regions = [
+            DocumentTextRegion::new(first, "alpha café"),
+            DocumentTextRegion::new(second, "beta CAFÉ gamma"),
+        ];
+
+        let forward = leap_match(
+            &regions,
+            LeapPosition::new(0, "alpha ".len()),
+            "cafe",
+            LeapDirection::Forward,
+            true,
+        )
+        .unwrap();
+        assert_eq!(forward.document(), first);
+        assert_eq!(forward.range(), 6..11);
+        assert!(!forward.wrapped());
+
+        let backward = leap_match(
+            &regions,
+            LeapPosition::new(0, 0),
+            "beta",
+            LeapDirection::Backward,
+            true,
+        )
+        .unwrap();
+        assert_eq!(backward.document(), second);
+        assert!(backward.wrapped());
+    }
+
+    #[test]
+    fn leap_no_match_handles_a_large_region_without_changing_semantics() {
+        let document = DocumentId::new_v7();
+        let text = "x".repeat(100_000);
+        let regions = [DocumentTextRegion::new(document, &text)];
+
+        assert!(leap_match(
+            &regions,
+            LeapPosition::new(0, 0),
+            "needle",
+            LeapDirection::Forward,
+            true,
+        )
+        .is_none());
+        assert!(leap_match(
+            &regions,
+            LeapPosition::new(0, text.len()),
+            "needle",
+            LeapDirection::Backward,
+            true,
+        )
+        .is_none());
     }
 }
