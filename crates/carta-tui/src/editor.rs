@@ -664,6 +664,7 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return;
         }
+        self.typing_run = None;
         self.cat_highlight = None;
         self.begin_selection(selecting);
         let ranges = visual_ranges(&self.regions[self.cursor.region].text, width.max(1));
@@ -679,6 +680,7 @@ impl CompositeEditor {
         if self.regions.is_empty() {
             return;
         }
+        self.typing_run = None;
         self.cat_highlight = None;
         self.begin_selection(selecting);
         let ranges = visual_ranges(&self.regions[self.cursor.region].text, width.max(1));
