@@ -145,7 +145,7 @@ Creating a Cat highlight also copies its text to the system clipboard. Clipboard
 
 RightCtrl+W opens the Work selector. RightCtrl+L inserts a link at point, or opens the existing link when point is already inside one. RightCtrl+N creates a new Document.
 
-RightCtrl+G is an emergency kill switch. It requests immediate application exit without the normal final autosave, checkpoint, session save, or sync. It is intended only for recovery when Carta is still processing keyboard events but normal shutdown is unsafe or stuck; no in-process keybinding can interrupt a thread that has stopped servicing terminal events.
+RightCtrl+G is an emergency kill switch. A dedicated input reader watches this chord independently of the main application loop, so it can terminate Carta even while the main loop is busy or stuck. It restores the terminal on a best-effort basis, then exits immediately without the normal final autosave, checkpoint, session save, or sync.
 
 Structural commands are explicit because they change more than ordinary text. Examples include New Document, Split Document at Point, Work membership changes, Work reordering, Trash, restore operations, and Wipe.
 
