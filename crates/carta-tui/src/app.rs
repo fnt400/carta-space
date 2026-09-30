@@ -2032,8 +2032,25 @@ impl App {
             return;
         }
 
+        self.leap_again_text(direction, false);
+    }
+
+    pub fn leap_again_preserving_anchor(&mut self, direction: LeapDirection) {
+        if let Some(kind) = self.remembered_structural_leap {
+            self.perform_structural_leap(kind, direction, true, true);
+            self.typed_span_start = None;
+            self.rehighlight_span = None;
+            return;
+        }
+
+        self.leap_again_text(direction, true);
+    }
+
+    fn leap_again_text(&mut self, direction: LeapDirection, preserve_anchor: bool) {
         let origin = self.editor.cursor();
-        self.cat_span_fixed = Some(self.cat_fixed_boundary_for(origin, direction));
+        if !preserve_anchor || self.cat_span_fixed.is_none() {
+            self.cat_span_fixed = Some(self.cat_fixed_boundary_for(origin, direction));
+        }
         if let Some(found) = self.leap.leap_again(
             direction,
             LeapPosition::new(self.editor.cursor().region, self.editor.cursor().byte),

@@ -786,11 +786,10 @@ fn handle_key(
                     if matches!(app.mode, AppMode::Leap { palette: false, .. }) {
                         app.leap_again_active();
                     } else {
-                        app.leap_again_active_structural(active.direction);
+                        app.leap_again_preserving_anchor(active.direction);
                     }
                 } else if let Some(pending) = dispatcher.pending_leap.take() {
-                    dispatcher.suppressed_leap_releases =
-                        dispatcher.suppressed_leap_releases.saturating_add(1);
+                    dispatcher.active_leap = Some(pending);
                     app.leap_again(pending.direction);
                 }
                 return Ok(());
@@ -3344,6 +3343,66 @@ mod tests {
             .unwrap();
             assert_eq!(app.editor.cursor().byte, expected);
         }
+    }
+
+    #[test]
+    fn leap_key_held_repeated_right_control_wraps_in_work() {
+        let (_temporary, mut app) = app_with_documents(&["one", "middle", "one"], true);
+        let mut dispatcher = Dispatcher::default();
+
+        app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
+        app.start_leap(LeapDirection::Forward, true);
+        app.leap_input("one");
+        app.end_leap();
+
+        app.editor.set_cursor(Cursor { region: 1, byte: 0 }, false);
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL | KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+        assert_eq!(app.editor.cursor(), Cursor { region: 2, byte: 0 });
+        assert!(dispatcher.active_leap.is_some());
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new_with_kind(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::ALT,
+                KeyEventKind::Release,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL | KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 0 });
     }
 
     #[test]
