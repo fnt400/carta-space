@@ -83,19 +83,10 @@ impl Archive {
         crate::transaction::recover(&root)?;
         recover_git_omitted_empty_roots(&root)?;
         recover_creation_staging(&root)?;
-        let was_dirty = crate::history::is_dirty_at(&root)?;
-        let normalized_legacy_documents = normalize_legacy_document_trailing_lf(&root)?;
         let scanned = scan_archive_with_recovery_documents(
             &root,
             crate::conflict::missing_document_infos(&root)?,
         )?;
-        if normalized_legacy_documents && !was_dirty {
-            crate::history::require_checkpoint(
-                &root,
-                crate::CheckpointKind::Automatic,
-                Some("Normalized legacy Document trailing LF"),
-            )?;
-        }
         Ok(Self {
             root,
             metadata: scanned.metadata,
@@ -1239,86 +1230,6 @@ fn staging_id<T: FromStr>(path: &Path, prefix: &str) -> Option<T> {
         .strip_prefix(prefix)?
         .parse()
         .ok()
-}
-
-fn normalize_legacy_document_trailing_lf(root: &Path) -> Result<bool, Error> {
-    let volumes = root.join("volumes");
-    let years = match fs::read_dir(&volumes) {
-        Ok(entries) => entries,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-        Err(error) => return Err(Error::io(&volumes, error)),
-    };
-    let mut changed = false;
-
-    for year in years {
-        let year = year.map_err(|error| Error::io(&volumes, error))?;
-        if !year
-            .file_type()
-            .map_err(|error| Error::io(year.path(), error))?
-            .is_dir()
-        {
-            continue;
-        }
-        let year_name = year.file_name();
-        let year_name = year_name.to_string_lossy();
-        if year_name.len() != 4 || !year_name.bytes().all(|byte| byte.is_ascii_digit()) {
-            continue;
-        }
-
-        for month in fs::read_dir(year.path()).map_err(|error| Error::io(year.path(), error))? {
-            let month = month.map_err(|error| Error::io(year.path(), error))?;
-            if !month
-                .file_type()
-                .map_err(|error| Error::io(month.path(), error))?
-                .is_dir()
-            {
-                continue;
-            }
-            let month_name = month.file_name();
-            let month_name = month_name.to_string_lossy();
-            if month_name.len() != 2 || !month_name.bytes().all(|byte| byte.is_ascii_digit()) {
-                continue;
-            }
-
-            for document in
-                fs::read_dir(month.path()).map_err(|error| Error::io(month.path(), error))?
-            {
-                let document = document.map_err(|error| Error::io(month.path(), error))?;
-                if !document
-                    .file_type()
-                    .map_err(|error| Error::io(document.path(), error))?
-                    .is_dir()
-                    || document
-                        .file_name()
-                        .to_string_lossy()
-                        .parse::<DocumentId>()
-                        .is_err()
-                {
-                    continue;
-                }
-
-                let content_path = document.path().join("content.md");
-                let bytes = match fs::read(&content_path) {
-                    Ok(bytes) => bytes,
-                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
-                    Err(error) => return Err(Error::io(&content_path, error)),
-                };
-                let Ok(content) = std::str::from_utf8(&bytes) else {
-                    continue;
-                };
-                if content.contains('\r') || content.ends_with('\n') {
-                    continue;
-                }
-
-                let mut normalized = bytes;
-                normalized.push(b'\n');
-                atomic_replace(&content_path, &normalized)?;
-                changed = true;
-            }
-        }
-    }
-
-    Ok(changed)
 }
 
 fn recoverable_document(path: &Path, id: DocumentId, volume: Volume) -> bool {
