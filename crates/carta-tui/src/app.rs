@@ -1316,18 +1316,29 @@ impl App {
         if !self.editor.is_dirty() {
             return Ok(());
         }
-        let regions = self.editor.regions().to_vec();
+        let dirty_documents: Vec<_> = self.editor.dirty_documents().collect();
         let mut preserved = Vec::new();
         let mut first_error = None;
-        for region in regions {
-            match save(&mut self.archive, region.document, &region.text) {
-                Ok(()) => {}
-                Err(carta_core::Error::ConflictPreserved(id)) => {
-                    preserved.push(id);
-                }
-                Err(error) => {
-                    if first_error.is_none() {
-                        first_error = Some(error);
+        {
+            let editor = &self.editor;
+            let archive = &mut self.archive;
+            for document in dirty_documents {
+                let Some(region) = editor
+                    .regions()
+                    .iter()
+                    .find(|region| region.document == document)
+                else {
+                    continue;
+                };
+                match save(archive, document, &region.text) {
+                    Ok(()) => {}
+                    Err(carta_core::Error::ConflictPreserved(id)) => {
+                        preserved.push(id);
+                    }
+                    Err(error) => {
+                        if first_error.is_none() {
+                            first_error = Some(error);
+                        }
                     }
                 }
             }
@@ -3322,6 +3333,49 @@ mod tests {
                 <= 40
         );
         assert_eq!(sanitize_filename("***"), "document");
+    }
+
+    #[test]
+    fn autosave_only_visits_documents_changed_in_the_editor() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let first = archive.create_document("first").unwrap();
+        let second = archive.create_document("second").unwrap();
+        let volume = archive
+            .documents()
+            .find(|info| info.id() == first)
+            .unwrap()
+            .volume();
+        let mut app = App::open(
+            archive,
+            Some(&Session {
+                view: SavedView::CreationDate {
+                    year: volume.year(),
+                    month: volume.month(),
+                },
+                position: Some(Position {
+                    document: first,
+                    byte: 0,
+                    scroll: 0,
+                }),
+                work_positions: BTreeMap::new(),
+                work_mru: Vec::new(),
+            }),
+            Instant::now(),
+        )
+        .unwrap();
+
+        assert!(app.editor.insert("!"));
+        let mut saved = Vec::new();
+        app.autosave_with(|_, document, _| {
+            saved.push(document);
+            Ok(())
+        })
+        .unwrap();
+
+        assert_eq!(saved, vec![first]);
+        assert!(!saved.contains(&second));
+        assert!(!app.editor.is_dirty());
     }
 
     #[test]
