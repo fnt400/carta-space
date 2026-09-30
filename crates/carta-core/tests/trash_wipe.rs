@@ -67,7 +67,7 @@ fn document_trash_reports_all_impacts_and_restore_uses_pre_trash_state() {
     assert!(archive.work(second_work).unwrap().documents().is_empty());
     assert_eq!(
         archive.read_document(source).unwrap().content(),
-        format!("[first](carta:doc:{target}) and [second](carta:doc:{target})")
+        format!("[first](carta:doc:{target}) and [second](carta:doc:{target})\n")
     );
     assert!(!archive.is_dirty().unwrap());
 
@@ -84,7 +84,7 @@ fn document_trash_reports_all_impacts_and_restore_uses_pre_trash_state() {
     ));
     assert_eq!(
         archive.read_document(target).unwrap().content(),
-        "# Original\n\nbody"
+        "# Original\n\nbody\n"
     );
     assert!(archive.memberships(target).unwrap().is_empty());
     assert!(archive.trash_inventory().unwrap().documents().is_empty());
@@ -121,7 +121,7 @@ fn work_trash_restore_requires_document_consent_and_is_atomic() {
     archive.restore_trashed_work(work, true, None).unwrap();
     assert_eq!(archive.work(work).unwrap().title(), "Recoverable");
     assert_eq!(archive.work(work).unwrap().documents(), &[document]);
-    assert_eq!(archive.read_document(document).unwrap().content(), "member");
+    assert_eq!(archive.read_document(document).unwrap().content(), "member\n");
     assert!(!archive.is_dirty().unwrap());
 }
 
@@ -171,7 +171,7 @@ fn wipe_preserves_identical_content_owned_by_an_unrelated_document() {
 
     assert_eq!(
         archive.read_document(survivor).unwrap().content(),
-        "identical body"
+        "identical body\n"
     );
     let listing = git(&archive, &["rev-list", "--objects", "--all"]);
     assert_git_ok(&listing);
@@ -332,7 +332,7 @@ fn wipe_rewrites_all_local_refs_prunes_objects_and_preserves_unrelated_state() {
     assert!(!archive.root().join(".carta-cache").exists());
     assert_eq!(
         archive.read_document(survivor).unwrap().content(),
-        "surviving history two"
+        "surviving history two\n"
     );
     assert_eq!(archive.document_revisions(survivor).unwrap().len(), 2);
     assert!(archive.trash_inventory().unwrap().documents().is_empty());
@@ -448,7 +448,7 @@ fn failed_trash_checkpoint_rolls_back_document_and_work_atomically() {
     ));
     assert_eq!(
         archive.read_document(document).unwrap().content(),
-        "must remain"
+        "must remain\n"
     );
     assert_eq!(archive.work(work).unwrap().documents(), &[document]);
     assert!(!archive.is_dirty().unwrap());
