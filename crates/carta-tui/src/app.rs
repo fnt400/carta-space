@@ -909,12 +909,14 @@ impl App {
             LeapAgainBackward => self.leap_again(LeapDirection::Backward),
             Undo => {
                 if !self.block_current_document_edit() && self.editor.undo() {
+                    self.editor.ensure_all_trailing_newlines();
                     self.cat_navigation();
                     self.edited(Instant::now());
                 }
             }
             Redo => {
                 if !self.block_current_document_edit() && self.editor.redo() {
+                    self.editor.ensure_all_trailing_newlines();
                     self.cat_navigation();
                     self.edited(Instant::now());
                 }
@@ -1545,6 +1547,7 @@ impl App {
         if !self.editor.insert(value) {
             return false;
         }
+        self.editor.ensure_current_trailing_newline();
         let after = self.editor.cursor();
         self.typed_span_start = Some(start);
         self.cat_span_fixed = Some(start);
@@ -1563,6 +1566,7 @@ impl App {
         if !self.editor.insert(&pair) {
             return false;
         }
+        self.editor.ensure_current_trailing_newline();
         let after = self.editor.cursor();
         self.editor.set_cursor(
             Cursor {
@@ -1584,6 +1588,7 @@ impl App {
         if !self.editor.insert_newline_with_list_continuation() {
             return false;
         }
+        self.editor.ensure_current_trailing_newline();
         let after = self.editor.cursor();
         self.typed_span_start = Some(start);
         self.cat_span_fixed = Some(start);
@@ -1616,6 +1621,7 @@ impl App {
         }
         let changed = self.editor.backspace();
         if changed {
+            self.editor.ensure_current_trailing_newline();
             self.typed_span_start = None;
             self.last_leap_span = None;
             self.cat_span_fixed = None;
@@ -1637,6 +1643,7 @@ impl App {
             self.editor.backspace()
         };
         if changed {
+            self.editor.ensure_current_trailing_newline();
             self.typed_span_start = None;
             self.last_leap_span = None;
             self.cat_span_fixed = None;
@@ -1797,6 +1804,7 @@ impl App {
             }
             let previous_highlight = self.editor.cat_highlight();
             if self.editor.move_cat_highlight_to(destination) {
+                    self.editor.ensure_all_trailing_newlines();
                 self.edited(Instant::now());
                 self.status = "Moved highlighted text".into();
                 self.cat_span_fixed = None;
@@ -1939,6 +1947,7 @@ impl App {
             return false;
         }
         if self.editor.copy_cat_highlight() {
+            self.editor.ensure_current_trailing_newline();
             self.edited(Instant::now());
             self.status = "Copied highlighted text".into();
             true
@@ -1981,6 +1990,7 @@ impl App {
                 }
                 let previous_highlight = self.editor.cat_highlight();
                 if self.editor.move_cat_highlight_to(destination) {
+                    self.editor.ensure_all_trailing_newlines();
                     self.edited(Instant::now());
                     self.status = "Moved highlighted text".into();
                 } else if let Some((start, end)) = previous_highlight {
@@ -2387,7 +2397,11 @@ impl App {
             return Ok(());
         }
         let changed = if replaced_highlight {
-            self.editor.replace_cat_highlight(&link)
+            let changed = self.editor.replace_cat_highlight(&link);
+            if changed {
+                self.editor.ensure_current_trailing_newline();
+            }
+            changed
         } else {
             self.cat_insert(&link)
         };
@@ -3085,7 +3099,14 @@ fn load_editor(
             scroll = position.scroll;
         }
     }
-    Ok((CompositeEditor::new(regions, cursor), scroll))
+    let mut editor = CompositeEditor::new(regions, cursor);
+    if matches!(
+        view,
+        View::CreationDate(_) | View::ModificationDate | View::Work(_)
+    ) {
+        editor.ensure_all_trailing_newlines();
+    }
+    Ok((editor, scroll))
 }
 
 fn load_document_regions(archive: &Archive, documents: Vec<DocumentId>) -> AppResult<Vec<Region>> {
