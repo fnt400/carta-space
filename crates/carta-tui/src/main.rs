@@ -193,10 +193,9 @@ fn run() -> Result<(), Box<dyn Error>> {
         if !app.status.is_empty() {
             app.status.push_str(" · ");
         }
-        app.status
-            .push_str(
-                "Compatibility keyboard mode: C-p opens palette; enable Portable Keyboard Mode",
-            );
+        app.status.push_str(
+            "Compatibility keyboard mode: C-p opens palette; enable Portable Keyboard Mode",
+        );
     }
     let mut dispatcher = Dispatcher::default();
     let mut last_session_save = Instant::now();
@@ -3483,7 +3482,13 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(app.mode, AppMode::Editing));
-        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 11 });
+        assert_eq!(
+            app.editor.cursor(),
+            Cursor {
+                region: 0,
+                byte: 11
+            }
+        );
     }
 
     #[test]
