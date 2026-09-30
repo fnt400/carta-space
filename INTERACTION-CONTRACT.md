@@ -323,7 +323,7 @@ LEAP is momentary/quasimodal and incremental:
 - if no match exists, Carta rebounds to the original position;
 - the active query may be shown transiently and disappears when LEAP ends.
 
-A single match MUST be entirely within one Document. LEAP may navigate across Document boundaries, but the query cannot match text formed by concatenating the end of one Document and the beginning of another. Document boundaries do not synthesize LF characters.
+A single match MUST be entirely within one Document. LEAP may navigate across Document boundaries, but the query cannot match text formed by concatenating the end of one Document and the beginning of another. Document boundaries do not synthesize LF characters. Because canonical Document text always ends with at least one real LF, that final LF participates in LEAP matching exactly like any other LF.
 
 When an LF is the first character of the matching pattern, the logical Cat cursor rests on that LF. The TUI does not need to draw a special LF marker; the authored line break already supplies the visual structure.
 
@@ -810,7 +810,7 @@ Exports live outside the Archive.
 
 ## 13. Text format and assets
 
-Canonical Document text is UTF-8 with LF (`\n`) line endings.
+Canonical Document text is UTF-8 with LF (`\n`) line endings and always ends with at least one LF. If editing would remove the final LF, Carta restores it automatically.
 
 Carta-managed v0.1 content is text only.
 
