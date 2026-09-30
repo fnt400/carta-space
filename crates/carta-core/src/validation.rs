@@ -282,7 +282,7 @@ impl Scanner {
             let metadata_path = path.join("meta.json");
             let content_path = path.join("content.md");
             let metadata = self.read_document_metadata(&metadata_path);
-            self.validate_content(&content_path);
+            let content_bytes = self.read_validated_content(&content_path);
 
             let Some(metadata) = metadata else {
                 continue;
@@ -315,7 +315,7 @@ impl Scanner {
                 volume,
                 path: path.clone(),
                 metadata_bytes: self.read_canonical_bytes(&metadata_path),
-                content_bytes: self.read_canonical_bytes(&content_path),
+                content_bytes,
             };
             if documents.insert(directory_id, info).is_some() {
                 self.issue(path, ValidationIssueKind::DuplicateDocument(directory_id));
@@ -340,19 +340,25 @@ impl Scanner {
         }
     }
 
-    fn validate_content(&mut self, path: &Path) {
+    fn read_validated_content(&mut self, path: &Path) -> Vec<u8> {
         if !self.require_file(path) {
-            return;
+            return Vec::new();
         }
-        match fs::read_to_string(path) {
-            Ok(content) if content.contains('\r') => {
-                self.issue(path, ValidationIssueKind::NonCanonicalLineEndings);
+        match fs::read(path) {
+            Ok(bytes) => {
+                match std::str::from_utf8(&bytes) {
+                    Ok(content) if content.contains('\r') => {
+                        self.issue(path, ValidationIssueKind::NonCanonicalLineEndings);
+                    }
+                    Ok(_) => {}
+                    Err(_) => self.issue(path, ValidationIssueKind::InvalidUtf8),
+                }
+                bytes
             }
-            Ok(_) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {
-                self.issue(path, ValidationIssueKind::InvalidUtf8);
+            Err(error) => {
+                self.issue(path, ValidationIssueKind::Io(error.to_string()));
+                Vec::new()
             }
-            Err(error) => self.issue(path, ValidationIssueKind::Io(error.to_string())),
         }
     }
 
