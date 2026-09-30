@@ -41,9 +41,9 @@ If that default Archive path does not yet exist, the reference TUI asks whether 
 
 ### 1.3 Device-local UI state
 
-Cursor positions, scroll positions, the last View, per-Work resume positions, most-recently-used ordering, palette state, and similar UI conveniences are device-local, disposable, non-canonical state.
+Cursor positions, scroll positions, the last View, per-Work resume positions, most-recently-used ordering, palette state, host keyboard preferences, and similar UI conveniences are device-local, disposable, non-canonical state.
 
-They MUST NOT be required to reconstruct authored content or Work structure and SHOULD NOT be versioned in the Archive Git history. The reference TUI stores this state under the same Carta XDG data root, `$XDG_DATA_HOME/carta` (fallback `~/.local/share/carta`), outside the `archive/` Git working tree.
+They MUST NOT be required to reconstruct authored content or Work structure and SHOULD NOT be versioned in the Archive Git history. The reference TUI stores this state under the same Carta XDG data root, `$XDG_DATA_HOME/carta` (fallback `~/.local/share/carta`), outside the `archive/` Git working tree. Host keyboard preferences are stored separately per hostname so enabling Portable Keyboard Mode on one host does not enable it on another.
 
 ---
 
@@ -297,7 +297,7 @@ If the terminal cannot distinguish the required physical modifier keys and their
 
 `LEAP Forward…` and `LEAP Backward…` provide a transient incremental query using the normal LEAP matching semantics and end on explicit confirmation or cancellation. This compatibility mode does not change normal momentary LEAP semantics on capable terminals.
 
-The reference TUI also exposes `Enable Portable Keyboard Mode` / `Disable Portable Keyboard Mode` in the command palette. Portable Keyboard Mode is off by default and is runtime-local. In degraded terminals where enhanced keyboard reporting is unavailable, `Ctrl+P` acts as a portable Esc so the interface remains controllable even when Esc is intercepted upstream: from normal editing it opens the command palette, and in transient modes it performs the same cancel/back action as Esc. When portable mode is enabled, `Ctrl+B` starts the same transient backward LEAP used by the palette and `Ctrl+F` starts the corresponding forward LEAP; the user types the incremental pattern and presses Enter to finish. `Ctrl+R` performs Leap Again in the direction of the most recent portable LEAP, and while a sticky portable LEAP is still active it repeats that active query. These bindings are frontend fallbacks for terminal chains that cannot preserve physical modifier press/release events and do not alter native physical LEAP semantics.
+The reference TUI also exposes `Enable Portable Keyboard Mode` / `Disable Portable Keyboard Mode` in the command palette. Portable Keyboard Mode defaults to off on a host with no saved preference. Its enabled/disabled state is device-local, stored separately per hostname outside the Archive, and restored on later launches on that same host; it MUST NOT propagate through Archive synchronization to other hosts. While active, the status bar includes a persistent `[PORTABLE]` indicator. In degraded terminals where enhanced keyboard reporting is unavailable, `Ctrl+P` acts as a portable Esc so the interface remains controllable even when Esc is intercepted upstream: from normal editing it opens the command palette, and in transient modes it performs the same cancel/back action as Esc. When portable mode is enabled, `Ctrl+B` starts the same transient backward LEAP used by the palette and `Ctrl+F` starts the corresponding forward LEAP; the user types the incremental pattern and presses Enter to finish. `Ctrl+R` performs Leap Again in the direction of the most recent portable LEAP, and while a sticky portable LEAP is still active it repeats that active query. These bindings are frontend fallbacks for terminal chains that cannot preserve physical modifier press/release events and do not alter native physical LEAP semantics.
 
 ### 4.2 Scope
 

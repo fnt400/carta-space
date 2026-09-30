@@ -7,7 +7,8 @@ use carta_tui::app::{AppMode, View};
 use carta_tui::editor::{visual_ranges, Cursor};
 use carta_tui::help::{documents as help_documents, HelpKind};
 use carta_tui::session::{
-    data_root, default_archive_path, load_session, migrate_legacy_state, save_session,
+    current_host_name, data_root, default_archive_path, load_host_settings, load_session,
+    migrate_legacy_state, save_host_settings, save_session, HostSettings,
 };
 use carta_tui::App;
 use chrono::{Datelike, Local, Weekday};
@@ -184,7 +185,10 @@ fn run() -> Result<(), Box<dyn Error>> {
     };
     let session = load_session(&data, archive.metadata().archive_id())?;
     let archive_id = archive.metadata().archive_id();
+    let host_name = current_host_name();
+    let host_settings = load_host_settings(&data, &host_name)?;
     let mut app = App::open(archive, session.as_ref(), Instant::now())?;
+    app.set_portable_keyboard_mode(host_settings.portable_keyboard_mode);
     if let Some(status) = startup_sync_status {
         app.status = status;
     }
@@ -193,9 +197,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         if !app.status.is_empty() {
             app.status.push_str(" · ");
         }
-        app.status.push_str(
-            "Compatibility keyboard mode: C-p opens palette; enable Portable Keyboard Mode",
-        );
+        app.status.push_str(if app.portable_keyboard_mode() {
+            "Compatibility keyboard mode · Portable Keyboard Mode restored"
+        } else {
+            "Compatibility keyboard mode: C-p opens palette; enable Portable Keyboard Mode"
+        });
     }
     let mut dispatcher = Dispatcher::default();
     let mut last_session_save = Instant::now();
@@ -204,12 +210,22 @@ fn run() -> Result<(), Box<dyn Error>> {
         terminal.terminal.draw(|frame| draw(frame, &mut app))?;
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
+                let portable_before = app.portable_keyboard_mode();
                 if let Err(error) =
                     handle_key(&mut app, &mut dispatcher, key, terminal.enhancements)
                 {
                     app.status = error.to_string();
                     app.mode = AppMode::Editing;
                     let _ = app.reveal_conflicts();
+                }
+                if app.portable_keyboard_mode() != portable_before {
+                    save_host_settings(
+                        &data,
+                        &host_name,
+                        &HostSettings {
+                            portable_keyboard_mode: app.portable_keyboard_mode(),
+                        },
+                    )?;
                 }
             }
         }
@@ -1836,41 +1852,43 @@ fn parse_rgb(color: &str) -> Option<(u8, u8, u8)> {
     ))
 }
 
-fn lock_status(app: &App) -> String {
-    if !matches!(
+fn status_flags(app: &App) -> String {
+    let mut flags = Vec::new();
+    if app.portable_keyboard_mode() {
+        flags.push("[PORTABLE]");
+    }
+
+    if matches!(
         app.view,
         View::CreationDate(_) | View::ModificationDate | View::Work(_)
     ) {
-        return String::new();
-    }
-
-    let mut locks = Vec::new();
-    if let Some(document) = app.editor.current_document() {
-        if app
-            .archive
-            .document_is_explicitly_locked(document)
-            .unwrap_or(false)
-        {
-            locks.push("[LOCK DOC]");
-        } else if app.archive.document_is_locked(document).unwrap_or(false) {
-            locks.push("[LOCKED BY WORK]");
+        if let Some(document) = app.editor.current_document() {
+            if app
+                .archive
+                .document_is_explicitly_locked(document)
+                .unwrap_or(false)
+            {
+                flags.push("[LOCK DOC]");
+            } else if app.archive.document_is_locked(document).unwrap_or(false) {
+                flags.push("[LOCKED BY WORK]");
+            }
+        }
+        if let View::Work(work) = &app.view {
+            if app.archive.work_is_locked(*work).unwrap_or(false) {
+                flags.push("[LOCK WORK]");
+            }
         }
     }
-    if let View::Work(work) = &app.view {
-        if app.archive.work_is_locked(*work).unwrap_or(false) {
-            locks.push("[LOCK WORK]");
-        }
-    }
-    locks.join(" ")
+    flags.join(" ")
 }
 
 fn status_line(app: &App) -> String {
-    let lock = lock_status(app);
+    let flags = status_flags(app);
     if !app.status.is_empty() {
-        return if lock.is_empty() {
+        return if flags.is_empty() {
             app.status.clone()
         } else {
-            format!("{lock} · {}", app.status)
+            format!("{flags} · {}", app.status)
         };
     }
     let base = match &app.view {
@@ -1936,27 +1954,28 @@ fn status_line(app: &App) -> String {
             },
         ),
         View::Trash { selected } => {
-            let Some(trash) = &app.trash else {
-                return "Trash · 0/0".to_owned();
-            };
-            let total = trash.documents().len() + trash.works().len();
-            if let Some(document) = trash.documents().get(*selected) {
-                format!(
-                    "{} · Trash · Document: {} · {}",
-                    date_only(document.created()),
-                    document.label(),
-                    list_position(*selected, total)
-                )
-            } else if let Some(work) = selected
-                .checked_sub(trash.documents().len())
-                .and_then(|index| trash.works().get(index))
-            {
-                format!(
-                    "{} · Trash · Work: {} · {}",
-                    date_only(work.created()),
-                    work.title(),
-                    list_position(*selected, total)
-                )
+            if let Some(trash) = &app.trash {
+                let total = trash.documents().len() + trash.works().len();
+                if let Some(document) = trash.documents().get(*selected) {
+                    format!(
+                        "{} · Trash · Document: {} · {}",
+                        date_only(document.created()),
+                        document.label(),
+                        list_position(*selected, total)
+                    )
+                } else if let Some(work) = selected
+                    .checked_sub(trash.documents().len())
+                    .and_then(|index| trash.works().get(index))
+                {
+                    format!(
+                        "{} · Trash · Work: {} · {}",
+                        date_only(work.created()),
+                        work.title(),
+                        list_position(*selected, total)
+                    )
+                } else {
+                    "Trash · 0/0".to_owned()
+                }
             } else {
                 "Trash · 0/0".to_owned()
             }
@@ -1977,10 +1996,10 @@ fn status_line(app: &App) -> String {
             )
         }
     };
-    if lock.is_empty() {
+    if flags.is_empty() {
         base
     } else {
-        format!("{lock} · {base}")
+        format!("{flags} · {base}")
     }
 }
 fn current_label(app: &App) -> String {
@@ -2294,6 +2313,19 @@ mod tests {
         assert_eq!(app.editor.regions().last().unwrap().document, first);
         assert!(rendered_status_line(&app, 80).ends_with("Modification Date "));
         assert_ne!(status_style(&app).bg, creation_style.bg);
+    }
+
+    #[test]
+    fn portable_mode_is_visible_in_status_bar() {
+        let (_temporary, mut app) = app_with_documents(&["text"], false);
+
+        assert!(!rendered_status_line(&app, 80).contains("[PORTABLE]"));
+
+        app.set_portable_keyboard_mode(true);
+        assert!(rendered_status_line(&app, 80).contains("[PORTABLE]"));
+
+        app.status = "Temporary message".into();
+        assert!(rendered_status_line(&app, 80).contains("[PORTABLE]"));
     }
 
     #[test]

@@ -668,6 +668,13 @@ impl App {
         self.portable_keyboard_mode
     }
 
+    pub fn set_portable_keyboard_mode(&mut self, enabled: bool) {
+        self.portable_keyboard_mode = enabled;
+        if !enabled {
+            self.portable_leap_direction = None;
+        }
+    }
+
     pub fn start_portable_leap(&mut self, direction: LeapDirection) {
         self.portable_leap_direction = Some(direction);
         self.start_leap(direction, true);
@@ -859,13 +866,13 @@ impl App {
             SyncNow => self.sync_now(true)?,
             SyncSettings => self.open_sync_settings()?,
             EnablePortableKeyboardMode => {
-                self.portable_keyboard_mode = true;
+                self.set_portable_keyboard_mode(true);
                 self.status =
                     "Portable keyboard mode enabled: C-b = LEAP backward, C-f = LEAP forward"
                         .into();
             }
             DisablePortableKeyboardMode => {
-                self.portable_keyboard_mode = false;
+                self.set_portable_keyboard_mode(false);
                 self.status = "Portable keyboard mode disabled".into();
             }
             InsertDateTime => {

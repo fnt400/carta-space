@@ -39,6 +39,12 @@ pub struct Session {
     pub work_mru: Vec<WorkId>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct HostSettings {
+    #[serde(default)]
+    pub portable_keyboard_mode: bool,
+}
+
 impl Session {
     pub fn new(volume: Volume) -> Self {
         Self {
@@ -71,6 +77,51 @@ pub fn data_root() -> io::Result<PathBuf> {
 
 pub fn default_archive_path() -> io::Result<PathBuf> {
     Ok(data_root()?.join("archive"))
+}
+
+pub fn current_host_name() -> String {
+    std::env::var("HOSTNAME")
+        .ok()
+        .filter(|name| !name.trim().is_empty())
+        .or_else(|| {
+            fs::read_to_string("/etc/hostname")
+                .ok()
+                .map(|name| name.trim().to_owned())
+                .filter(|name| !name.is_empty())
+        })
+        .unwrap_or_else(|| "unknown-host".to_owned())
+}
+
+fn host_settings_path(root: &Path, host: &str) -> PathBuf {
+    let mut safe = String::new();
+    let mut separator = false;
+    for character in host.trim().chars() {
+        if character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.') {
+            safe.push(character);
+            separator = false;
+        } else if !safe.is_empty() {
+            separator = true;
+        }
+        if separator {
+            safe.push('-');
+            separator = false;
+        }
+    }
+    while safe.ends_with('-') {
+        safe.pop();
+    }
+    if safe.is_empty() {
+        safe.push_str("unknown-host");
+    }
+    root.join(format!("host-{safe}.json"))
+}
+
+pub fn load_host_settings(root: &Path, host: &str) -> io::Result<HostSettings> {
+    Ok(read_json(&host_settings_path(root, host))?.unwrap_or_default())
+}
+
+pub fn save_host_settings(root: &Path, host: &str, settings: &HostSettings) -> io::Result<()> {
+    write_json(&host_settings_path(root, host), settings)
 }
 
 pub fn migrate_legacy_state(root: &Path) -> io::Result<()> {
@@ -180,6 +231,42 @@ mod tests {
         let session = Session::new(volume);
         save_session(dir.path(), id, &session).unwrap();
         assert_eq!(load_session(dir.path(), id).unwrap(), Some(session));
+    }
+
+    #[test]
+    fn host_settings_are_isolated_by_host_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let enabled = HostSettings {
+            portable_keyboard_mode: true,
+        };
+
+        save_host_settings(dir.path(), "nixosvm", &enabled).unwrap();
+
+        assert_eq!(
+            load_host_settings(dir.path(), "nixosvm").unwrap(),
+            enabled
+        );
+        assert_eq!(
+            load_host_settings(dir.path(), "fermi").unwrap(),
+            HostSettings::default()
+        );
+        assert!(dir.path().join("host-nixosvm.json").exists());
+        assert!(!dir.path().join("host-fermi.json").exists());
+    }
+
+    #[test]
+    fn host_settings_filename_is_sanitized() {
+        let dir = tempfile::tempdir().unwrap();
+        save_host_settings(
+            dir.path(),
+            "nixos vm / ssh",
+            &HostSettings {
+                portable_keyboard_mode: true,
+            },
+        )
+        .unwrap();
+
+        assert!(dir.path().join("host-nixos-vm-ssh.json").exists());
     }
 
     #[test]
