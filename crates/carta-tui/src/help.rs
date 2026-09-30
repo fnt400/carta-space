@@ -138,7 +138,7 @@ Creating a Cat highlight also copies its text to the system clipboard. Clipboard
     },
     HelpDocument {
         title: "7. Undo, redo and structural commands",
-        body: r#"RightCtrl+Z performs Undo and RightCtrl+R performs Redo. Undo/Redo operate on the current in-memory editing history.
+        body: r#"RightCtrl+Z performs Undo and RightCtrl+R performs Redo. Undo/Redo operate on the current in-memory editing history. Consecutive character typing is grouped into a single undo step until navigation, another edit type, or autosave closes that typing run.
 
 RightCtrl+W opens the Work selector. RightCtrl+L inserts a link at point, or opens the existing link when point is already inside one.
 
