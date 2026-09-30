@@ -175,7 +175,7 @@ fn normalizes_created_document_content_to_lf() {
 
     assert_eq!(
         archive.read_document(document).unwrap().content(),
-        "first\nsecond\nthird"
+        "first\nsecond\nthird\n"
     );
     Archive::validate(archive.root()).unwrap();
 }
@@ -511,7 +511,7 @@ fn duplicates_as_a_neutral_document_with_new_identity() {
     assert_ne!(duplicate, source);
     assert_eq!(
         archive.read_document(duplicate).unwrap().content(),
-        "same body"
+        "same body\n"
     );
     assert!(archive.memberships(duplicate).unwrap().is_empty());
     assert_eq!(archive.memberships(source).unwrap(), vec![work]);
@@ -525,10 +525,10 @@ fn creates_linked_document_at_a_utf8_byte_boundary() {
         .new_linked_document(source, "caffè".len(), "Continue [here]")
         .unwrap();
 
-    assert_eq!(archive.read_document(target).unwrap().content(), "");
+    assert_eq!(archive.read_document(target).unwrap().content(), "\n");
     assert_eq!(
         archive.read_document(source).unwrap().content(),
-        format!("caffè[Continue \\[here\\]](carta:doc:{target}) fine")
+        format!("caffè[Continue \\[here\\]](carta:doc:{target}) fine\n")
     );
     assert!(archive.memberships(target).unwrap().is_empty());
 }
@@ -549,8 +549,8 @@ fn splits_document_at_point_and_preserves_work_order() {
 
     let target = archive.split_document_at(source, 6).unwrap();
 
-    assert_eq!(archive.read_document(source).unwrap().content(), "alpha ");
-    assert_eq!(archive.read_document(target).unwrap().content(), "beta");
+    assert_eq!(archive.read_document(source).unwrap().content(), "alpha \n");
+    assert_eq!(archive.read_document(target).unwrap().content(), "beta\n");
     let target_created = archive
         .documents()
         .find(|info| info.id() == target)
@@ -661,7 +661,7 @@ fn recovers_complete_unambiguous_document_staging_and_preserves_resources() {
     fs::rename(&destination, &staging).unwrap();
 
     let recovered = Archive::open(archive.root()).unwrap();
-    assert_eq!(recovered.read_document(document).unwrap().content(), "body");
+    assert_eq!(recovered.read_document(document).unwrap().content(), "body\n");
     assert_eq!(
         fs::read_to_string(destination.join("future-resource")).unwrap(),
         "keep"
@@ -690,7 +690,7 @@ fn rolls_forward_linked_staging_when_the_source_link_was_saved() {
         .unwrap();
 
     let recovered = Archive::open(archive.root()).unwrap();
-    assert_eq!(recovered.read_document(target).unwrap().content(), "");
+    assert_eq!(recovered.read_document(target).unwrap().content(), "\n");
     assert!(destination.is_dir());
     assert!(!staging.exists());
 }
@@ -797,14 +797,14 @@ fn lists_reads_and_restores_document_revisions_without_rewriting_history() {
 
     let revisions = archive.document_revisions(document).unwrap();
     assert_eq!(revisions.len(), 2);
-    assert_eq!(revisions[0].document().content(), "version two");
-    assert_eq!(revisions[1].document().content(), "version one");
+    assert_eq!(revisions[0].document().content(), "version two\n");
+    assert_eq!(revisions[1].document().content(), "version one\n");
     assert_eq!(
         archive
             .read_document_revision(document, first.id())
             .unwrap()
             .content(),
-        "version one"
+        "version one\n"
     );
 
     let restored = archive
@@ -827,7 +827,7 @@ fn lists_reads_and_restores_document_revisions_without_rewriting_history() {
     assert_ne!(new_document, document);
     assert_eq!(
         archive.read_document(new_document).unwrap().content(),
-        "version two"
+        "version two\n"
     );
     assert!(archive.memberships(new_document).unwrap().is_empty());
 }
@@ -867,8 +867,8 @@ fn historical_work_snapshot_and_restore_are_integral() {
     let snapshot = archive.work_snapshot(work, historical.id()).unwrap();
     assert_eq!(snapshot.title(), "Old title");
     assert_eq!(snapshot.document_ids(), &[second, first]);
-    assert_eq!(snapshot.documents()[0].content(), "second old");
-    assert_eq!(snapshot.documents()[1].content(), "first old");
+    assert_eq!(snapshot.documents()[0].content(), "second old\n");
+    assert_eq!(snapshot.documents()[1].content(), "first old\n");
 
     archive
         .restore_work_version(work, historical.id(), WorkRestoreOptions::default())
@@ -881,10 +881,10 @@ fn historical_work_snapshot_and_restore_are_integral() {
         archive.work(work).unwrap().metadata().extensions()["future"],
         serde_json::json!({"generation": "current"})
     );
-    assert_eq!(archive.read_document(first).unwrap().content(), "first old");
+    assert_eq!(archive.read_document(first).unwrap().content(), "first old\n");
     assert_eq!(
         archive.read_document(second).unwrap().content(),
-        "second old"
+        "second old\n"
     );
     assert!(archive
         .history()
@@ -943,7 +943,7 @@ fn work_restore_requires_consent_before_restoring_required_trashed_documents() {
     assert_eq!(archive.work(work).unwrap().documents(), &[kept, trashed]);
     assert_eq!(
         archive.read_document(trashed).unwrap().content(),
-        "restore me"
+        "restore me\n"
     );
 }
 
@@ -997,7 +997,7 @@ fn restore_refuses_to_mix_with_uncheckpointed_changes() {
     ));
     assert_eq!(
         archive.read_document(document).unwrap().content(),
-        "uncheckpointed"
+        "uncheckpointed\n"
     );
 }
 
@@ -1104,7 +1104,7 @@ fn reopen_rolls_back_interrupted_multi_object_trash_and_preserves_untracked_reso
     let recovered = Archive::open(document_path.ancestors().nth(4).unwrap()).unwrap();
     assert_eq!(
         recovered.read_document(document).unwrap().content(),
-        "must survive"
+        "must survive\n"
     );
     assert_eq!(recovered.work(work).unwrap().documents(), &[document]);
     assert!(!recovered.root().join(transaction).exists());
@@ -1161,7 +1161,7 @@ fn reopen_rolls_back_interrupted_new_linked_document() {
     drop(archive);
 
     let recovered = Archive::open(&root).unwrap();
-    assert_eq!(recovered.read_document(source).unwrap().content(), "source");
+    assert_eq!(recovered.read_document(source).unwrap().content(), "source\n");
     assert!(!target_path.exists());
 }
 
@@ -1238,7 +1238,7 @@ fn interrupted_recovery_preserves_changed_owned_path_as_conflict() {
     let recovered = Archive::open(&root).unwrap();
     assert_eq!(
         recovered.read_document(document).unwrap().content(),
-        "before crash"
+        "before crash\n"
     );
     let conflicts = recovered.conflicts().unwrap();
     assert_eq!(conflicts.len(), 1);
@@ -1247,7 +1247,7 @@ fn interrupted_recovery_preserves_changed_owned_path_as_conflict() {
     };
     assert_eq!(conflict.document(), document);
     assert_eq!(conflict.local(), b"changed after crash");
-    assert_eq!(conflict.external(), b"before crash");
+    assert_eq!(conflict.external(), b"before crash\n");
 }
 
 #[test]
@@ -1293,7 +1293,7 @@ fn interrupted_recovery_preserves_changed_operation_created_document() {
         .unwrap();
     assert_eq!(
         recovered.read_document(document).unwrap().content(),
-        "created after crash"
+        "created after crash\n"
     );
 }
 
@@ -1368,7 +1368,7 @@ fn document_lock_persists_and_blocks_content_changes() {
     assert!(reopened.document_is_explicitly_locked(document).unwrap());
     assert_eq!(
         reopened.read_document(document).unwrap().content(),
-        "original"
+        "original\n"
     );
 
     reopened.set_document_locked(document, false).unwrap();
@@ -1376,7 +1376,7 @@ fn document_lock_persists_and_blocks_content_changes() {
     assert!(!reopened.document_is_locked(document).unwrap());
     assert_eq!(
         reopened.read_document(document).unwrap().content(),
-        "changed"
+        "changed\n"
     );
 }
 
@@ -1417,7 +1417,7 @@ fn work_lock_makes_member_documents_effectively_read_only() {
 
     archive.set_document_locked(first, false).unwrap();
     archive.edit_document(first, "changed").unwrap();
-    assert_eq!(archive.read_document(first).unwrap().content(), "changed");
+    assert_eq!(archive.read_document(first).unwrap().content(), "changed\n");
 }
 
 #[test]
@@ -1430,8 +1430,8 @@ fn unchanged_locked_document_does_not_block_other_document_saves() {
     archive.edit_document(locked, "locked").unwrap();
     archive.edit_document(writable, "after").unwrap();
 
-    assert_eq!(archive.read_document(locked).unwrap().content(), "locked");
-    assert_eq!(archive.read_document(writable).unwrap().content(), "after");
+    assert_eq!(archive.read_document(locked).unwrap().content(), "locked\n");
+    assert_eq!(archive.read_document(writable).unwrap().content(), "after\n");
     assert!(matches!(
         archive.edit_document(locked, "changed"),
         Err(Error::DocumentLocked(id)) if id == locked
