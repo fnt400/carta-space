@@ -92,7 +92,7 @@ impl Archive {
         if normalized_legacy_documents && !was_dirty {
             crate::history::require_checkpoint(
                 &root,
-                crate::CheckpointKind::Structural,
+                crate::CheckpointKind::Automatic,
                 Some("Normalized legacy Document trailing LF"),
             )?;
         }
