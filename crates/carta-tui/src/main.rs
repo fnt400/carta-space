@@ -3400,6 +3400,31 @@ mod tests {
     }
 
     #[test]
+    fn emergency_input_detector_recognizes_right_control_g() {
+        let mut right_control_held = false;
+        let press = Event::Key(KeyEvent::new(
+            KeyCode::Modifier(ModifierKeyCode::RightControl),
+            KeyModifiers::CONTROL,
+        ));
+        assert!(!emergency_kill_event(&press, &mut right_control_held));
+        assert!(right_control_held);
+
+        let kill = Event::Key(KeyEvent::new(
+            KeyCode::Char('g'),
+            KeyModifiers::CONTROL,
+        ));
+        assert!(emergency_kill_event(&kill, &mut right_control_held));
+
+        let release = Event::Key(KeyEvent::new_with_kind(
+            KeyCode::Modifier(ModifierKeyCode::RightControl),
+            KeyModifiers::NONE,
+            KeyEventKind::Release,
+        ));
+        assert!(!emergency_kill_event(&release, &mut right_control_held));
+        assert!(!right_control_held);
+    }
+
+    #[test]
     fn right_control_g_triggers_emergency_quit() {
         let (_temporary, mut app) = app_with_documents(&["a"], false);
         let mut dispatcher = Dispatcher::default();
