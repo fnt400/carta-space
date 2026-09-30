@@ -512,15 +512,15 @@ fn handle_key(
         && key.modifiers.contains(KeyModifiers::CONTROL)
         && matches!(key.code, KeyCode::Char('p' | 'P'))
         && (!enhanced || app.portable_keyboard_mode())
-        && matches!(app.mode, AppMode::Editing | AppMode::Leap { .. })
     {
         dispatcher.pending_leap = None;
         dispatcher.active_leap = None;
-        if matches!(app.mode, AppMode::Leap { .. }) {
-            app.cancel_leap();
-        }
-        app.open_palette();
-        return Ok(());
+        return handle_key(
+            app,
+            dispatcher,
+            KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
+            enhanced,
+        );
     }
 
     if app.portable_keyboard_mode()
@@ -3392,7 +3392,7 @@ mod tests {
     }
 
     #[test]
-    fn degraded_control_p_opens_palette_without_escape() {
+    fn degraded_control_p_behaves_like_escape() {
         let (_temporary, mut app) = app_with_documents(&["alpha"], false);
         let mut dispatcher = Dispatcher::default();
 
@@ -3403,8 +3403,16 @@ mod tests {
             false,
         )
         .unwrap();
-
         assert!(matches!(app.mode, AppMode::Palette { .. }));
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL),
+            false,
+        )
+        .unwrap();
+        assert!(matches!(app.mode, AppMode::Editing));
     }
 
     #[test]
@@ -3529,7 +3537,7 @@ mod tests {
     }
 
     #[test]
-    fn portable_control_p_cancels_active_leap_and_opens_palette() {
+    fn portable_control_p_cancels_active_leap_like_escape() {
         let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
         let mut dispatcher = Dispatcher::default();
         app.execute(carta_tui::Command::EnablePortableKeyboardMode)
@@ -3557,7 +3565,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(matches!(app.mode, AppMode::Palette { .. }));
+        assert!(matches!(app.mode, AppMode::Editing));
         assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 0 });
     }
 
