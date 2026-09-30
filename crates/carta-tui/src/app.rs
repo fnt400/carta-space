@@ -3581,7 +3581,7 @@ mod tests {
         app.autosave().unwrap();
 
         let document = app.editor.current_document().unwrap();
-        assert_eq!(app.archive.read_document(document).unwrap().content(), "x");
+        assert_eq!(app.archive.read_document(document).unwrap().content(), "x\n");
         assert!(app.provisional.is_none());
     }
 
@@ -3999,7 +3999,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             app.archive.read_document(document).unwrap().content(),
-            "base local"
+            "base local\n"
         );
         assert!(app.archive.conflicts().unwrap().is_empty());
     }
@@ -4079,7 +4079,7 @@ mod tests {
         assert_eq!(app.archive.conflicts().unwrap().len(), 1);
         assert_eq!(
             app.archive.read_document(second).unwrap().content(),
-            "second saved"
+            "second saved\n"
         );
         assert!(!app.editor.is_dirty());
     }
@@ -4154,9 +4154,9 @@ mod tests {
         assert!(error.to_string().contains("injected"));
         assert_eq!(
             app.archive.read_document(second).unwrap().content(),
-            "second durable"
+            "second durable\n"
         );
-        assert_eq!(app.archive.read_document(first).unwrap().content(), "first");
+        assert_eq!(app.archive.read_document(first).unwrap().content(), "first\n");
         assert!(app.editor.is_dirty());
     }
 
@@ -4397,16 +4397,16 @@ mod tests {
         assert!(app.extend_last_leap_highlight());
         assert_eq!(app.editor.selected_text().as_deref(), Some("abc"));
         assert!(app.cat_erase());
-        assert_eq!(app.editor.current_text(), Some(""));
+        assert_eq!(app.editor.current_text(), Some("\n"));
 
         assert!(app.cat_insert("xy"));
         assert!(app.cat_erase());
-        assert_eq!(app.editor.current_text(), Some("x"));
+        assert_eq!(app.editor.current_text(), Some("x\n"));
 
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
         app.cat_navigation();
         assert!(app.cat_erase());
-        assert_eq!(app.editor.current_text(), Some(""));
+        assert_eq!(app.editor.current_text(), Some("\n"));
     }
 
     #[test]
@@ -4663,23 +4663,23 @@ mod tests {
         assert!(app.palette_commands("").contains(&Command::Undo));
 
         app.execute(Command::Undo).unwrap();
-        assert_eq!(app.editor.current_text(), Some("first"));
+        assert_eq!(app.editor.current_text(), Some("first\n"));
         assert!(app.editor.is_dirty());
         assert!(app.commands().contains(&Command::Redo));
         assert!(app.palette_commands("").contains(&Command::Redo));
         app.tick(Instant::now() + Duration::from_secs(2)).unwrap();
         assert_eq!(
             app.archive.read_document(document).unwrap().content(),
-            "first"
+            "first\n"
         );
 
         app.execute(Command::Redo).unwrap();
-        assert_eq!(app.editor.current_text(), Some("first second"));
+        assert_eq!(app.editor.current_text(), Some("first second\n"));
         assert!(app.editor.is_dirty());
         app.tick(Instant::now() + Duration::from_secs(2)).unwrap();
         assert_eq!(
             app.archive.read_document(document).unwrap().content(),
-            "first second"
+            "first second\n"
         );
     }
 
