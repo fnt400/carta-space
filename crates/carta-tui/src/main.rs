@@ -200,7 +200,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         app.status.push_str(if app.portable_keyboard_mode() {
             "Compatibility keyboard mode · Portable Keyboard Mode restored"
         } else {
-            "Compatibility keyboard mode: C-p opens palette; enable Portable Keyboard Mode"
+            "Compatibility keyboard mode: enable Portable Keyboard Mode from the palette"
         });
     }
     let mut dispatcher = Dispatcher::default();
@@ -526,7 +526,7 @@ fn handle_key(
         && key.kind == KeyEventKind::Press
         && key.modifiers.contains(KeyModifiers::CONTROL)
         && matches!(key.code, KeyCode::Char('p' | 'P'))
-        && (!enhanced || app.portable_keyboard_mode())
+        && app.portable_keyboard_mode()
     {
         dispatcher.pending_leap = None;
         dispatcher.active_leap = None;
@@ -3423,9 +3423,10 @@ mod tests {
     }
 
     #[test]
-    fn degraded_control_p_behaves_like_escape() {
+    fn control_p_is_not_intercepted_when_portable_mode_is_disabled() {
         let (_temporary, mut app) = app_with_documents(&["alpha"], false);
         let mut dispatcher = Dispatcher::default();
+        let original_cursor = app.editor.cursor();
 
         handle_key(
             &mut app,
@@ -3434,16 +3435,10 @@ mod tests {
             false,
         )
         .unwrap();
-        assert!(matches!(app.mode, AppMode::Palette { .. }));
 
-        handle_key(
-            &mut app,
-            &mut dispatcher,
-            KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL),
-            false,
-        )
-        .unwrap();
         assert!(matches!(app.mode, AppMode::Editing));
+        assert_eq!(app.editor.cursor(), original_cursor);
+        assert!(!app.portable_keyboard_mode());
     }
 
     #[test]

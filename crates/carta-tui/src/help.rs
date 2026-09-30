@@ -35,7 +35,7 @@ Right Ctrl + Left Alt       Leap Again forward
 Right Ctrl + Left Ctrl      Leap Again backward
 Portable Keyboard Mode      Enable/disable from the command palette
 [PORTABLE]                  Shown in the status bar while portable mode is active
-Ctrl+P (portable/degraded)  Portable Esc: palette/cancel
+Ctrl+P (portable mode)      Portable Esc: palette/cancel
 Ctrl+B (portable mode)      Start sticky LEAP backward; Enter confirms
 Ctrl+F (portable mode)      Start sticky LEAP forward; Enter confirms
 Ctrl+R (portable mode)      Leap Again in the last portable LEAP direction
@@ -192,9 +192,9 @@ Left Control and Left Alt are the two LEAP keys. Right Alt/AltGr is reserved for
 
 When enhanced keyboard reporting is unavailable, Carta remains usable in compatibility mode and exposes LEAP commands through the command palette.
 
-For terminals that cannot deliver physical modifier press/release events, Ctrl+P acts as a portable Esc even when Esc itself is intercepted upstream: in normal editing it opens the command palette, while in palettes, prompts, selectors, confirmations, and LEAP it performs the same cancel/back action as Esc. Enable Portable Keyboard Mode from the palette. While it is enabled, Ctrl+B starts a sticky backward LEAP and Ctrl+F starts a sticky forward LEAP; type the pattern and press Enter to finish. Ctrl+R performs Leap Again in the direction of the most recent portable LEAP; during an active sticky LEAP it advances the current query immediately.
+For terminals that cannot deliver physical modifier press/release events, enable Portable Keyboard Mode from the palette. While it is enabled, Ctrl+P acts as a portable Esc: in normal editing it opens the command palette, while in palettes, prompts, selectors, confirmations, and LEAP it performs the same cancel/back action as Esc. Ctrl+B starts a sticky backward LEAP and Ctrl+F starts a sticky forward LEAP; type the pattern and press Enter to finish. Ctrl+R performs Leap Again in the direction of the most recent portable LEAP; during an active sticky LEAP it advances the current query immediately.
 
-Portable Keyboard Mode defaults to off on a host that has no saved preference. Its enabled/disabled state is then remembered locally for that host and restored on later Carta launches on the same machine; it is not Archive metadata and is not carried to other hosts. The status bar shows [PORTABLE] whenever the mode is active. Native physical LEAP bindings remain unchanged."#,
+Portable Keyboard Mode defaults to off on a host that has no saved preference. Its enabled/disabled state is then remembered locally for that host and restored on later Carta launches on the same machine; it is not Archive metadata and is not carried to other hosts. The status bar shows [PORTABLE] whenever the mode is active. When Portable Keyboard Mode is disabled, Ctrl+P is not intercepted by Carta. Native physical LEAP bindings remain unchanged."#,
     },
 ];
 
