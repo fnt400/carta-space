@@ -29,7 +29,7 @@ fn document_divergence_preserves_both_variants_and_resolves_explicitly() {
     let Conflict::Document(conflict) = &conflicts[0] else {
         panic!("expected Document conflict")
     };
-    assert_eq!(conflict.local(), b"local");
+    assert_eq!(conflict.local(), b"local\n");
     assert_eq!(conflict.external(), b"external");
     let package = temporary.path().join("conflicted.cat");
     archive.package(&package).unwrap();
@@ -49,10 +49,10 @@ fn document_divergence_preserves_both_variants_and_resolves_explicitly() {
         .resolve_document_conflict(&conflict_id, ConflictChoice::Local, true)
         .unwrap()
         .unwrap();
-    assert_eq!(archive.read_document(document).unwrap().content(), "local");
+    assert_eq!(archive.read_document(document).unwrap().content(), "local\n");
     assert_eq!(
         archive.read_document(preserved).unwrap().content(),
-        "external"
+        "external\n"
     );
     assert!(archive.conflicts().unwrap().is_empty());
 }
@@ -116,7 +116,7 @@ fn externally_missing_document_preserves_local_and_last_loaded_variants() {
         panic!("expected Document conflict")
     };
     assert!(conflict.external_missing());
-    assert_eq!(conflict.external(), b"last loaded");
+    assert_eq!(conflict.external(), b"last loaded\n");
     drop(archive);
 
     let mut archive = Archive::open(&root).unwrap();
@@ -127,11 +127,11 @@ fn externally_missing_document_preserves_local_and_last_loaded_variants() {
         .unwrap();
     assert_eq!(
         archive.read_document(document).unwrap().content(),
-        "local intended"
+        "local intended\n"
     );
     assert_eq!(
         archive.read_document(preserved).unwrap().content(),
-        "last loaded"
+        "last loaded\n"
     );
 }
 
