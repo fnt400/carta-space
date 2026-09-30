@@ -1251,18 +1251,20 @@ impl App {
         Ok(())
     }
 
-    pub fn tick(&mut self, now: Instant) -> AppResult {
+    pub fn tick(&mut self, now: Instant) -> AppResult<bool> {
         if self.quit {
-            return Ok(());
+            return Ok(false);
         }
-        self.expire_status(now);
+        let mut redraw = self.expire_status(now);
         if self.scheduler.autosave_due(now, self.editor.is_dirty()) {
             self.autosave()?;
+            redraw = true;
         }
         if self.scheduler.checkpoint_due(now) {
             self.autosave()?;
             self.checkpoint(CheckpointKind::Automatic, None)?;
             self.scheduler.checkpointed(now);
+            redraw = true;
         }
         if self.scheduler.sync_due(now)
             && matches!(self.mode, AppMode::Editing)
@@ -1276,18 +1278,19 @@ impl App {
         {
             if self.archive.sync_remote()?.is_some() {
                 self.sync_now(false)?;
+                redraw = true;
             } else {
                 self.scheduler.sync_attempted(now);
             }
         }
-        Ok(())
+        Ok(redraw)
     }
 
-    fn expire_status(&mut self, now: Instant) {
+    fn expire_status(&mut self, now: Instant) -> bool {
         if self.status != self.status_observed {
             self.status_observed.clone_from(&self.status);
             self.status_since = (!self.status.is_empty()).then_some(now);
-            return;
+            return false;
         }
 
         if !self.status.is_empty()
@@ -1298,7 +1301,9 @@ impl App {
             self.status.clear();
             self.status_observed.clear();
             self.status_since = None;
+            return true;
         }
+        false
     }
 
     pub fn edited(&mut self, now: Instant) {
