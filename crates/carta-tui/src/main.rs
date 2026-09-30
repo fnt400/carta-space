@@ -3442,6 +3442,37 @@ mod tests {
     }
 
     #[test]
+    fn control_p_remains_normal_backward_leap_input_when_portable_mode_is_disabled() {
+        let (_temporary, mut app) = app_with_documents(&["alpha"], false);
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
+
+        let AppMode::Leap { session, palette } = &app.mode else {
+            panic!("expected native backward LEAP")
+        };
+        assert_eq!(session.direction(), LeapDirection::Backward);
+        assert_eq!(session.query(), "p");
+        assert!(!palette);
+    }
+
+    #[test]
     fn portable_keyboard_mode_maps_control_b_and_f_to_palette_leap() {
         let (_temporary, mut app) = app_with_documents(&["alpha beta gamma"], false);
         let mut dispatcher = Dispatcher::default();
