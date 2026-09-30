@@ -310,7 +310,7 @@ Document identity MUST NOT depend on title, position, pathname beyond the UUID d
 
 A Document title, when present, SHOULD be represented in the Markdown body, normally as a heading. Draft 0.1 defines no separate Document title metadata field.
 
-Canonical Document text MUST use LF (`U+000A`) line endings. Writers importing text with CRLF SHOULD normalize it to LF.
+Canonical Document text MUST use LF (`U+000A`) line endings and MUST end with at least one LF. Writers importing text with CRLF SHOULD normalize it to LF, and writers MUST append a final LF when it is absent. Existing additional trailing blank lines MUST NOT be removed merely to enforce this invariant.
 
 Carta Space Draft 0.1 defines no Markdown extensions.
 
