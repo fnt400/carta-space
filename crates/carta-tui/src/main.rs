@@ -39,7 +39,7 @@ use std::fs;
 use std::io::{self, Stdout, Write};
 use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 use theme::markdown_theme;
 use unicode_width::UnicodeWidthChar;
@@ -98,6 +98,56 @@ impl Drop for TerminalGuard {
         let _ = execute!(self.terminal.backend_mut(), Show, LeaveAlternateScreen);
         let _ = disable_raw_mode();
     }
+}
+
+fn spawn_input_reader(enhancements: bool) -> mpsc::Receiver<io::Result<Event>> {
+    let (sender, receiver) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut right_control_held = false;
+        loop {
+            match event::read() {
+                Ok(event) => {
+                    if emergency_kill_event(&event, &mut right_control_held) {
+                        emergency_terminal_exit(enhancements);
+                    }
+                    if sender.send(Ok(event)).is_err() {
+                        break;
+                    }
+                }
+                Err(error) => {
+                    let _ = sender.send(Err(error));
+                    break;
+                }
+            }
+        }
+    });
+    receiver
+}
+
+fn emergency_kill_event(event: &Event, right_control_held: &mut bool) -> bool {
+    let Event::Key(key) = event else {
+        return false;
+    };
+    if key.code == KeyCode::Modifier(ModifierKeyCode::RightControl) {
+        match key.kind {
+            KeyEventKind::Press | KeyEventKind::Repeat => *right_control_held = true,
+            KeyEventKind::Release => *right_control_held = false,
+        }
+        return false;
+    }
+    *right_control_held
+        && matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat)
+        && key.modifiers.contains(KeyModifiers::CONTROL)
+        && matches!(key.code, KeyCode::Char('g' | 'G'))
+}
+
+fn emergency_terminal_exit(enhancements: bool) -> ! {
+    if enhancements {
+        let _ = execute!(io::stdout(), PopKeyboardEnhancementFlags);
+    }
+    let _ = execute!(io::stdout(), Show, LeaveAlternateScreen);
+    let _ = disable_raw_mode();
+    std::process::exit(130);
 }
 
 fn main() {
@@ -219,6 +269,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             "Compatibility keyboard mode: enable Portable Keyboard Mode from the palette"
         });
     }
+    let input = spawn_input_reader(terminal.enhancements);
     let mut dispatcher = Dispatcher::default();
     let mut last_session_save = Instant::now();
     let mut last_saved_session = session;
@@ -229,30 +280,37 @@ fn run() -> Result<(), Box<dyn Error>> {
             terminal.terminal.draw(|frame| draw(frame, &mut app))?;
             redraw = false;
         }
-        if event::poll(Duration::from_millis(100))? {
-            match event::read()? {
-                Event::Key(key) => {
-                    let portable_before = app.portable_keyboard_mode();
-                    if let Err(error) =
-                        handle_key(&mut app, &mut dispatcher, key, terminal.enhancements)
-                    {
-                        app.status = error.to_string();
-                        app.mode = AppMode::Editing;
-                        let _ = app.reveal_conflicts();
-                    }
-                    if app.portable_keyboard_mode() != portable_before {
-                        save_host_settings(
-                            &data,
-                            &host_name,
-                            &HostSettings {
-                                portable_keyboard_mode: app.portable_keyboard_mode(),
-                            },
-                        )?;
-                    }
-                    redraw = true;
+        match input.recv_timeout(Duration::from_millis(100)) {
+            Ok(Ok(Event::Key(key))) => {
+                let portable_before = app.portable_keyboard_mode();
+                if let Err(error) =
+                    handle_key(&mut app, &mut dispatcher, key, terminal.enhancements)
+                {
+                    app.status = error.to_string();
+                    app.mode = AppMode::Editing;
+                    let _ = app.reveal_conflicts();
                 }
-                Event::Resize(_, _) => redraw = true,
-                _ => {}
+                if app.portable_keyboard_mode() != portable_before {
+                    save_host_settings(
+                        &data,
+                        &host_name,
+                        &HostSettings {
+                            portable_keyboard_mode: app.portable_keyboard_mode(),
+                        },
+                    )?;
+                }
+                redraw = true;
+            }
+            Ok(Ok(Event::Resize(_, _))) => redraw = true,
+            Ok(Ok(_)) => {}
+            Ok(Err(error)) => return Err(error.into()),
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "terminal input reader stopped",
+                )
+                .into());
             }
         }
         if app.quit {
