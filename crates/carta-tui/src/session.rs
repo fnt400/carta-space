@@ -94,17 +94,16 @@ pub fn current_host_name() -> String {
 
 fn host_settings_path(root: &Path, host: &str) -> PathBuf {
     let mut safe = String::new();
-    let mut separator = false;
+    let mut separator_pending = false;
     for character in host.trim().chars() {
         if character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.') {
+            if separator_pending && !safe.is_empty() {
+                safe.push('-');
+            }
             safe.push(character);
-            separator = false;
+            separator_pending = false;
         } else if !safe.is_empty() {
-            separator = true;
-        }
-        if separator {
-            safe.push('-');
-            separator = false;
+            separator_pending = true;
         }
     }
     while safe.ends_with('-') {
