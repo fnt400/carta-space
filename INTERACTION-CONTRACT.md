@@ -454,6 +454,8 @@ Clipboard integration belongs to the frontend, not the archive/core model. Clipb
 
 Undo/Redo are session-local editing facilities.
 
+Consecutive single-character typing at the same insertion point is grouped into one undoable typing run. Navigation, another kind of edit, or the next completed autosave closes the current typing run.
+
 They MAY include recent structural actions such as Work membership/order changes, but they are not an interface to Git history.
 
 Undo/Redo state may be lost when Carta exits.
