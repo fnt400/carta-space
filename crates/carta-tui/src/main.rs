@@ -129,9 +129,10 @@ fn emergency_kill_event(event: &Event, right_control_held: &mut bool) -> bool {
         return false;
     };
     if key.code == KeyCode::Modifier(ModifierKeyCode::RightControl) {
-        match key.kind {
-            KeyEventKind::Press | KeyEventKind::Repeat => *right_control_held = true,
-            KeyEventKind::Release => *right_control_held = false,
+        if matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) {
+            *right_control_held = true;
+        } else if key.kind == KeyEventKind::Release {
+            *right_control_held = false;
         }
         return false;
     }
