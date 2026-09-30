@@ -200,6 +200,65 @@ fn rejects_noncanonical_external_line_endings() {
 }
 
 #[test]
+fn open_migrates_clean_legacy_document_to_trailing_lf() {
+    let (_temporary, mut archive) = create_archive();
+    let document = archive.create_document("body").unwrap();
+    archive
+        .checkpoint(CheckpointKind::Structural, Some("Created Document"))
+        .unwrap();
+    let path = archive
+        .documents()
+        .find(|info| info.id() == document)
+        .unwrap()
+        .path()
+        .join("content.md");
+    fs::write(&path, b"body").unwrap();
+    archive
+        .checkpoint(
+            CheckpointKind::Structural,
+            Some("Legacy Document without trailing LF"),
+        )
+        .unwrap();
+    let history_before = archive.history().unwrap().len();
+    let root = archive.root().to_path_buf();
+    drop(archive);
+
+    let reopened = Archive::open(&root).unwrap();
+
+    assert_eq!(reopened.read_document(document).unwrap().content(), "body\n");
+    assert!(!reopened.is_dirty().unwrap());
+    assert_eq!(reopened.history().unwrap().len(), history_before + 1);
+    Archive::validate(&root).unwrap();
+}
+
+#[test]
+fn open_normalizes_dirty_legacy_document_without_committing_external_changes() {
+    let (_temporary, mut archive) = create_archive();
+    let document = archive.create_document("body").unwrap();
+    archive
+        .checkpoint(CheckpointKind::Structural, Some("Created Document"))
+        .unwrap();
+    let path = archive
+        .documents()
+        .find(|info| info.id() == document)
+        .unwrap()
+        .path()
+        .join("content.md");
+    fs::write(&path, b"external edit").unwrap();
+    let root = archive.root().to_path_buf();
+    drop(archive);
+
+    let reopened = Archive::open(&root).unwrap();
+
+    assert_eq!(
+        reopened.read_document(document).unwrap().content(),
+        "external edit\n"
+    );
+    assert!(reopened.is_dirty().unwrap());
+    Archive::validate(&root).unwrap();
+}
+
+#[test]
 fn rejects_document_without_canonical_trailing_lf() {
     let (_temporary, mut archive) = create_archive();
     let document = archive.create_document("body").unwrap();
