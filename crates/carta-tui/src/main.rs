@@ -2304,6 +2304,22 @@ mod tests {
     }
 
     #[test]
+    fn current_label_preserves_canonical_markdown_and_empty_document_semantics() {
+        let (_temporary, app) = app_with_documents(&["# Hello *world*"], false);
+        assert_eq!(current_label(&app), "Hello world");
+
+        let (_temporary, empty) = app_with_documents(&[""], false);
+        let document = empty.editor.current_document().unwrap();
+        let expected = empty
+            .archive
+            .document_info(document)
+            .unwrap()
+            .created()
+            .to_string();
+        assert_eq!(current_label(&empty), expected);
+    }
+
+    #[test]
     fn displayed_dates_use_the_system_local_timezone() {
         use std::str::FromStr;
 
