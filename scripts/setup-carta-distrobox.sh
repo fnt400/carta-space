@@ -12,6 +12,31 @@ set -euo pipefail
 BOX_NAME="${CARTA_DISTROBOX_NAME:-carta-dev}"
 BOX_IMAGE="${CARTA_DISTROBOX_IMAGE:-debian:stable}"
 
+host_timezone() {
+    if [[ -n "${TZ:-}" ]]; then
+        printf '%s\n' "$TZ"
+        return
+    fi
+
+    if command -v timedatectl >/dev/null 2>&1; then
+        local zone
+        zone="$(timedatectl show -p Timezone --value 2>/dev/null || true)"
+        if [[ -n "$zone" ]]; then
+            printf '%s\n' "$zone"
+            return
+        fi
+    fi
+
+    local target
+    target="$(readlink -f /etc/localtime 2>/dev/null || true)"
+    if [[ "$target" == *"/zoneinfo/"* ]]; then
+        printf '%s\n' "${target#*/zoneinfo/}"
+    fi
+}
+
+HOST_TIMEZONE="$(host_timezone)"
+HOST_LOCALE="${LC_ALL:-${LC_TIME:-${LANG:-C.UTF-8}}}"
+
 fail() {
     printf 'setup-carta-distrobox: %s\n' "$*" >&2
     exit 1
@@ -41,9 +66,12 @@ else
     distrobox create --yes --no-entry --name "$BOX_NAME" --image "$BOX_IMAGE"
 fi
 
-printf 'Configuro ambiente di sviluppo e locale...\n'
+printf 'Configuro ambiente di sviluppo...\n'
 
-distrobox enter "$BOX_NAME" -- bash -s <<'EOF'
+distrobox enter "$BOX_NAME" -- env \
+    CARTA_HOST_TIMEZONE="$HOST_TIMEZONE" \
+    CARTA_HOST_LOCALE="$HOST_LOCALE" \
+    bash -s <<'EOF'
 set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
@@ -72,20 +100,32 @@ if ! dpkg --compare-versions "$rust_version" ge 1.85; then
     exit 1
 fi
 
-# Locale italiano UTF-8.
-if grep -Eq '^#[[:space:]]*it_IT\.UTF-8[[:space:]]+UTF-8' /etc/locale.gen; then
-    sudo sed -i 's/^#[[:space:]]*it_IT\.UTF-8[[:space:]]\+UTF-8/it_IT.UTF-8 UTF-8/' /etc/locale.gen
-elif ! grep -Eq '^it_IT\.UTF-8[[:space:]]+UTF-8' /etc/locale.gen; then
-    printf '%s\n' 'it_IT.UTF-8 UTF-8' | sudo tee -a /etc/locale.gen >/dev/null
+# Match the host timezone when the container has the corresponding zoneinfo data.
+if [[ -n "${CARTA_HOST_TIMEZONE:-}" && -e "/usr/share/zoneinfo/$CARTA_HOST_TIMEZONE" ]]; then
+    sudo ln -snf "/usr/share/zoneinfo/$CARTA_HOST_TIMEZONE" /etc/localtime
+    printf '%s\n' "$CARTA_HOST_TIMEZONE" | sudo tee /etc/timezone >/dev/null
+    sudo dpkg-reconfigure -f noninteractive tzdata >/dev/null
 fi
-sudo locale-gen it_IT.UTF-8 >/dev/null
-sudo update-locale LANG=it_IT.UTF-8
+
+# Generate support for the host locale without changing the container default.
+host_locale="${CARTA_HOST_LOCALE:-}"
+locale_key="${host_locale%%.*}"
+if [[ -n "$locale_key" && "$locale_key" != "C" && "$locale_key" != "POSIX" ]]; then
+    supported="$(awk -v key="$locale_key" '
+        $1 ~ ("^" key "\\.") && $2 == "UTF-8" { print; exit }
+    ' /usr/share/i18n/SUPPORTED)"
+    if [[ -n "$supported" ]] && ! grep -Fxq "$supported" /etc/locale.gen; then
+        printf '%s\n' "$supported" | sudo tee -a /etc/locale.gen >/dev/null
+        sudo locale-gen >/dev/null
+    fi
+fi
 
 printf '\nAmbiente Carta pronto.\n'
 printf 'Rust:   %s\n' "$(rustc --version)"
 printf 'Cargo:  %s\n' "$(cargo --version)"
-printf 'Locale: %s\n' "$(LANG=it_IT.UTF-8 locale charmap)"
-printf 'Ora container: %s\n' "$(date '+%Y-%m-%d %H:%M:%S %Z %z')"
+printf 'Host locale: %s\n' "${CARTA_HOST_LOCALE:-system default}"
+printf 'Host timezone: %s\n' "${CARTA_HOST_TIMEZONE:-system default}"
+printf 'Container time: %s\n' "$(date '+%Y-%m-%d %H:%M:%S %Z %z')"
 EOF
 
 cat <<EOF
