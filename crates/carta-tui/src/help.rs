@@ -149,7 +149,9 @@ RightCtrl+G is an emergency kill switch. It requests immediate application exit 
 
 Structural commands are explicit because they change more than ordinary text. Examples include New Document, Split Document at Point, Work membership changes, Work reordering, Trash, restore operations, and Wipe.
 
-Generated boundaries cannot be changed by Backspace, Delete, typing, or Cat highlight operations."#,
+Generated boundaries cannot be changed by Backspace, Delete, typing, or Cat highlight operations.
+
+Every Document keeps one final LF so that an empty line is always available at its end. Carta restores that LF automatically if an edit would remove it. The final LF is real Document content and therefore participates normally in LEAP searches; Document boundaries themselves still add no synthetic LF."#,
     },
     HelpDocument {
         title: "8. Works",
