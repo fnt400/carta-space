@@ -1438,20 +1438,12 @@ fn date_view_separator(
 }
 
 fn membership_summary(titles: &[String]) -> String {
-    let more = titles.len() > 2;
-    let mut summary = titles
-        .iter()
-        .take(2)
-        .map(String::as_str)
-        .collect::<Vec<_>>()
-        .join(" - ");
-    if more {
-        if !summary.is_empty() {
-            summary.push_str(" - ");
-        }
-        summary.push('…');
+    match titles {
+        [] => String::new(),
+        [first] => first.clone(),
+        [first, second] => format!("{first} - {second}"),
+        [first, second, ..] => format!("{first} - {second} - …"),
     }
-    summary
 }
 
 fn italian_date(timestamp: carta_core::Timestamp) -> String {
