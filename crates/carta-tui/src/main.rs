@@ -195,7 +195,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         }
         app.status
             .push_str(
-                "Compatibility keyboard mode: enable Portable Keyboard Mode from the palette",
+                "Compatibility keyboard mode: C-p opens palette; enable Portable Keyboard Mode",
             );
     }
     let mut dispatcher = Dispatcher::default();
@@ -507,6 +507,41 @@ fn handle_key(
         return Ok(());
     }
 
+    if !dispatcher.right_control_held
+        && key.kind == KeyEventKind::Press
+        && key.modifiers.contains(KeyModifiers::CONTROL)
+        && matches!(key.code, KeyCode::Char('p' | 'P'))
+        && (!enhanced || app.portable_keyboard_mode())
+        && matches!(app.mode, AppMode::Editing | AppMode::Leap { .. })
+    {
+        dispatcher.pending_leap = None;
+        dispatcher.active_leap = None;
+        if matches!(app.mode, AppMode::Leap { .. }) {
+            app.cancel_leap();
+        }
+        app.open_palette();
+        return Ok(());
+    }
+
+    if app.portable_keyboard_mode()
+        && !dispatcher.right_control_held
+        && key.kind == KeyEventKind::Press
+        && key.modifiers.contains(KeyModifiers::CONTROL)
+        && matches!(key.code, KeyCode::Char('r' | 'R'))
+    {
+        match app.mode {
+            AppMode::Leap { palette: true, .. } => {
+                app.leap_again_active();
+                return Ok(());
+            }
+            AppMode::Editing => {
+                app.portable_leap_again();
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
+
     if app.portable_keyboard_mode()
         && !dispatcher.right_control_held
         && key.kind == KeyEventKind::Press
@@ -526,7 +561,7 @@ fn handle_key(
         } else {
             LeapDirection::Forward
         };
-        app.start_leap(direction, true);
+        app.start_portable_leap(direction);
         return Ok(());
     }
 
@@ -3357,6 +3392,22 @@ mod tests {
     }
 
     #[test]
+    fn degraded_control_p_opens_palette_without_escape() {
+        let (_temporary, mut app) = app_with_documents(&["alpha"], false);
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL),
+            false,
+        )
+        .unwrap();
+
+        assert!(matches!(app.mode, AppMode::Palette { .. }));
+    }
+
+    #[test]
     fn portable_keyboard_mode_maps_control_b_and_f_to_palette_leap() {
         let (_temporary, mut app) = app_with_documents(&["alpha beta gamma"], false);
         let mut dispatcher = Dispatcher::default();
@@ -3425,6 +3476,89 @@ mod tests {
         .unwrap();
         assert!(matches!(app.mode, AppMode::Editing));
         assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 11 });
+    }
+
+    #[test]
+    fn portable_control_r_repeats_active_and_finished_leap_direction() {
+        let (_temporary, mut app) = app_with_documents(&["one one one"], false);
+        let mut dispatcher = Dispatcher::default();
+        app.execute(carta_tui::Command::EnablePortableKeyboardMode)
+            .unwrap();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
+            false,
+        )
+        .unwrap();
+        for character in "one".chars() {
+            handle_key(
+                &mut app,
+                &mut dispatcher,
+                KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE),
+                false,
+            )
+            .unwrap();
+        }
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL),
+            false,
+        )
+        .unwrap();
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 4 });
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+            false,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL),
+            false,
+        )
+        .unwrap();
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 8 });
+    }
+
+    #[test]
+    fn portable_control_p_cancels_active_leap_and_opens_palette() {
+        let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
+        let mut dispatcher = Dispatcher::default();
+        app.execute(carta_tui::Command::EnablePortableKeyboardMode)
+            .unwrap();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
+            false,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('b'), KeyModifiers::NONE),
+            false,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL),
+            false,
+        )
+        .unwrap();
+
+        assert!(matches!(app.mode, AppMode::Palette { .. }));
+        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 0 });
     }
 
     #[test]

@@ -34,8 +34,10 @@ Left Alt + PageDown         LEAP to start of next Document
 Right Ctrl + Left Alt       Leap Again forward
 Right Ctrl + Left Ctrl      Leap Again backward
 Portable Keyboard Mode      Enable/disable from the command palette
+Ctrl+P (portable/degraded)  Open command palette
 Ctrl+B (portable mode)      Start sticky LEAP backward; Enter confirms
 Ctrl+F (portable mode)      Start sticky LEAP forward; Enter confirms
+Ctrl+R (portable mode)      Leap Again in the last portable LEAP direction
 
 CAT HIGHLIGHT
 
@@ -189,7 +191,7 @@ Left Control and Left Alt are the two LEAP keys. Right Alt/AltGr is reserved for
 
 When enhanced keyboard reporting is unavailable, Carta remains usable in compatibility mode and exposes LEAP commands through the command palette.
 
-For terminals that cannot deliver physical modifier press/release events, enable Portable Keyboard Mode from the palette. While it is enabled, Ctrl+B starts a sticky backward LEAP and Ctrl+F starts a sticky forward LEAP; type the pattern and press Enter to finish. Portable Keyboard Mode is off by default and does not replace the native physical LEAP bindings."#,
+For terminals that cannot deliver physical modifier press/release events, Ctrl+P opens the command palette even when Esc cannot be delivered. Enable Portable Keyboard Mode from the palette. While it is enabled, Ctrl+B starts a sticky backward LEAP and Ctrl+F starts a sticky forward LEAP; type the pattern and press Enter to finish. Ctrl+R performs Leap Again in the direction of the most recent portable LEAP; during an active sticky LEAP it advances the current query immediately. Ctrl+P during an active sticky LEAP cancels it and opens the palette. Portable Keyboard Mode is off by default and does not replace the native physical LEAP bindings."#,
     },
 ];
 

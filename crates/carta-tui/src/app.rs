@@ -368,6 +368,7 @@ pub struct App {
     pub leap: LeapRuntime,
     pub quit: bool,
     portable_keyboard_mode: bool,
+    portable_leap_direction: Option<LeapDirection>,
     remembered_structural_leap: Option<StructuralLeap>,
     last_leap_span: Option<(Cursor, Cursor)>,
     cat_span_fixed: Option<Cursor>,
@@ -475,6 +476,7 @@ impl App {
             leap: LeapRuntime::default(),
             quit: false,
             portable_keyboard_mode: false,
+            portable_leap_direction: None,
             remembered_structural_leap: None,
             last_leap_span: None,
             cat_span_fixed: None,
@@ -664,6 +666,19 @@ impl App {
 
     pub fn portable_keyboard_mode(&self) -> bool {
         self.portable_keyboard_mode
+    }
+
+    pub fn start_portable_leap(&mut self, direction: LeapDirection) {
+        self.portable_leap_direction = Some(direction);
+        self.start_leap(direction, true);
+    }
+
+    pub fn portable_leap_again(&mut self) {
+        let Some(direction) = self.portable_leap_direction else {
+            self.status = "No portable LEAP direction to repeat".into();
+            return;
+        };
+        self.leap_again(direction);
     }
 
     pub fn open_palette(&mut self) {
@@ -859,8 +874,18 @@ impl App {
                     self.edited(Instant::now());
                 }
             }
-            LeapForward => self.start_leap(LeapDirection::Forward, true),
-            LeapBackward => self.start_leap(LeapDirection::Backward, true),
+            LeapForward => {
+                if self.portable_keyboard_mode {
+                    self.portable_leap_direction = Some(LeapDirection::Forward);
+                }
+                self.start_leap(LeapDirection::Forward, true);
+            }
+            LeapBackward => {
+                if self.portable_keyboard_mode {
+                    self.portable_leap_direction = Some(LeapDirection::Backward);
+                }
+                self.start_leap(LeapDirection::Backward, true);
+            }
             LeapAgainForward => self.leap_again(LeapDirection::Forward),
             LeapAgainBackward => self.leap_again(LeapDirection::Backward),
             Undo => {
