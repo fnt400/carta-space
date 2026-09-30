@@ -434,7 +434,7 @@ fn detects_external_document_edits_and_refreshes_explicitly() {
     archive.edit_document(document, "accepted").unwrap();
     assert_eq!(
         archive.read_document(document).unwrap().content(),
-        "accepted"
+        "accepted\n"
     );
 }
 
@@ -813,7 +813,7 @@ fn lists_reads_and_restores_document_revisions_without_rewriting_history() {
     assert_eq!(restored.kind(), Some(CheckpointKind::Structural));
     assert_eq!(
         archive.read_document(document).unwrap().content(),
-        "version one"
+        "version one\n"
     );
     assert!(archive
         .history()
