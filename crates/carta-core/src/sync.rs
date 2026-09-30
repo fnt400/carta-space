@@ -482,7 +482,7 @@ mod tests {
 
         assert_eq!(
             imported.read_document(document).unwrap().content(),
-            "remote document"
+            "remote document\n"
         );
         assert_eq!(imported.sync_remote().unwrap().as_deref(), remote.to_str());
         assert!(imported_path.join("carta.json").is_file());
@@ -541,7 +541,7 @@ mod tests {
         );
         assert_eq!(
             second.read_document(document).unwrap().content(),
-            "from first"
+            "from first\n"
         );
         assert_eq!(second.sync().unwrap().outcome(), SyncOutcome::Synced);
     }
@@ -569,11 +569,11 @@ mod tests {
         assert_eq!(second.sync().unwrap().outcome(), SyncOutcome::Merged);
         assert_eq!(
             second.read_document(first_document).unwrap().content(),
-            "first"
+            "first\n"
         );
         assert_eq!(
             second.read_document(second_document).unwrap().content(),
-            "second"
+            "second\n"
         );
     }
 
@@ -603,7 +603,7 @@ mod tests {
         assert_eq!(second.sync().unwrap().outcome(), SyncOutcome::Conflict);
         assert_eq!(
             second.read_document(document).unwrap().content(),
-            "second version"
+            "second version\n"
         );
         assert!(!second.is_dirty().unwrap());
     }
