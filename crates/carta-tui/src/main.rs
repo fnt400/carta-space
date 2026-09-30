@@ -1266,9 +1266,55 @@ fn anchored_viewport(cursor_line: usize, height: usize) -> (usize, usize) {
     )
 }
 
+#[derive(Debug, Default)]
+struct ViewDocumentMetadata {
+    locked: bool,
+    memberships: Vec<String>,
+}
+
+fn view_document_metadata(app: &App) -> BTreeMap<carta_core::DocumentId, ViewDocumentMetadata> {
+    let mut metadata = app
+        .editor
+        .regions()
+        .iter()
+        .map(|region| {
+            (
+                region.document,
+                ViewDocumentMetadata {
+                    locked: app
+                        .archive
+                        .document_info(region.document)
+                        .is_none_or(|info| info.locked()),
+                    memberships: Vec::new(),
+                },
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    for work in app.archive.works() {
+        for document in work.documents() {
+            if let Some(entry) = metadata.get_mut(document) {
+                entry.locked |= work.locked();
+                entry.memberships.push(work.title().to_owned());
+            }
+        }
+    }
+
+    for entry in metadata.values_mut() {
+        entry
+            .memberships
+            .sort_by_cached_key(|title| title.to_lowercase());
+    }
+    metadata
+}
+
 fn visual_lines(app: &App, width: usize) -> Vec<VisualLine> {
+    let document_metadata = view_document_metadata(app);
     let mut out = Vec::new();
     for (region_index, region) in app.editor.regions().iter().enumerate() {
+        let metadata = document_metadata
+            .get(&region.document)
+            .expect("editor region metadata was built above");
         match &app.view {
             View::CreationDate(_) => {
                 if region_index > 0 {
@@ -1277,6 +1323,7 @@ fn visual_lines(app: &App, width: usize) -> Vec<VisualLine> {
                 out.push(generated_line(date_view_separator(
                     app,
                     region.document,
+                    metadata,
                     width,
                     false,
                 )));
@@ -1289,21 +1336,18 @@ fn visual_lines(app: &App, width: usize) -> Vec<VisualLine> {
                 out.push(generated_line(date_view_separator(
                     app,
                     region.document,
+                    metadata,
                     width,
                     true,
                 )));
                 out.push(generated_line(String::new()));
             }
             View::Work(_) => {
-                let locked = app
-                    .archive
-                    .document_is_locked(region.document)
-                    .unwrap_or(true);
                 if region_index > 0 {
                     out.push(generated_line(String::new()));
-                    out.push(generated_line(work_separator(width, locked)));
+                    out.push(generated_line(work_separator(width, metadata.locked)));
                     out.push(generated_line(String::new()));
-                } else if locked {
+                } else if metadata.locked {
                     out.push(generated_line(work_separator(width, true)));
                     out.push(generated_line(String::new()));
                 }
@@ -1350,6 +1394,7 @@ fn work_separator(width: usize, locked: bool) -> String {
 fn date_view_separator(
     app: &App,
     document: carta_core::DocumentId,
+    metadata: &ViewDocumentMetadata,
     width: usize,
     modified: bool,
 ) -> String {
@@ -1369,7 +1414,7 @@ fn date_view_separator(
                 })
             },
         );
-    let prefix = if app.archive.document_is_locked(document).unwrap_or(true) {
+    let prefix = if metadata.locked {
         format!("── [LOCKED] {date} ")
     } else {
         format!("── {date} ")
@@ -1378,7 +1423,7 @@ fn date_view_separator(
         return truncate_display(&prefix, width, false);
     }
 
-    let memberships = membership_summary(app, document);
+    let memberships = membership_summary(&metadata.memberships);
     let available = width.saturating_sub(display_width(&prefix));
     let suffix = if memberships.is_empty() || available < 5 {
         String::new()
@@ -1392,17 +1437,14 @@ fn date_view_separator(
     format!("{prefix}{}{suffix}", "─".repeat(fill))
 }
 
-fn membership_summary(app: &App, document: carta_core::DocumentId) -> String {
-    let mut titles: Vec<_> = app
-        .archive
-        .works()
-        .filter(|work| work.documents().contains(&document))
-        .map(|work| work.title().to_owned())
-        .collect();
-    titles.sort_by_key(|title| title.to_lowercase());
+fn membership_summary(titles: &[String]) -> String {
     let more = titles.len() > 2;
-    titles.truncate(2);
-    let mut summary = titles.join(" - ");
+    let mut summary = titles
+        .iter()
+        .take(2)
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .join(" - ");
     if more {
         if !summary.is_empty() {
             summary.push_str(" - ");
@@ -4286,6 +4328,8 @@ mod tests {
         app.archive.set_document_locked(document, true).unwrap();
 
         assert!(status_line(&app).contains("[LOCK DOC]"));
-        assert!(date_view_separator(&app, document, 80, false).contains("[LOCKED]"));
+        let metadata = view_document_metadata(&app);
+        assert!(date_view_separator(&app, document, &metadata[&document], 80, false)
+            .contains("[LOCKED]"));
     }
 }
