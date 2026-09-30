@@ -3409,7 +3409,11 @@ mod tests {
         let mut app = App::open(archive, None, now).unwrap();
         app.archive.set_sync_remote("unused-local-remote").unwrap();
 
-        assert!(app.editor.insert("changed"));
+        assert!(app.editor.insert("seed"));
+        app.autosave().unwrap();
+        assert!(!app.archive.is_dirty().unwrap());
+
+        assert!(app.editor.insert(" changed"));
         app.autosave().unwrap();
         assert!(app.archive.is_dirty().unwrap());
         app.scheduler.sync_pending();
