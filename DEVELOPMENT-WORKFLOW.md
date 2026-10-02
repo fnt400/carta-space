@@ -75,8 +75,6 @@ For the current v0.1 development cycle the active branch is:
 
 Implementation work must not be committed to `main` unless explicitly requested.
 
-The two pre-existing local untracked files `session-ses_f357.md` and `temp.txt` are not project changes and must not be committed.
-
 ## Scope rule
 
 Each implementation commit should represent one coherent behavior change or one tightly related dogfooding pass.
@@ -89,14 +87,14 @@ When a requested change affects the archive format, canonical metadata, identity
 
 A normal OpenCode verification prompt should:
 
-1. state the exact repository path: `/path/to/carta-space`;
-2. state branch `opencode/v0.1`;
-3. explicitly say **do not modify files**;
+1. state the repository root being verified;
+2. state the active branch and expected commit;
+3. explicitly say **do not modify files** unless formatting-only changes are authorized;
 4. list the exact commands and runtime checks;
 5. ask for raw failure output when something fails;
 6. stop after reporting results.
 
-OpenCode must not request access to sibling repositories such as `~/software/git/carta-core` or `~/software/git/carta-tui`; those are crates inside the Carta Space workspace, not separate repositories.
+The Carta crates live inside this workspace; verification should not assume separate sibling repositories for them.
 
 ## Rust verification baseline
 
