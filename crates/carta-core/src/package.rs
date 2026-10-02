@@ -216,6 +216,7 @@ fn validate_package(path: &Path) -> Result<(), Error> {
 }
 
 pub(crate) fn safe_export_destination(root: &Path, destination: &Path) -> Result<PathBuf, Error> {
+    let requested_destination = destination.to_path_buf();
     let parent = destination
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
@@ -234,7 +235,7 @@ pub(crate) fn safe_export_destination(root: &Path, destination: &Path) -> Result
         .canonicalize()
         .map_err(|error| Error::io(root, error))?;
     if destination.starts_with(&root) {
-        return Err(Error::DestinationInsideArchive(destination));
+        return Err(Error::DestinationInsideArchive(requested_destination));
     }
     match fs::symlink_metadata(&destination) {
         Ok(metadata) if !metadata.is_file() => Err(Error::UnsafeDestination(destination)),
