@@ -299,19 +299,91 @@ fn is_ancestor(root: &Path, ancestor: &str, descendant: &str) -> Result<bool, Er
 fn merged_tree(root: &Path, local: &str, remote: &str) -> Result<MergeTree, Error> {
     let output = raw_git_output(root, &["merge-tree", "--write-tree", local, remote])?;
     match output.status.code() {
+        Some(0) => clean_merge_tree_output(output),
+        Some(1) => Ok(MergeTree::Conflict),
+        _ if String::from_utf8_lossy(&output.stderr).contains("--write-tree") => {
+            merged_tree_legacy(root, local, remote)
+        }
+        _ => Err(command_failed("prepare sync merge", output)),
+    }
+}
+
+fn clean_merge_tree_output(output: Output) -> Result<MergeTree, Error> {
+    let text = String::from_utf8(output.stdout)
+        .map_err(|error| Error::InvalidSyncRemote(error.to_string()))?;
+    let tree = text.lines().next().unwrap_or_default().trim();
+    if tree.is_empty() {
+        return Err(Error::InvalidSyncRemote(
+            "Git merge produced no tree identifier".into(),
+        ));
+    }
+    Ok(MergeTree::Clean(tree.to_owned()))
+}
+
+fn merged_tree_legacy(root: &Path, local: &str, remote: &str) -> Result<MergeTree, Error> {
+    let temporary =
+        tempfile::tempdir().map_err(|error| Error::io(root, error))?;
+    let worktree = temporary.path().join("worktree");
+    fs::create_dir(&worktree).map_err(|error| Error::io(&worktree, error))?;
+    let index = temporary.path().join("index");
+
+    let bases = required_git_text(
+        root,
+        "find sync merge base",
+        &["merge-base", "--all", local, remote],
+    )?;
+    let bases: Vec<&str> = bases.lines().filter(|line| !line.trim().is_empty()).collect();
+    if bases.is_empty() {
+        return Err(Error::InvalidSyncRemote(
+            "Git produced no merge base for divergent sync history".into(),
+        ));
+    }
+
+    let run_with_temporary_index = |args: &[&str]| -> Result<Output, Error> {
+        crate::history::git_command(root)
+            .env("GIT_INDEX_FILE", &index)
+            .env("GIT_WORK_TREE", &worktree)
+            .args(args)
+            .output()
+            .map_err(|source| Error::GitUnavailable {
+                path: root.to_path_buf(),
+                source,
+            })
+    };
+
+    let output = run_with_temporary_index(&["read-tree", "--reset", "-u", local])?;
+    if !output.status.success() {
+        return Err(command_failed("prepare legacy sync worktree", output));
+    }
+
+    let mut command = crate::history::git_command(root);
+    command
+        .env("GIT_INDEX_FILE", &index)
+        .env("GIT_WORK_TREE", &worktree)
+        .arg("merge-recursive");
+    for base in &bases {
+        command.arg(base);
+    }
+    let output = command
+        .arg("--")
+        .arg(local)
+        .arg(remote)
+        .output()
+        .map_err(|source| Error::GitUnavailable {
+            path: root.to_path_buf(),
+            source,
+        })?;
+
+    match output.status.code() {
         Some(0) => {
-            let text = String::from_utf8(output.stdout)
-                .map_err(|error| Error::InvalidSyncRemote(error.to_string()))?;
-            let tree = text.lines().next().unwrap_or_default().trim();
-            if tree.is_empty() {
-                return Err(Error::InvalidSyncRemote(
-                    "Git merge-tree produced no tree identifier".into(),
-                ));
+            let output = run_with_temporary_index(&["write-tree"])?;
+            if !output.status.success() {
+                return Err(command_failed("write legacy sync merge tree", output));
             }
-            Ok(MergeTree::Clean(tree.to_owned()))
+            clean_merge_tree_output(output)
         }
         Some(1) => Ok(MergeTree::Conflict),
-        _ => Err(command_failed("prepare sync merge", output)),
+        _ => Err(command_failed("prepare legacy sync merge", output)),
     }
 }
 
