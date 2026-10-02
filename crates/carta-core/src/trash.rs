@@ -1272,11 +1272,10 @@ fn update_refs_transaction(root: &Path, updates: &[(String, String, String)]) ->
     if updates.is_empty() {
         return Ok(());
     }
-    let mut input = String::from("start\n");
+    let mut input = String::new();
     for (name, new, old) in updates {
         input.push_str(&format!("update {name} {new} {old}\n"));
     }
-    input.push_str("prepare\ncommit\n");
     let mut command = git_command(root);
     command
         .args(["update-ref", "--stdin"])
