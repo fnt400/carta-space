@@ -39,6 +39,21 @@ install -Dm755 carta-cli ~/.local/bin/carta-cli
 
 A matching `.sha256` file is published with the archive so the download can be verified with `sha256sum -c`.
 
+On NixOS, or on another system with Nix flakes enabled, Carta can instead be built and run natively:
+
+```bash
+nix run github:fnt400/carta-space
+```
+
+To install it into the current Nix profile:
+
+```bash
+nix profile install github:fnt400/carta-space
+carta
+```
+
+The Nix package builds Carta from source and provides its Git runtime dependency inside the package environment, so it does not require `steam-run` or `nix-ld`.
+
 On first launch, `carta` opens the default XDG archive location and offers to create an empty Archive or import an existing Git Archive when none exists.
 
 The helper programs under `scripts/`, including the Distrobox setup and development launcher, are development and maintenance tools. They are not part of the normal installation or startup path.

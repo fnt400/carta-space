@@ -1,6 +1,6 @@
 # Carta Space — Development Workflow
 
-This document defines the default development workflow for the current Carta Space v0.1 cycle.
+This document defines the default development workflow for the current Carta Space v0.2 cycle.
 
 The goal is to keep product reasoning and source changes coherent while using the local coding agent only where direct access to the real development environment materially helps.
 
@@ -69,9 +69,9 @@ Repeat until the change is accepted by dogfooding.
 
 ## Active branch
 
-For the current v0.1 development cycle the active branch is:
+For the current v0.2 development cycle the active branch is:
 
-`opencode/v0.1`
+`opencode/v0.2`
 
 Implementation work must not be committed to `main` unless explicitly requested.
 
