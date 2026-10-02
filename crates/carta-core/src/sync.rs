@@ -340,7 +340,9 @@ fn merged_tree_legacy(root: &Path, local: &str, remote: &str) -> Result<MergeTre
     }
 
     let run_with_temporary_index = |args: &[&str]| -> Result<Output, Error> {
-        crate::history::git_command(root)
+        Command::new("git")
+            .current_dir(root)
+            .arg("--git-dir=.git")
             .env("GIT_INDEX_FILE", &index)
             .env("GIT_WORK_TREE", &worktree)
             .args(args)
@@ -356,8 +358,10 @@ fn merged_tree_legacy(root: &Path, local: &str, remote: &str) -> Result<MergeTre
         return Err(command_failed("prepare legacy sync worktree", output));
     }
 
-    let mut command = crate::history::git_command(root);
+    let mut command = Command::new("git");
     command
+        .current_dir(root)
+        .arg("--git-dir=.git")
         .env("GIT_INDEX_FILE", &index)
         .env("GIT_WORK_TREE", &worktree)
         .arg("merge-recursive");
