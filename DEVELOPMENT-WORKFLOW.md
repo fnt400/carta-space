@@ -58,7 +58,7 @@ user/dogfooding
     ↓
 ChatGPT: analyse + implement + tests + commit + push
     ↓
-local: git pull --ff-only origin opencode/v0.1
+local: git pull --ff-only origin opencode/v0.2
     ↓
 OpenCode: verify without modifying files
     ↓
@@ -115,7 +115,7 @@ ChatGPT creates focused commits on the development branch and pushes them.
 The local checkout updates with:
 
 ```bash
-git pull --ff-only origin opencode/v0.1
+git pull --ff-only origin opencode/v0.2
 ```
 
 Do not force-push, rewrite published history, or commit local temporary files.
