@@ -21,13 +21,20 @@ jobs:
       - name: Install system dependencies
         run: |
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y             build-essential             ca-certificates             curl             git             libwayland-dev             pkg-config
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            build-essential \
+            ca-certificates \
+            curl \
+            git \
+            libwayland-dev \
+            pkg-config
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust 1.85
         run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs             | sh -s -- -y --profile minimal --default-toolchain 1.85.0
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            | sh -s -- -y --profile minimal --default-toolchain 1.85.0
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Test workspace
@@ -40,8 +47,32 @@ jobs:
         run: |
           target/release/carta --version
           target/release/carta-cli --version
+          git --version
           ldd target/release/carta
           ldd target/release/carta-cli
+
+  alpine-source:
+    name: Alpine Linux source build
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build and test on Alpine
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/src" \
+            -w /src \
+            alpine:3.24 \
+            sh -euxc '
+              apk add --no-cache build-base cargo git pkgconf rust wayland-dev
+              git config --global --add safe.directory /src
+              cargo test --workspace --locked
+              cargo build --release --workspace --locked
+              target/release/carta --version
+              target/release/carta-cli --version
+              git --version
+            '
 
   macos:
     name: macOS (${{ matrix.arch }})
@@ -55,9 +86,11 @@ jobs:
             arch: x86_64
 
     runs-on: ${{ matrix.runner }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust 1.85
         run: |
@@ -74,5 +107,6 @@ jobs:
         run: |
           ./target/release/carta --version
           ./target/release/carta-cli --version
+          git --version
           file ./target/release/carta
           file ./target/release/carta-cli

@@ -15,7 +15,7 @@
           inherit (pkgs) lib stdenv;
           cartaSpace = pkgs.rustPlatform.buildRustPackage {
             pname = "carta-space";
-            version = "0.1.0";
+            version = "0.1.1";
 
             src = self;
 

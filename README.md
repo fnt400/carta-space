@@ -1,8 +1,8 @@
 # Carta Space
 
-> **Current release:** v0.1.0  
+> **Current release:** v0.1.1  
 > **Format draft:** 0.1  
-> **Platform:** Linux  
+> **Platforms:** Linux and macOS  
 > **License:** GPL-3.0-or-later (software); CC0-1.0 (original project documentation).
 
 Carta Space is an experimental document environment inspired by Jef Raskin's work on the Canon Cat and later humane-interface research.
@@ -19,41 +19,77 @@ The reference implementation is written in Rust and is explicitly split into a f
 
 ## Install and run
 
-Carta Space is a Linux program, not a Nix-specific application. There are three supported installation paths:
+Carta Space supports Linux and macOS. Nix is one installation option, not a requirement. The main installation paths are:
 
-- **prebuilt Linux x86_64 binary** — the quickest route on recent glibc-based distributions;
-- **build from source** — the most portable route across Linux distributions and architectures;
+- **prebuilt Linux x86_64 binary** — built on Ubuntu 20.04 for a glibc 2.31 baseline;
+- **prebuilt macOS binaries** — separate builds for Apple Silicon and Intel;
+- **build from source** — the broadest route across Linux distributions, architectures, and macOS;
 - **Nix / NixOS** — native flake packaging, without `steam-run` or `nix-ld`.
 
 Git is a runtime dependency because Carta archive history and synchronization are Git-backed.
 
 ### Prebuilt Linux x86_64
 
-Download the v0.1.0 release and its checksum:
+Download the v0.1.1 release and its checksum:
 
 ```bash
-wget https://github.com/fnt400/carta-space/releases/download/v0.1.0/carta-v0.1.0-linux-x86_64.tar.gz
-wget https://github.com/fnt400/carta-space/releases/download/v0.1.0/carta-v0.1.0-linux-x86_64.tar.gz.sha256
-sha256sum -c carta-v0.1.0-linux-x86_64.tar.gz.sha256
+wget https://github.com/fnt400/carta-space/releases/download/v0.1.1/carta-v0.1.1-linux-x86_64.tar.gz
+wget https://github.com/fnt400/carta-space/releases/download/v0.1.1/carta-v0.1.1-linux-x86_64.tar.gz.sha256
+sha256sum -c carta-v0.1.1-linux-x86_64.tar.gz.sha256
 
-tar -xzf carta-v0.1.0-linux-x86_64.tar.gz
-cd carta-v0.1.0-linux-x86_64
+tar -xzf carta-v0.1.1-linux-x86_64.tar.gz
+cd carta-v0.1.1-linux-x86_64
 
 install -Dm755 carta ~/.local/bin/carta
 install -Dm755 carta-cli ~/.local/bin/carta-cli   # optional
 carta
 ```
 
-This binary is dynamically linked and intended for recent glibc-based x86_64 Linux systems. If it is incompatible with your distribution, use the source-build instructions below instead.
+The v0.1.1 Linux binary is built and tested on Ubuntu 20.04 with glibc 2.31 and Git 2.25.1. It is intended for x86_64 distributions with glibc 2.31 or newer. If it is incompatible with your distribution, use the source-build instructions below instead.
+
+### Prebuilt macOS
+
+Choose the archive for your Mac.
+
+Apple Silicon:
+
+```bash
+curl -LO https://github.com/fnt400/carta-space/releases/download/v0.1.1/carta-v0.1.1-macos-arm64.tar.gz
+curl -LO https://github.com/fnt400/carta-space/releases/download/v0.1.1/carta-v0.1.1-macos-arm64.tar.gz.sha256
+shasum -a 256 -c carta-v0.1.1-macos-arm64.tar.gz.sha256
+tar -xzf carta-v0.1.1-macos-arm64.tar.gz
+cd carta-v0.1.1-macos-arm64
+```
+
+Intel:
+
+```bash
+curl -LO https://github.com/fnt400/carta-space/releases/download/v0.1.1/carta-v0.1.1-macos-x86_64.tar.gz
+curl -LO https://github.com/fnt400/carta-space/releases/download/v0.1.1/carta-v0.1.1-macos-x86_64.tar.gz.sha256
+shasum -a 256 -c carta-v0.1.1-macos-x86_64.tar.gz.sha256
+tar -xzf carta-v0.1.1-macos-x86_64.tar.gz
+cd carta-v0.1.1-macos-x86_64
+```
+
+Then install:
+
+```bash
+mkdir -p ~/.local/bin
+install -m 755 carta ~/.local/bin/carta
+install -m 755 carta-cli ~/.local/bin/carta-cli   # optional
+carta
+```
+
+The macOS binaries use a macOS 11 deployment target and are CI-tested on Apple Silicon and Intel. They are currently not Apple Developer signed or notarized; if macOS blocks a quarantined download, use the source-build method below.
 
 ### Build from source
 
-Building locally is the distribution-independent fallback and also supports Linux architectures other than x86_64 when the Rust dependencies support the target.
+Building locally is the distribution-independent fallback. It also supports Linux architectures other than x86_64 when the Rust dependencies support the target.
 
-You need Rust 1.85 or newer, Cargo, Git, a C build toolchain, pkg-config/pkgconf, and Wayland development files. Then:
+On Linux you need Rust 1.85 or newer, Cargo, Git, a C build toolchain, pkg-config/pkgconf, and Wayland development files. On macOS you need Rust 1.85 or newer, Git, and the Xcode Command Line Tools. Then:
 
 ```bash
-git clone --depth 1 --branch v0.1.0 https://github.com/fnt400/carta-space.git
+git clone --depth 1 --branch v0.1.1 https://github.com/fnt400/carta-space.git
 cd carta-space
 
 cargo install --locked --path crates/carta-tui
