@@ -22,13 +22,22 @@ The normal v0.1 entry point is the prebuilt `carta` executable. The release pack
 
 Git is a required runtime dependency because Carta archive history and synchronization are Git-backed.
 
-After unpacking a Linux release archive:
+Download and unpack the Linux x86_64 release archive, then install the interactive binary:
 
 ```bash
+tar -xzf carta-v0.1.0-linux-x86_64.tar.gz
+cd carta-v0.1.0-linux-x86_64
 install -Dm755 carta ~/.local/bin/carta
-install -Dm755 carta-cli ~/.local/bin/carta-cli   # optional
 carta
 ```
+
+The package also contains `carta-cli`. Install it only if you want the scriptable administrative interface:
+
+```bash
+install -Dm755 carta-cli ~/.local/bin/carta-cli
+```
+
+A matching `.sha256` file is published with the archive so the download can be verified with `sha256sum -c`.
 
 On first launch, `carta` opens the default XDG archive location and offers to create an empty Archive or import an existing Git Archive when none exists.
 
@@ -186,7 +195,7 @@ If canonical Document content or Work structure changes externally while the TUI
 - `SPECIFICATION.md` — normative draft of Carta Space Format 0.1.
 - `INTERACTION-CONTRACT.md` — accepted behavior of the first usable v0.1 interaction model.
 - `DESIGN-DECISIONS.md` — important architectural decisions and their rationale.
-- `LICENSES.md` — proposed licensing model.
+- `LICENSES.md` — licensing scope for software and documentation.
 
 ## Current scope
 

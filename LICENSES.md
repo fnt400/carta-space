@@ -1,35 +1,29 @@
-# Carta Space — Proposed Licensing
+# Carta Space — Licensing
 
-**Status:** Draft licensing plan; not legal advice.
+Carta Space deliberately separates the license of the reference software from the freedom to implement and reuse the format documentation.
 
-Carta Space separates the license of the reference software from the freedom to implement the format.
+## Reference implementation — GPL-3.0-or-later
 
-## Reference implementation
+Unless a file states otherwise, the Carta Space reference implementation is licensed under the **GNU General Public License v3.0 or later** (`GPL-3.0-or-later`).
 
-The planned reference implementation should be released under:
+This includes the Rust crates, executable frontends, development experiments, shell scripts, and build metadata that make up the reference implementation.
 
-**GNU General Public License v3.0 or later — `GPL-3.0-or-later`**
+The complete GPLv3 license text is in the repository root as `LICENSE`. The `GPL-3.0-or-later` designation means that the covered software may be redistributed and/or modified under GPL version 3 or, at the recipient's option, any later version published by the Free Software Foundation.
 
-This is a deliberate copyleft choice for the Rust-based reference implementation and its CLI/TUI frontends. It ensures that distributed modified versions of the reference program remain free software under the terms of the GPL while leaving independent implementations of the Carta Space format free to choose their own software license.
+## Original project documentation — CC0-1.0
 
-The repository should include the official GPLv3 license text when implementation work begins.
+Unless a file states otherwise, original Carta Space project documentation is dedicated under **Creative Commons CC0 1.0 Universal** (`CC0-1.0`).
 
-## Format specification and design documentation
+This includes the format specification, white paper, interaction contract, design-decision records, README, and project/development documentation.
 
-The format specification should be available for implementation without imposing the GPL on independent Carta Space readers or writers.
+The complete CC0 legal code is in `LICENSES/CC0-1.0.txt`.
 
-The proposed dedication for original Carta Space specification text is:
+The intent is that the Carta Space format can be described, quoted, adapted, and independently implemented without imposing the GPL on independent readers, writers, tools, or applications.
 
-**Creative Commons CC0 1.0 Universal — `CC0-1.0`**
+## Third-party material
 
-The intention is that anyone may implement the format in free, open-source, commercial, proprietary, educational, archival, or research software.
-
-Where third-party standards are referenced, their own copyrights and licenses remain applicable. Carta Space documentation should link to those standards rather than copy substantial portions of them.
+Third-party standards, names, code, excerpts, and other material remain subject to their own copyright, license, and trademark terms. A reference to an external standard does not relicense that standard under CC0.
 
 ## Names and trademarks
 
-"Carta Space" is currently a working name.
-
-No trademark rights are asserted by this draft documentation.
-
-Before a stable public release, the project name should be checked for potential conflicts and the project's naming/trademark policy should be decided separately from copyright licensing.
+These copyright licenses do not grant trademark rights. Carta Space v0.1 does not define a separate trademark policy.
