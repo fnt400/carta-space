@@ -1,8 +1,9 @@
 # Carta Space
 
-> **Status:** Working name; early design draft.  
-> **Current format draft:** 0.1  
-> **Reference implementation:** first usable Rust v0.1.
+> **Current release:** v0.1.0  
+> **Format draft:** 0.1  
+> **Platform:** Linux  
+> **License:** GPL-3.0-or-later (software); CC0-1.0 (original project documentation).
 
 Carta Space is an experimental document environment inspired by Jef Raskin's work on the Canon Cat and later humane-interface research.
 
@@ -18,45 +19,71 @@ The reference implementation is written in Rust and is explicitly split into a f
 
 ## Install and run
 
-The normal v0.1 entry point is the prebuilt `carta` executable. The release package also includes `carta-cli` for optional scripting and archive administration.
+Carta Space is a Linux program, not a Nix-specific application. There are three supported installation paths:
 
-Git is a required runtime dependency because Carta archive history and synchronization are Git-backed.
+- **prebuilt Linux x86_64 binary** — the quickest route on recent glibc-based distributions;
+- **build from source** — the most portable route across Linux distributions and architectures;
+- **Nix / NixOS** — native flake packaging, without `steam-run` or `nix-ld`.
 
-Download and unpack the Linux x86_64 release archive, then install the interactive binary:
+Git is a runtime dependency because Carta archive history and synchronization are Git-backed.
+
+### Prebuilt Linux x86_64
+
+Download the v0.1.0 release and its checksum:
 
 ```bash
+wget https://github.com/fnt400/carta-space/releases/download/v0.1.0/carta-v0.1.0-linux-x86_64.tar.gz
+wget https://github.com/fnt400/carta-space/releases/download/v0.1.0/carta-v0.1.0-linux-x86_64.tar.gz.sha256
+sha256sum -c carta-v0.1.0-linux-x86_64.tar.gz.sha256
+
 tar -xzf carta-v0.1.0-linux-x86_64.tar.gz
 cd carta-v0.1.0-linux-x86_64
+
 install -Dm755 carta ~/.local/bin/carta
+install -Dm755 carta-cli ~/.local/bin/carta-cli   # optional
 carta
 ```
 
-The package also contains `carta-cli`. Install it only if you want the scriptable administrative interface:
+This binary is dynamically linked and intended for recent glibc-based x86_64 Linux systems. If it is incompatible with your distribution, use the source-build instructions below instead.
+
+### Build from source
+
+Building locally is the distribution-independent fallback and also supports Linux architectures other than x86_64 when the Rust dependencies support the target.
+
+You need Rust 1.85 or newer, Cargo, Git, a C build toolchain, pkg-config/pkgconf, and Wayland development files. Then:
 
 ```bash
-install -Dm755 carta-cli ~/.local/bin/carta-cli
+git clone --depth 1 --branch v0.1.0 https://github.com/fnt400/carta-space.git
+cd carta-space
+
+cargo install --locked --path crates/carta-tui
+cargo install --locked --path crates/carta-cli   # optional
+
+carta
 ```
 
-A matching `.sha256` file is published with the archive so the download can be verified with `sha256sum -c`.
+See [INSTALL.md](INSTALL.md) for dependency commands for Debian/Ubuntu, Fedora, Arch/Manjaro, Alpine, and guidance for other distributions.
 
-On NixOS, or on another system with Nix flakes enabled, Carta can instead be built and run natively:
+### Nix / NixOS
+
+Run Carta directly:
 
 ```bash
 nix run github:fnt400/carta-space
 ```
 
-To install it into the current Nix profile:
+Or install it into the current Nix profile:
 
 ```bash
 nix profile install github:fnt400/carta-space
 carta
 ```
 
-The Nix package builds Carta from source and provides its Git runtime dependency inside the package environment, so it does not require `steam-run` or `nix-ld`.
+The Nix package builds Carta natively and supplies its Git runtime dependency.
 
 On first launch, `carta` opens the default XDG archive location and offers to create an empty Archive or import an existing Git Archive when none exists.
 
-The helper programs under `scripts/`, including the Distrobox setup and development launcher, are development and maintenance tools. They are not part of the normal installation or startup path.
+The helper programs under `scripts/` are development and maintenance tools. They are not part of the normal installation or startup path.
 
 ## Reference implementation architecture
 
