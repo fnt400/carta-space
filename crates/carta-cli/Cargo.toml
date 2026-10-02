@@ -6,7 +6,7 @@ rust-version.workspace = true
 publish = false
 
 [[bin]]
-name = "carta"
+name = "carta-cli"
 path = "src/main.rs"
 
 [dependencies]

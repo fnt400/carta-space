@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [[bin]]
-name = "carta-tui"
+name = "carta"
 path = "src/main.rs"
 
 [dependencies]

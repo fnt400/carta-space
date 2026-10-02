@@ -46,7 +46,7 @@ use theme::markdown_theme;
 use unicode_width::UnicodeWidthChar;
 
 #[derive(Parser)]
-#[command(name = "carta-tui", version, about = "Carta Space writing environment")]
+#[command(name = "carta", version, about = "Carta Space writing environment")]
 struct Args {
     /// Archive directory. Without it, use the XDG Carta data archive.
     path: Option<PathBuf>,
@@ -175,7 +175,7 @@ fn main() {
             },
         );
         let backtrace = Backtrace::capture();
-        let mut diagnostic = format!("carta-tui panicked at {location}:\n{payload}");
+        let mut diagnostic = format!("carta panicked at {location}:\n{payload}");
         if backtrace.status() == std::backtrace::BacktraceStatus::Captured {
             diagnostic.push_str(&format!("\n\nStack backtrace:\n{backtrace}"));
         }
@@ -189,14 +189,14 @@ fn main() {
     match outcome {
         Ok(Ok(())) => {}
         Ok(Err(error)) => {
-            eprintln!("carta-tui: {error}");
+            eprintln!("carta: {error}");
             std::process::exit(1);
         }
         Err(_) => {
             let diagnostic = panic_report
                 .lock()
                 .map(|report| report.clone())
-                .unwrap_or_else(|_| "carta-tui panicked (diagnostic unavailable)".to_owned());
+                .unwrap_or_else(|_| "carta panicked (diagnostic unavailable)".to_owned());
             eprintln!("{diagnostic}");
             std::process::exit(101);
         }

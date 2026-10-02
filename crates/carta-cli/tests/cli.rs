@@ -8,19 +8,19 @@ fn create_validate_and_inspect_have_scriptable_success_output() {
     let temporary = tempfile::tempdir().unwrap();
     let archive = temporary.path().join("archive");
 
-    Command::cargo_bin("carta")
+    Command::cargo_bin("carta-cli")
         .unwrap()
         .args(["create", archive.to_str().unwrap()])
         .assert()
         .success()
         .stdout(predicate::str::contains(archive.to_str().unwrap()));
-    Command::cargo_bin("carta")
+    Command::cargo_bin("carta-cli")
         .unwrap()
         .args(["--archive", archive.to_str().unwrap(), "validate"])
         .assert()
         .success()
         .stdout("valid\n");
-    Command::cargo_bin("carta")
+    Command::cargo_bin("carta-cli")
         .unwrap()
         .args(["--archive", archive.to_str().unwrap(), "inspect"])
         .assert()
@@ -36,13 +36,13 @@ fn commands_default_to_xdg_data_archive() {
     let archive = carta_data.join("archive");
     fs::create_dir_all(&carta_data).unwrap();
 
-    Command::cargo_bin("carta")
+    Command::cargo_bin("carta-cli")
         .unwrap()
         .args(["create", archive.to_str().unwrap()])
         .assert()
         .success();
 
-    Command::cargo_bin("carta")
+    Command::cargo_bin("carta-cli")
         .unwrap()
         .env("XDG_DATA_HOME", &xdg_data_home)
         .args(["inspect"])
@@ -56,13 +56,13 @@ fn invalid_archive_and_usage_errors_are_nonzero() {
     let temporary = tempfile::tempdir().unwrap();
     fs::write(temporary.path().join("mimetype"), b"wrong").unwrap();
 
-    Command::cargo_bin("carta")
+    Command::cargo_bin("carta-cli")
         .unwrap()
         .args(["--archive", temporary.path().to_str().unwrap(), "validate"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("required entry is missing"));
-    Command::cargo_bin("carta")
+    Command::cargo_bin("carta-cli")
         .unwrap()
         .args(["trash", "document"])
         .assert()
@@ -72,7 +72,7 @@ fn invalid_archive_and_usage_errors_are_nonzero() {
 #[test]
 fn missing_required_trash_confirmation_is_a_usage_error() {
     let id = carta_core::DocumentId::new_v7();
-    Command::cargo_bin("carta")
+    Command::cargo_bin("carta-cli")
         .unwrap()
         .args(["trash", "document", &id.to_string()])
         .assert()
@@ -83,12 +83,12 @@ fn missing_required_trash_confirmation_is_a_usage_error() {
 #[test]
 fn wipe_exposes_only_fresh_preflight_execute_interface() {
     let id = carta_core::DocumentId::new_v7();
-    Command::cargo_bin("carta")
+    Command::cargo_bin("carta-cli")
         .unwrap()
         .args(["wipe", "plan", &id.to_string()])
         .assert()
         .code(2);
-    Command::cargo_bin("carta")
+    Command::cargo_bin("carta-cli")
         .unwrap()
         .args(["wipe", "execute", &id.to_string()])
         .assert()

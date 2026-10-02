@@ -8,7 +8,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "carta",
+    name = "carta-cli",
     version,
     about = "Scriptable Carta Space archive tools"
 )]
@@ -162,7 +162,7 @@ fn default_archive_path() -> io::Result<PathBuf> {
 
 fn main() {
     if let Err(error) = run(Cli::parse()) {
-        eprintln!("carta: {error}");
+        eprintln!("carta-cli: {error}");
         std::process::exit(1);
     }
 }

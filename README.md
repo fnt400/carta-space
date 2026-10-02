@@ -16,14 +16,32 @@ Carta Space stores documents as ordinary UTF-8 Markdown, gives every document a 
 
 The reference implementation is written in Rust and is explicitly split into a frontend-independent core, a Unix-style command-line interface, and a terminal user interface. The format remains independent of Rust and of any particular frontend.
 
+## Install and run
+
+The normal v0.1 entry point is the prebuilt `carta` executable. The release package also includes `carta-cli` for optional scripting and archive administration.
+
+Git is a required runtime dependency because Carta archive history and synchronization are Git-backed.
+
+After unpacking a Linux release archive:
+
+```bash
+install -Dm755 carta ~/.local/bin/carta
+install -Dm755 carta-cli ~/.local/bin/carta-cli   # optional
+carta
+```
+
+On first launch, `carta` opens the default XDG archive location and offers to create an empty Archive or import an existing Git Archive when none exists.
+
+The helper programs under `scripts/`, including the Distrobox setup and development launcher, are development and maintenance tools. They are not part of the normal installation or startup path.
+
 ## Reference implementation architecture
 
 The initial implementation is planned as a small set of separable Rust components:
 
 - `carta-format` — format types, validation, serialization, and compatibility rules;
 - `carta-core` — archive operations, Documents, Volumes, Works, LEAP search, history, Trash/Wipe, import/export;
-- `carta-cli` — scriptable Unix-style administrative commands, producing the `carta` binary;
-- `carta-tui` — the first interactive frontend, built with Ratatui and Crossterm.
+- `carta-cli` — scriptable Unix-style administrative commands, producing the optional `carta-cli` binary;
+- `carta-tui` — the first interactive frontend, built with Ratatui and Crossterm, producing the user-facing `carta` binary.
 
 The TUI is the reference interactive environment, not the definition of Carta Space. Future GTK, Emacs, web, or other frontends should use the same core model rather than reimplementing archive semantics.
 
@@ -126,32 +144,32 @@ Built-in PDF publication is intentionally deferred beyond v0.1. Markdown export 
 
 ## Command line
 
-The `carta` binary uses `--archive <path>` and has a noninteractive, scriptable command surface. Without `--archive`, it opens `$XDG_DATA_HOME/carta/archive` (or `~/.local/share/carta/archive` when `XDG_DATA_HOME` is unset):
+The optional `carta-cli` binary uses `--archive <path>` and has a noninteractive, scriptable command surface. Without `--archive`, it opens `$XDG_DATA_HOME/carta/archive` (or `~/.local/share/carta/archive` when `XDG_DATA_HOME` is unset):
 
 ```text
-carta create <path>
-carta --archive <path> validate|inspect|documents|works|history
-carta --archive <path> checkpoint [--kind manual] [--note <text>]
-carta --archive <path> import <file>
-carta --archive <path> search <literal-query>
-carta --archive <path> export markdown-document <document-id>
-carta --archive <path> export markdown-work <work-id>
-carta --archive <path> package <output.cat>
-carta --archive <path> trash inventory|impact|document|work ...
-carta --archive <path> restore document|work ...
-carta --archive <path> wipe execute <document-id> --confirm "WIPE <document-id> PERMANENTLY"
+carta-cli create <path>
+carta-cli --archive <path> validate|inspect|documents|works|history
+carta-cli --archive <path> checkpoint [--kind manual] [--note <text>]
+carta-cli --archive <path> import <file>
+carta-cli --archive <path> search <literal-query>
+carta-cli --archive <path> export markdown-document <document-id>
+carta-cli --archive <path> export markdown-work <work-id>
+carta-cli --archive <path> package <output.cat>
+carta-cli --archive <path> trash inventory|impact|document|work ...
+carta-cli --archive <path> restore document|work ...
+carta-cli --archive <path> wipe execute <document-id> --confirm "WIPE <document-id> PERMANENTLY"
 ```
 
-Markdown exports are written exactly to standard output. Package destinations must be outside the Archive. Trash mutations require `--confirm`; `wipe execute --confirm` performs a fresh preflight and requires the exact strong confirmation phrase without an interactive prompt. Run `carta <command> --help` for complete arguments.
+Markdown exports are written exactly to standard output. Package destinations must be outside the Archive. Trash mutations require `--confirm`; `wipe execute --confirm` performs a fresh preflight and requires the exact strong confirmation phrase without an interactive prompt. Run `carta-cli <command> --help` for complete arguments.
 
 ## Terminal interface
 
-`carta-tui` is the writing-first full-screen frontend. Pass an Archive directory explicitly, create one with `--create`, or omit the path to open the deterministic XDG default Archive at `$XDG_DATA_HOME/carta/archive` (or `~/.local/share/carta/archive`):
+`carta` is the writing-first full-screen frontend and the normal user entry point. Pass an Archive directory explicitly, create one with `--create`, or omit the path to open the deterministic XDG default Archive at `$XDG_DATA_HOME/carta/archive` (or `~/.local/share/carta/archive`):
 
 ```bash
-carta-tui /path/to/archive
-carta-tui --create /path/to/new-archive
-carta-tui
+carta /path/to/archive
+carta --create /path/to/new-archive
+carta
 ```
 
 Device-local session state is stored alongside the default Archive root under `$XDG_DATA_HOME/carta` (or `~/.local/share/carta`), but outside the `archive/` Git working tree; session files are named `session-<archive-id>.json`. On startup, the TUI migrates legacy session files from `$XDG_STATE_HOME/carta-space` (or `~/.local/state/carta-space`) and discards the obsolete `last-archive.json`.
