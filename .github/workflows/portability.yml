@@ -1,0 +1,78 @@
+name: Portability
+
+on:
+  push:
+    branches:
+      - main
+      - opencode/v0.2
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-glibc:
+    name: Linux x86_64 (Ubuntu 20.04 baseline)
+    runs-on: ubuntu-22.04
+    container: ubuntu:20.04
+
+    steps:
+      - name: Install system dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y             build-essential             ca-certificates             curl             git             libwayland-dev             pkg-config
+
+      - uses: actions/checkout@v4
+
+      - name: Install Rust 1.85
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs             | sh -s -- -y --profile minimal --default-toolchain 1.85.0
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Test workspace
+        run: cargo test --workspace --locked
+
+      - name: Build release binaries
+        run: cargo build --release --workspace --locked
+
+      - name: Smoke test binaries
+        run: |
+          target/release/carta --version
+          target/release/carta-cli --version
+          ldd target/release/carta
+          ldd target/release/carta-cli
+
+  macos:
+    name: macOS (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust 1.85
+        run: |
+          rustup toolchain install 1.85.0 --profile minimal
+          rustup override set 1.85.0
+
+      - name: Test workspace
+        run: cargo test --workspace --locked
+
+      - name: Build release binaries
+        run: cargo build --release --workspace --locked
+
+      - name: Smoke test binaries
+        run: |
+          ./target/release/carta --version
+          ./target/release/carta-cli --version
+          file ./target/release/carta
+          file ./target/release/carta-cli

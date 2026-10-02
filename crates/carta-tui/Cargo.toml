@@ -10,7 +10,6 @@ name = "carta"
 path = "src/main.rs"
 
 [dependencies]
-arboard = { version = "3.6.1", default-features = false, features = ["wayland-data-control"] }
 carta-core = { path = "../carta-core" }
 chrono.workspace = true
 clap.workspace = true
@@ -24,7 +23,11 @@ unicode-width = "0.2.0"
 
 # wayland-protocols 0.32.13 raises MSRV to Rust 1.86; Carta v0.1 supports Rust 1.85.
 [target.'cfg(target_os = "linux")'.dependencies]
+arboard = { version = "3.6.1", default-features = false, features = ["wayland-data-control"] }
 wayland-protocols = "=0.32.12"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+arboard = { version = "3.6.1", default-features = false }
 
 [dev-dependencies]
 tempfile.workspace = true
