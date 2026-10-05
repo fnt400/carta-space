@@ -927,6 +927,125 @@ fn main() -> Result<(), Box<dyn Error>> {
 mod tests {
     use super::*;
 
+    fn bridge_event(key: BridgeKey, pressed: bool) -> BridgeKeyEvent {
+        BridgeKeyEvent {
+            key,
+            pressed,
+            repeat: false,
+        }
+    }
+
+    #[test]
+    fn physical_left_control_runs_backward_leap_until_release() {
+        let mut bridge = LeapBridge::default();
+
+        assert!(bridge.handle_key(bridge_event(
+            BridgeKey::Leap(PhysicalLeapKey::Backward),
+            true,
+        )));
+        assert!(bridge.actions.is_empty());
+
+        assert!(bridge.handle_key(bridge_event(
+            BridgeKey::Text("abc".to_owned()),
+            true,
+        )));
+        assert_eq!(
+            bridge.drain_actions().collect::<Vec<_>>(),
+            vec![
+                LeapAction::Start(LeapDirection::Backward),
+                LeapAction::Input("abc".to_owned()),
+            ]
+        );
+
+        assert!(bridge.handle_key(bridge_event(
+            BridgeKey::Leap(PhysicalLeapKey::Backward),
+            false,
+        )));
+        assert_eq!(
+            bridge.drain_actions().collect::<Vec<_>>(),
+            vec![LeapAction::End]
+        );
+    }
+
+    #[test]
+    fn physical_left_alt_runs_forward_leap_and_altgr_is_not_a_leap_key() {
+        let mut bridge = LeapBridge::default();
+
+        assert!(bridge.handle_key(bridge_event(
+            BridgeKey::Leap(PhysicalLeapKey::Forward),
+            true,
+        )));
+        assert!(bridge.handle_key(bridge_event(
+            BridgeKey::Text("z".to_owned()),
+            true,
+        )));
+        assert_eq!(
+            bridge.drain_actions().collect::<Vec<_>>(),
+            vec![
+                LeapAction::Start(LeapDirection::Forward),
+                LeapAction::Input("z".to_owned()),
+            ]
+        );
+
+        assert!(!bridge.handle_key(bridge_event(BridgeKey::Other, true)));
+    }
+
+    #[test]
+    fn tapping_a_leap_key_and_pressing_both_preserve_cat_semantics() {
+        let mut bridge = LeapBridge::default();
+
+        assert!(bridge.handle_key(bridge_event(
+            BridgeKey::Leap(PhysicalLeapKey::Backward),
+            true,
+        )));
+        assert!(bridge.handle_key(bridge_event(
+            BridgeKey::Leap(PhysicalLeapKey::Backward),
+            false,
+        )));
+        assert_eq!(
+            bridge.drain_actions().collect::<Vec<_>>(),
+            vec![LeapAction::Tap(LeapDirection::Backward)]
+        );
+
+        assert!(bridge.handle_key(bridge_event(
+            BridgeKey::Leap(PhysicalLeapKey::Backward),
+            true,
+        )));
+        assert!(bridge.handle_key(bridge_event(
+            BridgeKey::Leap(PhysicalLeapKey::Forward),
+            true,
+        )));
+        assert_eq!(
+            bridge.drain_actions().collect::<Vec<_>>(),
+            vec![LeapAction::ExtendHighlight]
+        );
+
+        assert!(bridge.handle_key(bridge_event(
+            BridgeKey::Leap(PhysicalLeapKey::Backward),
+            false,
+        )));
+        assert!(bridge.handle_key(bridge_event(
+            BridgeKey::Leap(PhysicalLeapKey::Forward),
+            false,
+        )));
+        assert!(bridge.actions.is_empty());
+    }
+
+    #[test]
+    fn right_control_plus_leap_requests_leap_again() {
+        let mut bridge = LeapBridge::default();
+
+        assert!(!bridge.handle_key(bridge_event(BridgeKey::RightControl, true)));
+        assert!(bridge.handle_key(bridge_event(
+            BridgeKey::Leap(PhysicalLeapKey::Forward),
+            true,
+        )));
+        assert_eq!(
+            bridge.drain_actions().collect::<Vec<_>>(),
+            vec![LeapAction::Again(LeapDirection::Forward)]
+        );
+    }
+
     #[test]
     fn display_column_maps_to_utf8_boundaries() {
         let text = "aé中";
