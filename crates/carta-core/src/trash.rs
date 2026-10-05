@@ -523,6 +523,7 @@ impl Archive {
         }
         require_clean_tracked_state(self.root())?;
         require_single_worktree(self.root())?;
+        remove_disposable_wipe_pseudorefs(self.root())?;
         require_safe_git_state(self.root())?;
         let refs = retained_refs(self.root())?;
         let commits = commits_from_refs(self.root(), &refs)?;
@@ -565,6 +566,7 @@ impl Archive {
         }
         require_clean_tracked_state(self.root())?;
         require_single_worktree(self.root())?;
+        remove_disposable_wipe_pseudorefs(self.root())?;
         require_safe_git_state(self.root())?;
         if head(self.root())? != plan.planned_head {
             return Err(Error::StaleWipePlan);
@@ -614,6 +616,7 @@ impl Archive {
                 crate::conflict::scrub_document_conflicts(self.root(), plan.document)?;
             removed_artifacts += crate::package::cleanup_registered_temporaries(self.root())?;
             removed_artifacts += remove_carta_artifacts(self.root())?;
+            remove_disposable_wipe_pseudorefs(self.root())?;
             Ok(removed_artifacts)
         })();
         let removed_artifacts = match reversible {
@@ -1382,10 +1385,30 @@ fn require_single_worktree(root: &Path) -> Result<(), Error> {
     }
 }
 
+fn remove_disposable_wipe_pseudorefs(root: &Path) -> Result<(), Error> {
+    for name in ["ORIG_HEAD", "FETCH_HEAD"] {
+        let output = git_output(
+            root,
+            "resolve disposable Git pseudoref before Wipe",
+            &["rev-parse", "--git-path", name],
+        )?;
+        let path = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim().to_owned());
+        let path = if path.is_absolute() {
+            path
+        } else {
+            root.join(path)
+        };
+        match fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(Error::io(&path, error)),
+        }
+    }
+    Ok(())
+}
+
 fn require_safe_git_state(root: &Path) -> Result<(), Error> {
     for name in [
-        "ORIG_HEAD",
-        "FETCH_HEAD",
         "MERGE_HEAD",
         "AUTO_MERGE",
         "CHERRY_PICK_HEAD",
