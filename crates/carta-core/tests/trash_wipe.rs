@@ -184,18 +184,31 @@ fn wipe_preserves_identical_content_owned_by_an_unrelated_document() {
 }
 
 #[test]
-fn wipe_rejects_orig_head_before_rewriting_refs() {
+fn wipe_discards_fetch_and_orig_head_bookkeeping_before_rewriting_refs() {
     let (_temporary, mut archive) = create_archive();
     let target = archive.create_document("sensitive").unwrap();
     archive.trash_document(target).unwrap();
     let head = git(&archive, &["rev-parse", "HEAD"]);
     assert_git_ok(&head);
-    fs::write(archive.root().join(".git/ORIG_HEAD"), head.stdout).unwrap();
+    let head_text = String::from_utf8(head.stdout).unwrap();
+    let head_text = head_text.trim();
+    fs::write(archive.root().join(".git/ORIG_HEAD"), format!("{head_text}\n")).unwrap();
+    fs::write(
+        archive.root().join(".git/FETCH_HEAD"),
+        format!("{head_text}\t\tbranch 'carta' of test-remote\n"),
+    )
+    .unwrap();
 
-    assert!(matches!(
-        archive.plan_wipe_document(target),
-        Err(Error::WipeRepositoryState(state)) if state == "ORIG_HEAD"
-    ));
+    let plan = archive.plan_wipe_document(target).unwrap();
+    assert!(!archive.root().join(".git/ORIG_HEAD").exists());
+    assert!(!archive.root().join(".git/FETCH_HEAD").exists());
+
+    archive
+        .execute_wipe_document(&plan, plan.confirmation_token())
+        .unwrap();
+    assert!(!archive.root().join(".git/ORIG_HEAD").exists());
+    assert!(!archive.root().join(".git/FETCH_HEAD").exists());
+    assert!(archive.trash_inventory().unwrap().documents().is_empty());
 }
 
 #[test]
