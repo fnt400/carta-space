@@ -122,8 +122,7 @@ impl LeapBridge {
                     }
                     if self.right_control_held && self.active.is_none() {
                         self.pending = None;
-                        self.suppressed_releases =
-                            self.suppressed_releases.saturating_add(1);
+                        self.suppressed_releases = self.suppressed_releases.saturating_add(1);
                         self.actions.push_back(LeapAction::Again(key.direction()));
                         return true;
                     }
@@ -170,8 +169,7 @@ impl LeapBridge {
                 (BridgeKey::PageUp, LeapDirection::Backward)
                 | (BridgeKey::PageDown, LeapDirection::Forward) => {
                     self.active = Some(pending);
-                    self.actions
-                        .push_back(LeapAction::DocumentStart(direction));
+                    self.actions.push_back(LeapAction::DocumentStart(direction));
                     return true;
                 }
                 _ => {
@@ -530,9 +528,7 @@ impl GuiApp {
                 self.app.cat_navigation();
             }
             egui::Key::ArrowDown => {
-                self.app
-                    .editor
-                    .move_visual(true, EDITOR_COLUMNS, selecting);
+                self.app.editor.move_visual(true, EDITOR_COLUMNS, selecting);
                 self.app.cat_navigation();
             }
             egui::Key::Home => {
@@ -619,11 +615,10 @@ impl GuiApp {
                 format!("Creation {:04}-{:02}", volume.year(), volume.month())
             }
             View::ModificationDate => "Modification Date".to_owned(),
-            View::Work(id) => self
-                .app
-                .archive
-                .work(*id)
-                .map_or_else(|| "Work".to_owned(), |work| format!("Work: {}", work.title())),
+            View::Work(id) => self.app.archive.work(*id).map_or_else(
+                || "Work".to_owned(),
+                |work| format!("Work: {}", work.title()),
+            ),
             View::Search { query, .. } => format!("Search: {query}"),
             View::History { .. } => "Document History — use TUI for this screen".to_owned(),
             View::WorkHistory { .. } => "Work History — use TUI for this screen".to_owned(),
@@ -946,10 +941,7 @@ mod tests {
         )));
         assert!(bridge.actions.is_empty());
 
-        assert!(bridge.handle_key(bridge_event(
-            BridgeKey::Text("abc".to_owned()),
-            true,
-        )));
+        assert!(bridge.handle_key(bridge_event(BridgeKey::Text("abc".to_owned()), true,)));
         assert_eq!(
             bridge.drain_actions().collect::<Vec<_>>(),
             vec![
@@ -976,10 +968,7 @@ mod tests {
             BridgeKey::Leap(PhysicalLeapKey::Forward),
             true,
         )));
-        assert!(bridge.handle_key(bridge_event(
-            BridgeKey::Text("z".to_owned()),
-            true,
-        )));
+        assert!(bridge.handle_key(bridge_event(BridgeKey::Text("z".to_owned()), true,)));
         assert_eq!(
             bridge.drain_actions().collect::<Vec<_>>(),
             vec![
@@ -1070,14 +1059,8 @@ mod tests {
         let start = Cursor { region: 0, byte: 2 };
         let end = Cursor { region: 0, byte: 8 };
 
-        assert_eq!(
-            highlight_intersection(start, end, 0, 0, 5),
-            Some((2, 5))
-        );
-        assert_eq!(
-            highlight_intersection(start, end, 0, 5, 10),
-            Some((5, 8))
-        );
+        assert_eq!(highlight_intersection(start, end, 0, 0, 5), Some((2, 5)));
+        assert_eq!(highlight_intersection(start, end, 0, 5, 10), Some((5, 8)));
         assert_eq!(highlight_intersection(start, end, 1, 0, 5), None);
     }
 }
