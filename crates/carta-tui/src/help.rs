@@ -126,7 +126,7 @@ LeftCtrl+Home and LeftAlt+End LEAP to the beginning and end of the current Docum
         title: "5. Leap Again and Cat highlight",
         body: r#"RightCtrl+LeftAlt repeats the last LEAP forward; RightCtrl+LeftCtrl repeats it backward.
 
-During an active physical LEAP, pressing Right Control performs Leap Again without changing the original LEAP origin. This applies to text patterns, including patterns containing LF entered with Enter, and to structural LEAPs using Home/End or PageUp/PageDown. For PageUp/PageDown, repeated Right Control continues through successive Document starts. Pressing the opposite LEAP key while the first remains held highlights the interval from the original origin through the final reachable target.
+During an active physical LEAP, pressing Right Control performs Leap Again without changing the original LEAP origin. This applies to text patterns, including patterns containing LF entered with Enter, and to structural LEAPs using Home/End or PageUp/PageDown. For PageUp/PageDown, repeated Right Control continues through successive Document starts. The opposite LEAP key is ignored while the LEAP query is still active, as on the Canon Cat. Release the LEAP key first; pressing both LEAP keys afterward highlights the interval from the original origin through the final reachable target.
 
 After releasing the LEAP key, RightCtrl+LeftAlt or RightCtrl+LeftCtrl repeats the most recently used text or structural LEAP in the requested direction. A structural LEAP replaces an older text pattern for Leap Again.
 
