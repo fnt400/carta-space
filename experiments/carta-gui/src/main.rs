@@ -393,31 +393,29 @@ impl GuiApp {
                                 let top = row_rect.top() + 1.0;
                                 let line = &region.text[line_start..line_end];
 
-                                if let Some((start, end)) = highlight {
-                                    if let Some((from, to)) = highlight_intersection(
+                                if let Some((start, end)) = highlight
+                                    && let Some((from, to)) = highlight_intersection(
                                         start,
                                         end,
                                         region_index,
                                         line_start,
                                         line_end,
-                                    ) {
-                                        let x0 = left
-                                            + display_width(&region.text[line_start..from])
-                                                as f32
-                                                * character_width;
-                                        let x1 = left
-                                            + display_width(&region.text[line_start..to])
-                                                as f32
-                                                * character_width;
-                                        ui.painter().rect_filled(
-                                            egui::Rect::from_min_max(
-                                                egui::pos2(x0, row_rect.top()),
-                                                egui::pos2(x1.max(x0 + 2.0), row_rect.bottom()),
-                                            ),
-                                            0.0,
-                                            selection_color,
-                                        );
-                                    }
+                                    )
+                                {
+                                    let x0 = left
+                                        + display_width(&region.text[line_start..from]) as f32
+                                            * character_width;
+                                    let x1 = left
+                                        + display_width(&region.text[line_start..to]) as f32
+                                            * character_width;
+                                    ui.painter().rect_filled(
+                                        egui::Rect::from_min_max(
+                                            egui::pos2(x0, row_rect.top()),
+                                            egui::pos2(x1.max(x0 + 2.0), row_rect.bottom()),
+                                        ),
+                                        0.0,
+                                        selection_color,
+                                    );
                                 }
 
                                 ui.painter().text(
@@ -448,21 +446,21 @@ impl GuiApp {
                                     }
                                 }
 
-                                if response.clicked() {
-                                    if let Some(pointer) = response.interact_pointer_pos() {
-                                        let column =
-                                            ((pointer.x - left).max(0.0) / character_width).round()
-                                                as usize;
-                                        clicked_cursor = Some(Cursor {
-                                            region: region_index,
-                                            byte: byte_at_display_column(
-                                                &region.text,
-                                                line_start,
-                                                line_end,
-                                                column,
-                                            ),
-                                        });
-                                    }
+                                if response.clicked()
+                                    && let Some(pointer) = response.interact_pointer_pos()
+                                {
+                                    let column =
+                                        ((pointer.x - left).max(0.0) / character_width).round()
+                                            as usize;
+                                    clicked_cursor = Some(Cursor {
+                                        region: region_index,
+                                        byte: byte_at_display_column(
+                                            &region.text,
+                                            line_start,
+                                            line_end,
+                                            column,
+                                        ),
+                                    });
                                 }
                             }
 
