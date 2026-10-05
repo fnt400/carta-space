@@ -4453,6 +4453,24 @@ mod tests {
     }
 
     #[test]
+    fn cat_highlight_includes_a_leaped_target_space() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        assert!(app.cat_insert("alpha beta gamma"));
+        app.editor.set_cursor(Cursor { region: 0, byte: 6 }, false);
+        app.cat_navigation();
+
+        app.start_leap(LeapDirection::Forward, false);
+        app.leap_input(" ");
+        assert_eq!(app.editor.cursor().byte, 10);
+        app.end_leap();
+
+        assert!(app.extend_last_leap_highlight());
+        assert_eq!(app.editor.selected_text().as_deref(), Some("beta "));
+    }
+
+    #[test]
     fn unhighlight_creep_and_rehighlight_adjust_the_active_end() {
         let temporary = tempfile::tempdir().unwrap();
         let archive = Archive::create(temporary.path().join("archive")).unwrap();
