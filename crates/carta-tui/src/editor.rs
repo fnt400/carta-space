@@ -402,7 +402,7 @@ impl CompositeEditor {
         self.record_documents([source_document, target_document]);
         self.regions[start.region].text.drain(start.byte..end.byte);
         let removed_len = end.byte - start.byte;
-        let insertion_byte = if destination.region == start.region && destination.byte > end.byte {
+        let insertion_byte = if destination.region == start.region && destination.byte >= end.byte {
             destination.byte - removed_len
         } else {
             destination.byte
@@ -1109,6 +1109,32 @@ mod tests {
         assert!(e.undo());
         assert_eq!(e.regions()[1].text, "betatarget");
         assert_eq!(e.selected_text().as_deref(), Some("beta"));
+    }
+
+    #[test]
+    fn cat_highlight_move_preserves_selected_spacing_at_adjacent_destination() {
+        let document = id();
+        let mut e = CompositeEditor::new(
+            vec![Region {
+                document,
+                text: "alpha beta gamma".into(),
+            }],
+            Cursor { region: 0, byte: 0 },
+        );
+
+        assert!(e.set_cat_highlight(
+            Cursor { region: 0, byte: 6 },
+            Cursor { region: 0, byte: 11 },
+        ));
+        assert_eq!(e.selected_text().as_deref(), Some("beta "));
+
+        assert!(e.move_cat_highlight_to(Cursor { region: 0, byte: 11 }));
+        assert_eq!(e.regions()[0].text, "alpha beta gamma");
+        assert_eq!(e.selected_text().as_deref(), Some("beta "));
+
+        assert!(e.move_cat_highlight_to(Cursor { region: 0, byte: 0 }));
+        assert_eq!(e.regions()[0].text, "beta alpha gamma");
+        assert_eq!(e.selected_text().as_deref(), Some("beta "));
     }
 
     #[test]
