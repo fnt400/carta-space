@@ -15,4 +15,4 @@ unicode-width = "0.2.0"
 winit = { version = "=0.30.12", default-features = false, features = ["rwh_06", "wayland"] }
 
 [workspace]
-resolver = "2"
+resolver = "3"
