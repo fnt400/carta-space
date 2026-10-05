@@ -284,7 +284,8 @@ The reference TUI also uses Right Control as the Carta command modifier:
 - `RightCtrl+B` = insert `**` before and after point, leaving point between the marker pairs;
 - `RightCtrl+I` = insert `*` before and after point, leaving point between the markers;
 - `RightCtrl+W` = `Open Work…`;
-- `RightCtrl+L` = `Insert Link…` when point is not on a link, otherwise `Open Link`.
+- `RightCtrl+L` = `Insert Link…` when point is not on a link, otherwise `Open Link`;
+- `RightCtrl+M` = open the Creation Date View for the current Document's monthly Volume.
 
 These are frontend bindings, not archive semantics.
 
@@ -354,6 +355,7 @@ With an extended highlight active:
 - starting another LEAP keeps the highlighted text in place while only the cursor moves;
 - releasing the LEAP key at a destination outside the highlight moves the highlighted text to that destination; because Carta uses an insertion-point cursor while the Cat cursor rests on a character, a moved block is inserted immediately before the target character;
 - the moved text remains highlighted so it may immediately be moved again;
+- movement transfers exactly the characters in the extended highlight; spaces and punctuation move only when highlighted, and Carta MUST NOT add, remove, or normalize surrounding whitespace automatically;
 - the destination may be in another Document of the same editable View;
 - a LEAP landing inside the highlight does not move the text and collapses to the target character;
 - after such a collapse, pressing both LEAP keys rehighlights from that target to the former forward end;
@@ -734,6 +736,8 @@ On the current device, Carta MUST remove every recoverable copy under Carta's co
 - Carta-managed autosave/temporary/session remnants containing the content.
 
 After successful Wipe, Carta itself must not be able to recover the Document from that device.
+
+Transient Git bookkeeping pseudorefs such as `FETCH_HEAD` and `ORIG_HEAD` are disposable local state, not active operations. Wipe removes them during preflight and again after rewriting retained refs so a normal Carta synchronization does not block permanent local removal. Active merge, rebase, cherry-pick, revert, bisect, or sequencer state, and additional worktrees, still block Wipe.
 
 This guarantee does not extend to external backups, clones, exports, filesystem/storage snapshots, or physical flash remnants outside Carta's control.
 
