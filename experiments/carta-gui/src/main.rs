@@ -393,15 +393,16 @@ impl GuiApp {
                                 let top = row_rect.top() + 1.0;
                                 let line = &region.text[line_start..line_end];
 
-                                if let Some((start, end)) = highlight
-                                    && let Some((from, to)) = highlight_intersection(
+                                let line_highlight = highlight.and_then(|(start, end)| {
+                                    highlight_intersection(
                                         start,
                                         end,
                                         region_index,
                                         line_start,
                                         line_end,
                                     )
-                                {
+                                });
+                                if let Some((from, to)) = line_highlight {
                                     let x0 = left
                                         + display_width(&region.text[line_start..from]) as f32
                                             * character_width;
@@ -446,9 +447,10 @@ impl GuiApp {
                                     }
                                 }
 
-                                if response.clicked()
-                                    && let Some(pointer) = response.interact_pointer_pos()
-                                {
+                                let clicked_pointer = response
+                                    .interact_pointer_pos()
+                                    .filter(|_| response.clicked());
+                                if let Some(pointer) = clicked_pointer {
                                     let column =
                                         ((pointer.x - left).max(0.0) / character_width).round()
                                             as usize;
