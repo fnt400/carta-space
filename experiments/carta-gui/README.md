@@ -15,7 +15,7 @@ Implemented:
 - a centered 80-column graphical text surface drawn directly from `CompositeEditor`;
 - normal text insertion, newline, backspace, erase, cursor movement, undo/redo and autosave;
 - Cat highlight rendering and the existing Carta LEAP engine;
-- portable LEAP keys, which do not consume Alt/AltGr;
+- physical Left Ctrl/Left Alt LEAP handling before egui, with Right Alt/AltGr left untouched;
 - simple buttons for New Document, Creation Date View, Modification Date View, Undo, Redo and Save;
 - the normal Carta session file, so the current view/document position can be restored.
 
