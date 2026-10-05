@@ -580,13 +580,16 @@ fn handle_key(
 
     if dispatcher.right_control_held
         && key.modifiers.contains(KeyModifiers::CONTROL)
-        && matches!(key.code, KeyCode::Char('w' | 'W' | 'l' | 'L'))
+        && matches!(key.code, KeyCode::Char('w' | 'W' | 'l' | 'L' | 'm' | 'M'))
     {
         dispatcher.pending_leap = None;
         if matches!(app.mode, AppMode::Editing) {
             match key.code {
                 KeyCode::Char('w' | 'W') => app.execute(carta_tui::Command::OpenWork)?,
                 KeyCode::Char('l' | 'L') => app.activate_link_shortcut()?,
+                KeyCode::Char('m' | 'M') => {
+                    app.execute(carta_tui::Command::OpenCreationDateView)?
+                }
                 _ => unreachable!(),
             }
         }
@@ -3576,6 +3579,35 @@ mod tests {
 
         assert!(app.quit);
         assert!(app.kill_switch_triggered());
+    }
+
+    #[test]
+    fn right_control_m_opens_monthly_creation_date_view() {
+        let (_temporary, mut app) = app_with_documents(&["a", "b"], true);
+        let document = app.editor.current_document().unwrap();
+        assert!(matches!(app.view, View::Work(_)));
+        let mut dispatcher = Dispatcher::default();
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::RightControl),
+                KeyModifiers::CONTROL,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(KeyCode::Char('m'), KeyModifiers::CONTROL),
+            true,
+        )
+        .unwrap();
+
+        assert!(matches!(app.view, View::CreationDate(_)));
+        assert_eq!(app.editor.current_document(), Some(document));
     }
 
     #[test]
