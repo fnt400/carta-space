@@ -986,6 +986,14 @@ mod tests {
                 LeapAction::Input("z".to_owned()),
             ]
         );
+        assert!(bridge.handle_key(bridge_event(
+            BridgeKey::Leap(PhysicalLeapKey::Forward),
+            false,
+        )));
+        assert_eq!(
+            bridge.drain_actions().collect::<Vec<_>>(),
+            vec![LeapAction::End]
+        );
 
         assert!(!bridge.handle_key(bridge_event(BridgeKey::Other, true)));
     }
