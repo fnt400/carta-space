@@ -22,6 +22,7 @@ Right Ctrl + Z              Undo
 Right Ctrl + R              Redo
 Right Ctrl + C              Cat COPY when highlighted; otherwise paste system clipboard
 Right Ctrl + N              New Document
+Right Ctrl + M              Monthly Creation Date View
 Right Ctrl + G              Emergency kill switch (no final save/checkpoint/sync)
 Right Ctrl + B              Insert Markdown bold markers (**|**)
 Right Ctrl + I              Insert Markdown italic markers (*|*)
@@ -129,7 +130,7 @@ During an active physical LEAP, pressing Right Control performs Leap Again witho
 
 After releasing the LEAP key, RightCtrl+LeftAlt or RightCtrl+LeftCtrl repeats the most recently used text or structural LEAP in the requested direction. A structural LEAP replaces an older text pattern for Leap Again.
 
-Holding both LEAP keys extends the Cat highlight. The final target character is included. Cat highlights never cross a Document boundary."#,
+Holding both LEAP keys extends the Cat highlight. The final target character is included. Cat highlights never cross a Document boundary. Moving transfers exactly the highlighted characters: spaces and punctuation move only when they are part of the highlight. To move a word together with its following separator, include that space in the highlight; Carta does not normalize whitespace automatically."#,
     },
     HelpDocument {
         title: "6. Editing, ERASE, copy and paste",
@@ -143,7 +144,7 @@ Creating a Cat highlight also copies its text to the system clipboard. Clipboard
         title: "7. Undo, redo and structural commands",
         body: r#"RightCtrl+Z performs Undo and RightCtrl+R performs Redo. Undo/Redo operate on the current in-memory editing history. Consecutive character typing is grouped into a single undo step until navigation, another edit type, or autosave closes that typing run.
 
-RightCtrl+W opens the Work selector. RightCtrl+L inserts a link at point, or opens the existing link when point is already inside one. RightCtrl+N creates a new Document.
+RightCtrl+W opens the Work selector. RightCtrl+L inserts a link at point, or opens the existing link when point is already inside one. RightCtrl+N creates a new Document. RightCtrl+M returns to the Creation Date View for the current Document's monthly Volume.
 
 RightCtrl+G is an emergency kill switch. A dedicated input reader watches this chord independently of the main application loop, so it can terminate Carta even while the main loop is busy or stuck. It restores the terminal on a best-effort basis, then exits immediately without the normal final autosave, checkpoint, session save, or sync.
 
