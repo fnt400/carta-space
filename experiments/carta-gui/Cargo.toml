@@ -1,0 +1,17 @@
+[package]
+name = "carta-gui"
+version = "0.1.1"
+edition = "2021"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+publish = false
+
+[dependencies]
+carta-core = { path = "../../crates/carta-core" }
+carta-tui = { path = "../../crates/carta-tui" }
+clap = { version = "4.5.48", features = ["derive"] }
+eframe = { version = "=0.32.3", default-features = false, features = ["default_fonts", "glow", "wayland"] }
+unicode-width = "0.2.0"
+
+[workspace]
+resolver = "2"
