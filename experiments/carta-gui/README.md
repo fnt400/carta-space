@@ -19,15 +19,18 @@ Implemented:
 - simple buttons for New Document, Creation Date View, Modification Date View, Undo, Redo and Save;
 - the normal Carta session file, so the current view/document position can be restored.
 
-Portable LEAP keys in this prototype:
+LEAP uses the same physical keys as the TUI:
 
-- `Ctrl-B`: LEAP backward;
-- `Ctrl-F`: LEAP forward;
-- `Ctrl-R`: LEAP again;
-- `Ctrl-P`: cancel an active LEAP;
-- `Enter`: finish an active LEAP.
+- physical **Left Ctrl**: LEAP backward;
+- physical **Left Alt**: LEAP forward;
+- tapping a LEAP key preserves the Cat single-step behavior;
+- pressing both LEAP keys preserves Cat highlight extension;
+- **Right Ctrl + LEAP** invokes LEAP Again;
+- releasing the active LEAP key ends the query, as in the TUI.
 
-The prototype intentionally does not yet reproduce every TUI dialog, palette, trash/history/conflict screen, Work selector or the physical left-Control/left-Alt Canon Cat bindings. Those remain in the TUI. In particular, Alt is not intercepted, so AltGr input remains available.
+The event loop reads the physical `winit::keyboard::KeyCode` before egui translates keyboard input. While a LEAP is pending or active, its query keystrokes are consumed by Carta's LEAP state machine rather than becoming ordinary GUI shortcuts. **Right Alt / AltGr is not a LEAP key** and is left to normal text input.
+
+The prototype intentionally does not yet reproduce every TUI dialog, palette, trash/history/conflict screen or Work selector.
 
 The GUI does not use `egui::TextEdit`: Carta's existing editor owns cursor, selection, Cat highlight and editing semantics.
 
