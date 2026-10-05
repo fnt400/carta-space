@@ -192,7 +192,11 @@ fn wipe_discards_fetch_and_orig_head_bookkeeping_before_rewriting_refs() {
     assert_git_ok(&head);
     let head_text = String::from_utf8(head.stdout).unwrap();
     let head_text = head_text.trim();
-    fs::write(archive.root().join(".git/ORIG_HEAD"), format!("{head_text}\n")).unwrap();
+    fs::write(
+        archive.root().join(".git/ORIG_HEAD"),
+        format!("{head_text}\n"),
+    )
+    .unwrap();
     fs::write(
         archive.root().join(".git/FETCH_HEAD"),
         format!("{head_text}\t\tbranch 'carta' of test-remote\n"),

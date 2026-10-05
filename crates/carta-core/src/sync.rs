@@ -321,8 +321,7 @@ fn clean_merge_tree_output(output: Output) -> Result<MergeTree, Error> {
 }
 
 fn merged_tree_legacy(root: &Path, local: &str, remote: &str) -> Result<MergeTree, Error> {
-    let temporary =
-        tempfile::tempdir().map_err(|error| Error::io(root, error))?;
+    let temporary = tempfile::tempdir().map_err(|error| Error::io(root, error))?;
     let worktree = temporary.path().join("worktree");
     fs::create_dir(&worktree).map_err(|error| Error::io(&worktree, error))?;
     let index = temporary.path().join("index");
@@ -332,7 +331,10 @@ fn merged_tree_legacy(root: &Path, local: &str, remote: &str) -> Result<MergeTre
         "find sync merge base",
         &["merge-base", "--all", local, remote],
     )?;
-    let bases: Vec<&str> = bases.lines().filter(|line| !line.trim().is_empty()).collect();
+    let bases: Vec<&str> = bases
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .collect();
     if bases.is_empty() {
         return Err(Error::InvalidSyncRemote(
             "Git produced no merge base for divergent sync history".into(),

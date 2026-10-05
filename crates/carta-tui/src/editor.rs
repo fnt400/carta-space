@@ -1124,11 +1124,17 @@ mod tests {
 
         assert!(e.set_cat_highlight(
             Cursor { region: 0, byte: 6 },
-            Cursor { region: 0, byte: 11 },
+            Cursor {
+                region: 0,
+                byte: 11
+            },
         ));
         assert_eq!(e.selected_text().as_deref(), Some("beta "));
 
-        assert!(e.move_cat_highlight_to(Cursor { region: 0, byte: 11 }));
+        assert!(e.move_cat_highlight_to(Cursor {
+            region: 0,
+            byte: 11
+        }));
         assert_eq!(e.regions()[0].text, "alpha beta gamma");
         assert_eq!(e.selected_text().as_deref(), Some("beta "));
 
