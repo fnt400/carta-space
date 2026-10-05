@@ -619,3 +619,34 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_column_maps_to_utf8_boundaries() {
+        let text = "aé中";
+        assert_eq!(byte_at_display_column(text, 0, text.len(), 0), 0);
+        assert_eq!(byte_at_display_column(text, 0, text.len(), 1), 1);
+        assert_eq!(byte_at_display_column(text, 0, text.len(), 2), 3);
+        assert_eq!(byte_at_display_column(text, 0, text.len(), 3), 3);
+        assert_eq!(byte_at_display_column(text, 0, text.len(), 4), text.len());
+    }
+
+    #[test]
+    fn highlight_is_clipped_to_each_visual_line() {
+        let start = Cursor { region: 0, byte: 2 };
+        let end = Cursor { region: 0, byte: 8 };
+
+        assert_eq!(
+            highlight_intersection(start, end, 0, 0, 5),
+            Some((2, 5))
+        );
+        assert_eq!(
+            highlight_intersection(start, end, 0, 5, 10),
+            Some((5, 8))
+        );
+        assert_eq!(highlight_intersection(start, end, 1, 0, 5), None);
+    }
+}
