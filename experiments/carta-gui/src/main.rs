@@ -98,7 +98,7 @@ impl LeapBridge {
     }
 
     fn handle_key(&mut self, event: BridgeKeyEvent) -> bool {
-        match event.key {
+        match &event.key {
             BridgeKey::RightControl => {
                 if event.pressed && !event.repeat {
                     self.right_control_held = true;
@@ -115,6 +115,7 @@ impl LeapBridge {
                 return false;
             }
             BridgeKey::Leap(key) => {
+                let key = *key;
                 if event.pressed {
                     if event.repeat {
                         return true;
