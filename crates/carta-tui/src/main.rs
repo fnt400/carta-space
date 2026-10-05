@@ -805,23 +805,9 @@ fn handle_key(
                 return Ok(());
             }
             KeyCode::Modifier(key @ (ModifierKeyCode::LeftControl | ModifierKeyCode::LeftAlt)) => {
-                if let Some(active) = dispatcher.active_leap {
-                    if active.key != key {
-                        dispatcher.active_leap = None;
-                        dispatcher.suppressed_leap_releases = 2;
-                        if matches!(app.mode, AppMode::Leap { .. }) {
-                            app.end_leap();
-                        }
-                        if app.extend_last_leap_highlight() {
-                            if let Some(text) = app.editor.selected_text() {
-                                if let Err(error) = dispatcher.clipboard.set_text(text) {
-                                    app.status = format!(
-                                        "Cat highlight active; clipboard unavailable: {error}"
-                                    );
-                                }
-                            }
-                        }
-                    }
+                if dispatcher.active_leap.is_some() {
+                    // Canon Cat: the opposite LEAP key is ignored while a LEAP query is active.
+                    // Extended highlighting is requested by pressing both LEAP keys after the LEAP.
                     return Ok(());
                 }
                 if let Some(pending) = dispatcher.pending_leap {
@@ -2852,7 +2838,7 @@ mod tests {
     }
 
     #[test]
-    fn active_enter_leap_again_preserves_origin_and_highlights_target_lf() {
+    fn active_enter_leap_again_preserves_origin_for_post_leap_highlight() {
         let (_temporary, mut app) = app_with_documents(&["a\nb\nc\nd"], false);
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
         app.cat_navigation();
@@ -2875,7 +2861,7 @@ mod tests {
             true,
         )
         .unwrap();
-        assert_eq!(app.editor.cursor(), Cursor { region: 0, byte: 1 });
+        assert_eq!(app.editor.cursor().byte, 1);
 
         for expected in [3, 5] {
             handle_key(
@@ -2917,6 +2903,29 @@ mod tests {
         handle_key(
             &mut app,
             &mut dispatcher,
+            KeyEvent::new_with_kind(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
+            ),
+            true,
+        )
+        .unwrap();
+        assert!(matches!(app.mode, AppMode::Editing));
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
             KeyEvent::new(
                 KeyCode::Modifier(ModifierKeyCode::LeftControl),
                 KeyModifiers::CONTROL | KeyModifiers::ALT,
@@ -2955,6 +2964,27 @@ mod tests {
         .unwrap();
         assert_eq!(app.editor.cursor(), Cursor { region: 1, byte: 1 });
 
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new_with_kind(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
         handle_key(
             &mut app,
             &mut dispatcher,
@@ -4339,7 +4369,7 @@ mod tests {
     }
 
     #[test]
-    fn opposite_leap_can_highlight_while_use_front_is_still_held() {
+    fn opposite_leap_is_ignored_during_active_leap() {
         let (_temporary, mut app) = app_with_documents(&["a x b x c"], false);
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
         app.cat_navigation();
@@ -4362,19 +4392,7 @@ mod tests {
             true,
         )
         .unwrap();
-
-        handle_key(
-            &mut app,
-            &mut dispatcher,
-            KeyEvent::new(
-                KeyCode::Modifier(ModifierKeyCode::RightControl),
-                KeyModifiers::CONTROL | KeyModifiers::ALT,
-            ),
-            true,
-        )
-        .unwrap();
-        assert_eq!(app.editor.cursor().byte, 6);
-        assert!(dispatcher.right_control_held);
+        assert_eq!(app.editor.cursor().byte, 2);
 
         handle_key(
             &mut app,
@@ -4387,12 +4405,41 @@ mod tests {
         )
         .unwrap();
 
+        assert!(matches!(app.mode, AppMode::Leap { .. }));
+        assert!(dispatcher.active_leap.is_some());
+        assert_eq!(app.editor.cursor().byte, 2);
+        assert!(app.editor.cat_highlight().is_none());
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new_with_kind(
+                KeyCode::Modifier(ModifierKeyCode::LeftControl),
+                KeyModifiers::ALT,
+                KeyEventKind::Release,
+            ),
+            true,
+        )
+        .unwrap();
+        assert!(matches!(app.mode, AppMode::Leap { .. }));
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new_with_kind(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
+            ),
+            true,
+        )
+        .unwrap();
         assert!(matches!(app.mode, AppMode::Editing));
-        assert_eq!(app.editor.selected_text().as_deref(), Some("a x b x"));
+        assert!(app.editor.cat_highlight().is_none());
     }
 
     #[test]
-    fn active_leap_again_keeps_original_anchor_until_opposite_leap_highlights() {
+    fn active_leap_again_keeps_original_anchor_for_post_leap_highlight() {
         let (_temporary, mut app) = app_with_documents(&["a x b x c x d"], false);
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
         app.cat_navigation();
@@ -4451,6 +4498,30 @@ mod tests {
         handle_key(
             &mut app,
             &mut dispatcher,
+            KeyEvent::new_with_kind(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
+            ),
+            true,
+        )
+        .unwrap();
+        assert!(matches!(app.mode, AppMode::Editing));
+        assert!(dispatcher.active_leap.is_none());
+
+        handle_key(
+            &mut app,
+            &mut dispatcher,
+            KeyEvent::new(
+                KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+                KeyModifiers::ALT,
+            ),
+            true,
+        )
+        .unwrap();
+        handle_key(
+            &mut app,
+            &mut dispatcher,
             KeyEvent::new(
                 KeyCode::Modifier(ModifierKeyCode::LeftControl),
                 KeyModifiers::CONTROL | KeyModifiers::ALT,
@@ -4459,8 +4530,6 @@ mod tests {
         )
         .unwrap();
 
-        assert!(matches!(app.mode, AppMode::Editing));
-        assert!(dispatcher.active_leap.is_none());
         assert_eq!(app.editor.selected_text().as_deref(), Some("a x b x c x"));
         assert_eq!(dispatcher.clipboard.get_text().unwrap(), "a x b x c x");
 
