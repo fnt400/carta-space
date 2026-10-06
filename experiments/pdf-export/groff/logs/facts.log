@@ -1,0 +1,220 @@
+mar 6 ott 2026, 17:12:01, UTC
+74e2819795b6aff431aeac983d63a9c8968eeaba2a2eba7df8ba4c7b41e7cfd8  /opt/carta-pdf-bench/groff-1.24.1.tar.gz
+GNU groff version 1.24.1
+Copyright 1989-2026 Free Software Foundation, Inc. and others
+
+This is free software, distributed under the terms of the GNU General Public
+License, version 3, or any later version, at your option.  There is NO warranty;
+not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+See the "COPYING", "FDL", and "LICENSES" files in the groff distribution or
+package for additional notices and permissions.
+
+programs in constructed pipeline:
+
+GNU grops (groff) version 1.24.1
+GNU troff (groff) version 1.24.1
+GNU gropdf (groff) version 1.24.1
+
+Installed payload (source excluded):
+13331128	/opt/carta-pdf-bench/groff-1.24.1/bin
+2428414	/opt/carta-pdf-bench/groff-1.24.1/lib
+70420805	/opt/carta-pdf-bench/groff-1.24.1/share
+
+Prefix including initially co-located sources:
+118167096	/opt/carta-pdf-bench/groff-1.24.1
+
+Build tree:
+56933682	/opt/carta-pdf-bench/groff-build-1.24.1
+
+Font artifacts:
+42239781	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font
+1007755 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/NotoSans-Regular.t42
+2886446 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/CB
+831895 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/NS
+5180 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/NH
+307898 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/SourceSerif4-Regular.t42
+60045 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/NA
+929534 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/NJ
+383330 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/SourceCodePro-Regular.t42
+43991 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/NotoSansHebrew-Regular.t42
+557 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/download
+375423 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/NotoSansDevanagari-Regular.t42
+12152397 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/NotoSansJP-Regular.t42
+515 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/download.bak
+306761 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/SourceSerif4-Semibold.t42
+429396 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/NotoSansArabic-Regular.t42
+2332210 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/CR
+2291399 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/CI
+54106 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/CM
+234394 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/SourceSerif4-It.t42
+39735 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/ND
+14699502 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NotoSansJP-Regular.pfa
+801045 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NotoSans-Regular.pfa
+40026 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NotoSansHebrew-Regular.pfa
+425 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/download
+324990 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/SourceCodePro-Regular.pfa
+382 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/download.bak
+359165 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/SourceSerif4-Semibold.pfa
+339408 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NotoSansArabic-Regular.pfa
+331390 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NotoSansDevanagari-Regular.pfa
+363362 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/SourceSerif4-Regular.pfa
+306543 /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/SourceSerif4-It.pfa
+
+Font symlinks:
+/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/CB -> /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/CB
+/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NS -> /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/NS
+/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NH -> /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/NH
+/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NA -> /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/NA
+/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NJ -> /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/NJ
+/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/CR -> /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/CR
+/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/CI -> /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/CI
+/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/CM -> /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/CM
+/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/ND -> /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/ND
+
+Scratch retained by upstream installer:
+d 4096 /opt/carta-pdf-bench/install-font
+f 89 /opt/carta-pdf-bench/install-font/generate-t42.pe
+
+Runtime ELF dependencies:
+
+groff
+	linux-vdso.so.1 (0x00007d557c392000)
+	libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007d557c0fb000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007d557c00b000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007d557bfde000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007d557bdea000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007d557c394000)
+
+preconv
+	linux-vdso.so.1 (0x0000754eb9b01000)
+	libuchardet.so.0 => /lib/x86_64-linux-gnu/libuchardet.so.0 (0x0000754eb9ab0000)
+	libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x0000754eb984a000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x0000754eb981d000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x0000754eb9629000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x0000754eb9537000)
+	/lib64/ld-linux-x86-64.so.2 (0x0000754eb9b03000)
+
+troff
+	linux-vdso.so.1 (0x00007dfc8b45c000)
+	libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007dfc8b10e000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007dfc8b01e000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007dfc8aff1000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007dfc8adfd000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007dfc8b45e000)
+
+gropdf interpreter and imported Perl modules:
+#!/usr/bin/perl
+use strict;
+use warnings;
+require 5.8.0;
+use Getopt::Long qw(:config bundling);
+use Encode qw(encode);
+use POSIX qw(mktime);
+use File::Spec;
+use File::Path;
+use constant
+Perl v5.40.1; Compress::Zlib 2.212
+	linux-vdso.so.1 (0x000078b6c2a8a000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x000078b6c25c4000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x000078b6c23d0000)
+	libcrypt.so.1 => /lib/x86_64-linux-gnu/libcrypt.so.1 (0x000078b6c2394000)
+	/lib64/ld-linux-x86-64.so.2 (0x000078b6c2a8c000)
+
+Perl compression shared-library dependencies:
+	linux-vdso.so.1 (0x00007324e7a03000)
+	libbz2.so.1.0 => /lib/x86_64-linux-gnu/libbz2.so.1.0 (0x00007324e79d6000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007324e77e2000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007324e7a05000)
+	linux-vdso.so.1 (0x000076f06961a000)
+	libz.so.1 => /lib/x86_64-linux-gnu/libz.so.1 (0x000076f0695d8000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x000076f0693e4000)
+	/lib64/ld-linux-x86-64.so.2 (0x000076f06961c000)
+
+Relevant Debian package versions:
+bison	2:3.8.2+dfsg-1+b2
+build-essential	12.12
+flex	2.6.4-8.2+b4
+fontforge	1:20230101~dfsg-4+b1
+libcompress-raw-bzip2-perl	
+libcompress-raw-zlib-perl	
+libio-compress-perl	
+libuchardet-dev:amd64	0.0.8-1+b2
+perl	5.40.1-6+deb13u1
+poppler-utils	25.03.0-5+deb13u4
+texinfo	7.1.1-1
+
+PDF facts:
+Creator:         groff version 1.24.1
+Producer:        gropdf version 1.24.1
+CreationDate:    Tue Oct  6 17:11:54 2026 UTC
+ModDate:         Tue Oct  6 17:11:54 2026 UTC
+Custom Metadata: no
+Metadata Stream: no
+Tagged:          no
+UserProperties:  no
+Suspects:        no
+Form:            none
+JavaScript:      no
+Pages:           2
+Encrypted:       no
+Page size:       595 x 842 pts (A4)
+Page rot:        0
+File size:       45293 bytes
+Optimized:       no
+PDF version:     1.7
+name                                 type              encoding         emb sub uni object ID
+------------------------------------ ----------------- ---------------- --- --- --- ---------
+AAAAAA+SourceSerif4-Regular          Type 1            Custom           yes yes no      10  0
+AAAAAB+SourceSerif4-It               Type 1            Custom           yes yes no      14  0
+AAAAAC+SourceSerif4-Semibold         Type 1            Custom           yes yes no      18  0
+AAAAAD+SourceCodePro-Regular         Type 1            Custom           yes yes no      22  0
+Creator:         groff version 1.24.1
+Producer:        gropdf version 1.24.1
+CreationDate:    Tue Oct  6 17:11:56 2026 UTC
+ModDate:         Tue Oct  6 17:11:56 2026 UTC
+Custom Metadata: no
+Metadata Stream: no
+Tagged:          no
+UserProperties:  no
+Suspects:        no
+Form:            none
+JavaScript:      no
+Pages:           1
+Encrypted:       no
+Page size:       595 x 842 pts (A4)
+Page rot:        0
+File size:       54280 bytes
+Optimized:       no
+PDF version:     1.7
+name                                 type              encoding         emb sub uni object ID
+------------------------------------ ----------------- ---------------- --- --- --- ---------
+AAAAAA+SourceSerif4-Regular          Type 1            Custom           yes yes no       8  0
+AAAAAB+SourceSerif4-Semibold         Type 1            Custom           yes yes no      12  0
+AAAAAC+NotoSans-Regular              Type 1            Custom           yes yes no      16  0
+AAAAAD+NotoSansHebrew-Regular        Type 1            Custom           yes yes no      20  0
+AAAAAE+NotoSansArabic-Regular        Type 1            Custom           yes yes no      24  0
+AAAAAF+NotoSansDevanagari-Regular    Type 1            Custom           yes yes no      28  0
+AAAABQ+NotoSansJP-Regular            Type 1            Custom           yes yes no      32  0
+Creator:         groff version 1.24.1
+Producer:        gropdf version 1.24.1
+CreationDate:    Tue Oct  6 17:11:55 2026 UTC
+ModDate:         Tue Oct  6 17:11:55 2026 UTC
+Custom Metadata: no
+Metadata Stream: no
+Tagged:          no
+UserProperties:  no
+Suspects:        no
+Form:            none
+JavaScript:      no
+Pages:           1
+Encrypted:       no
+Page size:       595 x 842 pts (A4)
+Page rot:        0
+File size:       28583 bytes
+Optimized:       no
+PDF version:     1.7
+name                                 type              encoding         emb sub uni object ID
+------------------------------------ ----------------- ---------------- --- --- --- ---------
+AAAAAA+SourceSerif4-Regular          Type 1            Custom           yes yes no       8  0
+AAAAAB+SourceSerif4-Semibold         Type 1            Custom           yes yes no      12  0

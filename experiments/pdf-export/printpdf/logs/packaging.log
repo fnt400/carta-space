@@ -1,0 +1,17 @@
+/opt/carta-pdf-bench/printpdf-target/release/carta-printpdf-bench 21108648 bytes
+/opt/carta-pdf-bench/printpdf-target/release/carta-printpdf-bench-stripped 19473272 bytes
+	linux-vdso.so.1 (0x00007911d1c94000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007911d09c3000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007911d08d3000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007911d06df000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007911d1c96000)
+ 240456 experiments/pdf-export/fonts/NotoSansArabic-Regular.ttf
+ 219212 experiments/pdf-export/fonts/NotoSansDevanagari-Regular.ttf
+  26900 experiments/pdf-export/fonts/NotoSansHebrew-Regular.ttf
+5767260 experiments/pdf-export/fonts/NotoSansJP-Regular.ttf
+ 569208 experiments/pdf-export/fonts/NotoSans-Regular.ttf
+ 210312 experiments/pdf-export/fonts/SourceCodePro-Regular.ttf
+ 187808 experiments/pdf-export/fonts/SourceSerif4-Italic.ttf
+ 261868 experiments/pdf-export/fonts/SourceSerif4-Regular.ttf
+ 272088 experiments/pdf-export/fonts/SourceSerif4-Semibold.ttf
+7755112 totale

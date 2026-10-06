@@ -1,0 +1,21 @@
+Processing [36mSourceSerif4-Semibold.ttf[0m...
+Running fontforge...
+Copyright (c) 2000-2025. See AUTHORS for Contributors.
+ License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+ with many parts BSD <http://fontforge.org/license.html>. Please read LICENSE.
+ Version: 20230101
+ Based on sources from 2025-01-07 13:54 UTC-ML-D-GDK3.
+PythonUI_Init()
+copyUIMethodsToBaseTable()
+Program root: /usr
+Le seguenti tabelle nel font sono state ignorate da FontForge
+  Ignoring 'DSIG' Tabella firma digitale
+Done.
+  =>[36mSourceSerif4-Semibold[0m (SourceSerif4-Semibold.ttf) assigned to family '[33mCarta[0m'.
+  =>[36mSourceSerif4-Semibold[0m assigned groff fontname '[33mCB[0m'.
+Creating [33mCB[0m...
+afmtodit: warning: cannot open 'DESC': No such file or directory
+Done.
+Installing [33mCB[0m in /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/... Done.
+Checking for gropdf executable and devpdf directory... gropdf found.
+Installing [33mCB[0m in /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/... Done.

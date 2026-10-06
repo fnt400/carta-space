@@ -1,0 +1,579 @@
+  GEN      lib/alloca.h
+  GEN      lib/fcntl.h
+  GEN      lib/float.h
+  GEN      lib/inttypes.h
+  GEN      lib/limits.h
+  GEN      lib/locale.h
+  GEN      lib/math.h
+  GEN      lib/pthread.h
+  GEN      lib/sched.h
+  GEN      lib/stdckdint.h
+  GEN      lib/stdcountof.h
+  GEN      lib/stddef.h
+  GEN      lib/stdio.h
+  GEN      lib/stdlib.h
+  GEN      lib/string.h
+  GEN      lib/strings.h
+  GEN      lib/sys/stat.h
+  GEN      lib/sys/types.h
+  GEN      lib/sys/wait.h
+  GEN      lib/time.h
+  GEN      lib/uchar.h
+  GEN      lib/unicase.h
+  GEN      lib/unictype.h
+  GEN      lib/uninorm.h
+  GEN      lib/unistd.h
+  GEN      lib/unitypes.h
+  GEN      lib/uniwidth.h
+  GEN      lib/wchar.h
+  GEN      lib/wctype.h
+  GEN      charset.alias
+  GEN      ref-add.sed
+  GEN      ref-del.sed
+make  all-recursive
+make[1]: ingresso nella directory «/opt/carta-pdf-bench/groff-build-1.24.1»
+make[2]: ingresso nella directory «/opt/carta-pdf-bench/groff-build-1.24.1»
+echo 1.24.1 > .version-t && mv .version-t .version
+  CC       lib/libgnu_a-printf-frexp.o
+  CC       lib/libgnu_a-printf-frexpl.o
+  CC       lib/libgnu_a-setlocale_null.o
+  CC       lib/libgnu_a-setlocale_null-unlocked.o
+  CC       lib/libgnu_a-stat-time.o
+  CC       lib/libgnu_a-stdlib.o
+  CC       lib/libgnu_a-string.o
+  CC       lib/glthread/libgnu_a-threadlib.o
+  CC       lib/glthread/libgnu_a-tls.o
+  CC       lib/libgnu_a-unistd.o
+  CC       lib/libgnu_a-vfzprintf.o
+  CC       lib/libgnu_a-vsnzprintf.o
+  CC       lib/libgnu_a-wctype-h.o
+  CC       lib/libgnu_a-xsize.o
+  CC       lib/libgnu_a-asnprintf.o
+  CC       lib/libgnu_a-printf-args.o
+  CC       lib/libgnu_a-printf-parse.o
+  CC       lib/libgnu_a-vasnprintf.o
+  GEN      src/roff/troff/majorminor.cpp
+  GEN      eqn2graph
+  GEN      gdiffmk
+  GEN      shdeps.sed
+  GEN      grap2graph
+  GEN      mmroff
+  GEN      pic2graph
+  GEN      gropdf
+  GEN      pdfmom
+  GEN      afmtodit
+  GEN      grog
+  GEN      chem
+  GEN      neqn
+  GEN      nroff
+  GEN      contrib/chem/chem.1
+  GEN      contrib/eqn2graph/eqn2graph.1
+  GEN      contrib/gdiffmk/gdiffmk.1
+  GEN      contrib/glilypond/glilypond.1
+  GEN      contrib/gperl/gperl.1
+  GEN      contrib/gpinyin/gpinyin.1
+  GEN      contrib/grap2graph/grap2graph.1
+  GEN      contrib/mm/mmroff.1
+  GEN      contrib/pic2graph/pic2graph.1
+  GEN      src/devices/grodvi/grodvi.1
+  GEN      src/devices/grohtml/grohtml.1
+  GEN      src/devices/grolbp/grolbp.1
+  GEN      src/devices/grolj4/grolj4.1
+  GEN      src/devices/gropdf/gropdf.1
+  GEN      src/devices/gropdf/pdfmom.1
+  GEN      src/devices/grops/grops.1
+  GEN      src/devices/grotty/grotty.1
+  GEN      src/preproc/preconv/preconv.1
+  GEN      src/roff/groff/groff.1
+  GEN      src/utils/addftinfo/addftinfo.1
+  GEN      src/utils/afmtodit/afmtodit.1
+  GEN      src/utils/grog/grog.1
+  GEN      src/utils/hpftodit/hpftodit.1
+  GEN      src/utils/lkbib/lkbib.1
+  GEN      src/utils/pfbtops/pfbtops.1
+  GEN      src/utils/tfmtodit/tfmtodit.1
+  GEN      src/preproc/eqn/eqn.1
+  GEN      src/preproc/eqn/neqn.1
+  GEN      src/preproc/grn/grn.1
+  GEN      src/preproc/pic/pic.1
+  GEN      src/preproc/refer/refer.1
+  GEN      src/preproc/soelim/soelim.1
+  GEN      src/preproc/tbl/tbl.1
+  GEN      src/roff/nroff/nroff.1
+  GEN      src/roff/troff/troff.1
+  GEN      src/utils/indxbib/indxbib.1
+  GEN      src/utils/lookbib/lookbib.1
+  GEN      man/groff_font.5
+  GEN      man/groff_out.5
+  GEN      man/groff_tmac.5
+  GEN      contrib/hdtbl/groff_hdtbl.7
+  GEN      contrib/mm/groff_mm.7
+  GEN      contrib/mm/groff_mmse.7
+  GEN      contrib/mom/groff_mom.7
+  GEN      contrib/rfc1345/groff_rfc1345.7
+  GEN      man/groff_char.7
+  GEN      man/groff_diff.7
+  GEN      man/groff.7
+  GEN      man/roff.7
+  GEN      tmac/groff_ms.7
+  GEN      tmac/groff_me.7
+  GEN      tmac/groff_mdoc.7
+  GEN      tmac/groff_trace.7
+  GEN      tmac/groff_www.7
+  GEN      font/devascii/R
+  GEN      font/devascii/I
+  GEN      font/devascii/B
+  GEN      font/devascii/BI
+  GEN      font/devascii/DESC
+  GEN      font/devdvi/DESC
+  GEN      font/devhtml/R
+  GEN      font/devhtml/I
+  GEN      font/devhtml/B
+  GEN      font/devhtml/BI
+  GEN      font/devhtml/CR
+  GEN      font/devhtml/CI
+  GEN      font/devhtml/CB
+  GEN      font/devhtml/CBI
+  GEN      font/devhtml/S
+  GEN      font/devhtml/DESC
+  GEN      font/devlatin1/R
+  GEN      font/devlatin1/I
+  GEN      font/devlatin1/B
+  GEN      font/devlatin1/BI
+  GEN      font/devlatin1/DESC
+  GEN      font/devlbp/DESC
+  GEN      font/devpdf/DESC
+  GEN      font/devpdf/Foundry
+  GEN      font/devpdf/util/BuildFoundries
+  GEN      font/devpdf/SS
+  GEN      font/devpdf/symbolsl.afm
+  GEN      font/devpdf/symbolsl.pfb
+  GEN      font/devutf8/R
+  GEN      font/devutf8/I
+  GEN      font/devutf8/B
+  GEN      font/devutf8/BI
+  GEN      font/devutf8/DESC
+  GEN      font/devlj4/DESC
+  GEN      font/devps/DESC
+  GEN      font/devps/prologue
+  GEN      font/devps/freeeuro.pfa
+  GEN      font/devps/zapfdr.pfa
+  GEN      font/devps/symbolsl.pfa
+  GEN      doc/groff-man-pages-cover.groff
+  GEN      tmac/www.tmac
+  GEN      contrib/hdtbl/examples/fonts_n.roff
+  GEN      contrib/hdtbl/examples/fonts_x.roff
+  GEN      doc/meref.me
+  GEN      doc/meintro.me
+  GEN      doc/meintro_fr.me
+  GEN      doc/ms.ms
+  CXX      src/devices/grodvi/dvi.o
+  GEN      contrib/sboxes/msboxes.ms
+  CXX      src/libs/libdriver/input.o
+  CXX      src/libs/libdriver/printer.o
+  CXX      src/libs/libgroff/libgroff_a-change_lf.o
+  CXX      src/libs/libgroff/libgroff_a-cmap.o
+  CXX      src/libs/libgroff/libgroff_a-color.o
+  CXX      src/libs/libgroff/libgroff_a-cset.o
+  CXX      src/libs/libgroff/libgroff_a-curtime.o
+  CXX      src/libs/libgroff/libgroff_a-device.o
+  CXX      src/libs/libgroff/libgroff_a-errarg.o
+  CXX      src/libs/libgroff/libgroff_a-error.o
+  CXX      src/libs/libgroff/libgroff_a-fatal.o
+  CXX      src/libs/libgroff/libgroff_a-filename.o
+  CXX      src/libs/libgroff/libgroff_a-font.o
+  CXX      src/libs/libgroff/libgroff_a-fontfile.o
+  CXX      src/libs/libgroff/libgroff_a-geometry.o
+  CXX      src/libs/libgroff/libgroff_a-glyphuni.o
+  CXX      src/libs/libgroff/libgroff_a-htmlhint.o
+  CC       src/libs/libgroff/libgroff_a-iftoa.o
+  CXX      src/libs/libgroff/libgroff_a-invalid.o
+  CC       src/libs/libgroff/libgroff_a-itoa.o
+  CXX      src/libs/libgroff/libgroff_a-json_encode.o
+  CXX      src/libs/libgroff/libgroff_a-lf.o
+  CXX      src/libs/libgroff/libgroff_a-lineno.o
+  CC       src/libs/libgroff/libgroff_a-localcharset.o
+  CXX      src/libs/libgroff/libgroff_a-macropath.o
+  CC       src/libs/libgroff/libgroff_a-matherr.o
+  CXX      src/libs/libgroff/libgroff_a-maxfilename.o
+  CXX      src/libs/libgroff/libgroff_a-maxpathname.o
+  CXX      src/libs/libgroff/libgroff_a-mksdir.o
+  CXX      src/libs/libgroff/libgroff_a-nametoindex.o
+  CXX      src/libs/libgroff/libgroff_a-paper.o
+  CXX      src/libs/libgroff/libgroff_a-prime.o
+  CC       src/libs/libgroff/libgroff_a-progname.o
+  CXX      src/libs/libgroff/libgroff_a-ptable.o
+  CC       src/libs/libgroff/libgroff_a-quotearg.o
+  CXX      src/libs/libgroff/libgroff_a-relocate.o
+  CXX      src/libs/libgroff/libgroff_a-searchpath.o
+  CC       src/libs/libgroff/libgroff_a-spawnvp.o
+  CXX      src/libs/libgroff/libgroff_a-string.o
+  CXX      src/libs/libgroff/libgroff_a-strsave.o
+  CXX      src/libs/libgroff/libgroff_a-symbol.o
+  CXX      src/libs/libgroff/libgroff_a-tmpfile.o
+  CXX      src/libs/libgroff/libgroff_a-tmpname.o
+  CXX      src/libs/libgroff/libgroff_a-unicode.o
+  CXX      src/libs/libgroff/libgroff_a-uniglyph.o
+  CXX      src/libs/libgroff/libgroff_a-uniuni.o
+  GEN      src/libs/libgroff/version.cpp
+  CC       lib/libgnu_a-c32isalnum.o
+  CC       lib/libgnu_a-c32isalpha.o
+  CC       lib/libgnu_a-c32isblank.o
+  CC       lib/libgnu_a-c32iscntrl.o
+  CC       lib/libgnu_a-c32isdigit.o
+  CC       lib/libgnu_a-c32isgraph.o
+  CC       lib/libgnu_a-c32islower.o
+  CC       lib/libgnu_a-c32isprint.o
+  CC       lib/libgnu_a-c32ispunct.o
+  CC       lib/libgnu_a-c32isspace.o
+  CC       lib/libgnu_a-c32isupper.o
+  CC       lib/libgnu_a-c32isxdigit.o
+  CC       lib/libgnu_a-c32tolower.o
+  CC       lib/libgnu_a-c32width.o
+  CC       lib/libgnu_a-float.o
+  CC       lib/libgnu_a-fseterr.o
+  CC       lib/libgnu_a-hard-locale.o
+  CC       lib/libgnu_a-issymlink.o
+  CC       lib/libgnu_a-localcharset.o
+  CC       lib/libgnu_a-malloca.o
+  CC       lib/libgnu_a-math.o
+  CC       lib/libgnu_a-mbchar.o
+  CC       lib/libgnu_a-mbiterf.o
+  CC       lib/libgnu_a-mbrtoc32.o
+  CC       lib/libgnu_a-mbrtowc.o
+  CC       lib/libgnu_a-mbsnlen.o
+  CC       lib/libgnu_a-mbszero.o
+  CC       lib/glthread/libgnu_a-once.o
+  CC       lib/unicase/libgnu_a-tolower.o
+  CC       lib/unictype/libgnu_a-ctype_alnum.o
+  CC       lib/unictype/libgnu_a-ctype_alpha.o
+  CC       lib/unictype/libgnu_a-ctype_blank.o
+  CC       lib/unictype/libgnu_a-ctype_cntrl.o
+  CC       lib/unictype/libgnu_a-ctype_digit.o
+  CC       lib/unictype/libgnu_a-ctype_graph.o
+  CC       lib/unictype/libgnu_a-ctype_lower.o
+  CC       lib/unictype/libgnu_a-ctype_print.o
+  CC       lib/unictype/libgnu_a-ctype_punct.o
+  CC       lib/unictype/libgnu_a-ctype_space.o
+  CC       lib/unictype/libgnu_a-ctype_upper.o
+  CC       lib/unictype/libgnu_a-ctype_xdigit.o
+  CC       lib/uniwidth/libgnu_a-width.o
+  CXX      src/devices/grohtml/post-html.o
+  CXX      src/devices/grohtml/html-table.o
+  CXX      src/devices/grohtml/html-text.o
+  CXX      src/devices/grohtml/output.o
+  CXX      src/devices/grolbp/lbp.o
+  CXX      src/devices/grolj4/lj4.o
+  CXX      src/devices/grops/ps.o
+  CXX      src/devices/grops/psrm.o
+  CXX      src/devices/grotty/tty.o
+  CXX      src/preproc/html/pre-html.o
+  CXX      src/preproc/html/pushback.o
+  CXX      src/preproc/preconv/preconv-preconv.o
+  CXX      src/roff/groff/groff.o
+  CC       src/roff/groff/pipeline.o
+  CXX      src/utils/addftinfo/addftinfo.o
+  CXX      src/utils/addftinfo/guess.o
+  CXX      src/utils/hpftodit/hpftodit.o
+  CXX      src/utils/hpftodit/hpuni.o
+  CXX      src/utils/lkbib/lkbib.o
+  CXX      src/libs/libbib/common.o
+  CXX      src/libs/libbib/index.o
+  CXX      src/libs/libbib/linear.o
+  CXX      src/libs/libbib/search.o
+  CC       src/libs/libbib/map.o
+  CXX      src/utils/tfmtodit/tfmtodit.o
+  CC       src/utils/pfbtops/pfbtops.o
+  CXX      src/preproc/eqn/eqn-main.o
+  CXX      src/preproc/eqn/eqn-lex.o
+  CXX      src/preproc/eqn/eqn-box.o
+  CXX      src/preproc/eqn/eqn-limit.o
+  CXX      src/preproc/eqn/eqn-list.o
+  CXX      src/preproc/eqn/eqn-over.o
+  CXX      src/preproc/eqn/eqn-text.o
+  CXX      src/preproc/eqn/eqn-script.o
+  CXX      src/preproc/eqn/eqn-mark.o
+  CXX      src/preproc/eqn/eqn-other.o
+  CXX      src/preproc/eqn/eqn-delim.o
+  CXX      src/preproc/eqn/eqn-sqrt.o
+  CXX      src/preproc/eqn/eqn-pile.o
+  CXX      src/preproc/eqn/eqn-special.o
+  CXX      src/preproc/eqn/eqn-eqn.o
+  CXX      src/preproc/grn/hdb.o
+  CXX      src/preproc/grn/hpoint.o
+  CXX      src/preproc/grn/hgraph.o
+  CXX      src/preproc/grn/main.o
+  CXX      src/preproc/pic/pic-pic.o
+  CXX      src/preproc/pic/pic-lex.o
+  CXX      src/preproc/pic/pic-main.o
+  CXX      src/preproc/pic/pic-object.o
+  CXX      src/preproc/pic/pic-common.o
+  CXX      src/preproc/pic/pic-troff.o
+  CXX      src/preproc/pic/pic-tex.o
+  CXX      src/preproc/refer/refer-command.o
+  CXX      src/preproc/refer/refer-ref.o
+  CXX      src/preproc/refer/refer-refer.o
+  CXX      src/preproc/refer/refer-token.o
+  CXX      src/preproc/refer/refer-label.o
+  CXX      src/preproc/soelim/soelim.o
+  CXX      src/preproc/tbl/main.o
+  CXX      src/preproc/tbl/table.o
+  CXX      src/roff/troff/dictionary.o
+  CXX      src/roff/troff/div.o
+  CXX      src/roff/troff/env.o
+  CXX      src/roff/troff/input.o
+  CXX      src/roff/troff/mtsm.o
+  CXX      src/roff/troff/node.o
+  CXX      src/roff/troff/number.o
+  CXX      src/roff/troff/reg.o
+  CXX      src/roff/troff/majorminor.o
+  CXX      src/utils/indxbib/indxbib.o
+  CC       src/utils/indxbib/signal.o
+  CXX      src/utils/lookbib/lookbib.o
+  GEN      glilypond
+  GEN      gperl
+  GEN      gpinyin
+  GEN      tmac/groff_man.7.man
+  GEN      tmac/groff_man_style.7.man
+  GEN      font/devpdf/download
+BuildFoundries: notice: copied grops font description AB for gropdf
+BuildFoundries: notice: copied grops font description ABI for gropdf
+BuildFoundries: notice: copied grops font description AI for gropdf
+BuildFoundries: notice: copied grops font description AR for gropdf
+BuildFoundries: notice: copied grops font description BMB for gropdf
+BuildFoundries: notice: copied grops font description BMBI for gropdf
+BuildFoundries: notice: copied grops font description BMI for gropdf
+BuildFoundries: notice: copied grops font description BMR for gropdf
+BuildFoundries: notice: copied grops font description CB for gropdf
+BuildFoundries: notice: copied grops font description CBI for gropdf
+BuildFoundries: notice: copied grops font description CI for gropdf
+BuildFoundries: notice: copied grops font description CR for gropdf
+BuildFoundries: notice: copied grops font description HB for gropdf
+BuildFoundries: notice: copied grops font description HBI for gropdf
+BuildFoundries: notice: copied grops font description HI for gropdf
+BuildFoundries: notice: copied grops font description HNB for gropdf
+BuildFoundries: notice: copied grops font description HNBI for gropdf
+BuildFoundries: notice: copied grops font description HNI for gropdf
+BuildFoundries: notice: copied grops font description HNR for gropdf
+BuildFoundries: notice: copied grops font description HR for gropdf
+BuildFoundries: notice: copied grops font description NB for gropdf
+BuildFoundries: notice: copied grops font description NBI for gropdf
+BuildFoundries: notice: copied grops font description NI for gropdf
+BuildFoundries: notice: copied grops font description NR for gropdf
+BuildFoundries: notice: copied grops font description PB for gropdf
+BuildFoundries: notice: copied grops font description PBI for gropdf
+BuildFoundries: notice: copied grops font description PI for gropdf
+BuildFoundries: notice: copied grops font description PR for gropdf
+BuildFoundries: notice: copied grops font description S for gropdf
+BuildFoundries: notice: copied grops font description TB for gropdf
+BuildFoundries: notice: copied grops font description TBI for gropdf
+BuildFoundries: notice: copied grops font description TI for gropdf
+BuildFoundries: notice: copied grops font description TR for gropdf
+BuildFoundries: notice: copied grops font description ZCMI for gropdf
+BuildFoundries: notice: copied grops font description ZD for gropdf
+BuildFoundries: notice: copied grops font description EURO for gropdf
+BuildFoundries: notice: generated font description U-AB for gropdf
+  AR       libdriver.a
+BuildFoundries: notice: generated font description U-ABI for gropdf
+  CXX      src/libs/libgroff/libgroff_a-version.o
+BuildFoundries: notice: generated font description U-AI for gropdf
+  AR       lib/libgnu.a
+  AR       libbib.a
+BuildFoundries: notice: generated font description U-AR for gropdf
+  GEN      tmac/groff_man.7
+  GEN      tmac/groff_man_style.7
+BuildFoundries: notice: generated font description U-BMB for gropdf
+  AR       libgroff.a
+BuildFoundries: notice: generated font description U-BMBI for gropdf
+  CXXLD    grodvi
+BuildFoundries: notice: generated font description U-BMI for gropdf
+BuildFoundries: notice: generated font description U-BMR for gropdf
+  CXXLD    post-grohtml
+BuildFoundries: notice: generated font description U-CB for gropdf
+BuildFoundries: notice: generated font description U-CBI for gropdf
+  CXXLD    grolbp
+BuildFoundries: notice: generated font description U-CI for gropdf
+  CXXLD    grolj4
+BuildFoundries: notice: generated font description U-CR for gropdf
+BuildFoundries: notice: generated font description U-HB for gropdf
+  CXXLD    grops
+BuildFoundries: notice: generated font description U-HBI for gropdf
+BuildFoundries: notice: generated font description U-HI for gropdf
+  CXXLD    grotty
+BuildFoundries: notice: generated font description U-HNB for gropdf
+  CXXLD    pre-grohtml
+BuildFoundries: notice: generated font description U-HNBI for gropdf
+  CXXLD    preconv
+BuildFoundries: notice: generated font description U-HNI for gropdf
+BuildFoundries: notice: generated font description U-HNR for gropdf
+  CXXLD    groff
+BuildFoundries: notice: generated font description U-HR for gropdf
+BuildFoundries: notice: generated font description U-NB for gropdf
+  CXXLD    addftinfo
+BuildFoundries: notice: generated font description U-NBI for gropdf
+  CXXLD    hpftodit
+BuildFoundries: notice: generated font description U-NI for gropdf
+BuildFoundries: notice: generated font description U-NR for gropdf
+  CXXLD    lkbib
+BuildFoundries: notice: generated font description U-PB for gropdf
+  CXXLD    pfbtops
+BuildFoundries: notice: generated font description U-PBI for gropdf
+  CXXLD    tfmtodit
+BuildFoundries: notice: generated font description U-PI for gropdf
+  CXXLD    eqn
+BuildFoundries: notice: generated font description U-PR for gropdf
+BuildFoundries: notice: generated font description U-S for gropdf
+  CXXLD    grn
+BuildFoundries: notice: generated font description U-TB for gropdf
+BuildFoundries: notice: generated font description U-TBI for gropdf
+  CXXLD    pic
+BuildFoundries: notice: generated font description U-TI for gropdf
+BuildFoundries: notice: generated font description U-TR for gropdf
+  CXXLD    refer
+BuildFoundries: notice: generated font description U-ZCMI for gropdf
+  CXXLD    soelim
+BuildFoundries: notice: generated font description U-ZD for gropdf
+  CXXLD    tbl
+  CXXLD    troff
+  CXXLD    indxbib
+  CXXLD    lookbib
+  GROFF    doc/webpage.ps
+  GROFF    doc/grnexmpl.ps
+  GROFF    contrib/hdtbl/examples/chess_board.ps
+  GROFF    contrib/hdtbl/examples/color_boxes.ps
+  GROFF    contrib/hdtbl/examples/color_nested_tables.ps
+  GROFF    contrib/hdtbl/examples/color_table_cells.ps
+  GROFF    contrib/hdtbl/examples/color_transitions.ps
+  GROFF    contrib/hdtbl/examples/col_rowspan_colors.ps
+  GROFF    contrib/hdtbl/examples/fonts_n.ps
+fonts_n.roff: listing fonts in /opt/carta-pdf-bench/groff-1.24.1/font/devps
+fonts_n.roff: listing font 'AB'...
+  GROFF    contrib/hdtbl/examples/fonts_x.ps
+fonts_x.roff: listing fonts in /opt/carta-pdf-bench/groff-1.24.1/font/devps
+fonts_x.roff: listing font 'AB'...
+fonts_n.roff: listing font 'ABI'...
+fonts_n.roff: listing font 'AI'...
+fonts_x.roff: listing font 'ABI'...
+fonts_x.roff: listing font 'AI'...
+fonts_n.roff: listing font 'AR'...
+fonts_x.roff: listing font 'AR'...
+fonts_n.roff: listing font 'BMB'...
+fonts_x.roff: listing font 'BMB'...
+fonts_n.roff: listing font 'BMBI'...
+fonts_n.roff: listing font 'BMI'...
+fonts_x.roff: listing font 'BMBI'...
+fonts_n.roff: listing font 'BMR'...
+fonts_x.roff: listing font 'BMI'...
+fonts_n.roff: listing font 'CB'...
+fonts_x.roff: listing font 'BMR'...
+fonts_n.roff: listing font 'CBI'...
+fonts_x.roff: listing font 'CB'...
+fonts_n.roff: listing font 'CI'...
+fonts_x.roff: listing font 'CBI'...
+fonts_n.roff: listing font 'CR'...
+fonts_x.roff: listing font 'CI'...
+fonts_n.roff: listing font 'CSH'...
+fonts_x.roff: listing font 'CR'...
+fonts_n.roff: listing font 'CSS'...
+fonts_x.roff: listing font 'CSH'...
+fonts_n.roff: listing font 'CTH'...
+fonts_x.roff: listing font 'CSS'...
+fonts_n.roff: listing font 'CTS'...
+fonts_x.roff: listing font 'CTH'...
+fonts_n.roff: listing font 'EURO'...
+fonts_x.roff: listing font 'CTS'...
+fonts_n.roff: listing font 'HB'...
+fonts_x.roff: listing font 'EURO'...
+fonts_n.roff: listing font 'HBI'...
+fonts_x.roff: listing font 'HB'...
+fonts_x.roff: listing font 'HBI'...
+fonts_n.roff: listing font 'HI'...
+fonts_x.roff: listing font 'HI'...
+fonts_n.roff: listing font 'HNB'...
+fonts_n.roff: listing font 'HNBI'...
+fonts_x.roff: listing font 'HNB'...
+fonts_n.roff: listing font 'HNI'...
+fonts_x.roff: listing font 'HNBI'...
+fonts_n.roff: listing font 'HNR'...
+fonts_x.roff: listing font 'HNI'...
+fonts_x.roff: listing font 'HNR'...
+fonts_n.roff: listing font 'HR'...
+fonts_n.roff: listing font 'JPG'...
+fonts_x.roff: listing font 'HR'...
+fonts_x.roff: listing font 'JPG'...
+fonts_n.roff: listing font 'JPM'...
+fonts_n.roff: listing font 'KOG'...
+fonts_x.roff: listing font 'JPM'...
+fonts_n.roff: listing font 'KOM'...
+fonts_x.roff: listing font 'KOG'...
+fonts_x.roff: listing font 'KOM'...
+fonts_n.roff: listing font 'NB'...
+fonts_x.roff: listing font 'NB'...
+fonts_n.roff: listing font 'NBI'...
+fonts_x.roff: listing font 'NBI'...
+fonts_n.roff: listing font 'NI'...
+fonts_x.roff: listing font 'NI'...
+fonts_n.roff: listing font 'NR'...
+fonts_x.roff: listing font 'NR'...
+fonts_n.roff: listing font 'PB'...
+fonts_x.roff: listing font 'PB'...
+fonts_n.roff: listing font 'PBI'...
+fonts_x.roff: listing font 'PBI'...
+fonts_n.roff: listing font 'PI'...
+fonts_x.roff: listing font 'PI'...
+fonts_n.roff: listing font 'PR'...
+fonts_x.roff: listing font 'PR'...
+fonts_n.roff: listing font 'S'...
+fonts_x.roff: listing font 'S'...
+fonts_x.roff: listing font 'SS'...
+fonts_n.roff: listing font 'SS'...
+fonts_x.roff: listing font 'TB'...
+fonts_n.roff: listing font 'TB'...
+fonts_x.roff: listing font 'TBI'...
+fonts_n.roff: listing font 'TBI'...
+fonts_x.roff: listing font 'TI'...
+fonts_n.roff: listing font 'TI'...
+fonts_x.roff: listing font 'TR'...
+fonts_n.roff: listing font 'TR'...
+fonts_x.roff: listing font 'ZCMI'...
+fonts_n.roff: listing font 'ZCMI'...
+fonts_x.roff: listing font 'ZD'...
+fonts_n.roff: listing font 'ZD'...
+fonts_x.roff: listing font 'ZDR'...
+fonts_n.roff: listing font 'ZDR'...
+  GROFF    contrib/hdtbl/examples/mixed_pickles.ps
+  GROFF    contrib/hdtbl/examples/rainbow.ps
+  GROFF    contrib/hdtbl/examples/short_reference.ps
+  GROFF    contrib/mom/examples/letter.pdf
+  GROFF    contrib/mom/examples/mom-pdf.pdf
+  GROFF    contrib/mom/examples/mon_premier_doc.pdf
+  GROFF    contrib/mom/examples/sample_docs.pdf
+  GROFF    contrib/mom/examples/slide-demo.pdf
+sh: 1: file: not found
+  GROFF    contrib/mom/examples/copyright-default.pdf
+  GROFF    contrib/mom/examples/copyright-chapter.pdf
+  GROFF    contrib/mom/examples/typesetting.pdf
+  GROFF    doc/meref.ps
+sh: 1: file: not found
+  GROFF    doc/meintro.ps
+  GROFF    doc/meintro_fr.ps
+  GROFF    doc/ms.ps
+  GROFF    doc/pic.ps
+  GROFF    doc/groff-man-pages.utf8.txt
+  GROFF    contrib/sboxes/msboxes.pdf
+  GROFF    doc/automake.pdf
+  GROFF    doc/groff-man-pages.pdf
+troff: backtrace: file 'man/groff_char.7':1060
+troff:man/groff_char.7:1060: warning: special character '.j' not defined
+troff: backtrace: file 'man/groff_char.7':1466
+troff:man/groff_char.7:1466: warning: special character 'vA' not defined
+troff: backtrace: file 'man/groff_char.7':1596
+troff:man/groff_char.7:1596: warning: special character 'bs' not defined
+troff: backtrace: file 'man/groff_char.7':1769
+troff:man/groff_char.7:1769: warning: special character '-+' not defined
+troff: backtrace: file 'man/groff_char.7':1818
+troff:man/groff_char.7:1818: warning: special character 'coproduct' not defined
+troff: backtrace: file 'man/groff_char.7':1918
+troff:man/groff_char.7:1918: warning: special character '+e' not defined
+make[2]: uscita dalla directory «/opt/carta-pdf-bench/groff-build-1.24.1»
+make[1]: uscita dalla directory «/opt/carta-pdf-bench/groff-build-1.24.1»

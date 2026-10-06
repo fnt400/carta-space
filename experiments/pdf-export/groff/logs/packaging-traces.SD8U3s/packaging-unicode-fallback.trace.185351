@@ -1,0 +1,14 @@
+execve("/opt/carta-pdf-bench/groff-1.24.1/bin/preconv", ["preconv", "-eutf8", "/opt/carta-pdf-bench/unicode-fal"...], 0x5ea64bc5ef30 /* 118 vars */) = 0
+openat(AT_FDCWD, "/etc/sane-libs/glibc-hwcaps/x86-64-v3/libuchardet.so.0", O_RDONLY|O_CLOEXEC) = -1 ENOENT (File o directory non esistente)
+openat(AT_FDCWD, "/etc/sane-libs/glibc-hwcaps/x86-64-v2/libuchardet.so.0", O_RDONLY|O_CLOEXEC) = -1 ENOENT (File o directory non esistente)
+openat(AT_FDCWD, "/etc/sane-libs/libuchardet.so.0", O_RDONLY|O_CLOEXEC) = -1 ENOENT (File o directory non esistente)
+openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libuchardet.so.0", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libstdc++.so.6", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libm.so.6", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/usr/lib/locale/locale-archive", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/opt/carta-pdf-bench/groff-1.24.1/lib/charset.alias", O_RDONLY|O_NOFOLLOW) = -1 ENOENT (File o directory non esistente)
+openat(AT_FDCWD, "/opt/carta-pdf-bench/unicode-fallback-combined.roff", O_RDONLY) = 3
++++ exited with 0 +++

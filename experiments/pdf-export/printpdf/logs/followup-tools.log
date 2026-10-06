@@ -1,0 +1,8 @@
+Python 3.13.5
+fontTools 4.57.0
+qpdf version 12.2.0
+Run qpdf --copyright to see copyright and license information.
+pdffonts version 25.03.0
+Copyright 2005-2025 The Poppler Developers - http://poppler.freedesktop.org
+Copyright 1996-2011, 2022 Glyph & Cog, LLC
+strace -- version 6.13

@@ -1,0 +1,47 @@
+Processing [36mNotoSans-Regular.ttf[0m...
+Running fontforge...
+Copyright (c) 2000-2025. See AUTHORS for Contributors.
+ License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+ with many parts BSD <http://fontforge.org/license.html>. Please read LICENSE.
+ Version: 20230101
+ Based on sources from 2025-01-07 13:54 UTC-ML-D-GDK3.
+PythonUI_Init()
+copyUIMethodsToBaseTable()
+Program root: /usr
+Le seguenti tabelle nel font sono state ignorate da FontForge
+  Ignoring 'STAT' style attributes table
+The glyph named uni1D7E is mapped to U+A7B9.
+  But its name indicates it should be mapped to U+1D7E.
+Done.
+  =>[36mNotoSans-Regular[0m (NotoSans-Regular.ttf) assigned to family '[33mCarta[0m'.
+  =>[36mNotoSans-Regular[0m assigned groff fontname '[33mNS[0m'.
+Creating [33mNS[0m...
+afmtodit: warning: cannot open 'DESC': No such file or directory
+afmtodit: warning: both gravecomb and uni0340 map to u0300
+afmtodit: warning: both acutecomb and uni0341 map to u0301
+afmtodit: warning: both uni0313 and uni0343 map to u0313
+afmtodit: warning: both uni02B9 and uni0374 map to u02B9
+afmtodit: warning: both alphatonos and uni1F71 map to u03B1_0301
+afmtodit: warning: both epsilontonos and uni1F73 map to u03B5_0301
+afmtodit: warning: both etatonos and uni1F75 map to u03B7_0301
+afmtodit: warning: both iotatonos and uni1F77 map to u03B9_0301
+afmtodit: warning: both omicrontonos and uni1F79 map to u03BF_0301
+afmtodit: warning: both omegatonos and uni1F7D map to u03C9_0301
+afmtodit: warning: both Alphatonos and uni1FBB map to u0391_0301
+afmtodit: warning: both iota and uni1FBE map to u03B9
+afmtodit: warning: both Epsilontonos and uni1FC9 map to u0395_0301
+afmtodit: warning: both Etatonos and uni1FCB map to u0397_0301
+afmtodit: warning: both iotadieresistonos and uni1FD3 map to u03B9_0308_0301
+afmtodit: warning: both Iotatonos and uni1FDB map to u0399_0301
+afmtodit: warning: both Upsilontonos and uni1FEB map to u03A5_0301
+afmtodit: warning: both dieresistonos and uni1FEE map to u00A8_0301
+afmtodit: warning: both Omicrontonos and uni1FF9 map to u039F_0301
+afmtodit: warning: both Omegatonos and uni1FFB map to u03A9_0301
+afmtodit: warning: both uni2000 and uni2002 map to u2002
+afmtodit: warning: both uni2001 and uni2003 map to u2003
+afmtodit: warning: both uni1FE3 and upsilondieresistonos map to u03C5_0308_0301
+afmtodit: warning: both uni1F7B and upsilontonos map to u03C5_0301
+Done.
+Installing [33mNS[0m in /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/... Done.
+Checking for gropdf executable and devpdf directory... gropdf found.
+Installing [33mNS[0m in /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/... Done.

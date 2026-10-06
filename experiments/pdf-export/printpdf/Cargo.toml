@@ -1,0 +1,11 @@
+[package]
+name = "carta-printpdf-bench"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[workspace]
+
+[dependencies]
+printpdf = "=0.12.8"

@@ -1,0 +1,90 @@
+$ uname -a
+Linux tanaka 6.18.51 #1-NixOS SMP PREEMPT_DYNAMIC Fri Sep 11 09:49:46 UTC 2026 x86_64 GNU/Linux
+
+$ lscpu
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           43 bits physical, 48 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  8
+On-line CPU(s) list:                     0-7
+Vendor ID:                               AuthenticAMD
+Model name:                              AMD Ryzen 5 PRO 3500U w/ Radeon Vega Mobile Gfx
+CPU family:                              23
+Model:                                   24
+Thread(s) per core:                      2
+Core(s) per socket:                      4
+Socket(s):                               1
+Stepping:                                1
+Frequency boost:                         enabled
+CPU(s) scaling MHz:                      102%
+CPU max MHz:                             2100,0000
+CPU min MHz:                             1400,0000
+BogoMIPS:                                4192,15
+Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb hw_pstate ssbd ibpb vmmcall fsgsbase bmi1 avx2 smep bmi2 rdseed adx smap clflushopt sha_ni xsaveopt xsavec xgetbv1 clzero xsaveerptr arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif overflow_recov succor smca sev sev_es
+Virtualization:                          AMD-V
+L1d cache:                               128 KiB (4 instances)
+L1i cache:                               256 KiB (4 instances)
+L2 cache:                                2 MiB (4 instances)
+L3 cache:                                4 MiB (1 instance)
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-7
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Ghostwrite:                Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Old microcode:             Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Mitigation; untrained return thunk; SMT vulnerable
+Vulnerability Spec rstack overflow:      Mitigation; Safe RET
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; STIBP disabled; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Not affected
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Mitigation; IBPB before exit to userspace
+
+$ free -h
+               total        used        free      shared  buff/cache   available
+Mem:            13Gi       4,5Gi       827Mi        44Mi       8,6Gi       9,1Gi
+Swap:          8,8Gi        75Mi       8,7Gi
+
+$ dpkg-query -W fontforge poppler-utils qpdf time python3-fonttools python3-pil strace perl libc6 gcc bison flex texinfo libuchardet-dev
+bison	2:3.8.2+dfsg-1+b2
+flex	2.6.4-8.2+b4
+fontforge	1:20230101~dfsg-4+b1
+gcc	4:14.2.0-1
+libc6:amd64	2.41-12+deb13u4
+libuchardet-dev:amd64	0.0.8-1+b2
+perl	5.40.1-6+deb13u1
+poppler-utils	25.03.0-5+deb13u4
+python3-fonttools	4.57.0-1+deb13u1
+python3-pil:amd64	11.1.0-5+deb13u4
+qpdf	12.2.0-1
+strace	6.13+ds-1
+texinfo	7.1.1-1
+time	1.9-0.2
+
+$ /opt/carta-pdf-bench/groff-1.24.1/bin/groff --version
+GNU groff version 1.24.1
+Copyright 1989-2026 Free Software Foundation, Inc. and others
+
+This is free software, distributed under the terms of the GNU General Public
+License, version 3, or any later version, at your option.  There is NO warranty;
+not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+See the "COPYING", "FDL", and "LICENSES" files in the groff distribution or
+package for additional notices and permissions.
+
+programs in constructed pipeline:
+
+GNU grops (groff) version 1.24.1
+GNU troff (groff) version 1.24.1
+
+$ /opt/carta-pdf-bench/groff-1.24.1/bin/gropdf --version
+GNU gropdf (groff) version 1.24.1

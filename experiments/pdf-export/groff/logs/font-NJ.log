@@ -1,0 +1,155 @@
+Processing [36mNotoSansJP-Regular.ttf[0m...
+Running fontforge...
+Copyright (c) 2000-2025. See AUTHORS for Contributors.
+ License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+ with many parts BSD <http://fontforge.org/license.html>. Please read LICENSE.
+ Version: 20230101
+ Based on sources from 2025-01-07 13:54 UTC-ML-D-GDK3.
+PythonUI_Init()
+copyUIMethodsToBaseTable()
+Program root: /usr
+Le seguenti tabelle nel font sono state ignorate da FontForge
+  Ignoring 'STAT' style attributes table
+Done.
+  =>[36mNotoSansJP-Regular[0m (NotoSansJP-Regular.ttf) assigned to family '[33mCarta[0m'.
+  =>[36mNotoSansJP-Regular[0m assigned groff fontname '[33mNJ[0m'.
+Creating [33mNJ[0m...
+afmtodit: warning: cannot open 'DESC': No such file or directory
+afmtodit: warning: both Omega and uni03A9 map to u03A9
+afmtodit: warning: both u2F804 and uni4F60 map to u4F60
+afmtodit: warning: both u2F80F and uni5154 map to u5154
+afmtodit: warning: both u2F815 and uni518D map to u518D
+afmtodit: warning: both u2F8D3 and uni5195 map to u5195
+afmtodit: warning: both u2F81A and uni51AC map to u51AC
+afmtodit: warning: both u2F822 and uni5272 map to u5272
+afmtodit: warning: both u2F828 and uni52FA map to u52FA
+afmtodit: warning: both u2F833 and uni537F map to u537F
+afmtodit: warning: both u2F83F and uni5468 map to u5468
+afmtodit: warning: both u2F846 and uni5584 map to u5584
+afmtodit: warning: both u2F852 and uni57CE map to u57CE
+afmtodit: warning: both u2F862 and uni59EC map to u59EC
+afmtodit: warning: both u2F86D and uni5BC3 map to u5BC3
+afmtodit: warning: both u2F873 and uni5C06 map to u5C06
+afmtodit: warning: both u2F9F4 and uni5DB2 map to u5DB2
+afmtodit: warning: both u2F884 and uni5DFD map to u5DFD
+afmtodit: warning: both u2F899 and uni5F62 map to u5F62
+afmtodit: warning: both u2F89A and uni5F6B map to u5F6B
+afmtodit: warning: both u2F8A6 and uni6148 map to u6148
+afmtodit: warning: both u2F8AC and uni61B2 map to u61B2
+afmtodit: warning: both u2F8B2 and uni6210 map to u6210
+afmtodit: warning: both u2F8B6 and uni62D4 map to u62D4
+afmtodit: warning: both u2F8E5 and uni681F map to u681F
+afmtodit: warning: both u2F8E1 and uni6852 map to u6852
+afmtodit: warning: both u2F8EA and uni69EA map to u69EA
+afmtodit: warning: both u2F8FC and uni6CBF map to u6CBF
+afmtodit: warning: both u2F903 and uni6D69 map to u6D69
+afmtodit: warning: both u2F90B and uni6ECB map to u6ECB
+afmtodit: warning: both u2F90F and uni6F6E map to u6F6E
+afmtodit: warning: both u2F91A and uni70AD map to u70AD
+afmtodit: warning: both u2F920 and uni7228 map to u7228
+afmtodit: warning: both u2F921 and uni7235 map to u7235
+afmtodit: warning: both u2F945 and uni771E map to u771E
+afmtodit: warning: both u2F947 and uni771F map to u771F
+afmtodit: warning: both u2F96C and uni7D63 map to u7D63
+afmtodit: warning: both u2F995 and uni82BD map to u82BD
+afmtodit: warning: both u2F9D0 and uni8AED map to u8AED
+afmtodit: warning: both u2F9DE and uni8ED4 map to u8ED4
+afmtodit: warning: both u2F9DF and uni8F38 map to u8F38
+afmtodit: warning: both uni5951 and uniF909 map to u5951
+afmtodit: warning: both uni6B04 and uniF91D map to u6B04
+afmtodit: warning: both uni862D and uniF91F map to u862D
+afmtodit: warning: both uni5ECA and uniF928 map to u5ECA
+afmtodit: warning: both uni6717 and uniF929 map to u6717
+afmtodit: warning: both uni865C and uniF936 map to u865C
+afmtodit: warning: both uni6BBA and uniF970 map to u6BBA
+afmtodit: warning: both uni65C5 and uniF983 map to u65C5
+afmtodit: warning: both uni9E97 and uniF988 map to u9E97
+afmtodit: warning: both uni7DF4 and uniF996 map to u7DF4
+afmtodit: warning: both uni84EE and uniF999 map to u84EE
+afmtodit: warning: both uni9023 and uniF99A map to u9023
+afmtodit: warning: both uni5EC9 and uniF9A2 map to u5EC9
+afmtodit: warning: both uni907C and uniF9C3 map to u907C
+afmtodit: warning: both uni985E and uniF9D0 map to u985E
+afmtodit: warning: both uni9686 and uniF9DC map to u9686
+afmtodit: warning: both uni96A3 and uniF9F1 map to u96A3
+afmtodit: warning: both uni7CD6 and uniFA03 map to u7CD6
+afmtodit: warning: both uni964D and uniFA09 map to u964D
+afmtodit: warning: both uni585A and uniFA10 map to u585A
+afmtodit: warning: both uni6674 and uniFA12 map to u6674
+afmtodit: warning: both uni51DE and uniFA15 map to u51DE
+afmtodit: warning: both uni732A and uniFA16 map to u732A
+afmtodit: warning: both uni76CA and uniFA17 map to u76CA
+afmtodit: warning: both uni793C and uniFA18 map to u793C
+afmtodit: warning: both uni795E and uniFA19 map to u795E
+afmtodit: warning: both uni7965 and uniFA1A map to u7965
+afmtodit: warning: both uni798F and uniFA1B map to u798F
+afmtodit: warning: both uni9756 and uniFA1C map to u9756
+afmtodit: warning: both uni7CBE and uniFA1D map to u7CBE
+afmtodit: warning: both uni8612 and uniFA20 map to u8612
+afmtodit: warning: both uni8AF8 and uniFA22 map to u8AF8
+afmtodit: warning: both uni9038 and uniFA25 map to u9038
+afmtodit: warning: both uni90FD and uniFA26 map to u90FD
+afmtodit: warning: both uni98EF and uniFA2A map to u98EF
+afmtodit: warning: both uni98FC and uniFA2B map to u98FC
+afmtodit: warning: both uni9928 and uniFA2C map to u9928
+afmtodit: warning: both uni9DB4 and uniFA2D map to u9DB4
+afmtodit: warning: both uni4FAE and uniFA30 map to u4FAE
+afmtodit: warning: both uni50E7 and uniFA31 map to u50E7
+afmtodit: warning: both uni514D and uniFA32 map to u514D
+afmtodit: warning: both uni52C9 and uniFA33 map to u52C9
+afmtodit: warning: both uni52E4 and uniFA34 map to u52E4
+afmtodit: warning: both uni5351 and uniFA35 map to u5351
+afmtodit: warning: both uni559D and uniFA36 map to u559D
+afmtodit: warning: both uni5606 and uniFA37 map to u5606
+afmtodit: warning: both uni5668 and uniFA38 map to u5668
+afmtodit: warning: both uni5840 and uniFA39 map to u5840
+afmtodit: warning: both uni58A8 and uniFA3A map to u58A8
+afmtodit: warning: both uni5C64 and uniFA3B map to u5C64
+afmtodit: warning: both uni6094 and uniFA3D map to u6094
+afmtodit: warning: both uni6168 and uniFA3E map to u6168
+afmtodit: warning: both uni618E and uniFA3F map to u618E
+afmtodit: warning: both uni61F2 and uniFA40 map to u61F2
+afmtodit: warning: both uni654F and uniFA41 map to u654F
+afmtodit: warning: both uni65E2 and uniFA42 map to u65E2
+afmtodit: warning: both uni6691 and uniFA43 map to u6691
+afmtodit: warning: both uni6885 and uniFA44 map to u6885
+afmtodit: warning: both uni6D77 and uniFA45 map to u6D77
+afmtodit: warning: both uni6E1A and uniFA46 map to u6E1A
+afmtodit: warning: both uni6F22 and uniFA47 map to u6F22
+afmtodit: warning: both uni716E and uniFA48 map to u716E
+afmtodit: warning: both uni7422 and uniFA4A map to u7422
+afmtodit: warning: both uni7891 and uniFA4B map to u7891
+afmtodit: warning: both uni793E and uniFA4C map to u793E
+afmtodit: warning: both uni7949 and uniFA4D map to u7949
+afmtodit: warning: both uni7948 and uniFA4E map to u7948
+afmtodit: warning: both uni7950 and uniFA4F map to u7950
+afmtodit: warning: both uni7956 and uniFA50 map to u7956
+afmtodit: warning: both uni795D and uniFA51 map to u795D
+afmtodit: warning: both uni798D and uniFA52 map to u798D
+afmtodit: warning: both uni798E and uniFA53 map to u798E
+afmtodit: warning: both uni7A40 and uniFA54 map to u7A40
+afmtodit: warning: both uni7A81 and uniFA55 map to u7A81
+afmtodit: warning: both uni7BC0 and uniFA56 map to u7BC0
+afmtodit: warning: both uni7E09 and uniFA58 map to u7E09
+afmtodit: warning: both uni7E41 and uniFA59 map to u7E41
+afmtodit: warning: both uni7F72 and uniFA5A map to u7F72
+afmtodit: warning: both uni8005 and uniFA5B map to u8005
+afmtodit: warning: both uni81ED and uniFA5C map to u81ED
+afmtodit: warning: both uni8457 and uniFA5F map to u8457
+afmtodit: warning: both uni8910 and uniFA60 map to u8910
+afmtodit: warning: both uni8996 and uniFA61 map to u8996
+afmtodit: warning: both uni8B01 and uniFA62 map to u8B01
+afmtodit: warning: both uni8B39 and uniFA63 map to u8B39
+afmtodit: warning: both uni8CD3 and uniFA64 map to u8CD3
+afmtodit: warning: both uni8D08 and uniFA65 map to u8D08
+afmtodit: warning: both uni9038 and uniFA67 map to u9038
+afmtodit: warning: both uni96E3 and uniFA68 map to u96E3
+afmtodit: warning: both uni97FF and uniFA69 map to u97FF
+afmtodit: warning: both uni983B and uniFA6A map to u983B
+afmtodit: warning: both uni6075 and uniFA6B map to u6075
+afmtodit: warning: both u242EE and uniFA6C map to u242EE
+afmtodit: warning: both uni8218 and uniFA6D map to u8218
+Done.
+Installing [33mNJ[0m in /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/... Done.
+Checking for gropdf executable and devpdf directory... gropdf found.
+Installing [33mNJ[0m in /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/... Done.

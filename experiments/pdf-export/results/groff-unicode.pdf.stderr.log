@@ -1,0 +1,45 @@
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:23: warning: special character 'u05E9' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:23: warning: special character 'u05DC' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:23: warning: special character 'u05D5' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:23: warning: special character 'u05DD' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:23: warning: special character 'u05E2' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:25: warning: special character 'u0645' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:25: warning: special character 'u0631' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:25: warning: special character 'u062D' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:25: warning: special character 'u0628' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:25: warning: special character 'u0627' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:25: warning: special character 'u0644' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:25: warning: special character 'u0639' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:28: warning: special character 'u0928' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:28: warning: special character 'u092E' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:28: warning: special character 'u0938' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:28: warning: special character 'u094D' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:28: warning: special character 'u0924' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:28: warning: special character 'u0947' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:28: warning: special character 'u0926' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:28: warning: special character 'u0941' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:28: warning: special character 'u093F' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:28: warning: special character 'u092F' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:28: warning: special character 'u093E' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:30: warning: special character 'u3053' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:30: warning: special character 'u3093' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:30: warning: special character 'u306B' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:30: warning: special character 'u3061' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:30: warning: special character 'u306F' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:30: warning: special character 'u4E16' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:30: warning: special character 'u754C' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:33: warning: special character 'u65E5' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:33: warning: special character 'u672C' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:33: warning: special character 'u8A9E' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:33: warning: special character 'u064A' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:33: warning: special character 'u0629' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:33: warning: special character 'u0939' not defined
+troff:/home/claudio/software/git/carta-space/experiments/pdf-export/benchmark/generated/unicode.roff:33: warning: special character 'u0940' not defined
+gropdf: notice: 
+Font 'SourceSerif4-Semibold (CB)' has 1497 glyphs
+You would see a noticeable speedup if you install the perl module Inline::C
+
+gropdf: notice: 
+Font 'SourceSerif4-Regular (CR)' has 1497 glyphs
+You would see a noticeable speedup if you install the perl module Inline::C
+

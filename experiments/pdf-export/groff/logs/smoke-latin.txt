@@ -1,0 +1,35 @@
+Latin Smoke Test
+Serif body, left aligned. Italic, semibold, and inline code.
+
+
+Second Level
+
+The quick brown fox jumps over the lazy dog.
+
+Third Level
+
+     Indented quotation.
+
+
+ •   First bullet.
+ •   Second bullet.
+
+
+ 1. First numbered item.
+ 2. Second numbered item.
+
+fn main() {
+    println!("Hello");
+}
+
+
+
+
+                                         1
+Second page: check the footer number and top margin.
+
+
+
+
+                                       2
+

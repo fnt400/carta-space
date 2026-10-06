@@ -1,0 +1,3 @@
+Explicit Semibold Heading
+Regular baseline. Explicit semibold importance. Italic baseline.
+

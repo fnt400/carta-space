@@ -1,0 +1,29 @@
+Title:           Carta Classic printpdf experiment
+Subject:         
+Keywords:        
+Author:          
+Creator:         
+Producer:        
+CreationDate:    Thu Jan  1 00:00:00 1970 UTC
+ModDate:         Thu Jan  1 00:00:00 1970 UTC
+Custom Metadata: yes
+Metadata Stream: no
+Tagged:          no
+UserProperties:  no
+Suspects:        no
+Form:            none
+JavaScript:      no
+Pages:           3
+Encrypted:       no
+Page size:       595.276 x 841.89 pts (A4)
+Page rot:        0
+File size:       48582 bytes
+Optimized:       no
+PDF version:     1.3
+PDF subtype:    
+    Title:         ISO 15930 - Electronic document file format for prepress digital data exchange (PDF/X)
+    Abbreviation:  PDF/X
+    Subtitle:      Part 9
+    Standard:      ISO 15930-9
+
+exit_status=0

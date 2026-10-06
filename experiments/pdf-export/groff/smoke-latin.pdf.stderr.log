@@ -1,0 +1,16 @@
+gropdf: notice: 
+Font 'SourceSerif4-Semibold (CB)' has 1497 glyphs
+You would see a noticeable speedup if you install the perl module Inline::C
+
+gropdf: notice: 
+Font 'SourceSerif4-Regular (CR)' has 1497 glyphs
+You would see a noticeable speedup if you install the perl module Inline::C
+
+gropdf: notice: 
+Font 'SourceSerif4-It (CI)' has 1126 glyphs
+You would see a noticeable speedup if you install the perl module Inline::C
+
+gropdf: notice: 
+Font 'SourceCodePro-Regular (CM)' has 1602 glyphs
+You would see a noticeable speedup if you install the perl module Inline::C
+

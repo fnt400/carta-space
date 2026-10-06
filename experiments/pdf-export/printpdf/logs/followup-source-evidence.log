@@ -1,0 +1,234 @@
+bool GfxFont::isSubset() const
+{
+    if (name) {
+        unsigned int i;
+        for (i = 0; i < name->size(); ++i) {
+            if ((*name)[i] < 'A' || (*name)[i] > 'Z') {
+                break;
+            }
+        }
+        return i == 6 && name->size() > 7 && (*name)[6] == '+';
+    }
+    return false;
+    // The `XXXXXX+` subset tag (ISO 32000-1, 9.6.4) marks a font program whose glyph
+    // complement was reduced. It must NOT appear on a full embed — and it must appear
+    // identically on /BaseFont (both levels) and the descriptor's /FontName, which are
+    // required to match.
+    let face_name = if subset_info.was_subset {
+        format!("{}+{}", font_id.0.clone().get(0..6).unwrap_or(&font_id.0), font_name)
+    } else {
+        font_name.clone()
+    };
+
+    match xml_to_pdf_pages(xml, options) {
+        Ok((pages, font_data, images, bridge_res)) => {
+            // Register fonts in the document
+            for (font_hash, parsed_font) in font_data.into_iter() {
+                let font_id = crate::FontId(format!("F{}", font_hash.font_hash));
+                let pdf_font = crate::font::PdfFont::new(parsed_font);
+                document.resources.fonts.map.insert(font_id, pdf_font);
+            }
+        if hf.show_footer && !skip_this_page {
+            let footer_text = hf.footer_text(page_info);
+            if !footer_text.is_empty() {
+                // THIS page's content height: under a PageSequence pages
+                // differ (first/parity/override); the uniform config height
+                // is only the no-sequence fallback.
+                let page_h = config
+                    .page_sequence
+                    .as_ref()
+                    .map_or(config.page_content_height, |s| {
+                        s.setup_for_page(page_idx).content_height()
+                    });
+                let footer_y = page_h - hf.footer_height;
+                let footer_items = generate_text_display_items(
+                    &footer_text,
+                    LogicalRect {
+                        origin: LogicalPosition {
+                            x: 0.0,
+                            y: footer_y,
+                        },
+                        size: LogicalSize {
+                            width: config.page_width,
+                            height: hf.footer_height,
+                        },
+                    },
+                    hf.font_size,
+/// and emits a single [`DisplayListItem::Text`] whose glyph indices are the
+/// font's real GIDs and whose `font_hash` is the font's registered hash, so the
+/// renderer (`cpurender::render_text`) can resolve and paint it.
+///
+/// This is a deliberately simple shaper for short, single-line running
+/// headers/footers (e.g. "Page 1 of 3"): per-character cmap lookup + horizontal
+/// advance, no complex shaping / kerning / bidi. The full text pipeline is not
+/// used because the pagination call site does not carry a styled run — only the
+/// header/footer string and a font size/color.
+///
+/// History: a previous stub fabricated glyphs whose `index` was the Unicode
+/// *codepoint* and whose `font_hash` was `0`, which matched no registered font
+/// (the renderer logged "Font hash 0 not found" and painted nothing). A later
+/// revision returned an empty list. Both rendered no header/footer text; this
+/// emits real glyphs.
+///
+/// Returns an empty list only when `text` is empty, no font is registered, or
+/// the chosen font has degenerate metrics (`units_per_em == 0`).
+fn generate_text_display_items(
+    text: &str,
+    bounds: LogicalRect,
+    font_size: f32,
+    color: ColorU,
+    alignment: TextAlignment,
+    renderer_resources: &RendererResources,
+) -> Vec<DisplayListItem> {
+    if text.is_empty() || font_size <= 0.0 {
+        return Vec::new();
+    }
+
+    // Pick the first registered font. Running headers/footers do not carry a
+    // styled run, so there is no per-node font family to resolve; the document's
+    // registered font is a reasonable choice for the page furniture.
+    let Some((_font_key, (font_ref, _instances))) =
+        renderer_resources.currently_registered_fonts.iter().next()
+    else {
+        return Vec::new();
+    };
+
+    let parsed = crate::font_ref_to_parsed_font(font_ref);
+    let units_per_em = f32::from(parsed.font_metrics.units_per_em);
+    if units_per_em <= 0.0 {
+        return Vec::new();
+    }
+    let scale = font_size / units_per_em;
+    let font_hash = parsed.hash;
+
+    // First pass: shape (cmap lookup + advance) and accumulate total width.
+    let mut shaped: Vec<(u16, f32)> = Vec::new(); // (glyph_id, advance_px)
+    let mut total_width = 0.0f32;
+    for c in text.chars() {
+        let gid = parsed.lookup_glyph_index(c as u32).unwrap_or(0);
+        let advance = f32::from(parsed.get_horizontal_advance(gid)) * scale;
+        shaped.push((gid, advance));
+        total_width += advance;
+    }
+
+    if shaped.is_empty() {
+        return Vec::new();
+    }
+
+    // Horizontal placement within the box.
+    let start_x = match alignment {
+        TextAlignment::Center => (bounds.size.width - total_width).mul_add(0.5, bounds.origin.x),
+        TextAlignment::Right => bounds.origin.x + (bounds.size.width - total_width),
+        TextAlignment::Left => bounds.origin.x,
+    };
+
+    // Vertical placement: center the text's em-box in the header/footer band and
+    // place the baseline accordingly (point.y is the glyph baseline).
+    let ascent_px = parsed.font_metrics.ascent * scale;
+    let descent_px = parsed.font_metrics.descent * scale; // hhea descender, usually negative
+    let text_height = ascent_px - descent_px;
+    let baseline_y = bounds.origin.y + (bounds.size.height - text_height).mul_add(0.5, ascent_px);
+
+    let mut pen_x = start_x;
+    let mut glyphs: Vec<GlyphInstance> = Vec::with_capacity(shaped.len());
+    for (gid, advance) in shaped {
+        let size = parsed
+            .get_glyph_size(gid, font_size)
+            .unwrap_or(LogicalSize {
+                width: advance,
+                height: font_size,
+            });
+        glyphs.push(GlyphInstance {
+            index: u32::from(gid),
+            point: LogicalPosition {
+                x: pen_x,
+                y: baseline_y,
+            },
+            size,
+        });
+        pen_x += advance;
+    }
+
+    vec![DisplayListItem::Text {
+        glyphs,
+        font_hash: FontHash::from_hash(font_hash),
+        font_size_px: font_size,
+        color,
+        clip_rect: bounds.into(),
+        source_node_index: None,
+    }]
+}
+
+/// Calculate the total height of a display list (max Y + height of all items).
+pub(crate) fn calculate_display_list_height(display_list: &DisplayList) -> f32 {
+    let mut max_bottom = 0.0f32;
+
+    for item in &display_list.items {
+        if let Some(bounds) = get_display_item_bounds(item) {
+            // Skip items with zero height - they don't contribute to visible content
+            if bounds.0.size.height < 0.1 {
+        DisplayListItem::Text { glyphs, font_hash, font_size_px, color, clip_rect: _, source_node_index: _ } => {
+            // Render simple text items (used for headers/footers)
+            // These use Unicode codepoints as glyph indices and a placeholder font hash (0)
+            // 
+            // IMPORTANT: For external fonts (font_hash != 0), the TextLayout item already
+            // renders the text via render_unified_layout_with_margins(). The Text items
+            // are kept in the display list for other renderers (like WebRender for screen)
+            // but should be SKIPPED for PDF output to avoid double-rendering.
+            if glyphs.is_empty() {
+                return;
+            }
+            
+            // For text with font_hash == 0, use a builtin PDF font (Helvetica)
+            // This is used for page headers/footers which don't go through text shaping
+            let use_builtin_font = font_hash.font_hash == 0;
+            
+            // Skip external fonts - they are rendered via TextLayout
+            if !use_builtin_font {
+                return;
+            }
+    fn build_inner(family_filter: Option<&[String]>) -> Self {
+        let cache = FcFontCache::default();
+
+        // Normalize filter families for matching
+        let filter_normalized: Option<Vec<String>> = family_filter.map(|families| {
+            families
+                .iter()
+                .map(|f| crate::utils::normalize_family_name(f))
+                .collect()
+        });
+
+        // Helper closure to check if a pattern matches the filter
+        let matches_filter = |pattern: &FcPattern| -> bool {
+            match &filter_normalized {
+                None => true, // No filter = accept all
+                Some(targets) => {
+                    pattern.name.as_ref().map_or(false, |name| {
+                        let name_norm = crate::utils::normalize_family_name(name);
+                        targets.iter().any(|target| name_norm.contains(target))
+                    }) || pattern.family.as_ref().map_or(false, |family| {
+                        let family_norm = crate::utils::normalize_family_name(family);
+                        targets.iter().any(|target| family_norm.contains(target))
+                    })
+                }
+            }
+        };
+
+        let mut state = cache.state_write();
+        state.fallback_config = FcFallbackConfig::os_defaults(OperatingSystem::current());
+
+        #[cfg(target_os = "linux")]
+        {
+            if let Some((font_entries, render_configs, system_aliases)) = FcScanDirectories() {
+                // The platform configuration is the authority; the built-in
+                // tables only fill what it leaves unsaid.
+                let mut config = FcFallbackConfig::default();
+                config.absorb_system_aliases(system_aliases);
+                config.merge_defaults(&state.fallback_config);
+                state.fallback_config = config;
+                for (mut pattern, path) in font_entries {
+                    if matches_filter(&pattern) {
+                        // Apply per-font render config if a matching family rule exists
+                        if let Some(family) = pattern.name.as_ref().or(pattern.family.as_ref()) {
+                            if let Some(rc) = render_configs.get(family) {
+                                pattern.render_config = rc.clone();

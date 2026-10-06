@@ -1,0 +1,20 @@
+This paragraph starts near the body-end trap and must continue on the next page
+
+
+
+                                        1
+without flushing any pending words below the footer. The formatter holds a
+partially filled line while the trap switches to its footer environment. Returning to
+the body environment must preserve those buffered words for the following page. A
+no-break page eject is necessary here, not a paragraph break. This text deliberately
+continues for several lines so that the test exercises an actual interruption within a
+paragraph rather than only a page change requested by a heading. Every word
+should survive the transition, remain above the body-end limit, and appear before
+its own page number in extracted text. The final sentence is a sentinel for checking
+that the end of the paragraph was not lost.
+
+
+
+
+                                          2
+

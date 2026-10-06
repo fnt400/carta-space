@@ -1,0 +1,12 @@
+body { font-family: 'Source Serif 4'; font-size: 11pt; line-height: 1.35; text-align: left; color: #000000; margin: 0; }
+h1 { font-size: 20pt; font-weight: 600; margin-top: 18pt; margin-bottom: 10pt; }
+h2 { font-size: 15pt; font-weight: 600; margin-top: 15pt; margin-bottom: 8pt; }
+h3 { font-size: 12pt; font-weight: 600; margin-top: 12pt; margin-bottom: 6pt; }
+p { margin-top: 0; margin-bottom: 8pt; }
+strong, b { font-weight: 600; }
+em, i { font-style: italic; }
+blockquote { margin-left: 15pt; margin-right: 0; color: #000000; }
+ul, ol { padding-left: 20pt; }
+pre, code { font-family: 'Source Code Pro'; font-size: 9pt; color: #000000; }
+pre { white-space: pre-wrap; margin-top: 8pt; margin-bottom: 8pt; }
+a { color: #000000; }

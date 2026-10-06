@@ -1,0 +1,1 @@
+pages=100 pdf_bytes=387742 embedded_font_input_bytes=7755112

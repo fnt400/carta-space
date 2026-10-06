@@ -1,0 +1,529 @@
+{
+  "version": 2,
+  "parameters": {
+    "decodelevel": "generalized"
+  },
+  "qpdf": [
+    {
+      "jsonversion": 2,
+      "pdfversion": "1.3",
+      "pushedinheritedpageresources": false,
+      "calledgetallpages": false,
+      "maxobjectid": 28
+    },
+    {
+      "obj:1 0 R": {
+        "value": {
+          "/Count": 3,
+          "/Kids": [
+            "18 0 R",
+            "19 0 R",
+            "20 0 R"
+          ],
+          "/Type": "/Pages"
+        }
+      },
+      "obj:2 0 R": {
+        "stream": {
+          "dict": {
+            "/Filter": "/FlateDecode",
+            "/Length": 7327,
+            "/Length1": 14204
+          }
+        }
+      },
+      "obj:3 0 R": {
+        "stream": {
+          "dict": {
+            "/Filter": "/FlateDecode",
+            "/Length": 458
+          }
+        }
+      },
+      "obj:4 0 R": {
+        "value": {
+          "/Ascent": 984,
+          "/CapHeight": 984,
+          "/Descent": -273,
+          "/Flags": 32,
+          "/FontBBox": [
+            -193,
+            -454,
+            793,
+            1060
+          ],
+          "/FontFile2": "2 0 R",
+          "/FontName": "/F15088+SourceCodePro-Regular",
+          "/ItalicAngle": 0,
+          "/StemV": 88,
+          "/Type": "/FontDescriptor"
+        }
+      },
+      "obj:5 0 R": {
+        "value": {
+          "/BaseFont": "/F15088+SourceCodePro-Regular",
+          "/DescendantFonts": [
+            {
+              "/BaseFont": "/F15088+SourceCodePro-Regular",
+              "/CIDSystemInfo": {
+                "/Ordering": "u:Identity",
+                "/Registry": "u:Adobe",
+                "/Supplement": 0
+              },
+              "/CIDToGIDMap": "/Identity",
+              "/DW": 1000,
+              "/FontDescriptor": "4 0 R",
+              "/Subtype": "/CIDFontType2",
+              "/Type": "/Font",
+              "/W": [
+                1,
+                [
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600,
+                  600
+                ]
+              ]
+            }
+          ],
+          "/Encoding": "/Identity-H",
+          "/Subtype": "/Type0",
+          "/ToUnicode": "3 0 R",
+          "/Type": "/Font"
+        }
+      },
+      "obj:6 0 R": {
+        "stream": {
+          "dict": {
+            "/Filter": "/FlateDecode",
+            "/Length": 7334,
+            "/Length1": 12660
+          }
+        }
+      },
+      "obj:7 0 R": {
+        "stream": {
+          "dict": {
+            "/Filter": "/FlateDecode",
+            "/Length": 688
+          }
+        }
+      },
+      "obj:8 0 R": {
+        "value": {
+          "/Ascent": 1036,
+          "/CapHeight": 1036,
+          "/Descent": -335,
+          "/Flags": 32,
+          "/FontBBox": [
+            -240,
+            -321,
+            2236,
+            1003
+          ],
+          "/FontFile2": "6 0 R",
+          "/FontName": "/F18282+SourceSerif4-Regular",
+          "/ItalicAngle": 0,
+          "/StemV": 88,
+          "/Type": "/FontDescriptor"
+        }
+      },
+      "obj:9 0 R": {
+        "value": {
+          "/BaseFont": "/F18282+SourceSerif4-Regular",
+          "/DescendantFonts": [
+            {
+              "/BaseFont": "/F18282+SourceSerif4-Regular",
+              "/CIDSystemInfo": {
+                "/Ordering": "u:Identity",
+                "/Registry": "u:Adobe",
+                "/Supplement": 0
+              },
+              "/CIDToGIDMap": "/Identity",
+              "/DW": 1000,
+              "/FontDescriptor": "8 0 R",
+              "/Subtype": "/CIDFontType2",
+              "/Type": "/Font",
+              "/W": [
+                1,
+                [
+                  233,
+                  664,
+                  629,
+                  631,
+                  710,
+                  603,
+                  579,
+                  682,
+                  788,
+                  371,
+                  374,
+                  667,
+                  596,
+                  902,
+                  735,
+                  707,
+                  589,
+                  707,
+                  651,
+                  512,
+                  604,
+                  727,
+                  674,
+                  962,
+                  648,
+                  633,
+                  551,
+                  509,
+                  577,
+                  488,
+                  567,
+                  510,
+                  354,
+                  518,
+                  601,
+                  298,
+                  277,
+                  547,
+                  298,
+                  901,
+                  606,
+                  549,
+                  583,
+                  557,
+                  423,
+                  434,
+                  325,
+                  583,
+                  505,
+                  764,
+                  526,
+                  512,
+                  456,
+                  509,
+                  510,
+                  510,
+                  298,
+                  549,
+                  583,
+                  607,
+                  612,
+                  658,
+                  911,
+                  916,
+                  500,
+                  500,
+                  500,
+                  500,
+                  500,
+                  500,
+                  500,
+                  500,
+                  500,
+                  500,
+                  300,
+                  300,
+                  300,
+                  300,
+                  416,
+                  212,
+                  487,
+                  487,
+                  812,
+                  305,
+                  500
+                ]
+              ]
+            }
+          ],
+          "/Encoding": "/Identity-H",
+          "/Subtype": "/Type0",
+          "/ToUnicode": "7 0 R",
+          "/Type": "/Font"
+        }
+      },
+      "obj:10 0 R": {
+        "stream": {
+          "dict": {
+            "/Filter": "/FlateDecode",
+            "/Length": 2246,
+            "/Length1": 4224
+          }
+        }
+      },
+      "obj:11 0 R": {
+        "stream": {
+          "dict": {
+            "/Filter": "/FlateDecode",
+            "/Length": 359
+          }
+        }
+      },
+      "obj:12 0 R": {
+        "value": {
+          "/Ascent": 1036,
+          "/CapHeight": 1036,
+          "/Descent": -335,
+          "/Flags": 96,
+          "/FontBBox": [
+            -238,
+            -324,
+            2226,
+            1009
+          ],
+          "/FontFile2": "10 0 R",
+          "/FontName": "/F69205+SourceSerif4-It",
+          "/ItalicAngle": -12,
+          "/StemV": 88,
+          "/Type": "/FontDescriptor"
+        }
+      },
+      "obj:13 0 R": {
+        "value": {
+          "/BaseFont": "/F69205+SourceSerif4-It",
+          "/DescendantFonts": [
+            {
+              "/BaseFont": "/F69205+SourceSerif4-It",
+              "/CIDSystemInfo": {
+                "/Ordering": "u:Identity",
+                "/Registry": "u:Adobe",
+                "/Supplement": 0
+              },
+              "/CIDToGIDMap": "/Identity",
+              "/DW": 1000,
+              "/FontDescriptor": "12 0 R",
+              "/Subtype": "/CIDFontType2",
+              "/Type": "/Font",
+              "/W": [
+                1,
+                [
+                  234,
+                  522,
+                  407,
+                  524,
+                  305,
+                  563,
+                  488,
+                  400,
+                  360,
+                  478
+                ]
+              ]
+            }
+          ],
+          "/Encoding": "/Identity-H",
+          "/Subtype": "/Type0",
+          "/ToUnicode": "11 0 R",
+          "/Type": "/Font"
+        }
+      },
+      "obj:14 0 R": {
+        "value": {
+          "/F15088531163105751818": "5 0 R",
+          "/F18282784845664923883": "9 0 R",
+          "/F6920520379018771386": "13 0 R"
+        }
+      },
+      "obj:15 0 R": {
+        "value": {}
+      },
+      "obj:16 0 R": {
+        "value": {}
+      },
+      "obj:17 0 R": {
+        "value": {}
+      },
+      "obj:18 0 R": {
+        "value": {
+          "/Annots": [],
+          "/Contents": "22 0 R",
+          "/CropBox": [
+            0,
+            0,
+            595.27563,
+            841.88983
+          ],
+          "/MediaBox": [
+            0,
+            0,
+            595.27563,
+            841.88983
+          ],
+          "/Parent": "1 0 R",
+          "/Resources": "21 0 R",
+          "/TrimBox": [
+            0,
+            0,
+            595.27563,
+            841.88983
+          ],
+          "/Type": "/Page"
+        }
+      },
+      "obj:19 0 R": {
+        "value": {
+          "/Annots": [],
+          "/Contents": "24 0 R",
+          "/CropBox": [
+            0,
+            0,
+            595.27563,
+            841.88983
+          ],
+          "/MediaBox": [
+            0,
+            0,
+            595.27563,
+            841.88983
+          ],
+          "/Parent": "1 0 R",
+          "/Resources": "23 0 R",
+          "/TrimBox": [
+            0,
+            0,
+            595.27563,
+            841.88983
+          ],
+          "/Type": "/Page"
+        }
+      },
+      "obj:20 0 R": {
+        "value": {
+          "/Annots": [],
+          "/Contents": "26 0 R",
+          "/CropBox": [
+            0,
+            0,
+            595.27563,
+            841.88983
+          ],
+          "/MediaBox": [
+            0,
+            0,
+            595.27563,
+            841.88983
+          ],
+          "/Parent": "1 0 R",
+          "/Resources": "25 0 R",
+          "/TrimBox": [
+            0,
+            0,
+            595.27563,
+            841.88983
+          ],
+          "/Type": "/Page"
+        }
+      },
+      "obj:21 0 R": {
+        "value": {
+          "/ExtGState": "16 0 R",
+          "/Font": "14 0 R",
+          "/Shading": "17 0 R",
+          "/XObject": "15 0 R"
+        }
+      },
+      "obj:22 0 R": {
+        "stream": {
+          "dict": {
+            "/Filter": "/FlateDecode",
+            "/Length": 7078
+          }
+        }
+      },
+      "obj:23 0 R": {
+        "value": {
+          "/ExtGState": "16 0 R",
+          "/Font": "14 0 R",
+          "/Shading": "17 0 R",
+          "/XObject": "15 0 R"
+        }
+      },
+      "obj:24 0 R": {
+        "stream": {
+          "dict": {
+            "/Filter": "/FlateDecode",
+            "/Length": 10286
+          }
+        }
+      },
+      "obj:25 0 R": {
+        "value": {
+          "/ExtGState": "16 0 R",
+          "/Font": "14 0 R",
+          "/Shading": "17 0 R",
+          "/XObject": "15 0 R"
+        }
+      },
+      "obj:26 0 R": {
+        "stream": {
+          "dict": {
+            "/Filter": "/FlateDecode",
+            "/Length": 7877
+          }
+        }
+      },
+      "obj:27 0 R": {
+        "value": {
+          "/PageLayout": "/OneColumn",
+          "/PageMode": "/UseNone",
+          "/Pages": "1 0 R",
+          "/Type": "/Catalog"
+        }
+      },
+      "obj:28 0 R": {
+        "value": {
+          "/Author": "u:",
+          "/CreationDate": "u:D:19700101000000+00'00'",
+          "/Creator": "u:",
+          "/GTS_PDFXVersion": "u:",
+          "/Identifier": "u:",
+          "/Keywords": "u:",
+          "/ModDate": "u:D:19700101000000+00'00'",
+          "/Producer": "u:",
+          "/Subject": "u:",
+          "/Title": "u:Carta Classic printpdf experiment",
+          "/Trapped": "/False"
+        }
+      },
+      "trailer": {
+        "value": {
+          "/ID": [
+            "u:HGJBDAIGCHFGIHDGCIGHCIGJEBHIGBEF",
+            "u:HEIGIDGCBAAHFGBHAEFHCBHGAJHCJDHF"
+          ],
+          "/Info": "28 0 R",
+          "/Root": "27 0 R",
+          "/Size": 29
+        }
+      }
+    }
+  ]
+}

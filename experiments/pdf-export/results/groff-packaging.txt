@@ -1,0 +1,222 @@
+GNU groff 1.24.1 PDF-only packaging measurement
+File sizes from stat (dereference metrics); no directory sizes, no stripping.
+CORE/CUSTOM records: tag<TAB>bytes<TAB>installed path.
+TRACE_DIRECTORY /home/claudio/software/git/carta-space/experiments/pdf-export/groff/logs/packaging-traces.qanzUg
+CORE	434496	/opt/carta-pdf-bench/groff-1.24.1/bin/groff
+CORE	109835	/opt/carta-pdf-bench/groff-1.24.1/bin/gropdf
+CORE	209480	/opt/carta-pdf-bench/groff-1.24.1/bin/preconv
+CORE	3489296	/opt/carta-pdf-bench/groff-1.24.1/bin/troff
+CORE	12451	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/AB
+CORE	14900	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/ABI
+CORE	14718	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/AI
+CORE	12236	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/AR
+CORE	12326	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/BMB
+CORE	14545	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/BMBI
+CORE	14142	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/BMI
+CORE	12000	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/BMR
+CORE	10609	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/CBI
+CORE	167	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/DESC
+CORE	20131	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/HB
+CORE	22539	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/HBI
+CORE	23875	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/HI
+CORE	20143	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/HNB
+CORE	22460	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/HNBI
+CORE	23817	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/HNI
+CORE	21405	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/HNR
+CORE	21393	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/HR
+CORE	15146	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/NB
+CORE	22289	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/NBI
+CORE	19385	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/NI
+CORE	17054	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/NR
+CORE	12838	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/PB
+CORE	15038	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/PBI
+CORE	14955	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/PI
+CORE	13185	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/PR
+CORE	7549	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/S
+CORE	1895	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/SS
+CORE	11130	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/TB
+CORE	12867	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/TBI
+CORE	13098	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/TI
+CORE	10925	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/TR
+CORE	5997	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/ZD
+CORE	5345	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/download
+CORE	678	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/composite.tmac
+CORE	2668	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/en.tmac
+CORE	2013	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/europs.tmac
+CORE	9119	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/fallbacks.tmac
+CORE	34128	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/hyphen.en
+CORE	1996	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/hyphenex.en
+CORE	3763	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/latin1.tmac
+CORE	4315	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/papersize.tmac
+CORE	31033	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/pdf.tmac
+CORE	9123	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/pdfpic.tmac
+CORE	20642	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/ps.tmac
+CORE	5171	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/pspic.tmac
+CORE	1770	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/troffrc
+CORE	1505	/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/troffrc-end
+CUSTOM	2886446	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/CB
+CUSTOM	2291399	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/CI
+CUSTOM	54106	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/CM
+CUSTOM	2332210	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/CR
+CUSTOM	60045	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NA
+CUSTOM	39735	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/ND
+CUSTOM	5180	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NH
+CUSTOM	929534	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NJ
+CUSTOM	831895	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NS
+CUSTOM	801045	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NotoSans-Regular.pfa
+CUSTOM	339408	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NotoSansArabic-Regular.pfa
+CUSTOM	331390	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NotoSansDevanagari-Regular.pfa
+CUSTOM	40026	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NotoSansHebrew-Regular.pfa
+CUSTOM	14699502	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/NotoSansJP-Regular.pfa
+CUSTOM	324990	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/SourceCodePro-Regular.pfa
+CUSTOM	306543	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/SourceSerif4-It.pfa
+CUSTOM	363362	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/SourceSerif4-Regular.pfa
+CUSTOM	359165	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/SourceSerif4-Semibold.pfa
+CUSTOM	425	/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/download
+CARTA_MACRO	1205	/home/claudio/software/git/carta-space/experiments/pdf-export/groff/carta.tmac
+SUMMARY 52 core files / 4863584 bytes
+SUMMARY 19 custom PDF font files / 26996406 bytes
+SUMMARY renderer + custom fonts + carta.tmac: 72 files / 31861195 bytes
+
+EXTERNAL observed opens (not a complete portable Perl/system closure):
+EXTERNAL	25215	/etc/ld.so.cache
+EXTERNAL	114	/etc/localtime
+EXTERNAL	1995216	/lib/x86_64-linux-gnu/libc.so.6
+EXTERNAL	206776	/lib/x86_64-linux-gnu/libcrypt.so.1
+EXTERNAL	182856	/lib/x86_64-linux-gnu/libgcc_s.so.1
+EXTERNAL	977112	/lib/x86_64-linux-gnu/libm.so.6
+EXTERNAL	2497768	/lib/x86_64-linux-gnu/libstdc++.so.6
+EXTERNAL	202760	/lib/x86_64-linux-gnu/libuchardet.so.0
+EXTERNAL	125376	/lib/x86_64-linux-gnu/libz.so.1
+EXTERNAL	3067504	/usr/lib/locale/locale-archive
+EXTERNAL	25399	/usr/lib/x86_64-linux-gnu/perl-base/Carp.pm
+EXTERNAL	17356	/usr/lib/x86_64-linux-gnu/perl-base/Cwd.pm
+EXTERNAL	2336	/usr/lib/x86_64-linux-gnu/perl-base/Exporter.pm
+EXTERNAL	6385	/usr/lib/x86_64-linux-gnu/perl-base/Exporter/Heavy.pm
+EXTERNAL	2218	/usr/lib/x86_64-linux-gnu/perl-base/Fcntl.pm
+EXTERNAL	5429	/usr/lib/x86_64-linux-gnu/perl-base/File/Basename.pm
+EXTERNAL	1540	/usr/lib/x86_64-linux-gnu/perl-base/File/Glob.pm
+EXTERNAL	20724	/usr/lib/x86_64-linux-gnu/perl-base/File/Path.pm
+EXTERNAL	643	/usr/lib/x86_64-linux-gnu/perl-base/File/Spec.pm
+EXTERNAL	9299	/usr/lib/x86_64-linux-gnu/perl-base/File/Spec/Unix.pm
+EXTERNAL	42526	/usr/lib/x86_64-linux-gnu/perl-base/Getopt/Long.pm
+EXTERNAL	469	/usr/lib/x86_64-linux-gnu/perl-base/IO.pm
+EXTERNAL	1388	/usr/lib/x86_64-linux-gnu/perl-base/IO/File.pm
+EXTERNAL	7948	/usr/lib/x86_64-linux-gnu/perl-base/IO/Handle.pm
+EXTERNAL	642	/usr/lib/x86_64-linux-gnu/perl-base/IO/Seekable.pm
+EXTERNAL	1272	/usr/lib/x86_64-linux-gnu/perl-base/List/Util.pm
+EXTERNAL	20442	/usr/lib/x86_64-linux-gnu/perl-base/POSIX.pm
+EXTERNAL	1096	/usr/lib/x86_64-linux-gnu/perl-base/Scalar/Util.pm
+EXTERNAL	344	/usr/lib/x86_64-linux-gnu/perl-base/SelectSaver.pm
+EXTERNAL	2205	/usr/lib/x86_64-linux-gnu/perl-base/Symbol.pm
+EXTERNAL	2044	/usr/lib/x86_64-linux-gnu/perl-base/Tie/Hash.pm
+EXTERNAL	4115	/usr/lib/x86_64-linux-gnu/perl-base/XSLoader.pm
+EXTERNAL	18784	/usr/lib/x86_64-linux-gnu/perl-base/auto/Cwd/Cwd.so
+EXTERNAL	22736	/usr/lib/x86_64-linux-gnu/perl-base/auto/Fcntl/Fcntl.so
+EXTERNAL	31408	/usr/lib/x86_64-linux-gnu/perl-base/auto/File/Glob/Glob.so
+EXTERNAL	22976	/usr/lib/x86_64-linux-gnu/perl-base/auto/IO/IO.so
+EXTERNAL	64288	/usr/lib/x86_64-linux-gnu/perl-base/auto/List/Util/Util.so
+EXTERNAL	106184	/usr/lib/x86_64-linux-gnu/perl-base/auto/POSIX/POSIX.so
+EXTERNAL	8912	/usr/lib/x86_64-linux-gnu/perl-base/base.pm
+EXTERNAL	569	/usr/lib/x86_64-linux-gnu/perl-base/bytes.pm
+EXTERNAL	5737	/usr/lib/x86_64-linux-gnu/perl-base/constant.pm
+EXTERNAL	4857	/usr/lib/x86_64-linux-gnu/perl-base/overload.pm
+EXTERNAL	964	/usr/lib/x86_64-linux-gnu/perl-base/overloading.pm
+EXTERNAL	460	/usr/lib/x86_64-linux-gnu/perl-base/parent.pm
+EXTERNAL	1606	/usr/lib/x86_64-linux-gnu/perl-base/strict.pm
+EXTERNAL	341	/usr/lib/x86_64-linux-gnu/perl-base/utf8.pm
+EXTERNAL	1148	/usr/lib/x86_64-linux-gnu/perl-base/vars.pm
+EXTERNAL	30759	/usr/lib/x86_64-linux-gnu/perl-base/warnings.pm
+EXTERNAL	462	/usr/lib/x86_64-linux-gnu/perl-base/warnings/register.pm
+EXTERNAL	49089	/usr/lib/x86_64-linux-gnu/perl/5.40/Compress/Raw/Zlib.pm
+EXTERNAL	32184	/usr/lib/x86_64-linux-gnu/perl/5.40/Encode.pm
+EXTERNAL	12697	/usr/lib/x86_64-linux-gnu/perl/5.40/Encode/Alias.pm
+EXTERNAL	6065	/usr/lib/x86_64-linux-gnu/perl/5.40/Encode/Config.pm
+EXTERNAL	9063	/usr/lib/x86_64-linux-gnu/perl/5.40/Encode/Encoding.pm
+EXTERNAL	3821	/usr/lib/x86_64-linux-gnu/perl/5.40/Encode/MIME/Name.pm
+EXTERNAL	50496	/usr/lib/x86_64-linux-gnu/perl/5.40/Storable.pm
+EXTERNAL	72336	/usr/lib/x86_64-linux-gnu/perl/5.40/auto/Compress/Raw/Zlib/Zlib.so
+EXTERNAL	47768	/usr/lib/x86_64-linux-gnu/perl/5.40/auto/Encode/Encode.so
+EXTERNAL	117768	/usr/lib/x86_64-linux-gnu/perl/5.40/auto/Storable/Storable.so
+EXTERNAL	44079	/usr/share/perl/5.40/Compress/Zlib.pm
+EXTERNAL	16775	/usr/share/perl/5.40/File/GlobMapper.pm
+EXTERNAL	3789	/usr/share/perl/5.40/IO/Compress/Adapter/Deflate.pm
+EXTERNAL	24024	/usr/share/perl/5.40/IO/Compress/Base.pm
+EXTERNAL	22774	/usr/share/perl/5.40/IO/Compress/Base/Common.pm
+EXTERNAL	37111	/usr/share/perl/5.40/IO/Compress/Gzip.pm
+EXTERNAL	3883	/usr/share/perl/5.40/IO/Compress/Gzip/Constants.pm
+EXTERNAL	28946	/usr/share/perl/5.40/IO/Compress/RawDeflate.pm
+EXTERNAL	5647	/usr/share/perl/5.40/IO/Compress/Zlib/Extra.pm
+EXTERNAL	3259	/usr/share/perl/5.40/IO/Uncompress/Adapter/Inflate.pm
+EXTERNAL	38463	/usr/share/perl/5.40/IO/Uncompress/Base.pm
+EXTERNAL	32770	/usr/share/perl/5.40/IO/Uncompress/Gunzip.pm
+EXTERNAL	32475	/usr/share/perl/5.40/IO/Uncompress/RawInflate.pm
+PERL_INTERPRETER /usr/bin/perl 3935376 bytes
+PERL_OBSERVED_MODULES 62 files / 1193293 bytes (not complete Perl distribution)
+ELF_LIBRARY	1995216	/lib/x86_64-linux-gnu/libc.so.6
+ELF_LIBRARY	206776	/lib/x86_64-linux-gnu/libcrypt.so.1
+ELF_LIBRARY	182856	/lib/x86_64-linux-gnu/libgcc_s.so.1
+ELF_LIBRARY	977112	/lib/x86_64-linux-gnu/libm.so.6
+ELF_LIBRARY	2497768	/lib/x86_64-linux-gnu/libstdc++.so.6
+ELF_LIBRARY	202760	/lib/x86_64-linux-gnu/libuchardet.so.0
+ELF_LIBRARY	125376	/lib/x86_64-linux-gnu/libz.so.1
+ELF_LIBRARY	225672	/lib64/ld-linux-x86-64.so.2
+ELF_LIBRARY_SUM 8 files / 6413536 bytes (system ABI-specific)
+
+EXCLUSIONS: all .t42, font conversion tools, AFMs, docs, unused groff tools, shared TTFs.
+No files were deleted or modified in the installed tree.
+
+COPIED-TREE VALIDATION (no installed-tree modifications):
+latin: extracted text identical; checking /opt/carta-pdf-bench/packaging-staged-latin.pdf
+PDF Version: 1.7
+File is not encrypted
+File is not linearized
+No syntax or stream encoding errors found; the file may still contain
+errors that qpdf cannot detect
+unicode-fallback: extracted text identical; checking /opt/carta-pdf-bench/packaging-staged-unicode-fallback.pdf
+PDF Version: 1.7
+File is not encrypted
+File is not linearized
+No syntax or stream encoding errors found; the file may still contain
+errors that qpdf cannot detect
+
+Compiled-prefix successful opens in copied-tree test:
+openat(AT_FDCWD, "/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/download", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/download", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/download", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/download", O_RDONLY|O_CLOEXEC) = 3
+
+Core dependency ldd (outside byte totals):
+/opt/carta-pdf-bench/groff-1.24.1/bin/groff
+	linux-vdso.so.1 (0x0000768ae3f6a000)
+	libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x0000768ae3cd3000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x0000768ae3be3000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x0000768ae3bb6000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x0000768ae39c2000)
+	/lib64/ld-linux-x86-64.so.2 (0x0000768ae3f6c000)
+/opt/carta-pdf-bench/groff-1.24.1/bin/preconv
+	linux-vdso.so.1 (0x0000776538f05000)
+	libuchardet.so.0 => /lib/x86_64-linux-gnu/libuchardet.so.0 (0x0000776538eb4000)
+	libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x0000776538c4e000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x0000776538c21000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x0000776538a2d000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x000077653893b000)
+	/lib64/ld-linux-x86-64.so.2 (0x0000776538f07000)
+/opt/carta-pdf-bench/groff-1.24.1/bin/troff
+	linux-vdso.so.1 (0x000073154b748000)
+	libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x000073154b3fa000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x000073154b30a000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x000073154b2dd000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x000073154b0e9000)
+	/lib64/ld-linux-x86-64.so.2 (0x000073154b74a000)
+/usr/bin/perl
+	linux-vdso.so.1 (0x0000713cc03ad000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x0000713cbfee7000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x0000713cbfcf3000)
+	libcrypt.so.1 => /lib/x86_64-linux-gnu/libcrypt.so.1 (0x0000713cbfcb7000)
+	/lib64/ld-linux-x86-64.so.2 (0x0000713cc03af000)
+
+PACKAGE SCOPE: 72 unstripped files, no directory overhead, not an absolute lower bound.
+gropdf retains compiled search roots: staged rendering still reads original download registries.
+For relocation, regenerate compiled paths or rebuild with the deployment prefix.
+Perl observed module sizes are workload-specific; full Perl and ELF libraries are separate.

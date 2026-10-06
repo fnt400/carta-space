@@ -1,0 +1,734 @@
+{
+  "schema_version": 1,
+  "license": "SIL Open Font License 1.1",
+  "sources": {
+    "source-serif": {
+      "repository": "https://github.com/adobe-fonts/source-serif",
+      "commit": "2823e993c53fca27c5c8749f529b56a5a7c77b6b",
+      "release": "4.005R",
+      "file": "OFL-source-serif.txt",
+      "url": "https://raw.githubusercontent.com/adobe-fonts/source-serif/2823e993c53fca27c5c8749f529b56a5a7c77b6b/LICENSE.md",
+      "bytes": 4492,
+      "sha256": "75784a295293a8992f5a8d99210566e0064a012e6dab6731305e3787f15896c7"
+    },
+    "source-code-pro": {
+      "repository": "https://github.com/adobe-fonts/source-code-pro",
+      "commit": "d3f1a5962cde503f9409c21e58527611d4a19ef1",
+      "release": "2.042R-u/1.062R-i/1.026R-vf",
+      "file": "OFL-source-code-pro.txt",
+      "url": "https://raw.githubusercontent.com/adobe-fonts/source-code-pro/d3f1a5962cde503f9409c21e58527611d4a19ef1/LICENSE.md",
+      "bytes": 4566,
+      "sha256": "7c940e28a5388e9bba866cf0e408edda45fe0899ba98665b8f6ab31dc5e4b8ff"
+    },
+    "noto-fonts": {
+      "repository": "https://github.com/notofonts/noto-fonts",
+      "commit": "ffebf8c1ee449e544955a7e813c54f9b73848eac",
+      "release": null,
+      "file": "OFL-noto-fonts.txt",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/LICENSE",
+      "bytes": 4377,
+      "sha256": "0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb"
+    },
+    "noto-cjk": {
+      "repository": "https://github.com/notofonts/noto-cjk",
+      "commit": "523d033d6cb47f4a80c58a35753646f5c3608a78",
+      "release": "Sans2.004",
+      "file": "OFL-noto-cjk.txt",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/LICENSE",
+      "bytes": 4301,
+      "sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+    }
+  },
+  "fonts": [
+    {
+      "file": "SourceSerif4-Regular.ttf",
+      "role": "Latin body",
+      "source": "source-serif",
+      "url": "https://raw.githubusercontent.com/adobe-fonts/source-serif/2823e993c53fca27c5c8749f529b56a5a7c77b6b/TTF/SourceSerif4-Regular.ttf",
+      "upstream_path": "TTF/SourceSerif4-Regular.ttf",
+      "upstream_file": {
+        "bytes": 261868,
+        "sha256": "e5a4ee6a3d87bb9024796be390c6771e2a0eb1883dae25effaf57ca01668e24b"
+      },
+      "conversion": null,
+      "bytes": 261868,
+      "sha256": "e5a4ee6a3d87bb9024796be390c6771e2a0eb1883dae25effaf57ca01668e24b",
+      "name_table": {
+        "0": [
+          "\u00a9 2014 - 2023 Adobe (http://www.adobe.com/), with Reserved Font Name \u2018Source\u2019."
+        ],
+        "1": [
+          "Source Serif 4"
+        ],
+        "2": [
+          "Regular"
+        ],
+        "3": [
+          "4.005;ADBO;SourceSerif4-Regular;ADOBE"
+        ],
+        "4": [
+          "Source Serif 4"
+        ],
+        "5": [
+          "Version 4.005;hotconv 1.1.0;makeotfexe 2.6.0"
+        ],
+        "6": [
+          "SourceSerif4-Regular"
+        ],
+        "13": [
+          "This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: http://scripts.sil.org/OFL. This Font Software is distributed on an \u2018AS IS\u2019 BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the SIL Open Font License for the specific language, permissions and limitations governing your use of this Font Software."
+        ],
+        "14": [
+          "http://scripts.sil.org/OFL"
+        ],
+        "16": [],
+        "17": []
+      },
+      "weight_class": 400,
+      "embedding_fsType": 0,
+      "glyphs": 1464,
+      "unicode_cmap_entries": 920,
+      "coverage_smoke_test": [
+        "U+0041",
+        "U+0061"
+      ],
+      "tables": [
+        "BASE",
+        "DSIG",
+        "GDEF",
+        "GPOS",
+        "GSUB",
+        "GlyphOrder",
+        "OS/2",
+        "cmap",
+        "glyf",
+        "head",
+        "hhea",
+        "hmtx",
+        "loca",
+        "maxp",
+        "name",
+        "post"
+      ]
+    },
+    {
+      "file": "SourceSerif4-Italic.ttf",
+      "role": "Latin italic",
+      "source": "source-serif",
+      "url": "https://raw.githubusercontent.com/adobe-fonts/source-serif/2823e993c53fca27c5c8749f529b56a5a7c77b6b/TTF/SourceSerif4-It.ttf",
+      "upstream_path": "TTF/SourceSerif4-It.ttf",
+      "upstream_file": {
+        "bytes": 187808,
+        "sha256": "9d2950a8f1da66e21502c35d646a1d2148e79f9ea43fd2158cf02f5232e7f430"
+      },
+      "conversion": null,
+      "bytes": 187808,
+      "sha256": "9d2950a8f1da66e21502c35d646a1d2148e79f9ea43fd2158cf02f5232e7f430",
+      "name_table": {
+        "0": [
+          "\u00a9 2014 - 2023 Adobe (http://www.adobe.com/), with Reserved Font Name \u2018Source\u2019."
+        ],
+        "1": [
+          "Source Serif 4"
+        ],
+        "2": [
+          "Italic"
+        ],
+        "3": [
+          "4.005;ADBO;SourceSerif4-It;ADOBE"
+        ],
+        "4": [
+          "Source Serif 4 Italic"
+        ],
+        "5": [
+          "Version 4.005;hotconv 1.1.0;makeotfexe 2.6.0"
+        ],
+        "6": [
+          "SourceSerif4-It"
+        ],
+        "13": [
+          "This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: http://scripts.sil.org/OFL. This Font Software is distributed on an \u2018AS IS\u2019 BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the SIL Open Font License for the specific language, permissions and limitations governing your use of this Font Software."
+        ],
+        "14": [
+          "http://scripts.sil.org/OFL"
+        ],
+        "16": [],
+        "17": []
+      },
+      "weight_class": 400,
+      "embedding_fsType": 0,
+      "glyphs": 1093,
+      "unicode_cmap_entries": 919,
+      "coverage_smoke_test": [
+        "U+0041",
+        "U+0061"
+      ],
+      "tables": [
+        "BASE",
+        "DSIG",
+        "GDEF",
+        "GPOS",
+        "GSUB",
+        "GlyphOrder",
+        "OS/2",
+        "cmap",
+        "glyf",
+        "head",
+        "hhea",
+        "hmtx",
+        "loca",
+        "maxp",
+        "name",
+        "post"
+      ]
+    },
+    {
+      "file": "SourceSerif4-Semibold.ttf",
+      "role": "Latin emphasis",
+      "source": "source-serif",
+      "url": "https://raw.githubusercontent.com/adobe-fonts/source-serif/2823e993c53fca27c5c8749f529b56a5a7c77b6b/TTF/SourceSerif4-Semibold.ttf",
+      "upstream_path": "TTF/SourceSerif4-Semibold.ttf",
+      "upstream_file": {
+        "bytes": 272088,
+        "sha256": "36db62940cb5728b12b1802476dc7fcf4c6c519a7bdd476ba23a4e555fc4655f"
+      },
+      "conversion": null,
+      "bytes": 272088,
+      "sha256": "36db62940cb5728b12b1802476dc7fcf4c6c519a7bdd476ba23a4e555fc4655f",
+      "name_table": {
+        "0": [
+          "\u00a9 2014 - 2023 Adobe (http://www.adobe.com/), with Reserved Font Name \u2018Source\u2019."
+        ],
+        "1": [
+          "Source Serif 4 Semibold"
+        ],
+        "2": [
+          "Regular"
+        ],
+        "3": [
+          "4.005;ADBO;SourceSerif4-Semibold;ADOBE"
+        ],
+        "4": [
+          "Source Serif 4 Semibold"
+        ],
+        "5": [
+          "Version 4.005;hotconv 1.1.0;makeotfexe 2.6.0"
+        ],
+        "6": [
+          "SourceSerif4-Semibold"
+        ],
+        "13": [
+          "This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: http://scripts.sil.org/OFL. This Font Software is distributed on an \u2018AS IS\u2019 BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the SIL Open Font License for the specific language, permissions and limitations governing your use of this Font Software."
+        ],
+        "14": [
+          "http://scripts.sil.org/OFL"
+        ],
+        "16": [
+          "Source Serif 4"
+        ],
+        "17": [
+          "Semibold"
+        ]
+      },
+      "weight_class": 600,
+      "embedding_fsType": 0,
+      "glyphs": 1464,
+      "unicode_cmap_entries": 920,
+      "coverage_smoke_test": [
+        "U+0041",
+        "U+0061"
+      ],
+      "tables": [
+        "BASE",
+        "DSIG",
+        "GDEF",
+        "GPOS",
+        "GSUB",
+        "GlyphOrder",
+        "OS/2",
+        "cmap",
+        "glyf",
+        "head",
+        "hhea",
+        "hmtx",
+        "loca",
+        "maxp",
+        "name",
+        "post"
+      ]
+    },
+    {
+      "file": "SourceCodePro-Regular.ttf",
+      "role": "Monospaced code",
+      "source": "source-code-pro",
+      "url": "https://raw.githubusercontent.com/adobe-fonts/source-code-pro/d3f1a5962cde503f9409c21e58527611d4a19ef1/TTF/SourceCodePro-Regular.ttf",
+      "upstream_path": "TTF/SourceCodePro-Regular.ttf",
+      "upstream_file": {
+        "bytes": 210312,
+        "sha256": "74bd80d3e42a08517cd7e1108ba3d86f2da29ac0f3065be95e0357956ab9db37"
+      },
+      "conversion": null,
+      "bytes": 210312,
+      "sha256": "74bd80d3e42a08517cd7e1108ba3d86f2da29ac0f3065be95e0357956ab9db37",
+      "name_table": {
+        "0": [
+          "\u00a9 2023 Adobe (http://www.adobe.com/), with Reserved Font Name \u2018Source\u2019"
+        ],
+        "1": [
+          "Source Code Pro"
+        ],
+        "2": [
+          "Regular"
+        ],
+        "3": [
+          "2.042;ADBO;SourceCodePro-Regular;ADOBE"
+        ],
+        "4": [
+          "Source Code Pro"
+        ],
+        "5": [
+          "Version 2.042;hotconv 1.1.0;makeotfexe 2.6.0"
+        ],
+        "6": [
+          "SourceCodePro-Regular"
+        ],
+        "13": [
+          "This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: http://scripts.sil.org/OFL. This Font Software is distributed on an \u2018AS IS\u2019 BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the SIL Open Font License for the specific language, permissions and limitations governing your use of this Font Software."
+        ],
+        "14": [
+          "http://scripts.sil.org/OFL"
+        ],
+        "16": [],
+        "17": []
+      },
+      "weight_class": 400,
+      "embedding_fsType": 0,
+      "glyphs": 1568,
+      "unicode_cmap_entries": 1335,
+      "coverage_smoke_test": [
+        "U+0041",
+        "U+0061",
+        "U+0030"
+      ],
+      "tables": [
+        "BASE",
+        "DSIG",
+        "GDEF",
+        "GPOS",
+        "GSUB",
+        "GlyphOrder",
+        "OS/2",
+        "cmap",
+        "cvt ",
+        "fpgm",
+        "gasp",
+        "glyf",
+        "head",
+        "hhea",
+        "hmtx",
+        "loca",
+        "maxp",
+        "name",
+        "post",
+        "prep"
+      ]
+    },
+    {
+      "file": "NotoSans-Regular.ttf",
+      "role": "Greek and Cyrillic fallback",
+      "source": "noto-fonts",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSans/NotoSans-Regular.ttf",
+      "upstream_path": "hinted/ttf/NotoSans/NotoSans-Regular.ttf",
+      "upstream_file": {
+        "bytes": 569208,
+        "sha256": "b85c38ecea8a7cfb39c24e395a4007474fa5a4fc864f6ee33309eb4948d232d5"
+      },
+      "conversion": null,
+      "bytes": 569208,
+      "sha256": "b85c38ecea8a7cfb39c24e395a4007474fa5a4fc864f6ee33309eb4948d232d5",
+      "name_table": {
+        "0": [
+          "Copyright 2015-2021 Google LLC. All Rights Reserved."
+        ],
+        "1": [
+          "Noto Sans"
+        ],
+        "2": [
+          "Regular"
+        ],
+        "3": [
+          "2.008;GOOG;NotoSans-Regular"
+        ],
+        "4": [
+          "Noto Sans Regular"
+        ],
+        "5": [
+          "Version 2.008; ttfautohint (v1.8) -l 8 -r 50 -G 200 -x 14 -D latn -f none -a qsq -X \"\""
+        ],
+        "6": [
+          "NotoSans-Regular"
+        ],
+        "13": [
+          "This Font Software is licensed under the SIL Open Font License, Version 1.1. This Font Software is distributed on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the SIL Open Font License for the specific language, permissions and limitations governing your use of this Font Software."
+        ],
+        "14": [
+          "http://scripts.sil.org/OFL"
+        ],
+        "16": [],
+        "17": []
+      },
+      "weight_class": 400,
+      "embedding_fsType": 0,
+      "glyphs": 3748,
+      "unicode_cmap_entries": 2840,
+      "coverage_smoke_test": [
+        "U+03B1",
+        "U+03A9",
+        "U+0416",
+        "U+044F"
+      ],
+      "tables": [
+        "GDEF",
+        "GPOS",
+        "GSUB",
+        "GlyphOrder",
+        "OS/2",
+        "STAT",
+        "cmap",
+        "cvt ",
+        "fpgm",
+        "gasp",
+        "glyf",
+        "head",
+        "hhea",
+        "hmtx",
+        "loca",
+        "maxp",
+        "name",
+        "post",
+        "prep"
+      ]
+    },
+    {
+      "file": "NotoSansHebrew-Regular.ttf",
+      "role": "Hebrew fallback",
+      "source": "noto-fonts",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf",
+      "upstream_path": "hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf",
+      "upstream_file": {
+        "bytes": 26900,
+        "sha256": "a7fa16fffb27bedb060a0866267c29e9859aeb9c21cc33f5b3aaf6eb062eca85"
+      },
+      "conversion": null,
+      "bytes": 26900,
+      "sha256": "a7fa16fffb27bedb060a0866267c29e9859aeb9c21cc33f5b3aaf6eb062eca85",
+      "name_table": {
+        "0": [
+          "Copyright 2019 Google Inc. All Rights Reserved."
+        ],
+        "1": [
+          "Noto Sans Hebrew"
+        ],
+        "2": [
+          "Regular"
+        ],
+        "3": [
+          "3.000;GOOG;NotoSansHebrew-Regular"
+        ],
+        "4": [
+          "Noto Sans Hebrew Regular"
+        ],
+        "5": [
+          "Version 3.000; ttfautohint (v1.8) -l 8 -r 50 -G 200 -x 14 -D hebr -f none -a qsq -X \"\""
+        ],
+        "6": [
+          "NotoSansHebrew-Regular"
+        ],
+        "13": [
+          "This Font Software is licensed under the SIL Open Font License, Version 1.1. This Font Software is distributed on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the SIL Open Font License for the specific language, permissions and limitations governing your use of this Font Software."
+        ],
+        "14": [
+          "http://scripts.sil.org/OFL"
+        ],
+        "16": [],
+        "17": []
+      },
+      "weight_class": 400,
+      "embedding_fsType": 0,
+      "glyphs": 149,
+      "unicode_cmap_entries": 145,
+      "coverage_smoke_test": [
+        "U+05D0",
+        "U+05E9"
+      ],
+      "tables": [
+        "DSIG",
+        "GDEF",
+        "GPOS",
+        "GSUB",
+        "GlyphOrder",
+        "OS/2",
+        "cmap",
+        "cvt ",
+        "fpgm",
+        "gasp",
+        "glyf",
+        "head",
+        "hhea",
+        "hmtx",
+        "loca",
+        "maxp",
+        "name",
+        "post",
+        "prep"
+      ]
+    },
+    {
+      "file": "NotoSansArabic-Regular.ttf",
+      "role": "Arabic fallback",
+      "source": "noto-fonts",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSansArabic/NotoSansArabic-Regular.ttf",
+      "upstream_path": "hinted/ttf/NotoSansArabic/NotoSansArabic-Regular.ttf",
+      "upstream_file": {
+        "bytes": 240456,
+        "sha256": "ceea25b464a656dc3b26849bab9356740401af62aedf1bfa8b7f0d9b75925b1b"
+      },
+      "conversion": null,
+      "bytes": 240456,
+      "sha256": "ceea25b464a656dc3b26849bab9356740401af62aedf1bfa8b7f0d9b75925b1b",
+      "name_table": {
+        "0": [
+          "Copyright 2015-2021 Google LLC. All Rights Reserved."
+        ],
+        "1": [
+          "Noto Sans Arabic"
+        ],
+        "2": [
+          "Regular"
+        ],
+        "3": [
+          "2.009;GOOG;NotoSansArabic-Regular"
+        ],
+        "4": [
+          "Noto Sans Arabic Regular"
+        ],
+        "5": [
+          "Version 2.009; ttfautohint (v1.8) -l 8 -r 50 -G 200 -x 14 -D arab -f none -a qsq -X \"\""
+        ],
+        "6": [
+          "NotoSansArabic-Regular"
+        ],
+        "13": [
+          "This Font Software is licensed under the SIL Open Font License, Version 1.1. This Font Software is distributed on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the SIL Open Font License for the specific language, permissions and limitations governing your use of this Font Software."
+        ],
+        "14": [
+          "http://scripts.sil.org/OFL"
+        ],
+        "16": [],
+        "17": []
+      },
+      "weight_class": 400,
+      "embedding_fsType": 0,
+      "glyphs": 1661,
+      "unicode_cmap_entries": 1161,
+      "coverage_smoke_test": [
+        "U+0627",
+        "U+0644",
+        "U+0645"
+      ],
+      "tables": [
+        "DSIG",
+        "GDEF",
+        "GPOS",
+        "GSUB",
+        "GlyphOrder",
+        "OS/2",
+        "cmap",
+        "cvt ",
+        "fpgm",
+        "gasp",
+        "glyf",
+        "head",
+        "hhea",
+        "hmtx",
+        "loca",
+        "maxp",
+        "name",
+        "post",
+        "prep"
+      ]
+    },
+    {
+      "file": "NotoSansDevanagari-Regular.ttf",
+      "role": "Devanagari fallback",
+      "source": "noto-fonts",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Regular.ttf",
+      "upstream_path": "hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Regular.ttf",
+      "upstream_file": {
+        "bytes": 219212,
+        "sha256": "385e78e6359a9d88a0f243d53b1209d7548361ba2194e2b9ec779bcaa7e8949d"
+      },
+      "conversion": null,
+      "bytes": 219212,
+      "sha256": "385e78e6359a9d88a0f243d53b1209d7548361ba2194e2b9ec779bcaa7e8949d",
+      "name_table": {
+        "0": [
+          "Copyright 2015-2022 Google Inc. All Rights Reserved."
+        ],
+        "1": [
+          "Noto Sans Devanagari"
+        ],
+        "2": [
+          "Regular"
+        ],
+        "3": [
+          "2.002;GOOG;NotoSansDevanagari-Regular"
+        ],
+        "4": [
+          "Noto Sans Devanagari Regular"
+        ],
+        "5": [
+          "Version 2.002; ttfautohint (v1.8) -l 8 -r 50 -G 200 -x 14 -D deva -f none -a qsq -X \"\""
+        ],
+        "6": [
+          "NotoSansDevanagari-Regular"
+        ],
+        "13": [
+          "This Font Software is licensed under the SIL Open Font License, Version 1.1. This Font Software is distributed on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the SIL Open Font License for the specific language, permissions and limitations governing your use of this Font Software."
+        ],
+        "14": [
+          "http://scripts.sil.org/OFL"
+        ],
+        "16": [],
+        "17": []
+      },
+      "weight_class": 400,
+      "embedding_fsType": 0,
+      "glyphs": 954,
+      "unicode_cmap_entries": 272,
+      "coverage_smoke_test": [
+        "U+0915",
+        "U+093F",
+        "U+0928"
+      ],
+      "tables": [
+        "GDEF",
+        "GPOS",
+        "GSUB",
+        "GlyphOrder",
+        "OS/2",
+        "cmap",
+        "cvt ",
+        "fpgm",
+        "gasp",
+        "glyf",
+        "head",
+        "hhea",
+        "hmtx",
+        "loca",
+        "maxp",
+        "name",
+        "post",
+        "prep"
+      ]
+    },
+    {
+      "file": "NotoSansJP-Regular.ttf",
+      "role": "Japanese fallback (upstream JP subset)",
+      "source": "noto-cjk",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/523d033d6cb47f4a80c58a35753646f5c3608a78/Sans/Variable/TTF/Subset/NotoSansJP-VF.ttf",
+      "upstream_path": "Sans/Variable/TTF/Subset/NotoSansJP-VF.ttf",
+      "upstream_file": {
+        "bytes": 9590732,
+        "sha256": "f4b373b226668ee33a6e54b02823dcd2d1209f17159f777421ae8c2275160369"
+      },
+      "conversion": {
+        "tool": "fontTools.varLib.instancer.instantiateVariableFont",
+        "fonttools_version": "4.57.0",
+        "axes": {
+          "wght": 400
+        },
+        "source_axes": {
+          "wght": {
+            "min": 100.0,
+            "default": 100.0,
+            "max": 900.0
+          }
+        },
+        "options": {
+          "inplace": true,
+          "optimize": true,
+          "updateFontNames": true,
+          "recalcTimestamp": false
+        },
+        "outline_conversion": false,
+        "subsetting": false
+      },
+      "bytes": 5767260,
+      "sha256": "1b103887faab2ab66e650311e333fbc3c945ceb0b86ea20ac3ec3071aea6895b",
+      "name_table": {
+        "0": [
+          "\u00a9 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'."
+        ],
+        "1": [
+          "Noto Sans JP"
+        ],
+        "2": [
+          "Regular"
+        ],
+        "3": [
+          "2.004;ADBO;NotoSansJP-Regular;ADOBE"
+        ],
+        "4": [
+          "Noto Sans JP",
+          "Noto Sans JP Regular"
+        ],
+        "5": [
+          "Version 2.004;hotconv 1.0.118;makeotfexe 2.5.65603"
+        ],
+        "6": [
+          "NotoSansJP-Regular"
+        ],
+        "13": [
+          "This Font Software is licensed under the SIL Open Font License, Version 1.1. This Font Software is distributed on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the SIL Open Font License for the specific language, permissions and limitations governing your use of this Font Software."
+        ],
+        "14": [
+          "http://scripts.sil.org/OFL"
+        ],
+        "16": [],
+        "17": []
+      },
+      "weight_class": 400,
+      "embedding_fsType": 0,
+      "glyphs": 17936,
+      "unicode_cmap_entries": 16732,
+      "coverage_smoke_test": [
+        "U+3042",
+        "U+30A2",
+        "U+65E5",
+        "U+672C",
+        "U+8A9E"
+      ],
+      "tables": [
+        "BASE",
+        "GDEF",
+        "GPOS",
+        "GSUB",
+        "GlyphOrder",
+        "OS/2",
+        "STAT",
+        "cmap",
+        "glyf",
+        "head",
+        "hhea",
+        "hmtx",
+        "loca",
+        "maxp",
+        "name",
+        "post",
+        "vhea",
+        "vmtx"
+      ]
+    }
+  ]
+}

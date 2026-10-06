@@ -1,0 +1,2 @@
+experiments/pdf-export/groff/logs/smoke-trap-trap-fixed.bbox.html page 1: PASS 14 body words, max yMax 755.388 pt / 266.484 mm; one centered footer
+experiments/pdf-export/groff/logs/smoke-trap-trap-fixed.bbox.html page 2: PASS 114 body words, max yMax 208.047 pt / 73.394 mm; one centered footer

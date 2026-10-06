@@ -1,0 +1,245 @@
+make  install-recursive
+make[1]: ingresso nella directory «/opt/carta-pdf-bench/groff-build-1.24.1»
+make[2]: ingresso nella directory «/opt/carta-pdf-bench/groff-build-1.24.1»
+make[3]: ingresso nella directory «/opt/carta-pdf-bench/groff-build-1.24.1»
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/bin'
+  /usr/bin/install -c grodvi post-grohtml grolbp grolj4 grops grotty pre-grohtml preconv groff addftinfo hpftodit lkbib pfbtops tfmtodit '/opt/carta-pdf-bench/groff-1.24.1/bin'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/bin'
+ /usr/bin/install -c eqn2graph gdiffmk glilypond gperl gpinyin grap2graph mmroff pic2graph gropdf pdfmom afmtodit grog '/opt/carta-pdf-bench/groff-1.24.1/bin'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/bin'
+  /usr/bin/install -c eqn grn pic refer soelim tbl troff indxbib lookbib '/opt/carta-pdf-bench/groff-1.24.1/bin'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/bin'
+ /usr/bin/install -c chem neqn nroff '/opt/carta-pdf-bench/groff-1.24.1/bin'
+make  install-exec-hook
+make[4]: ingresso nella directory «/opt/carta-pdf-bench/groff-build-1.24.1»
+make[4]: Nessuna operazione da eseguire per «install-exec-hook».
+make[4]: uscita dalla directory «/opt/carta-pdf-bench/groff-build-1.24.1»
+test -d /opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/chem/cstr-122 \
+          || /bin/bash /opt/carta-pdf-bench/groff-1.24.1/build-aux/install-sh -d /opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/chem/cstr-122;
+for i in /opt/carta-pdf-bench/groff-1.24.1/contrib/chem/examples/cstr-122/*; do \
+  n=`echo $i | sed 's|/opt/carta-pdf-bench/groff-1.24.1/contrib/chem/examples/cstr-122/||g'`; \
+  /usr/bin/install -c -m 644 $i /opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/chem/cstr-122/$n; \
+done
+test -d /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac || /bin/bash /opt/carta-pdf-bench/groff-1.24.1/build-aux/install-sh -d /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac
+test -d /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/mm || /bin/bash /opt/carta-pdf-bench/groff-1.24.1/build-aux/install-sh -d /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/mm
+rm -f /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/tmac.`if test no = yes; then for i in  ""; do case "$i" in m) echo g;; esac; done; fi`m
+rm -f /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/`if test no = yes; then for i in  ""; do case "$i" in m) echo g;; esac; done; fi`m.tmac
+/usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/contrib/mm/m.tmac \
+  /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/`if test no = yes; then for i in  ""; do case "$i" in m) echo g;; esac; done; fi`m.tmac
+LANG=C LC_ALL=C sed -e "s;^.mso m.tmac;.mso `if test no = yes; then for i in  ""; do case "$i" in m) echo g;; esac; done; fi`m.tmac;g" \
+  /opt/carta-pdf-bench/groff-1.24.1/contrib/mm/mse.tmac > /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/`if test no = yes; then for i in  ""; do case "$i" in m) echo g;; esac; done; fi`mse.tmac
+test -d /opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1 \
+  || /bin/bash /opt/carta-pdf-bench/groff-1.24.1/build-aux/install-sh -d /opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1
+for d in doc /opt/carta-pdf-bench/groff-1.24.1/doc; do \
+  if [ -f "$d"/groff.txt ]; then \
+    cp "$d"/groff.txt /opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1; \
+    break; \
+  fi; \
+done
+test -d /opt/carta-pdf-bench/groff-1.24.1/share/info \
+  || /bin/bash /opt/carta-pdf-bench/groff-1.24.1/build-aux/install-sh -d /opt/carta-pdf-bench/groff-1.24.1/share/info
+rm -f /doc/groff.info*
+for d in doc /opt/carta-pdf-bench/groff-1.24.1/doc; do \
+  if [ -f "$d"/groff.info ]; then \
+    cp "$d"/groff.info* /opt/carta-pdf-bench/groff-1.24.1/share/info; \
+    : --info-file="$d"/groff.info \
+      --info-dir=/opt/carta-pdf-bench/groff-1.24.1/share/info; \
+    break; \
+  fi; \
+done
+test yes != no || /bin/bash /opt/carta-pdf-bench/groff-1.24.1/build-aux/install-sh -d /opt/carta-pdf-bench/groff-1.24.1/lib
+if test -f /opt/carta-pdf-bench/groff-1.24.1/lib/charset.alias; then \
+  sed -f ref-add.sed /opt/carta-pdf-bench/groff-1.24.1/lib/charset.alias \
+    > /opt/carta-pdf-bench/groff-1.24.1/lib/t-charset.alias; \
+  /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/lib/t-charset.alias \
+    /opt/carta-pdf-bench/groff-1.24.1/lib/charset.alias; \
+  rm -f /opt/carta-pdf-bench/groff-1.24.1/lib/t-charset.alias; \
+else \
+  if test yes = no && grep -q '^[^#]' charset.alias; then \
+    sed -f ref-add.sed charset.alias \
+      > /opt/carta-pdf-bench/groff-1.24.1/lib/t-charset.alias; \
+    /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/lib/t-charset.alias \
+      /opt/carta-pdf-bench/groff-1.24.1/lib/charset.alias; \
+    rm -f /opt/carta-pdf-bench/groff-1.24.1/lib/t-charset.alias; \
+  fi; \
+fi
+test -d /opt/carta-pdf-bench/groff-1.24.1/share \
+  || /bin/bash /opt/carta-pdf-bench/groff-1.24.1/build-aux/install-sh -d /opt/carta-pdf-bench/groff-1.24.1/share
+test -d /opt/carta-pdf-bench/groff-1.24.1/share/groff \
+  || /bin/bash /opt/carta-pdf-bench/groff-1.24.1/build-aux/install-sh -d /opt/carta-pdf-bench/groff-1.24.1/share/groff
+test -d /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1 \
+  || /bin/bash /opt/carta-pdf-bench/groff-1.24.1/build-aux/install-sh -d /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1
+if test -f /usr/lib/eign; then \
+  rm -f /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/eign; \
+  ln -s /usr/lib/eign /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/eign 2>/dev/null \
+    || ln /usr/lib/eign /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/eign 2>/dev/null \
+    || cp /usr/lib/eign /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/eign; \
+else \
+  rm -f /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/eign; \
+  /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/src/utils/indxbib/eign /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/eign; \
+fi
+/usr/bin/mkdir -p /opt/carta-pdf-bench/groff-1.24.1/lib/groff/site-tmac;
+if test "no" != "no"; then \
+  if test -n ""; then \
+    for m in ""; do \
+      /usr/bin/install -c -m 644 tmac/$m-wrap \
+        /opt/carta-pdf-bench/groff-1.24.1/lib/groff/site-tmac/$m`if test no = manual; then echo "-os"; fi`.tmac; \
+    done; \
+  fi; \
+fi
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devascii'
+ /usr/bin/install -c -m 644 font/devascii/R font/devascii/I font/devascii/B font/devascii/BI font/devascii/DESC '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devascii'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devdvi'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/TR /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/TI /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/TB /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/TBI /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/CW /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/CWI /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/HR /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/HI /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/HB /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/HBI /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/TREC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/TIEC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/TBEC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/TBIEC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/CWEC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/CWIEC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/HREC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/HIEC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/HBEC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/HBIEC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/TRTC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/TITC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/TBTC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/TBITC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/CWTC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/CWITC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/HRTC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/HITC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/HBTC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/HBITC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/MI /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/S /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/EX /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/SA /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/SB /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/SC /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/CSH /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/CSS /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/CTH /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/CTS '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devdvi'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/JPG /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/JPM /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/KOG /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/KOM font/devdvi/DESC '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devdvi'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devdvi/generate'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/generate/Makefile /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/generate/msam.map /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/generate/msbm.map /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/generate/texb.map /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/generate/texex.map /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/generate/texi.map /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/generate/texmi.map /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/generate/texr.map /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/generate/texsy.map /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/generate/textt.map /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/generate/textex.map /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/generate/ec.map /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/generate/tc.map /opt/carta-pdf-bench/groff-1.24.1/font/devdvi/generate/CompileFonts '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devdvi/generate'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devhtml'
+ /usr/bin/install -c -m 644 font/devhtml/R font/devhtml/I font/devhtml/B font/devhtml/BI font/devhtml/CR font/devhtml/CI font/devhtml/CB font/devhtml/CBI font/devhtml/S /opt/carta-pdf-bench/groff-1.24.1/font/devhtml/CSH /opt/carta-pdf-bench/groff-1.24.1/font/devhtml/CSS /opt/carta-pdf-bench/groff-1.24.1/font/devhtml/CTH /opt/carta-pdf-bench/groff-1.24.1/font/devhtml/CTS /opt/carta-pdf-bench/groff-1.24.1/font/devhtml/JPG /opt/carta-pdf-bench/groff-1.24.1/font/devhtml/JPM /opt/carta-pdf-bench/groff-1.24.1/font/devhtml/KOG /opt/carta-pdf-bench/groff-1.24.1/font/devhtml/KOM font/devhtml/DESC '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devhtml'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devlatin1'
+ /usr/bin/install -c -m 644 font/devlatin1/R font/devlatin1/I font/devlatin1/B font/devlatin1/BI font/devlatin1/DESC '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devlatin1'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devlbp'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/HB /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/HBI /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/HI /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/HR /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/HNB /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/HNBI /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/HNI /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/HNR /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/TB /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/TBI /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/TI /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/TR /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/CR /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/CB /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/CI /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/ER /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/EB /opt/carta-pdf-bench/groff-1.24.1/font/devlbp/EI font/devlbp/DESC '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devlbp'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf'
+ /usr/bin/install -c -m 644 font/devpdf/S font/devpdf/ZD font/devpdf/CB font/devpdf/CBI font/devpdf/CI font/devpdf/CR font/devpdf/HB font/devpdf/HBI font/devpdf/HI font/devpdf/HR font/devpdf/TB font/devpdf/TBI font/devpdf/TI font/devpdf/TR font/devpdf/EURO font/devpdf/AB font/devpdf/ABI font/devpdf/AI font/devpdf/AR font/devpdf/BMB font/devpdf/BMBI font/devpdf/BMI font/devpdf/BMR font/devpdf/HNB font/devpdf/HNBI font/devpdf/HNI font/devpdf/HNR font/devpdf/NB font/devpdf/NBI font/devpdf/NI font/devpdf/NR font/devpdf/PB font/devpdf/PBI font/devpdf/PI font/devpdf/PR font/devpdf/ZCMI font/devpdf/U-S font/devpdf/U-ZD font/devpdf/U-ZCMI font/devpdf/U-AB '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf'
+ /usr/bin/install -c -m 644 font/devpdf/U-ABI font/devpdf/U-AI font/devpdf/U-AR font/devpdf/U-BMB font/devpdf/U-BMBI font/devpdf/U-BMI font/devpdf/U-BMR font/devpdf/U-CB font/devpdf/U-CBI font/devpdf/U-CI font/devpdf/U-CR font/devpdf/U-HB font/devpdf/U-HBI font/devpdf/U-HI font/devpdf/U-HR font/devpdf/U-HNB font/devpdf/U-HNBI font/devpdf/U-HNI font/devpdf/U-HNR font/devpdf/U-NB font/devpdf/U-NBI font/devpdf/U-NI font/devpdf/U-NR font/devpdf/U-PB font/devpdf/U-PBI font/devpdf/U-PI font/devpdf/U-PR font/devpdf/U-TB font/devpdf/U-TBI font/devpdf/U-TI font/devpdf/U-TR font/devpdf/DESC font/devpdf/SS font/devpdf/symbolsl.afm font/devpdf/symbolsl.pfb font/devpdf/download font/devpdf/Foundry '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/enc'
+ /usr/bin/install -c -m 644 font/devpdf/enc/text.enc '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/enc'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/map'
+ /usr/bin/install -c -m 644 font/devpdf/map/dingbats.map font/devpdf/map/symbol.map font/devpdf/map/text.map '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devpdf/map'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devutf8'
+ /usr/bin/install -c -m 644 font/devutf8/R font/devutf8/I font/devutf8/B font/devutf8/BI /opt/carta-pdf-bench/groff-1.24.1/font/devutf8/CSH /opt/carta-pdf-bench/groff-1.24.1/font/devutf8/CSS /opt/carta-pdf-bench/groff-1.24.1/font/devutf8/CTH /opt/carta-pdf-bench/groff-1.24.1/font/devutf8/CTS /opt/carta-pdf-bench/groff-1.24.1/font/devutf8/JPG /opt/carta-pdf-bench/groff-1.24.1/font/devutf8/JPM /opt/carta-pdf-bench/groff-1.24.1/font/devutf8/KOG /opt/carta-pdf-bench/groff-1.24.1/font/devutf8/KOM font/devutf8/DESC '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devutf8'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/chem'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/contrib/chem/examples/README /opt/carta-pdf-bench/groff-1.24.1/contrib/chem/examples/atp.chem /opt/carta-pdf-bench/groff-1.24.1/contrib/chem/examples/cholesterol.chem /opt/carta-pdf-bench/groff-1.24.1/contrib/chem/examples/ethamivan.chem /opt/carta-pdf-bench/groff-1.24.1/contrib/chem/examples/lsd.chem /opt/carta-pdf-bench/groff-1.24.1/contrib/chem/examples/mepacrine.chem /opt/carta-pdf-bench/groff-1.24.1/contrib/chem/examples/morphine.chem /opt/carta-pdf-bench/groff-1.24.1/contrib/chem/examples/penicillin.chem /opt/carta-pdf-bench/groff-1.24.1/contrib/chem/examples/reserpine.chem '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/chem'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/contrib/chem/chem.pic '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devlj4'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/AB /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/ABI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/AI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/AR /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/ALBB /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/ALBR /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/AOB /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/AOI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/AOR /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/CB /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/CBI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/CI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/CR /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/GB /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/GBI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/GI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/GR /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/LGB /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/LGI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/LGR /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/OB /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/OBI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/OI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/OR /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/TB /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/TBI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/TI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/TR /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/TNRB /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/TNRBI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/TNRI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/TNRR /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/UB /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/UBI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/UI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/UR /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/UCB /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/UCBI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/UCI /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/UCR '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devlj4'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/CLARENDON /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/CORONET /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/MARIGOLD /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/S /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/SYMBOL /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/WINGDINGS '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devlj4'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devlj4/generate'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/generate/Makefile /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/generate/special.map /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/generate/symbol.map /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/generate/text.map /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/generate/wingdings.map /opt/carta-pdf-bench/groff-1.24.1/font/devlj4/generate/special.awk '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devlj4/generate'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devps'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/font/devps/S /opt/carta-pdf-bench/groff-1.24.1/font/devps/SS /opt/carta-pdf-bench/groff-1.24.1/font/devps/ZD /opt/carta-pdf-bench/groff-1.24.1/font/devps/ZDR /opt/carta-pdf-bench/groff-1.24.1/font/devps/ZCMI /opt/carta-pdf-bench/groff-1.24.1/font/devps/AB /opt/carta-pdf-bench/groff-1.24.1/font/devps/ABI /opt/carta-pdf-bench/groff-1.24.1/font/devps/AI /opt/carta-pdf-bench/groff-1.24.1/font/devps/AR /opt/carta-pdf-bench/groff-1.24.1/font/devps/BMB /opt/carta-pdf-bench/groff-1.24.1/font/devps/BMBI /opt/carta-pdf-bench/groff-1.24.1/font/devps/BMI /opt/carta-pdf-bench/groff-1.24.1/font/devps/BMR /opt/carta-pdf-bench/groff-1.24.1/font/devps/CB /opt/carta-pdf-bench/groff-1.24.1/font/devps/CBI /opt/carta-pdf-bench/groff-1.24.1/font/devps/CI /opt/carta-pdf-bench/groff-1.24.1/font/devps/CR /opt/carta-pdf-bench/groff-1.24.1/font/devps/HB /opt/carta-pdf-bench/groff-1.24.1/font/devps/HBI /opt/carta-pdf-bench/groff-1.24.1/font/devps/HI /opt/carta-pdf-bench/groff-1.24.1/font/devps/HR /opt/carta-pdf-bench/groff-1.24.1/font/devps/HNB /opt/carta-pdf-bench/groff-1.24.1/font/devps/HNBI /opt/carta-pdf-bench/groff-1.24.1/font/devps/HNI /opt/carta-pdf-bench/groff-1.24.1/font/devps/HNR /opt/carta-pdf-bench/groff-1.24.1/font/devps/NB /opt/carta-pdf-bench/groff-1.24.1/font/devps/NBI /opt/carta-pdf-bench/groff-1.24.1/font/devps/NI /opt/carta-pdf-bench/groff-1.24.1/font/devps/NR /opt/carta-pdf-bench/groff-1.24.1/font/devps/PB /opt/carta-pdf-bench/groff-1.24.1/font/devps/PBI /opt/carta-pdf-bench/groff-1.24.1/font/devps/PI /opt/carta-pdf-bench/groff-1.24.1/font/devps/PR /opt/carta-pdf-bench/groff-1.24.1/font/devps/TB /opt/carta-pdf-bench/groff-1.24.1/font/devps/TBI /opt/carta-pdf-bench/groff-1.24.1/font/devps/TI /opt/carta-pdf-bench/groff-1.24.1/font/devps/TR /opt/carta-pdf-bench/groff-1.24.1/font/devps/EURO /opt/carta-pdf-bench/groff-1.24.1/font/devps/CSH /opt/carta-pdf-bench/groff-1.24.1/font/devps/CSS '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devps'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/font/devps/CTH /opt/carta-pdf-bench/groff-1.24.1/font/devps/CTS /opt/carta-pdf-bench/groff-1.24.1/font/devps/JPG /opt/carta-pdf-bench/groff-1.24.1/font/devps/JPM /opt/carta-pdf-bench/groff-1.24.1/font/devps/KOG /opt/carta-pdf-bench/groff-1.24.1/font/devps/KOM /opt/carta-pdf-bench/groff-1.24.1/font/devps/freeeuro.afm /opt/carta-pdf-bench/groff-1.24.1/font/devps/symbolsl.afm /opt/carta-pdf-bench/groff-1.24.1/font/devps/text.enc /opt/carta-pdf-bench/groff-1.24.1/font/devps/zapfdr.afm /opt/carta-pdf-bench/groff-1.24.1/font/devps/download '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devps'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devps/generate'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/font/devps/generate/Makefile /opt/carta-pdf-bench/groff-1.24.1/font/devps/generate/dingbats.map /opt/carta-pdf-bench/groff-1.24.1/font/devps/generate/dingbats-reversed.map /opt/carta-pdf-bench/groff-1.24.1/font/devps/generate/slanted-symbol.map /opt/carta-pdf-bench/groff-1.24.1/font/devps/generate/symbol.map /opt/carta-pdf-bench/groff-1.24.1/font/devps/generate/symbolsl.awk /opt/carta-pdf-bench/groff-1.24.1/font/devps/generate/text.map /opt/carta-pdf-bench/groff-1.24.1/font/devps/generate/afmname /opt/carta-pdf-bench/groff-1.24.1/font/devps/generate/symbol.sed '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devps/generate'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/doc/webpage.ms /opt/carta-pdf-bench/groff-1.24.1/doc/groff.css /opt/carta-pdf-bench/groff-1.24.1/doc/grnexmpl.g /opt/carta-pdf-bench/groff-1.24.1/doc/grnexmpl.me '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/tmac/eqnrc '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/tmac/dvi.tmac '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/tmac/lbp.tmac '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/tmac/lj4.tmac '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/tmac/pdf.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/pdfpic.tmac '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/tmac/europs.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/ps.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/psatk.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/psfig.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/psold.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/pspic.tmac '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/tmac/tty.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/tty-char.tmac '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/hdtbl'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/contrib/hdtbl/examples/common.roff /opt/carta-pdf-bench/groff-1.24.1/contrib/hdtbl/examples/chess_board.roff /opt/carta-pdf-bench/groff-1.24.1/contrib/hdtbl/examples/color_boxes.roff /opt/carta-pdf-bench/groff-1.24.1/contrib/hdtbl/examples/color_nested_tables.roff /opt/carta-pdf-bench/groff-1.24.1/contrib/hdtbl/examples/color_table_cells.roff /opt/carta-pdf-bench/groff-1.24.1/contrib/hdtbl/examples/color_transitions.roff /opt/carta-pdf-bench/groff-1.24.1/contrib/hdtbl/examples/col_rowspan_colors.roff /opt/carta-pdf-bench/groff-1.24.1/contrib/hdtbl/examples/mixed_pickles.roff /opt/carta-pdf-bench/groff-1.24.1/contrib/hdtbl/examples/rainbow.roff /opt/carta-pdf-bench/groff-1.24.1/contrib/hdtbl/examples/short_reference.roff '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/hdtbl'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/contrib/hdtbl/hdtbl.tmac /opt/carta-pdf-bench/groff-1.24.1/contrib/hdtbl/hdmisc.tmac '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/contrib/install-font/install-font.bash '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/tmac/man.local /opt/carta-pdf-bench/groff-1.24.1/tmac/mdoc.local '/opt/carta-pdf-bench/groff-1.24.1/share/groff/site-tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/mdoc'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/tmac/mdoc/doc-common /opt/carta-pdf-bench/groff-1.24.1/tmac/mdoc/doc-ditroff /opt/carta-pdf-bench/groff-1.24.1/tmac/mdoc/doc-nroff /opt/carta-pdf-bench/groff-1.24.1/tmac/mdoc/doc-syms '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/mdoc'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/mm'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/contrib/mm/mm/0.MT /opt/carta-pdf-bench/groff-1.24.1/contrib/mm/mm/5.MT /opt/carta-pdf-bench/groff-1.24.1/contrib/mm/mm/4.MT /opt/carta-pdf-bench/groff-1.24.1/contrib/mm/mm/ms.cov /opt/carta-pdf-bench/groff-1.24.1/contrib/mm/mm/se_ms.cov '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/mm'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/mm'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/contrib/mm/examples/letter.mm /opt/carta-pdf-bench/groff-1.24.1/contrib/mm/examples/memorandum.mm /opt/carta-pdf-bench/groff-1.24.1/contrib/mm/examples/story.mm '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/mm'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/mom'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/examples/letter.mom /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/examples/mom-pdf.mom /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/examples/mon_premier_doc.mom /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/examples/sample_docs.mom /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/examples/typesetting.mom /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/examples/README.txt /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/examples/README-fr.txt /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/examples/elvis_syntax /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/examples/elvis_syntax.new /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/examples/penguin.ps /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/examples/penguin.pdf /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/examples/mom.vim /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/examples/slide-demo.mom /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/examples/copyright-default.mom /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/examples/copyright-chapter.mom '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/mom'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/mom.tmac /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/om.tmac '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/oldfont/devps'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/S /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/SS /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/CB /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/CBI /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/CI /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/CR /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/HB /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/HBI /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/HI /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/HR /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/HNB /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/HNBI /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/HNI /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/HNR /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/NB /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/NBI /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/NI /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/NR /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/PB /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/PBI /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/PI /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/PR /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/TB /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/TBI /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/TI /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/TR /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/symbol.afm /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/symbolsl.afm /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/zapfdr.afm /opt/carta-pdf-bench/groff-1.24.1/font/devps/old/zapfdr.ps '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/oldfont/devps'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/doc/me-revisions /opt/carta-pdf-bench/groff-1.24.1/doc/pic.ms '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/tmac/pic.tmac '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/tmac/html.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/html-end.tmac '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/tmac/refer.tmac '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/contrib/rfc1345/rfc1345.tmac '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/contrib/sboxes/sboxes.tmac '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/tmac/man.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/mandoc.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/andoc.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/an-ext.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/ms.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/e.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/me.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/doc-old.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/doc.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/mdoc.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/papersize.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/62bit.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/ec.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/trace.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/ptx.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/latin1.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/latin2.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/latin5.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/latin9.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/koi8-r.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/X.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/Xps.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/devtag.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/composite.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/fallbacks.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/refer-me.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/refer-ms.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/troffrc /opt/carta-pdf-bench/groff-1.24.1/tmac/troffrc-end /opt/carta-pdf-bench/groff-1.24.1/tmac/trans.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/en.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/hyphen.en /opt/carta-pdf-bench/groff-1.24.1/tmac/hyphenex.en /opt/carta-pdf-bench/groff-1.24.1/tmac/es.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/hyphen.es /opt/carta-pdf-bench/groff-1.24.1/tmac/fr.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/hyphen.fr /opt/carta-pdf-bench/groff-1.24.1/tmac/it.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/hyphen.it /opt/carta-pdf-bench/groff-1.24.1/tmac/pl.tmac '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/tmac/hyphen.pl /opt/carta-pdf-bench/groff-1.24.1/tmac/ru.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/hyphen.ru /opt/carta-pdf-bench/groff-1.24.1/tmac/sv.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/hyphen.sv /opt/carta-pdf-bench/groff-1.24.1/tmac/de.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/den.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/hyphen.det /opt/carta-pdf-bench/groff-1.24.1/tmac/hyphen.den /opt/carta-pdf-bench/groff-1.24.1/tmac/cs.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/hyphen.cs /opt/carta-pdf-bench/groff-1.24.1/tmac/hyphenex.cs /opt/carta-pdf-bench/groff-1.24.1/tmac/ja.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/zh.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/an.tmac /opt/carta-pdf-bench/groff-1.24.1/tmac/s.tmac '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/contrib/mm/refer-mm.tmac '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/man/man1'
+ /usr/bin/install -c -m 644 contrib/chem/chem.1 contrib/eqn2graph/eqn2graph.1 contrib/gdiffmk/gdiffmk.1 contrib/glilypond/glilypond.1 contrib/gperl/gperl.1 contrib/gpinyin/gpinyin.1 contrib/grap2graph/grap2graph.1 contrib/mm/mmroff.1 contrib/pic2graph/pic2graph.1 src/devices/grodvi/grodvi.1 src/devices/grohtml/grohtml.1 src/devices/grolbp/grolbp.1 src/devices/grolj4/grolj4.1 src/devices/gropdf/gropdf.1 src/devices/gropdf/pdfmom.1 src/devices/grops/grops.1 src/devices/grotty/grotty.1 src/preproc/preconv/preconv.1 src/roff/groff/groff.1 src/utils/addftinfo/addftinfo.1 src/utils/afmtodit/afmtodit.1 src/utils/grog/grog.1 src/utils/hpftodit/hpftodit.1 src/utils/lkbib/lkbib.1 src/utils/pfbtops/pfbtops.1 src/utils/tfmtodit/tfmtodit.1 src/preproc/eqn/eqn.1 src/preproc/eqn/neqn.1 src/preproc/grn/grn.1 src/preproc/pic/pic.1 src/preproc/refer/refer.1 src/preproc/soelim/soelim.1 src/preproc/tbl/tbl.1 src/roff/nroff/nroff.1 src/roff/troff/troff.1 src/utils/indxbib/indxbib.1 src/utils/lookbib/lookbib.1 '/opt/carta-pdf-bench/groff-1.24.1/share/man/man1'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/man/man5'
+ /usr/bin/install -c -m 644 man/groff_font.5 man/groff_out.5 man/groff_tmac.5 '/opt/carta-pdf-bench/groff-1.24.1/share/man/man5'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/man/man7'
+ /usr/bin/install -c -m 644 contrib/hdtbl/groff_hdtbl.7 contrib/mm/groff_mm.7 contrib/mm/groff_mmse.7 contrib/mom/groff_mom.7 contrib/rfc1345/groff_rfc1345.7 man/groff_char.7 man/groff_diff.7 man/groff.7 man/roff.7 tmac/groff_ms.7 tmac/groff_man.7 tmac/groff_man_style.7 tmac/groff_me.7 tmac/groff_mdoc.7 tmac/groff_trace.7 tmac/groff_www.7 '/opt/carta-pdf-bench/groff-1.24.1/share/man/man7'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/html/mom'
+ /usr/bin/install -c -m 644 /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/stylesheet.css /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/appendices.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/color.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/cover.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/definitions.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/docelement.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/docprocessing.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/goodies.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/graphical.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/headfootpage.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/images.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/inlines.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/intro.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/letters.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/macrolist.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/rectoverso.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/refer.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/reserved.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/tables-of-contents.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/toc.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/typesetting.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/using.html /opt/carta-pdf-bench/groff-1.24.1/contrib/mom/momdoc/version-2.html '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/html/mom'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devlj4'
+ /usr/bin/install -c -m 644 font/devlj4/DESC '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devlj4'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devps'
+ /usr/bin/install -c -m 644 font/devps/DESC font/devps/prologue font/devps/freeeuro.pfa font/devps/zapfdr.pfa font/devps/symbolsl.pfa '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/font/devps'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples'
+ /usr/bin/install -c -m 644 doc/webpage.ps doc/grnexmpl.ps '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/pdf'
+ /usr/bin/install -c -m 644 doc/automake.pdf doc/groff-man-pages.pdf '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/pdf'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/hdtbl'
+ /usr/bin/install -c -m 644 contrib/hdtbl/examples/fonts_n.roff contrib/hdtbl/examples/fonts_x.roff contrib/hdtbl/examples/chess_board.ps contrib/hdtbl/examples/color_boxes.ps contrib/hdtbl/examples/color_nested_tables.ps contrib/hdtbl/examples/color_table_cells.ps contrib/hdtbl/examples/color_transitions.ps contrib/hdtbl/examples/col_rowspan_colors.ps contrib/hdtbl/examples/fonts_n.ps contrib/hdtbl/examples/fonts_x.ps contrib/hdtbl/examples/mixed_pickles.ps contrib/hdtbl/examples/rainbow.ps contrib/hdtbl/examples/short_reference.ps /opt/carta-pdf-bench/groff-1.24.1/doc/gnu.eps '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/hdtbl'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/mom'
+ /usr/bin/install -c -m 644 contrib/mom/examples/letter.pdf contrib/mom/examples/mom-pdf.pdf contrib/mom/examples/mon_premier_doc.pdf contrib/mom/examples/sample_docs.pdf contrib/mom/examples/slide-demo.pdf contrib/mom/examples/copyright-default.pdf contrib/mom/examples/copyright-chapter.pdf contrib/mom/examples/typesetting.pdf '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/mom'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1'
+ /usr/bin/install -c -m 644 doc/meref.ps doc/meintro.ps doc/meintro_fr.ps doc/ms.ps doc/pic.ps doc/groff-man-pages.utf8.txt doc/meintro.me doc/meintro_fr.me doc/meref.me doc/ms.ms '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1'
+ /usr/bin/install -c -m 644 contrib/sboxes/msboxes.ms '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/pdf'
+ /usr/bin/install -c -m 644 contrib/sboxes/msboxes.pdf '/opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/pdf'
+ /usr/bin/mkdir -p '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+ /usr/bin/install -c -m 644 tmac/www.tmac '/opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac'
+make  install-data-hook
+make[4]: ingresso nella directory «/opt/carta-pdf-bench/groff-build-1.24.1»
+for f in mom-pdf.pdf; do \
+  rm -f /opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/pdf/$f; \
+  ln -s /opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/mom/$f /opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/pdf/$f; \
+done
+for d in doc /opt/carta-pdf-bench/groff-1.24.1/doc; do \
+  if test -f "$d/gnu.eps"; then \
+    rm -f /opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/gnu.eps; \
+    /usr/bin/install -c -m 644 \
+      $d/gnu.eps /opt/carta-pdf-bench/groff-1.24.1/share/doc/groff-1.24.1/examples/gnu.eps; \
+    break; \
+  fi; \
+done
+if test "no" = "yes"; then \
+  if test -n ""; then \
+    if test -f /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/s.tmac -a -n "`if test no = yes; then for i in  ""; do case "$i" in s) echo g;; esac; done; fi`"; \
+    then \
+      mv /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/s.tmac \
+         /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/`if test no = yes; then for i in  ""; do case "$i" in s) echo g;; esac; done; fi`s.tmac; \
+    fi; \
+    if test -f /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/an.tmac -a -n "`if test no = yes; then for i in  ""; do case "$i" in an) echo g;; esac; done; fi`"; \
+    then \
+      mv /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/an.tmac \
+         /opt/carta-pdf-bench/groff-1.24.1/share/groff/1.24.1/tmac/`if test no = yes; then for i in  ""; do case "$i" in an) echo g;; esac; done; fi`an.tmac; \
+    fi; \
+  fi; \
+fi
+cd /opt/carta-pdf-bench/groff-1.24.1/share/groff; \
+  rm -f current; \
+  ln -s 1.24.1 current
+test -d /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font \
+  || /bin/bash /opt/carta-pdf-bench/groff-1.24.1/build-aux/install-sh -d /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font
+test -d /opt/carta-pdf-bench/groff-1.24.1/lib/groff/site-tmac \
+  || /bin/bash /opt/carta-pdf-bench/groff-1.24.1/build-aux/install-sh -d /opt/carta-pdf-bench/groff-1.24.1/lib/groff/site-tmac
+make[4]: uscita dalla directory «/opt/carta-pdf-bench/groff-build-1.24.1»
+make[3]: uscita dalla directory «/opt/carta-pdf-bench/groff-build-1.24.1»
+make[2]: uscita dalla directory «/opt/carta-pdf-bench/groff-build-1.24.1»
+make[1]: uscita dalla directory «/opt/carta-pdf-bench/groff-build-1.24.1»

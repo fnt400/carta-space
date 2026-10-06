@@ -1,0 +1,3 @@
+experiments/pdf-export/results/groff-unicode.raw.txt: U+039A U+03B1 U+03BB U+03B7 U+00B5 U+03AD U+03C1 U+03B1 U+0020 U+03BA U+03CC U+03C3 U+00B5 U+03B5 U+000A
+experiments/pdf-export/results/groff-unicode-explicit.raw.txt: U+039A U+03B1 U+03BB U+03B7 U+03BC U+03AD U+03C1 U+03B1 U+0020 U+03BA U+03CC U+03C3 U+03BC U+03B5 U+000A
+experiments/pdf-export/results/groff-unicode-fallback.raw.txt: U+039A U+03B1 U+03BB U+03B7 U+00B5 U+03AD U+03C1 U+03B1 U+0020 U+03BA U+03CC U+03C3 U+00B5 U+03B5 U+000A

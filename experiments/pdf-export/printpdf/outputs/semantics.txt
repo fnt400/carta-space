@@ -1,0 +1,22 @@
+Carta Classic Heading One
+Plain text with italic emphasis and semibold importance and inline_code().
+
+
+Heading Two
+A second paragraph. Black, left aligned, with no automatic numbering.
+
+Heading Three
+   Quoted text inside a block quotation.
+
+  • First unordered item
+  • Second unordered item
+
+ 1. First ordered item
+ 2. Second ordered item
+
+fn main() {
+    println!("preserve indentation");
+}
+
+A semantic link
+

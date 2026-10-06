@@ -1,0 +1,322 @@
+[
+  {
+    "file": "groff-unicode.layout.txt",
+    "checks": [
+      {
+        "input": "Perché l'estate è già finita — «Davvero?» Costa 10 €.",
+        "exact_substring_present": false
+      },
+      {
+        "input": "Příliš žluťoučký kůň",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Zażółć gęślą jaźń",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Știință și țară",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Καλημέρα κόσμε",
+        "exact_substring_present": false
+      },
+      {
+        "input": "Добрый день",
+        "exact_substring_present": true
+      },
+      {
+        "input": "é",
+        "exact_substring_present": true
+      },
+      {
+        "input": "é",
+        "exact_substring_present": true
+      },
+      {
+        "input": "שלום עולם",
+        "exact_substring_present": false
+      },
+      {
+        "input": "مرحبا بالعالم",
+        "exact_substring_present": false
+      },
+      {
+        "input": "नमस्ते दुनिया",
+        "exact_substring_present": false
+      },
+      {
+        "input": "こんにちは世界",
+        "exact_substring_present": false
+      },
+      {
+        "input": "Italiano 日本語 Ελληνικά العربية हिन्दी",
+        "exact_substring_present": false
+      }
+    ],
+    "cleaned_extraction": "Unicode: copertura, ordine e shaping Italiano e lingue europee Perché l’estate è già finita — «Davvero?» Costa 10 €. Příliš žluťoučký kůň Zażółć gęślą jaźń Știință și țară Greco e cirillico Καληµέρα κόσµε Добрый день Precomposto e combinante Precomposto: é. Decomposto: é. Confronto: é é é é. Legature: fi fl ffi ffl; ufficio affitto difficile flessibile. Ebraico e arabo Devanagari e giapponese Fallback nello stesso paragrafo Italiano Ελληνικά 1"
+  },
+  {
+    "file": "groff-unicode-explicit.layout.txt",
+    "checks": [
+      {
+        "input": "Perché l'estate è già finita — «Davvero?» Costa 10 €.",
+        "exact_substring_present": false
+      },
+      {
+        "input": "Příliš žluťoučký kůň",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Zażółć gęślą jaźń",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Știință și țară",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Καλημέρα κόσμε",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Добрый день",
+        "exact_substring_present": true
+      },
+      {
+        "input": "é",
+        "exact_substring_present": true
+      },
+      {
+        "input": "é",
+        "exact_substring_present": true
+      },
+      {
+        "input": "שלום עולם",
+        "exact_substring_present": false
+      },
+      {
+        "input": "مرحبا بالعالم",
+        "exact_substring_present": false
+      },
+      {
+        "input": "नमस्ते दुनिया",
+        "exact_substring_present": true
+      },
+      {
+        "input": "こんにちは世界",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Italiano 日本語 Ελληνικά العربية हिन्दी",
+        "exact_substring_present": false
+      }
+    ],
+    "cleaned_extraction": "Unicode: copertura, ordine e shaping Italiano e lingue europee Perché l’estate è già finita — «Davvero?» Costa 10 €. Příliš žluťoučký kůň Zażółć gęślą jaźń Știință și țară Greco e cirillico Καλημέρα κόσμε Добрый день Precomposto e combinante Precomposto: é. Decomposto: é. Confronto: é é é é. Legature: fi fl ffi ffl; ufficio affitto difficile flessibile. Ebraico e arabo םלוע םולש ملاعلاب ابحرم Devanagari e giapponese नमस्ते दुनिया こんにちは世界 Fallback nello stesso paragrafo Italiano 本語 Ελληνικά ةيبرعلاहिन्दी 1"
+  },
+  {
+    "file": "groff-unicode-fallback.layout.txt",
+    "checks": [
+      {
+        "input": "Perché l'estate è già finita — «Davvero?» Costa 10 €.",
+        "exact_substring_present": false
+      },
+      {
+        "input": "Příliš žluťoučký kůň",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Zażółć gęślą jaźń",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Știință și țară",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Καλημέρα κόσμε",
+        "exact_substring_present": false
+      },
+      {
+        "input": "Добрый день",
+        "exact_substring_present": true
+      },
+      {
+        "input": "é",
+        "exact_substring_present": true
+      },
+      {
+        "input": "é",
+        "exact_substring_present": true
+      },
+      {
+        "input": "שלום עולם",
+        "exact_substring_present": false
+      },
+      {
+        "input": "مرحبا بالعالم",
+        "exact_substring_present": false
+      },
+      {
+        "input": "नमस्ते दुनिया",
+        "exact_substring_present": true
+      },
+      {
+        "input": "こんにちは世界",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Italiano 日本語 Ελληνικά العربية हिन्दी",
+        "exact_substring_present": false
+      }
+    ],
+    "cleaned_extraction": "Unicode: copertura, ordine e shaping Italiano e lingue europee Perché l’estate è già finita — «Davvero?» Costa 10 €. Příliš žluťoučký kůň Zażółć gęślą jaźń Știință și țară Greco e cirillico Καληµέρα κόσµε Добрый день Precomposto e combinante Precomposto: é. Decomposto: é. Confronto: é é é é. Legature: fi fl ffi ffl; ufficio affitto difficile flessibile. Ebraico e arabo םלוע םולש ملاعلاب ابحرم Devanagari e giapponese नमस्ते दुनिया こんにちは世界 Fallback nello stesso paragrafo Italiano 本語 Ελληνικά ةيبرعلاहिन्दी 1"
+  },
+  {
+    "file": "groff-perf-1.layout.txt",
+    "expected_paragraphs": 5,
+    "extracted_paragraph_starts": 5
+  },
+  {
+    "file": "groff-perf-10.layout.txt",
+    "expected_paragraphs": 50,
+    "extracted_paragraph_starts": 50
+  },
+  {
+    "file": "groff-perf-100.layout.txt",
+    "expected_paragraphs": 500,
+    "extracted_paragraph_starts": 500
+  },
+  {
+    "file": "printpdf-unicode.layout.txt",
+    "checks": [
+      {
+        "input": "Perché l'estate è già finita — «Davvero?» Costa 10 €.",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Příliš žluťoučký kůň",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Zażółć gęślą jaźń",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Știință și țară",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Καλημέρα κόσμε",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Добрый день",
+        "exact_substring_present": true
+      },
+      {
+        "input": "é",
+        "exact_substring_present": true
+      },
+      {
+        "input": "é",
+        "exact_substring_present": true
+      },
+      {
+        "input": "שלום עולם",
+        "exact_substring_present": true
+      },
+      {
+        "input": "مرحبا بالعالم",
+        "exact_substring_present": true
+      },
+      {
+        "input": "नमस्ते दुनिया",
+        "exact_substring_present": true
+      },
+      {
+        "input": "こんにちは世界",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Italiano 日本語 Ελληνικά العربية हिन्दी",
+        "exact_substring_present": false
+      }
+    ],
+    "cleaned_extraction": "Unicode: copertura, ordine e shaping Italiano e lingue europee Perché l'estate è già finita — «Davvero?» Costa 10 €. Příliš žluťoučký kůň Zażółć gęślą jaźń Știință și țară Greco e cirillico Καλημέρα κόσμε Добрый день Precomposto e combinante Precomposto: é. Decomposto: é. Confronto: é é é é. Legature: fi fl ffi ffl; ufficio affitto difficile flessibile. Ebraico e arabo שלום עולם مرحبا بالعالم Devanagari e giapponese नमस्ते दुनिया こんにちは世界 Fallback nello stesso paragrafo Italiano 日本語 Ελληνικά العربيةहिन्दी"
+  },
+  {
+    "file": "printpdf-unicode-explicit.layout.txt",
+    "checks": [
+      {
+        "input": "Perché l'estate è già finita — «Davvero?» Costa 10 €.",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Příliš žluťoučký kůň",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Zażółć gęślą jaźń",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Știință și țară",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Καλημέρα κόσμε",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Добрый день",
+        "exact_substring_present": true
+      },
+      {
+        "input": "é",
+        "exact_substring_present": true
+      },
+      {
+        "input": "é",
+        "exact_substring_present": true
+      },
+      {
+        "input": "שלום עולם",
+        "exact_substring_present": true
+      },
+      {
+        "input": "مرحبا بالعالم",
+        "exact_substring_present": true
+      },
+      {
+        "input": "नमस्ते दुनिया",
+        "exact_substring_present": true
+      },
+      {
+        "input": "こんにちは世界",
+        "exact_substring_present": true
+      },
+      {
+        "input": "Italiano 日本語 Ελληνικά العربية हिन्दी",
+        "exact_substring_present": false
+      }
+    ],
+    "cleaned_extraction": "Unicode: copertura, ordine e shaping Italiano e lingue europee Perché l'estate è già finita — «Davvero?» Costa 10 €. Příliš žluťoučký kůň Zażółć gęślą jaźń Știință și țară Greco e cirillico Καλημέρα κόσμε Добрый день Precomposto e combinante Precomposto: é. Decomposto: é. Confronto: é é é é. Legature: fi fl ffi ffl; ufficio affitto difficile flessibile. Ebraico e arabo שלום עולם مرحبا بالعالم Devanagari e giapponese नमस्ते दुनिया こんにちは世界 Fallback nello stesso paragrafo Italiano 日本語 Ελληνικά العربيةहिन्दी"
+  },
+  {
+    "file": "printpdf-perf-1.layout.txt",
+    "expected_paragraphs": 5,
+    "extracted_paragraph_starts": 5
+  },
+  {
+    "file": "printpdf-perf-10.layout.txt",
+    "expected_paragraphs": 50,
+    "extracted_paragraph_starts": 50
+  },
+  {
+    "file": "printpdf-perf-100.layout.txt",
+    "expected_paragraphs": 500,
+    "extracted_paragraph_starts": 500
+  }
+]

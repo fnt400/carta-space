@@ -1,0 +1,7 @@
+experiments/pdf-export/groff/logs/trap-long-paragraph.bbox.html page 1: PASS 619 body words, max yMax 764.922 pt / 269.847 mm; one centered footer
+experiments/pdf-export/groff/logs/trap-long-paragraph.bbox.html page 2: PASS 619 body words, max yMax 757.497 pt / 267.228 mm; one centered footer
+experiments/pdf-export/groff/logs/trap-long-paragraph.bbox.html page 3: PASS 620 body words, max yMax 757.497 pt / 267.228 mm; one centered footer
+experiments/pdf-export/groff/logs/trap-long-paragraph.bbox.html page 4: PASS 620 body words, max yMax 757.497 pt / 267.228 mm; one centered footer
+experiments/pdf-export/groff/logs/trap-long-paragraph.bbox.html page 5: PASS 622 body words, max yMax 757.497 pt / 267.228 mm; one centered footer
+experiments/pdf-export/groff/logs/trap-long-paragraph.bbox.html page 6: PASS 620 body words, max yMax 757.497 pt / 267.228 mm; one centered footer
+experiments/pdf-export/groff/logs/trap-long-paragraph.bbox.html page 7: PASS 120 body words, max yMax 208.047 pt / 73.394 mm; one centered footer

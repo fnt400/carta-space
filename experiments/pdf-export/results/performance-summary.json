@@ -1,0 +1,68 @@
+[
+  {
+    "engine": "groff",
+    "target_pages": 1,
+    "actual_pages": 1,
+    "wall_s": 0.79,
+    "precise_wall_s": 0.7932473209984892,
+    "user_s": 0.83,
+    "system_s": 0.07,
+    "peak_rss_kib": 38544,
+    "pdf_bytes": 24549
+  },
+  {
+    "engine": "groff",
+    "target_pages": 10,
+    "actual_pages": 9,
+    "wall_s": 0.95,
+    "precise_wall_s": 0.9593934719996469,
+    "user_s": 1.14,
+    "system_s": 0.06,
+    "peak_rss_kib": 38628,
+    "pdf_bytes": 36266
+  },
+  {
+    "engine": "groff",
+    "target_pages": 100,
+    "actual_pages": 82,
+    "wall_s": 2.69,
+    "precise_wall_s": 2.698124111000652,
+    "user_s": 4.32,
+    "system_s": 0.08,
+    "peak_rss_kib": 38628,
+    "pdf_bytes": 131088
+  },
+  {
+    "engine": "printpdf",
+    "target_pages": 1,
+    "actual_pages": 1,
+    "wall_s": 0.09,
+    "precise_wall_s": 0.09304827799860504,
+    "user_s": 0.04,
+    "system_s": 0.05,
+    "peak_rss_kib": 47460,
+    "pdf_bytes": 10064
+  },
+  {
+    "engine": "printpdf",
+    "target_pages": 10,
+    "actual_pages": 10,
+    "wall_s": 0.16,
+    "precise_wall_s": 0.16854914700161316,
+    "user_s": 0.1,
+    "system_s": 0.06,
+    "peak_rss_kib": 59708,
+    "pdf_bytes": 44454
+  },
+  {
+    "engine": "printpdf",
+    "target_pages": 100,
+    "actual_pages": 100,
+    "wall_s": 1.0,
+    "precise_wall_s": 1.0058744699999806,
+    "user_s": 0.8,
+    "system_s": 0.18,
+    "peak_rss_kib": 246148,
+    "pdf_bytes": 387742
+  }
+]

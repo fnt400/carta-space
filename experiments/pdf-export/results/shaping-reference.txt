@@ -1,0 +1,3 @@
+Independent raster reference only; not a third PDF renderer.
+Pillow RAQM 0.10.2; HarfBuzz None; FriBidi None
+Same bundled fonts; RTL/language explicit. Visual comparison, not full-script conformance.

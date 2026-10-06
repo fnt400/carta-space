@@ -1,0 +1,215 @@
+rustc 1.94.0 (4a4ef493e 2026-03-02)
+binary: rustc
+commit-hash: 4a4ef493e3a1488c6e321570238084b38948f6db
+commit-date: 2026-03-02
+host: x86_64-unknown-linux-gnu
+release: 1.94.0
+LLVM version: 21.1.8
+cargo 1.94.0 (85eff7c80 2026-01-15)
+release: 1.94.0
+commit-hash: 85eff7c80277b57f78b11e28d14154ab12fcf643
+commit-date: 2026-01-15
+host: x86_64-unknown-linux-gnu
+libgit2: 1.9.2 (sys:0.20.3 vendored)
+libcurl: 8.17.0-DEV (sys:0.4.84+curl-8.17.0 vendored ssl:OpenSSL/3.5.4)
+ssl: OpenSSL 3.5.4 30 Sep 2025
+os: Debian 13.0.0 [64-bit]
+carta-printpdf-bench v0.1.0 (/home/claudio/software/git/carta-space/experiments/pdf-export/printpdf)
+└── printpdf v0.12.8
+    ├── allsorts-azul v0.17.2
+    │   ├── bitflags v2.13.2
+    │   ├── brotli-decompressor v5.0.3
+    │   │   ├── alloc-no-stdlib v2.0.4
+    │   │   └── alloc-stdlib v0.2.4
+    │   │       └── alloc-no-stdlib v2.0.4
+    │   ├── encoding_rs v0.8.42
+    │   │   ├── cfg-if v1.0.5
+    │   │   ├── core_detect v1.0.0
+    │   │   ├── multiversion_no_op v1.0.0 (proc-macro)
+    │   │   ├── scopeguard v1.2.0
+    │   │   └── simdutf8 v0.1.5
+    │   │   [build-dependencies]
+    │   │   └── rustversion v1.0.23 (proc-macro)
+    │   ├── enumflags2 v0.7.12
+    │   │   └── enumflags2_derive v0.7.12 (proc-macro)
+    │   │       ├── proc-macro2 v1.0.107
+    │   │       │   └── unicode-ident v1.0.26
+    │   │       ├── quote v1.0.47
+    │   │       │   └── proc-macro2 v1.0.107 (*)
+    │   │       └── syn v2.0.119
+    │   │           ├── proc-macro2 v1.0.107 (*)
+    │   │           ├── quote v1.0.47 (*)
+    │   │           └── unicode-ident v1.0.26
+    │   ├── flate2 v1.1.10
+    │   │   ├── crc32fast v1.5.2
+    │   │   │   └── cfg-if v1.0.5
+    │   │   └── miniz_oxide v0.9.1
+    │   │       ├── adler2 v2.0.1
+    │   │       └── simd-adler32 v0.3.10
+    │   ├── glyph-names v0.2.0
+    │   ├── log v0.4.34
+    │   ├── ouroboros v0.18.5
+    │   │   ├── aliasable v0.1.3
+    │   │   ├── ouroboros_macro v0.18.5 (proc-macro)
+    │   │   │   ├── heck v0.4.1
+    │   │   │   ├── proc-macro2 v1.0.107 (*)
+    │   │   │   ├── proc-macro2-diagnostics v0.10.1
+    │   │   │   │   ├── proc-macro2 v1.0.107 (*)
+    │   │   │   │   ├── quote v1.0.47 (*)
+    │   │   │   │   ├── syn v2.0.119 (*)
+    │   │   │   │   └── yansi v1.0.1
+    │   │   │   │   [build-dependencies]
+    │   │   │   │   └── version_check v0.9.5
+    │   │   │   ├── quote v1.0.47 (*)
+    │   │   │   └── syn v2.0.119 (*)
+    │   │   └── static_assertions v1.1.0
+    │   ├── pathfinder_geometry v0.5.1
+    │   │   ├── log v0.4.34
+    │   │   └── pathfinder_simd v0.5.6
+    │   │       [build-dependencies]
+    │   │       └── rustc_version v0.4.1
+    │   │           └── semver v1.0.28
+    │   ├── rustc-hash v2.1.3
+    │   ├── tinyvec v1.13.3
+    │   ├── ucd-trie v0.1.7
+    │   ├── unicode-canonical-combining-class v1.0.0
+    │   ├── unicode-general-category v1.1.0
+    │   └── unicode-joining-type v1.0.0
+    ├── azul-core v0.0.16
+    │   ├── azul-css v0.0.16
+    │   │   ├── azul-simplecss v0.2.2
+    │   │   └── libm v0.2.16
+    │   ├── gl-context-loader v0.1.10
+    │   ├── libm v0.2.16
+    │   └── rust-fontconfig v5.0.1
+    │       ├── allsorts-azul v0.17.2 (*)
+    │       ├── mmapio v0.9.1
+    │       │   └── libc v0.2.190
+    │       └── xmlparser v0.13.6
+    ├── azul-css v0.0.16 (*)
+    ├── azul-layout v0.0.16
+    │   ├── allsorts-azul v0.17.2 (*)
+    │   ├── azul-core v0.0.16 (*)
+    │   ├── azul-css v0.0.16 (*)
+    │   ├── base64 v0.22.1
+    │   ├── hyphenation v0.8.4
+    │   │   ├── bincode v1.3.3
+    │   │   │   └── serde v1.0.229
+    │   │   │       ├── serde_core v1.0.229
+    │   │   │       └── serde_derive v1.0.229 (proc-macro)
+    │   │   │           ├── proc-macro2 v1.0.107 (*)
+    │   │   │           ├── quote v1.0.47 (*)
+    │   │   │           └── syn v3.0.6
+    │   │   │               ├── proc-macro2 v1.0.107 (*)
+    │   │   │               ├── quote v1.0.47 (*)
+    │   │   │               └── unicode-ident v1.0.26
+    │   │   ├── fst v0.4.7
+    │   │   ├── hyphenation_commons v0.8.4
+    │   │   │   ├── fst v0.4.7
+    │   │   │   └── serde v1.0.229 (*)
+    │   │   └── serde v1.0.229 (*)
+    │   │   [build-dependencies]
+    │   │   ├── bincode v1.3.3 (*)
+    │   │   ├── fst v0.4.7
+    │   │   ├── hyphenation_commons v0.8.4 (*)
+    │   │   ├── pocket-resources v0.3.2
+    │   │   └── serde v1.0.229 (*)
+    │   ├── lru v0.18.5
+    │   ├── regex-lite v0.1.9
+    │   ├── roxmltree v0.21.1
+    │   │   └── memchr v2.8.3
+    │   ├── rust-fontconfig v5.0.1 (*)
+    │   ├── serde v1.0.229 (*)
+    │   ├── smallvec v1.16.2
+    │   │   └── serde v1.0.229 (*)
+    │   ├── taffy v0.10.1
+    │   │   ├── arrayvec v0.7.8
+    │   │   ├── grid v1.0.1
+    │   │   └── slotmap v1.1.1
+    │   │       [build-dependencies]
+    │   │       └── version_check v0.9.5
+    │   ├── thiserror v2.0.21
+    │   │   └── thiserror-impl v2.0.21 (proc-macro)
+    │   │       ├── proc-macro2 v1.0.107 (*)
+    │   │       ├── quote v1.0.47 (*)
+    │   │       └── syn v3.0.6 (*)
+    │   ├── tinyvec v1.13.3
+    │   ├── unicode-bidi v0.3.18
+    │   ├── unicode-normalization v0.1.25
+    │   │   └── tinyvec v1.13.3
+    │   ├── unicode-segmentation v1.13.3
+    │   ├── xmlparser v0.13.6
+    │   └── xmlwriter v0.1.0
+    ├── base64 v0.22.1
+    ├── flate2 v1.1.10 (*)
+    ├── lopdf v0.44.0
+    │   ├── aes v0.9.3
+    │   │   ├── cipher v0.5.2
+    │   │   │   ├── crypto-common v0.2.2
+    │   │   │   │   └── hybrid-array v0.4.15
+    │   │   │   │       └── typenum v1.20.1
+    │   │   │   └── inout v0.2.2
+    │   │   │       ├── block-padding v0.4.2
+    │   │   │       │   └── hybrid-array v0.4.15 (*)
+    │   │   │       └── hybrid-array v0.4.15 (*)
+    │   │   ├── cpubits v0.1.1
+    │   │   └── cpufeatures v0.3.1
+    │   ├── bitflags v2.13.2
+    │   ├── cbc v0.2.1
+    │   │   └── cipher v0.5.2 (*)
+    │   ├── ecb v0.2.1
+    │   │   └── cipher v0.5.2 (*)
+    │   ├── encoding_rs v0.8.42 (*)
+    │   ├── flate2 v1.1.10 (*)
+    │   ├── getrandom v0.4.3
+    │   │   ├── cfg-if v1.0.5
+    │   │   ├── libc v0.2.190
+    │   │   └── rand_core v0.10.1
+    │   ├── indexmap v2.14.2
+    │   │   ├── equivalent v1.0.2
+    │   │   └── hashbrown v0.17.1
+    │   ├── itoa v1.0.18
+    │   ├── log v0.4.34
+    │   ├── md-5 v0.11.0
+    │   │   ├── cfg-if v1.0.5
+    │   │   └── digest v0.11.3
+    │   │       ├── block-buffer v0.12.1
+    │   │       │   └── hybrid-array v0.4.15 (*)
+    │   │       ├── const-oid v0.10.2
+    │   │       └── crypto-common v0.2.2 (*)
+    │   ├── nom v8.0.0
+    │   │   └── memchr v2.8.3
+    │   ├── rand v0.10.3
+    │   │   ├── chacha20 v0.10.2
+    │   │   │   ├── cfg-if v1.0.5
+    │   │   │   ├── cpufeatures v0.3.1
+    │   │   │   └── rand_core v0.10.1
+    │   │   ├── getrandom v0.4.3 (*)
+    │   │   └── rand_core v0.10.1
+    │   ├── rangemap v1.8.0
+    │   ├── sha2 v0.11.0
+    │   │   ├── cfg-if v1.0.5
+    │   │   ├── cpufeatures v0.3.1
+    │   │   └── digest v0.11.3 (*)
+    │   ├── stringprep v0.1.5
+    │   │   ├── unicode-bidi v0.3.18
+    │   │   ├── unicode-normalization v0.1.25 (*)
+    │   │   └── unicode-properties v0.1.4
+    │   ├── thiserror v2.0.21 (*)
+    │   └── weezl v0.2.1
+    ├── rust-fontconfig v5.0.1 (*)
+    ├── serde v1.0.229 (*)
+    ├── serde_derive v1.0.229 (proc-macro) (*)
+    ├── serde_json v1.0.151
+    │   ├── itoa v1.0.18
+    │   ├── memchr v2.8.3
+    │   ├── serde_core v1.0.229
+    │   └── zmij v1.0.23
+    ├── smallvec v1.16.2 (*)
+    ├── time v0.3.55
+    │   ├── deranged v0.5.8
+    │   ├── num-conv v0.2.2
+    │   ├── powerfmt v0.2.1
+    │   └── time-core v0.1.9
+    ├── weezl v0.2.1
+    └── xmlparser v0.13.6

@@ -1,0 +1,12 @@
+Unicode Baseline: No Fallback
+Latin: café naïve Straße .
+
+Combining: café; Greek: Ελληνικά; Cyrillic: Русский.
+
+Hebrew: ; Arabic: ; Devanagari: ; Japanese:
+
+
+
+
+                                         1
+

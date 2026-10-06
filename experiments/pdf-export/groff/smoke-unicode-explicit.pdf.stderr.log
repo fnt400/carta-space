@@ -1,0 +1,25 @@
+troff:experiments/pdf-export/groff/smoke-unicode-explicit.roff:16: warning: special character 'u65E5' not defined
+gropdf: notice: 
+Font 'SourceSerif4-Semibold (CB)' has 1497 glyphs
+You would see a noticeable speedup if you install the perl module Inline::C
+
+gropdf: notice: 
+Font 'NotoSans-Regular (NS)' has 3782 glyphs
+You would see a noticeable speedup if you install the perl module Inline::C
+
+gropdf: notice: 
+Font 'NotoSansArabic-Regular (NA)' has 1898 glyphs
+You would see a noticeable speedup if you install the perl module Inline::C
+
+gropdf: notice: 
+Font 'NotoSansDevanagari-Regular (ND)' has 1208 glyphs
+You would see a noticeable speedup if you install the perl module Inline::C
+
+gropdf: notice: 
+Font 'NotoSansJP-Regular (NJ)' has 17985 glyphs
+You would see a noticeable speedup if you install the perl module Inline::C
+
+gropdf: notice: 
+Font 'SourceSerif4-Regular (CR)' has 1497 glyphs
+You would see a noticeable speedup if you install the perl module Inline::C
+

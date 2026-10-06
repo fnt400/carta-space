@@ -1,0 +1,3 @@
+experiments/pdf-export/groff/logs/latin-trap-fixed.bbox.html page 1: PASS 245 body words, max yMax 698.957 pt / 246.576 mm; one centered footer
+experiments/pdf-export/groff/logs/latin-trap-fixed.bbox.html page 2: PASS 379 body words, max yMax 728.322 pt / 256.936 mm; one centered footer
+experiments/pdf-export/groff/logs/latin-trap-fixed.bbox.html page 3: PASS 306 body words, max yMax 587.247 pt / 207.168 mm; one centered footer

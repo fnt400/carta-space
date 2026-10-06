@@ -1,0 +1,6 @@
+name                                 type              encoding         emb sub uni object ID
+------------------------------------ ----------------- ---------------- --- --- --- ---------
+AAAAAA+SourceSerif4-Regular          Type 1            Custom           yes yes no      24  0
+AAAAAB+SourceSerif4-Semibold         Type 1            Custom           yes yes no      28  0
+
+exit_status=0

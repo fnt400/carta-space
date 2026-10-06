@@ -1,0 +1,12 @@
+ENTER nl=781557 ev=0 pe=0
+SWITCH nl=781557 ev=carta-footer
+BEFORESPACE nl=781557 ev=carta-footer
+BEFORETITLE nl=789370 ev=carta-footer
+BEFOREBP nl=799370 ev=carta-footer
+AFTERBP nl=70866 ev=carta-footer
+RESTORE nl=70866 ev=0
+ENTER nl=771023 ev=0 pe=1
+SWITCH nl=771023 ev=carta-footer
+BEFORESPACE nl=771023 ev=carta-footer
+BEFORETITLE nl=789370 ev=carta-footer
+BEFOREBP nl=799370 ev=carta-footer

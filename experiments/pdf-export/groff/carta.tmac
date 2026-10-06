@@ -1,0 +1,122 @@
+.\" Isolated PDF bench, not Carta archive or application semantics.
+.fp 1 CR
+.fp 2 CI
+.fp 3 CB
+.fp 4 CM
+.fp 5 NS
+.fp 6 NH
+.fp 7 NA
+.fp 8 ND
+.fp 9 NJ
+.pl 29.7c
+.po 3.2c
+.ll 14.6c
+.lt 14.6c
+.ps 11
+.vs 14.85p
+.ft CR
+.ad l
+.hy 0
+.de carta-top
+'sp |2.5c
+..
+.de carta-bottom
+.ev carta-footer
+.nf
+.in 0
+.ll 14.6c
+.lt 14.6c
+.ft CR
+.ps 8
+.vs 10p
+.sp |(28.2c-10p)
+.tl ''\\n%''
+.bp
+.ev
+..
+.wh 0 carta-top
+.\" Reserve body leading and glyph descent before the 272 mm ink limit.
+.wh -(2.5c+14.85p+6p) carta-bottom
+.de P
+.br
+.sp .5v
+.fi
+.ad l
+.ps 11
+.vs 14.85p
+..
+.de carta-heading
+.br
+.ne 90p
+.sp 1v
+.ft CB
+.ps \\$1
+.vs \\$1p+4p
+\\$2
+.br
+.sp .5v
+.ft CR
+.ps 11
+.vs 14.85p
+..
+.de H1
+.carta-heading 20 "\\$*"
+..
+.de H2
+.carta-heading 15 "\\$*"
+..
+.de H3
+.carta-heading 12 "\\$*"
+..
+.de BQ
+.P
+.in +0.8c
+.ll -0.8c
+..
+.de EQ
+.br
+.in -0.8c
+.ll +0.8c
+.P
+..
+.de UL
+.P
+.nr carta-ordered 0
+.in +0.8c
+.ll -0.8c
+..
+.de OL
+.UL
+.nr carta-ordered 1
+.nr carta-item 0 1
+..
+.de LI
+.br
+.sp .25v
+.ti -0.6c
+.ie \\n[.$] \\$1\h'|0.6c'\c
+.el \{\
+.ie \\n[carta-ordered] \\n+[carta-item].\h'|0.6c'\c
+.el \[bu]\h'|0.6c'\c
+.\}
+..
+.de LE
+.br
+.in -0.8c
+.ll +0.8c
+.P
+..
+.de CODE
+.P
+.nf
+.ft CM
+..
+.de ENDCODE
+.br
+.ft CR
+.P
+..
+.de FONT
+.br
+.ft \\$1
+..

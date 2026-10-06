@@ -1,0 +1,4 @@
+gropdf: notice: 
+Font 'SourceSerif4-Regular (CR)' has 1497 glyphs
+You would see a noticeable speedup if you install the perl module Inline::C
+

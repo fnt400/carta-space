@@ -1,0 +1,14 @@
+execve("/usr/bin/bash", ["bash", "/home/claudio/software/git/carta"..., "/home/claudio/software/git/carta"..., "/opt/carta-pdf-bench/packaging-u"...], 0x7ffd4a6b5450 /* 117 vars */) = 0
+openat(AT_FDCWD, "/etc/sane-libs/glibc-hwcaps/x86-64-v3/libtinfo.so.6", O_RDONLY|O_CLOEXEC) = -1 ENOENT (File o directory non esistente)
+openat(AT_FDCWD, "/etc/sane-libs/glibc-hwcaps/x86-64-v2/libtinfo.so.6", O_RDONLY|O_CLOEXEC) = -1 ENOENT (File o directory non esistente)
+openat(AT_FDCWD, "/etc/sane-libs/libtinfo.so.6", O_RDONLY|O_CLOEXEC) = -1 ENOENT (File o directory non esistente)
+openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libtinfo.so.6", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/dev/tty", O_RDWR|O_NONBLOCK) = -1 ENXIO (Device o indirizzo non esistente)
+openat(AT_FDCWD, "/usr/lib/locale/locale-archive", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/gconv/gconv-modules.cache", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/home/claudio/software/git/carta-space/experiments/pdf-export/groff/render.sh", O_RDONLY) = 3
+--- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=179434, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+--- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=179436, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
++++ exited with 0 +++

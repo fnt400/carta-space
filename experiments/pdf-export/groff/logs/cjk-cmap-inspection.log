@@ -1,0 +1,11 @@
+Copyright (c) 2000-2025. See AUTHORS for Contributors.
+ License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+ with many parts BSD <http://fontforge.org/license.html>. Please read LICENSE.
+ Version: 20230101
+ Based on sources from 2025-01-07 13:54 UTC-ML-D-GDK3.
+PythonUI_Init()
+copyUIMethodsToBaseTable()
+Program root: /usr
+Le seguenti tabelle nel font sono state ignorate da FontForge
+  Ignoring 'STAT' style attributes table
+<command-string> line: 1 Undefined variable: $glyphname

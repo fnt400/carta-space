@@ -1,0 +1,26 @@
+Processing [36mNotoSansDevanagari-Regular.ttf[0m...
+Running fontforge...
+Copyright (c) 2000-2025. See AUTHORS for Contributors.
+ License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+ with many parts BSD <http://fontforge.org/license.html>. Please read LICENSE.
+ Version: 20230101
+ Based on sources from 2025-01-07 13:54 UTC-ML-D-GDK3.
+PythonUI_Init()
+copyUIMethodsToBaseTable()
+Program root: /usr
+The glyph named null is mapped to U+0000.
+  But its name indicates it should be mapped to U+2400.
+Done.
+  =>[36mNotoSansDevanagari-Regular[0m (NotoSansDevanagari-Regular.ttf) assigned to family '[33mCarta[0m'.
+  =>[36mNotoSansDevanagari-Regular[0m assigned groff fontname '[33mND[0m'.
+Creating [33mND[0m...
+afmtodit: warning: cannot open 'DESC': No such file or directory
+afmtodit: warning: both radeva and vi_radeva map to u0930
+afmtodit: warning: both uni1CE2 and visarga_uni1CE2 map to u1CE2
+afmtodit: warning: both uni1CE4 and visarga_uni1CE4 map to u1CE4
+afmtodit: warning: both uni1CE5 and visarga_uni1CE5 map to u1CE5
+afmtodit: warning: both uni1CE8 and visarga_uni1CE8 map to u1CE8
+Done.
+Installing [33mND[0m in /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/... Done.
+Checking for gropdf executable and devpdf directory... gropdf found.
+Installing [33mND[0m in /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/... Done.

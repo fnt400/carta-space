@@ -1,0 +1,4 @@
+   Compiling carta-printpdf-bench v0.1.0 (/home/claudio/software/git/carta-space/experiments/pdf-export/printpdf)
+    Finished `release` profile [optimized] target(s) in 1.67s
+    Checking carta-printpdf-bench v0.1.0 (/home/claudio/software/git/carta-space/experiments/pdf-export/printpdf)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.45s

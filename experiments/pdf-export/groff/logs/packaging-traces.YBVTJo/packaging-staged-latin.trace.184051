@@ -1,0 +1,15 @@
+execve("/opt/carta-pdf-bench/groff-pdf-runtime-measured/bin/groff", ["/opt/carta-pdf-bench/groff-pdf-r"..., "-Kutf8", "-Tpdf", "-P-pa4", "-mcarta", "-ww", "/home/claudio/software/git/carta"...], 0x7ffc1cc0c678 /* 120 vars */) = 0
+openat(AT_FDCWD, "/etc/sane-libs/glibc-hwcaps/x86-64-v3/libstdc++.so.6", O_RDONLY|O_CLOEXEC) = -1 ENOENT (File o directory non esistente)
+openat(AT_FDCWD, "/etc/sane-libs/glibc-hwcaps/x86-64-v2/libstdc++.so.6", O_RDONLY|O_CLOEXEC) = -1 ENOENT (File o directory non esistente)
+openat(AT_FDCWD, "/etc/sane-libs/libstdc++.so.6", O_RDONLY|O_CLOEXEC) = -1 ENOENT (File o directory non esistente)
+openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libstdc++.so.6", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libm.so.6", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+openat(AT_FDCWD, "/opt/carta-pdf-bench/groff-pdf-runtime-measured/share/groff/site-font/devpdf/DESC", O_RDONLY) = -1 ENOENT (File o directory non esistente)
+openat(AT_FDCWD, "/opt/carta-pdf-bench/groff-pdf-runtime-measured/share/groff/1.24.1/font/devpdf/DESC", O_RDONLY) = 3
+--- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=184052, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+--- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=184053, si_uid=1000, si_status=0, si_utime=37 /* 0.37 s */, si_stime=5 /* 0.05 s */} ---
+--- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=184054, si_uid=1000, si_status=0, si_utime=89 /* 0.89 s */, si_stime=4 /* 0.04 s */} ---
++++ exited with 0 +++

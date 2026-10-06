@@ -1,0 +1,20 @@
+Creator:         groff version 1.24.1
+Producer:        gropdf version 1.24.1
+CreationDate:    Tue Oct  6 17:43:01 2026 UTC
+ModDate:         Tue Oct  6 17:43:01 2026 UTC
+Custom Metadata: no
+Metadata Stream: no
+Tagged:          no
+UserProperties:  no
+Suspects:        no
+Form:            none
+JavaScript:      no
+Pages:           82
+Encrypted:       no
+Page size:       595 x 842 pts (A4)
+Page rot:        0
+File size:       131088 bytes
+Optimized:       no
+PDF version:     1.7
+
+exit_status=0

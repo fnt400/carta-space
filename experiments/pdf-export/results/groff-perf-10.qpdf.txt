@@ -1,0 +1,8 @@
+checking /home/claudio/software/git/carta-space/experiments/pdf-export/results/groff-perf-10.pdf
+PDF Version: 1.7
+File is not encrypted
+File is not linearized
+No syntax or stream encoding errors found; the file may still contain
+errors that qpdf cannot detect
+
+exit_status=0

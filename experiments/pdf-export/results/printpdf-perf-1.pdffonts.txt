@@ -1,0 +1,5 @@
+name                                 type              encoding         emb sub uni object ID
+------------------------------------ ----------------- ---------------- --- --- --- ---------
+F18282+SourceSerif4-Regular          CID TrueType      Identity-H       yes no  yes      5  0
+
+exit_status=0

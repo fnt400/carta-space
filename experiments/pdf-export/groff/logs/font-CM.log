@@ -1,0 +1,26 @@
+Processing [36mSourceCodePro-Regular.ttf[0m...
+Running fontforge...
+Copyright (c) 2000-2025. See AUTHORS for Contributors.
+ License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+ with many parts BSD <http://fontforge.org/license.html>. Please read LICENSE.
+ Version: 20230101
+ Based on sources from 2025-01-07 13:54 UTC-ML-D-GDK3.
+PythonUI_Init()
+copyUIMethodsToBaseTable()
+Program root: /usr
+Le seguenti tabelle nel font sono state ignorate da FontForge
+  Ignoring 'DSIG' Tabella firma digitale
+Done.
+  =>[36mSourceCodePro-Regular[0m (SourceCodePro-Regular.ttf) assigned to family '[33mCarta[0m'.
+  =>[36mSourceCodePro-Regular[0m assigned groff fontname '[33mCM[0m'.
+Creating [33mCM[0m...
+afmtodit: warning: cannot open 'DESC': No such file or directory
+afmtodit: warning: both uni0300 and uni0340 map to u0300
+afmtodit: warning: both uni0313 and uni0343 map to u0313
+afmtodit: warning: both uni02B9 and uni0374 map to u02B9
+afmtodit: warning: both iota and uni1FBE map to u03B9
+afmtodit: warning: both dieresistonos and uni1FEE map to u00A8_0301
+Done.
+Installing [33mCM[0m in /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devps/... Done.
+Checking for gropdf executable and devpdf directory... gropdf found.
+Installing [33mCM[0m in /opt/carta-pdf-bench/groff-1.24.1/share/groff/site-font/devpdf/... Done.

@@ -1,0 +1,92 @@
+[
+  {
+    "file": "groff-latin.pdf",
+    "bytes": 61196,
+    "pages": 3,
+    "sha256": "6798c94067427b749b14efddb2fd0b20ceeaeb1e4cf27e824bb0c54f7846f9bd"
+  },
+  {
+    "file": "groff-perf-1.pdf",
+    "bytes": 24549,
+    "pages": 1,
+    "sha256": "e0d28528a331a17889c1024a946d5dee6f1ec470edc120379d8ee8fc5661e570"
+  },
+  {
+    "file": "groff-perf-10.pdf",
+    "bytes": 36266,
+    "pages": 9,
+    "sha256": "20a458eae7f33d7e8e036e499b2bdbba5389130c0645a0c0de7d2bfefc224159"
+  },
+  {
+    "file": "groff-perf-100.pdf",
+    "bytes": 131088,
+    "pages": 82,
+    "sha256": "853601c2b08e8090885c330de17c43a95ec2fa8309ebaa6471427b2c75d9a3c0"
+  },
+  {
+    "file": "groff-unicode-explicit.pdf",
+    "bytes": 69469,
+    "pages": 1,
+    "sha256": "9c3bc2bf5436ff036f69bd7a245676f02ee7d299267fc62474c3d574b1949047"
+  },
+  {
+    "file": "groff-unicode-fallback.pdf",
+    "bytes": 63723,
+    "pages": 1,
+    "sha256": "32b6fb7176a09a0ddc8191e4a7932bf9209e19f34debcd7881d597779a9e7c4c"
+  },
+  {
+    "file": "groff-unicode.pdf",
+    "bytes": 37620,
+    "pages": 1,
+    "sha256": "bbb9f28d873494d48be5708e90cf6afb69d703f37a57a2619140d3923243d089"
+  },
+  {
+    "file": "printpdf-latin.pdf",
+    "bytes": 48582,
+    "pages": 3,
+    "sha256": "44ee937ccb4169913c204a3e2846145f50ae1db751eb703c00b5187d7bf51210"
+  },
+  {
+    "file": "printpdf-perf-1.pdf",
+    "bytes": 10064,
+    "pages": 1,
+    "sha256": "59a41017e30032e50cbca270b6602cc850f6f05f1543011a2d50f9e92b53d8d5"
+  },
+  {
+    "file": "printpdf-perf-10.pdf",
+    "bytes": 44454,
+    "pages": 10,
+    "sha256": "74d7cfad851b06b7dadc10433005b39f4a42f1f821ddf0b9d63d08ef1f534e2a"
+  },
+  {
+    "file": "printpdf-perf-100.pdf",
+    "bytes": 387742,
+    "pages": 100,
+    "sha256": "153f68c29cd1e51f72e830fe4cdf2dad9f3704534b2332ffbbf4bdf504c321af"
+  },
+  {
+    "file": "printpdf-rtl.pdf",
+    "bytes": 16638,
+    "pages": 1,
+    "sha256": "165361aed8a37ff4031d68117ebf6b507eb975030882b2acb51acd64e30162bd"
+  },
+  {
+    "file": "printpdf-unicode-explicit.pdf",
+    "bytes": 40710,
+    "pages": 1,
+    "sha256": "e624e89dfb2587b178dda2bea316932b334f523ace46f9cea7e6c546f7ac99d7"
+  },
+  {
+    "file": "printpdf-unicode.pdf",
+    "bytes": 35005,
+    "pages": 1,
+    "sha256": "e8b9090bc7840bf6e9c22dcfe00f39d66991d834dcf5a976b2aa4e06629107ee"
+  },
+  {
+    "file": "printpdf-weight-explicit.pdf",
+    "bytes": 13705,
+    "pages": 1,
+    "sha256": "81cfcf154cafb4e643c7dbcc24ec032938771482fa5baf17a77bb6e0ce997118"
+  }
+]

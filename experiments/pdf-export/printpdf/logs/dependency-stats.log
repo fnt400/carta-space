@@ -1,0 +1,11 @@
+resolved_packages 132
+resolved_dependency_packages 131
+dependency_edges 223
+declared_features
+printpdf 0.12.8 {'bmp': ['images', 'image/bmp'], 'dds': ['images', 'image/dds'], 'default': ['html'], 'gif': ['images', 'image/gif'], 'hdr': ['images', 'image/hdr'], 'html': ['text_layout_hyphenation', 'dep:xmlparser', 'dep:rust-fontconfig', 'azul-layout/xml', 'azul-layout/pdf'], 'html_multithreaded': ['html', 'rust-fontconfig/multithreading', 'azul-layout/font_loading_multithreaded'], 'ico': ['images', 'image/ico'], 'images': ['dep:image'], 'jpeg': ['images', 'image/jpeg'], 'js-sys': ['dep:js-sys', 'web-sys', 'wasm-bindgen-futures'], 'png': ['images', 'image/png'], 'pnm': ['images', 'image/pnm'], 'rayon': ['images', 'image/rayon'], 'svg': ['html', 'dep:svg2pdf', 'azul-layout/svg', 'azul-layout/cpurender'], 'text_layout': ['dep:azul-css', 'dep:azul-core', 'dep:azul-layout', 'dep:rust-fontconfig', 'azul-layout/std', 'azul-layout/text_layout', 'azul-layout/font_loading'], 'text_layout_hyphenation': ['text_layout', 'azul-layout/text_layout_hyphenation'], 'tga': ['images', 'image/tga'], 'tiff': ['images', 'image/tiff'], 'wasm-bindgen-futures': ['dep:wasm-bindgen-futures'], 'web-sys': ['dep:web-sys'], 'webp': ['images', 'image/webp']}
+enabled_features
+azul-core css_parser,std
+azul-css parser
+azul-layout font_loading,pdf,std,text_layout,text_layout_hyphenation,xml
+printpdf default,html,text_layout,text_layout_hyphenation
+rust-fontconfig allsorts,async-registry,mmapio,parsing,std,xmlparser

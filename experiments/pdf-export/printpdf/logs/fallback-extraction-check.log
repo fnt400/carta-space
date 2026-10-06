@@ -1,0 +1,5 @@
+auto: extracted='Italiano 日本語 Ελληνικά \u202b العربية\u202cहिन्दी\n\x0c'
+auto: normalized='Italiano 日本語 Ελληνικά العربيةहिन्दी' matches_expected=False
+explicit: extracted='Italiano 日本語 Ελληνικά \u202b العربية\u202cहिन्दी\n\x0c'
+explicit: normalized='Italiano 日本語 Ελληνικά العربيةहिन्दी' matches_expected=False
+Normalization removes Unicode format controls and collapses whitespace; does not verify shaping or visual bidi.
