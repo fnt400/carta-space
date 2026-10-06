@@ -446,6 +446,24 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires a Typst 0.15.1+ executable in CARTA_TYPST"]
+    fn typst_backend_smoke_renders_real_pdf() {
+        let executable = env::var_os("CARTA_TYPST")
+            .expect("set CARTA_TYPST to a Typst 0.15.1+ executable");
+        let temporary = tempfile::tempdir().unwrap();
+        let destination = temporary.path().join("smoke.pdf");
+        let markdown = "# PDF smoke\n\nPerché — «Carta». العربية हिन्दी 日本語\n\n> Quote\n\n- one\n- two\n\n\`\`\`\nfn main() {}\n\`\`\`\n";
+
+        TypstBackend::with_executable(executable)
+            .export(Publication::Document { markdown }, &destination)
+            .unwrap();
+
+        let pdf = fs::read(destination).unwrap();
+        assert!(pdf.starts_with(b"%PDF-"));
+        assert!(pdf.len() > 1_000);
+    }
+
+    #[test]
     fn backend_failure_does_not_replace_existing_destination() {
         let temporary = tempfile::tempdir().unwrap();
         let destination = temporary.path().join("existing.pdf");
