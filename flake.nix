@@ -51,7 +51,7 @@
                 "$out/bin/carta-cli"
 
               wrapProgram "$out/bin/carta" \
-                --prefix PATH : ${lib.makeBinPath [ pkgs.git ]}
+                --prefix PATH : ${lib.makeBinPath [ pkgs.git pkgs.typst ]}
               wrapProgram "$out/bin/carta-cli" \
                 --prefix PATH : ${lib.makeBinPath [ pkgs.git ]}
 

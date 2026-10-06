@@ -73,7 +73,7 @@ Search Archive
 Go to Start of View / Go to End of View
 Document History / Work History
 Trash / Show Trash
-Export Document or Work
+Export Document or Work (Markdown/PDF)
 Sync Now / Sync Settings
 Cheatsheet / Manual
 
@@ -176,7 +176,9 @@ Trash is recoverable structural deletion. Wipe is the explicit permanent-removal
         title: "10. Export and publication",
         body: r#"Export is publication, not the normal writing workflow. Document and Work exports are always written under $HOME/Downloads. The directory is created automatically if necessary; the export prompt asks only for a filename.
 
-Markdown export preserves authored structure. Built-in PDF publication is intentionally deferred beyond v0.1; external tools can consume the Markdown export when needed.
+Markdown export preserves authored structure. PDF export uses one fixed Carta Classic publication profile: A4, generous margins, Source Serif 4 body text, semantic Markdown styling, and small centered page numbers. A Document begins directly with its authored content. A Work receives a simple title page and each member Document begins on a new page.
+
+PDF rendering is isolated behind Carta's publication backend and currently uses Typst 0.15.1 or newer. Carta supplies a controlled embedded font set and does not use system fonts for PDF output. Typst must be available on PATH unless CARTA_TYPST names another executable. If the renderer is unavailable or fails, Carta reports the error and does not replace the requested PDF.
 
 Packaging an Archive as .cat is distinct from Document/Work export and preserves the portable Archive representation and its required history."#,
     },

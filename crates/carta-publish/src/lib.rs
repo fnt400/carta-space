@@ -232,7 +232,10 @@ fn publication_source(publication: Publication<'_>) -> String {
                 "#align(center + horizon)[#text(size: 20pt, weight: \"semibold\")[",
             );
             push_text(&mut output, title);
-            output.push_str("]]\n#pagebreak()\n\n");
+            output.push_str("]]\n");
+            if !documents.is_empty() {
+                output.push_str("#pagebreak()\n\n");
+            }
             for (index, markdown) in documents.iter().enumerate() {
                 if index != 0 {
                     output.push_str("#pagebreak()\n\n");
