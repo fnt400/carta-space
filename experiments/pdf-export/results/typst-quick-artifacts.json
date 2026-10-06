@@ -1,0 +1,22 @@
+[
+  {
+    "input": "latin",
+    "pages": 3,
+    "pdf_bytes": 45162
+  },
+  {
+    "input": "unicode",
+    "pages": 1,
+    "pdf_bytes": 44541
+  },
+  {
+    "input": "long-100",
+    "pages": 79,
+    "pdf_bytes": 258684
+  },
+  {
+    "input": "long-500",
+    "pages": 395,
+    "pdf_bytes": 1288680
+  }
+]

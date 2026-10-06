@@ -1,0 +1,8 @@
+name                                 type              encoding         emb sub uni object ID
+------------------------------------ ----------------- ---------------- --- --- --- ---------
+VKRZRS+SourceSerif4-Semibold         CID TrueType      Identity-H       yes yes yes     76  0
+SVUAXL+SourceSerif4-Regular          CID TrueType      Identity-H       yes yes yes     79  0
+NULZFM+SourceSerif4-It               CID TrueType      Identity-H       yes yes yes     82  0
+BUNCGQ+SourceCodePro-Regular         CID TrueType      Identity-H       yes yes yes     85  0
+
+exit_status=0

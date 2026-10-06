@@ -1,0 +1,142 @@
+[
+  {
+    "mode": "layout",
+    "samples": [
+      {
+        "input": "Perché l'estate è già finita — «Davvero?» Costa 10 €.",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "Příliš žluťoučký kůň",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "Zażółć gęślą jaźń",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "Știință și țară",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "Καλημέρα κόσμε",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "Добрый день",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "Precomposto: é. Decomposto: é. Confronto: é é é é.",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "Legature: fi fl ffi ffl; ufficio affitto difficile flessibile.",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "שלום עולם",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "مرحبا بالعالم",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "नमस्ते दुनिया",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "こんにちは世界",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "Italiano 日本語 Ελληνικά العربية हिन्दी",
+        "exact_substring": false,
+        "nfc_substring": false
+      }
+    ]
+  },
+  {
+    "mode": "raw",
+    "samples": [
+      {
+        "input": "Perché l'estate è già finita — «Davvero?» Costa 10 €.",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "Příliš žluťoučký kůň",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "Zażółć gęślą jaźń",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "Știință și țară",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "Καλημέρα κόσμε",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "Добрый день",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "Precomposto: é. Decomposto: é. Confronto: é é é é.",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "Legature: fi fl ffi ffl; ufficio affitto difficile flessibile.",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "שלום עולם",
+        "exact_substring": false,
+        "nfc_substring": false
+      },
+      {
+        "input": "مرحبا بالعالم",
+        "exact_substring": false,
+        "nfc_substring": false
+      },
+      {
+        "input": "नमस्ते दुनिया",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "こんにちは世界",
+        "exact_substring": true,
+        "nfc_substring": true
+      },
+      {
+        "input": "Italiano 日本語 Ελληνικά العربية हिन्दी",
+        "exact_substring": true,
+        "nfc_substring": true
+      }
+    ]
+  }
+]

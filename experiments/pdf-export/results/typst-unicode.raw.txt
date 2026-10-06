@@ -1,0 +1,22 @@
+Unicode: copertura, ordine e shaping
+Italiano e lingue europee
+Perché l'estate è già finita — «Davvero?» Costa 10 €.
+Příliš žluťoučký kůň
+Zażółć gęślą jaźń
+Știință și țară
+Greco e cirillico
+Καλημέρα κόσμε
+Добрый день
+Precomposto e combinante
+Precomposto: é. Decomposto: é. Confronto: é é é é.
+Legature: fi fl ffi ffl; ufficio affitto difficile flessibile.
+Ebraico e arabo
+‫עולם‬ ‫שלום‬
+‫بالعالم‬ ‫مرحبا‬
+Devanagari e giapponese
+नमस्ते दुनिया
+こんにちは世界
+Fallback nello stesso paragrafo
+Italiano 日本語 Ελληνικά ‫العربية‬ हिन्दी
+1
+

@@ -1,0 +1,20 @@
+Creator:         Typst 0.15.1
+CreationDate:    Tue Oct  6 00:00:00 2026 UTC
+ModDate:         Tue Oct  6 00:00:00 2026 UTC
+Custom Metadata: no
+Metadata Stream: yes
+Tagged:          yes
+UserProperties:  no
+Suspects:        no
+Form:            none
+JavaScript:      no
+Pages:           3
+Encrypted:       no
+Page size:       595.276 x 841.89 pts (A4)
+Page rot:        0
+File size:       45162 bytes
+Optimized:       no
+PDF version:     1.7
+Syntax Error: Suspects object is wrong type (boolean)
+
+exit_status=0

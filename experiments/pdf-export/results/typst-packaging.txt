@@ -1,0 +1,57 @@
+typst 0.15.1 (9dfd3a08)
+
+exit_status=0
+
+	statically linked
+
+exit_status=0
+
+
+File elf di tipo DYN (Position-Independent Executable file)
+Entry point 0x305e8e
+There are 7 program headers, starting at offset 64
+
+Intestazioni di programma:
+  Tipo           Offset             IndirVirt          IndirFis
+                 DimFile            DimMem              Flag   Allin
+  LOAD           0x0000000000000000 0x0000000000000000 0x0000000000000000
+                 0x00000000033375bc 0x00000000033375bc  R E    0x200000
+  LOAD           0x0000000003338008 0x0000000003538008 0x0000000003538008
+                 0x00000000001efcb8 0x00000000001f67f8  RW     0x200000
+  DYNAMIC        0x00000000034f49b0 0x00000000036f49b0 0x00000000036f49b0
+                 0x00000000000001a0 0x00000000000001a0  RW     0x8
+  TLS            0x0000000003338008 0x0000000003538008 0x0000000003538008
+                 0x0000000000000028 0x00000000000001e0  R      0x8
+  GNU_EH_FRAME   0x0000000002fd264c 0x0000000002fd264c 0x0000000002fd264c
+                 0x0000000000054bdc 0x0000000000054bdc  R      0x4
+  GNU_STACK      0x0000000000000000 0x0000000000000000 0x0000000000000000
+                 0x0000000000000000 0x0000000000000000  RW     0x10
+  GNU_RELRO      0x0000000003338008 0x0000000003538008 0x0000000003538008
+                 0x00000000001c7ff8 0x00000000001c7ff8  R      0x1
+
+ Mappatura da sezione a segmento:
+  Sezioni del segmento...
+   00     .hash .gnu.hash .dynsym .dynstr .rela.dyn .init .plt .plt.got .text .fini .rodata .eh_frame_hdr .eh_frame .gcc_except_table 
+   01     .tdata .init_array .fini_array .data.rel.ro .dynamic .got .data .bss 
+   02     .dynamic 
+   03     .tdata .tbss 
+   04     .eh_frame_hdr 
+   05     
+   06     .tdata .init_array .fini_array .data.rel.ro .dynamic .got 
+
+exit_status=0
+
+Noto Sans
+Noto Sans Arabic
+Noto Sans Devanagari
+Noto Sans Hebrew
+Noto Sans JP
+Source Code Pro
+Source Serif 4
+
+exit_status=0
+
+binary_bytes=55739488
+font_bytes=7755112
+
+official_archive_sha256=a6d077d0a95eed5a2eba715b2dae06be954f624ccbf85758a03f389ded33118c
