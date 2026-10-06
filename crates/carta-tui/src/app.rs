@@ -1020,7 +1020,12 @@ impl App {
                 let markdown = self
                     .archive
                     .export_document_markdown(self.current_document()?)?;
-                export_pdf(Publication::Document { markdown: &markdown }, &path)?;
+                export_pdf(
+                    Publication::Document {
+                        markdown: &markdown,
+                    },
+                    &path,
+                )?;
                 self.status = format!("Exported PDF to {}", path.display());
             }
             PromptAction::ExportWorkPdf => {

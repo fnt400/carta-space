@@ -228,9 +228,7 @@ fn publication_source(publication: Publication<'_>) -> String {
     match publication {
         Publication::Document { markdown } => output.push_str(&markdown_to_typst(markdown)),
         Publication::Work { title, documents } => {
-            output.push_str(
-                "#align(center + horizon)[#text(size: 20pt, weight: \"semibold\")[",
-            );
+            output.push_str("#align(center + horizon)[#text(size: 20pt, weight: \"semibold\")[");
             push_text(&mut output, title);
             output.push_str("]]\n");
             if !documents.is_empty() {
@@ -448,8 +446,8 @@ mod tests {
     #[test]
     #[ignore = "requires a Typst 0.15.1+ executable in CARTA_TYPST"]
     fn typst_backend_smoke_renders_real_pdf() {
-        let executable = env::var_os("CARTA_TYPST")
-            .expect("set CARTA_TYPST to a Typst 0.15.1+ executable");
+        let executable =
+            env::var_os("CARTA_TYPST").expect("set CARTA_TYPST to a Typst 0.15.1+ executable");
         let temporary = tempfile::tempdir().unwrap();
         let destination = temporary.path().join("smoke.pdf");
         let markdown = "# PDF smoke\n\nPerché — «Carta». العربية हिन्दी 日本語\n\n> Quote\n\n- one\n- two\n\n```\nfn main() {}\n```\n";
