@@ -193,7 +193,7 @@ impl PdfBackend for TypstBackend {
             .output()
             .map_err(|error| {
                 if error.kind() == io::ErrorKind::NotFound {
-                    PdfError::BackendUnavailable(PathBuf::from(&self.executable))
+                    PdfError::BackendUnavailable(PathBuf::from(self.executable.clone()))
                 } else {
                     PdfError::Io(error)
                 }
