@@ -3451,6 +3451,46 @@ mod tests {
         assert!(scheduler.sync_due(now + Duration::from_secs(180)));
     }
     #[test]
+    fn pdf_export_commands_are_contextual_and_prefill_pdf_names() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let document = archive
+            .create_document("# Example title\n\nBody.\n")
+            .unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+
+        assert!(app.commands().contains(&Command::ExportDocumentPdf));
+        assert!(!app.commands().contains(&Command::ExportWorkPdf));
+        app.execute(Command::ExportDocumentPdf).unwrap();
+        let AppMode::Prompt {
+            title,
+            input,
+            action,
+            ..
+        } = &app.mode
+        else {
+            panic!("expected Document PDF export prompt")
+        };
+        assert_eq!(title, "Export PDF filename");
+        assert_eq!(input, "Example-title.pdf");
+        assert_eq!(*action, PromptAction::ExportDocumentPdf);
+        app.cancel_mode();
+
+        let work = app
+            .archive
+            .create_work("Collected Notes".into(), vec![document])
+            .unwrap();
+        app.switch_view(View::Work(work), None, false).unwrap();
+        assert!(app.commands().contains(&Command::ExportWorkPdf));
+        app.execute(Command::ExportWorkPdf).unwrap();
+        let AppMode::Prompt { input, action, .. } = &app.mode else {
+            panic!("expected Work PDF export prompt")
+        };
+        assert_eq!(input, "Collected-Notes.pdf");
+        assert_eq!(*action, PromptAction::ExportWorkPdf);
+    }
+
+    #[test]
     fn export_filename_is_short_and_free_of_punctuation() {
         assert_eq!(
             sanitize_filename("# Titolo: prova / con caratteri? speciali"),

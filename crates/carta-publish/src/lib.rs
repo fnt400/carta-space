@@ -446,6 +446,26 @@ mod tests {
     }
 
     #[test]
+    fn backend_failure_does_not_replace_existing_destination() {
+        let temporary = tempfile::tempdir().unwrap();
+        let destination = temporary.path().join("existing.pdf");
+        fs::write(&destination, b"existing").unwrap();
+        let missing = temporary.path().join("typst-does-not-exist");
+
+        let error = TypstBackend::with_executable(missing.as_os_str())
+            .export(
+                Publication::Document {
+                    markdown: "Hello.\n",
+                },
+                &destination,
+            )
+            .unwrap_err();
+
+        assert!(matches!(error, PdfError::BackendUnavailable(_)));
+        assert_eq!(fs::read(&destination).unwrap(), b"existing");
+    }
+
+    #[test]
     fn carta_links_remain_text_instead_of_becoming_broken_pdf_links() {
         let rendered = markdown_to_typst("[target](carta:doc:1234)");
         assert!(rendered.contains("#text(\"target\")"));
