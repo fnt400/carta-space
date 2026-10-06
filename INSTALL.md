@@ -4,6 +4,8 @@ Carta Space v0.1.1 supports Linux and macOS. The interactive program is `carta`;
 
 Git is a runtime dependency because Carta archives use Git for history and synchronization.
 
+Built-in PDF publication requires Typst 0.15.1 or newer on `PATH`. This is an optional runtime dependency: Carta and Markdown export continue to work without it. The Nix package supplies Typst automatically.
+
 ## Choose an installation method
 
 | System | Recommended method |
@@ -147,6 +149,14 @@ carta --version
 carta-cli --version
 ```
 
+If you want built-in PDF export, also verify:
+
+```bash
+typst --version
+```
+
+Use Typst 0.15.1 or newer. The official Typst release binaries are self-contained and may be installed independently of the Rust toolchain.
+
 ## 4. Nix / NixOS
 
 Carta includes a native flake.
@@ -169,7 +179,7 @@ Then:
 carta
 ```
 
-The Nix package includes Git in Carta's runtime environment and does not require `steam-run` or `nix-ld`.
+The Nix package includes Git and Typst in Carta's runtime environment and does not require `steam-run` or `nix-ld`.
 
 ## First launch
 

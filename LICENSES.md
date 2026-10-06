@@ -20,6 +20,19 @@ The complete CC0 legal code is in `LICENSES/CC0-1.0.txt`.
 
 The intent is that the Carta Space format can be described, quoted, adapted, and independently implemented without imposing the GPL on independent readers, writers, tools, or applications.
 
+## Third-party fonts — SIL Open Font License 1.1
+
+Carta's PDF publication backend embeds Source Serif 4, Source Code Pro, and selected Noto Sans families so publication is deterministic and does not depend on system fonts. These font files are distributed under the SIL Open Font License 1.1.
+
+The corresponding license texts are:
+
+- `LICENSES/OFL-source-serif.txt`;
+- `LICENSES/OFL-source-code-pro.txt`;
+- `LICENSES/OFL-noto-fonts.txt`;
+- `LICENSES/OFL-noto-cjk.txt`.
+
+The fonts remain third-party works; embedding them in Carta's binary does not relicense them under GPL or CC0.
+
 ## Third-party material
 
 Third-party standards, names, code, excerpts, and other material remain subject to their own copyright, license, and trademark terms. A reference to an external standard does not relicense that standard under CC0.

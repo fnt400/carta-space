@@ -26,7 +26,7 @@ Carta Space supports Linux and macOS. Nix is one installation option, not a requ
 - **build from source** — the broadest route across Linux distributions, architectures, and macOS;
 - **Nix / NixOS** — native flake packaging, without `steam-run` or `nix-ld`.
 
-Git is a runtime dependency because Carta archive history and synchronization are Git-backed.
+Git is a runtime dependency because Carta archive history and synchronization are Git-backed. Builds with built-in PDF publication additionally require Typst 0.15.1 or newer at runtime; Markdown export does not require Typst. The Nix package supplies both dependencies automatically.
 
 ### Prebuilt Linux x86_64
 
@@ -115,7 +115,7 @@ nix profile install github:fnt400/carta-space
 carta
 ```
 
-The Nix package builds Carta natively and supplies its Git runtime dependency.
+The Nix package builds Carta natively and supplies its Git and Typst runtime dependencies.
 
 On first launch, `carta` opens the default XDG archive location and offers to create an empty Archive or import an existing Git Archive when none exists.
 
@@ -127,6 +127,7 @@ The initial implementation is planned as a small set of separable Rust component
 
 - `carta-format` — format types, validation, serialization, and compatibility rules;
 - `carta-core` — archive operations, Documents, Volumes, Works, LEAP search, history, Trash/Wipe, import/export;
+- `carta-publish` — frontend-independent publication layer with a replaceable PDF backend; the first backend uses Typst;
 - `carta-cli` — scriptable Unix-style administrative commands, producing the optional `carta-cli` binary;
 - `carta-tui` — the first interactive frontend, built with Ratatui and Crossterm, producing the user-facing `carta` binary.
 
@@ -227,7 +228,7 @@ A portable `.cat` package is a ZIP-based container of that tree. Its purpose is 
 
 `carta-core` creates packages through a temporary sibling of the destination, validates the ZIP and its unpacked Archive before replacement, and checkpoints current state first. The exact uncompressed `mimetype` is the first member; canonical files, unknown resources, and complete Git history are included, while reserved Carta-managed temporary artifacts are omitted.
 
-Built-in PDF publication is intentionally deferred beyond v0.1. Markdown export remains available for external publishing tools.
+Built-in PDF publication uses the fixed Carta Classic profile through the isolated `carta-publish` layer. The current backend invokes Typst and supplies Carta's own embedded fonts; Markdown export remains available as the renderer-independent interchange path.
 
 ## Command line
 
@@ -277,7 +278,7 @@ If canonical Document content or Work structure changes externally while the TUI
 
 ## Current scope
 
-The current Rust workspace contains `carta-format`, `carta-core`, `carta-cli`, and `carta-tui`. The first usable v0.1 can create, read, validate, inspect, search, import, export, package, edit, navigate, recover, and administer Draft 0.1 Archives. It implements the Reader and Writer responsibilities, the accepted v0.1 interaction contract, and the explicitly scoped on-device Wipe guarantee. Draft 0.1 remains experimental and is not a stable 1.0 format.
+The current Rust workspace contains `carta-format`, `carta-core`, `carta-publish`, `carta-cli`, and `carta-tui`. The first usable v0.1 can create, read, validate, inspect, search, import, export, package, edit, navigate, recover, and administer Draft 0.1 Archives. It implements the Reader and Writer responsibilities, the accepted v0.1 interaction contract, and the explicitly scoped on-device Wipe guarantee. Draft 0.1 remains experimental and is not a stable 1.0 format.
 
 The enhanced-keyboard-reporting experiment remains separate under `experiments/keyboard-events` as a diagnostic for terminal compatibility.
 

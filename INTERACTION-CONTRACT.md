@@ -789,18 +789,20 @@ Input must be valid UTF-8; UTF-8 BOM is accepted and stripped. CRLF is normalize
 
 ### 12.2 Export
 
-v0.1 provides:
+Carta provides:
 
 - `Export Document as Markdown`;
-- `Export Work as Markdown`.
+- `Export Work as Markdown`;
+- `Export Document as PDF`;
+- `Export Work as PDF`.
 
 Work export commands are visible only in a Work context.
 
-Markdown export contains authored text, not Carta UUIDs or administrative metadata.
+Markdown export contains authored text, not Carta UUIDs or administrative metadata. Work Markdown export concatenates component Documents in Work order without UI boundary separators.
 
-Work Markdown export concatenates component Documents in Work order without UI boundary separators.
+PDF export is a publication operation with one fixed Carta Classic profile rather than a page-layout UI. A Document begins directly with its authored content. A Work receives a simple title page and each member Document begins on a new page. The renderer interprets authored Markdown semantically; authored text is never evaluated as renderer code.
 
-Built-in PDF export is intentionally deferred beyond v0.1. Markdown export remains the publication interchange path for this release.
+PDF publication is isolated behind a replaceable backend. The current backend invokes Typst 0.15.1 or newer as an external process, supplies Carta's controlled embedded font set, and disables system-font selection. Typst must be available on `PATH` unless `CARTA_TYPST` explicitly names another executable. Renderer failure must not leave a partial requested PDF.
 
 Carta proposes a short filesystem-safe filename from the Document label or Work name. The proposed stem is at most 40 characters, keeps letters and digits, replaces runs of punctuation/whitespace with a single `-`, and falls back to `document` when no usable name remains.
 

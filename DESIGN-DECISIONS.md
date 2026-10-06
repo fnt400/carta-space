@@ -190,7 +190,7 @@ The package is created atomically when required.
 
 Printing and publication are rendering operations.
 
-LaTeX is a likely rendering backend for high-quality print/PDF output, but it is not part of the canonical storage model.
+The first built-in PDF backend uses Typst with one fixed Carta Classic publication profile and a controlled embedded font set. The backend is isolated in `carta-publish`: Typst is a renderer, not part of the canonical storage model, and may be replaced later without changing Archive semantics or authored Markdown.
 
 ---
 
