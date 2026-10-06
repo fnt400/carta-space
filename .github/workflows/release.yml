@@ -93,6 +93,10 @@ jobs:
           install -m 644 LICENSE "dist/$package/LICENSE"
           install -m 644 LICENSES.md "dist/$package/LICENSES.md"
           install -m 644 LICENSES/CC0-1.0.txt "dist/$package/LICENSES/CC0-1.0.txt"
+          install -m 644 LICENSES/OFL-source-serif.txt "dist/$package/LICENSES/OFL-source-serif.txt"
+          install -m 644 LICENSES/OFL-source-code-pro.txt "dist/$package/LICENSES/OFL-source-code-pro.txt"
+          install -m 644 LICENSES/OFL-noto-fonts.txt "dist/$package/LICENSES/OFL-noto-fonts.txt"
+          install -m 644 LICENSES/OFL-noto-cjk.txt "dist/$package/LICENSES/OFL-noto-cjk.txt"
           tar -C dist -czf "dist/$package.tar.gz" "$package"
           (cd dist && sha256sum "$package.tar.gz" > "$package.tar.gz.sha256")
 
@@ -149,6 +153,10 @@ jobs:
           install -m 644 LICENSE "dist/$package/LICENSE"
           install -m 644 LICENSES.md "dist/$package/LICENSES.md"
           install -m 644 LICENSES/CC0-1.0.txt "dist/$package/LICENSES/CC0-1.0.txt"
+          install -m 644 LICENSES/OFL-source-serif.txt "dist/$package/LICENSES/OFL-source-serif.txt"
+          install -m 644 LICENSES/OFL-source-code-pro.txt "dist/$package/LICENSES/OFL-source-code-pro.txt"
+          install -m 644 LICENSES/OFL-noto-fonts.txt "dist/$package/LICENSES/OFL-noto-fonts.txt"
+          install -m 644 LICENSES/OFL-noto-cjk.txt "dist/$package/LICENSES/OFL-noto-cjk.txt"
           tar -C dist -czf "dist/$package.tar.gz" "$package"
           (cd dist && shasum -a 256 "$package.tar.gz" > "$package.tar.gz.sha256")
 
