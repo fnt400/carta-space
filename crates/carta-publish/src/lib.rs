@@ -452,7 +452,7 @@ mod tests {
             .expect("set CARTA_TYPST to a Typst 0.15.1+ executable");
         let temporary = tempfile::tempdir().unwrap();
         let destination = temporary.path().join("smoke.pdf");
-        let markdown = "# PDF smoke\n\nPerché — «Carta». العربية हिन्दी 日本語\n\n> Quote\n\n- one\n- two\n\n\`\`\`\nfn main() {}\n\`\`\`\n";
+        let markdown = "# PDF smoke\n\nPerché — «Carta». العربية हिन्दी 日本語\n\n> Quote\n\n- one\n- two\n\n```\nfn main() {}\n```\n";
 
         TypstBackend::with_executable(executable)
             .export(Publication::Document { markdown }, &destination)
