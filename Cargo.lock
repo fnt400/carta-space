@@ -194,11 +194,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "carta-publish"
+version = "0.1.1"
+dependencies = [
+ "pulldown-cmark",
+ "tempfile",
+]
+
+[[package]]
 name = "carta-tui"
 version = "0.1.1"
 dependencies = [
  "arboard",
  "carta-core",
+ "carta-publish",
  "chrono",
  "clap",
  "crossterm",

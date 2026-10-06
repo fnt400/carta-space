@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 carta-core = { path = "../carta-core" }
+carta-publish = { path = "../carta-publish" }
 chrono.workspace = true
 clap.workspace = true
 crossterm.workspace = true

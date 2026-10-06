@@ -4,6 +4,7 @@ members = [
     "crates/carta-core",
     "crates/carta-cli",
     "crates/carta-tui",
+    "crates/carta-publish",
 ]
 exclude = ["experiments/keyboard-events"]
 resolver = "2"
