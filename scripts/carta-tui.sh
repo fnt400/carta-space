@@ -41,6 +41,12 @@ for name in LANG LC_ALL LC_TIME LC_MESSAGES LC_CTYPE; do
 done
 
 exec distrobox enter carta-dev -- env "${ENV_ARGS[@]}" bash -lc '
+  # Development-only fallback: use the pinned Typst from the PDF benchmark
+  # unless the caller already selected another renderer explicitly.
+  if [[ -z "${CARTA_TYPST:-}" && -x /opt/carta-pdf-bench/typst-0.15.1/typst ]]; then
+    export CARTA_TYPST=/opt/carta-pdf-bench/typst-0.15.1/typst
+  fi
+
   cd "$HOME/software/git/carta-space"
   exec cargo run -p carta-tui -- "$@"
 ' bash "$@"
