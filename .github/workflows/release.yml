@@ -35,15 +35,14 @@ jobs:
         run: |
           if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             cat > /tmp/release-notes.md <<'EOF'
-          Carta Space v0.1.1 is a portability and packaging release.
+          Carta Space v0.1.2 is the final terminal-interface release before development moves to the graphical frontend in v0.2.
 
-          - Linux x86_64 binary built on Ubuntu 20.04 (glibc 2.31 baseline).
-          - Compatibility tested with Git 2.25.1.
-          - Native macOS binaries for Apple Silicon and Intel.
-          - Native Nix/NixOS packaging.
-          - Source builds tested on Alpine Linux/musl.
+          - Adds backlink indexing, persistent backlink cache, and backlink navigation.
+          - Adds built-in PDF publication through Typst.
+          - Includes the latest Canon Cat selection, text-movement, Wipe, and interaction fixes.
+          - Retains portable Linux, macOS, and native Nix/NixOS packaging.
 
-          The macOS binaries are currently not Apple Developer signed or notarized.
+          The terminal frontend is frozen at v0.1.2. The macOS binaries are currently not Apple Developer signed or notarized.
           EOF
             gh release create "$GITHUB_REF_NAME" \
               --draft \
