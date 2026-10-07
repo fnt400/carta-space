@@ -5,6 +5,7 @@
 //! they must not grow second implementations of editing behavior.
 
 pub mod action;
+pub mod application;
 pub mod editor;
 pub mod help;
 pub mod mode;
@@ -13,6 +14,7 @@ pub mod session;
 pub mod view;
 
 pub use action::Action;
+pub use application::{App, AppResult, Command};
 pub use editor::{CompositeEditor, Cursor, Region};
 pub use help::HelpKind;
 pub use mode::{AppMode, Choice, ConfirmAction, PromptAction, ResultRow, SelectAction};
