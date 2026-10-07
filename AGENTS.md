@@ -28,6 +28,8 @@ The reference implementation is written in Rust and is migrating toward explicit
 
 Archive semantics belong in `carta-core`. Reusable interaction semantics belong in `carta-app`. Platform input, rendering, clipboard, windowing and OS integration belong in frontend adapters.
 
+For the frozen TUI, Crossterm-specific keyboard interpretation belongs in `crates/carta-tui/src/input.rs`, not in `carta-app`. Pending/active physical LEAP keys, suppressed key-release quirks, Right Control tracking and terminal keycode mapping are adapter state.
+
 No frontend may grow a second implementation of the editor, Cat selection, LEAP semantics, Views or other shared application behavior merely for convenience. Future desktop, web and mobile frontends should reuse `carta-app` and `carta-core` to the maximum practical extent.
 
 ## Interaction

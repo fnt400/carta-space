@@ -120,7 +120,9 @@ Status: started.
 
 `carta-app::Action` now carries the first frontend-neutral editing intents and LEAP input intents. The TUI translates ordinary text-editing keys into these actions, and physical LEAP start/end/query handling already crosses the same semantic seam before invoking application behavior.
 
-The TUI still owns physical modifier bookkeeping, terminal compatibility behavior and rendering-dependent navigation.
+`carta-tui/src/input.rs` is now the explicit Crossterm adapter. It owns the terminal-specific pending/active LEAP modifier state, suppressed release bookkeeping, Right Control state, physical LeftCtrl/LeftAlt mapping, ordinary editing-key translation, and emergency-kill event recognition. These details must not migrate into `carta-app`.
+
+`main.rs` still orchestrates the transition logic around that adapter and still owns terminal compatibility behavior, clipboard execution and rendering-dependent navigation. The next extraction should move more of those terminal-state transitions behind the adapter API without changing Carta semantics.
 
 Up/Down/Home/End/PageUp/PageDown are deliberately not generalized yet: their current semantics depend on visual layout width/height. Do not encode terminal columns or future GUI pixel/font assumptions into `Action` merely to move code. Decide the shared layout/navigation contract only when the graphical text renderer gives us the second concrete implementation.
 
