@@ -26,6 +26,25 @@ impl PendingLeap {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum TuiInputIntent {
+    TapLeap(LeapDirection),
+    EndLeap,
+    LeapAgain(LeapDirection),
+    LeapAgainActive(LeapDirection),
+    ExtendLastLeapHighlight,
+    BeginLeap(LeapDirection),
+    LeapDocumentBoundary(LeapDirection),
+    LeapDocumentStart(LeapDirection),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ModifierPress {
+    Pass,
+    Consumed,
+    Intent(TuiInputIntent),
+}
+
 /// Crossterm-specific state used while translating physical terminal input.
 ///
 /// This state is intentionally kept out of `carta-app`: physical modifier
@@ -114,6 +133,130 @@ impl TuiInputState {
         self.suppressed_leap_releases -= 1;
         true
     }
+
+    pub(super) fn release_intent(&mut self, key: &KeyEvent) -> Option<TuiInputIntent> {
+        let KeyCode::Modifier(released) = key.code else {
+            return None;
+        };
+        if released == ModifierKeyCode::RightControl {
+            self.set_right_control_held(false);
+            return None;
+        }
+        if matches!(
+            released,
+            ModifierKeyCode::LeftControl | ModifierKeyCode::LeftAlt
+        ) && self.consume_suppressed_leap_release()
+        {
+            return None;
+        }
+        if self
+            .pending()
+            .is_some_and(|pending| pending.matches_key(released))
+        {
+            return self
+                .take_pending()
+                .map(|pending| TuiInputIntent::TapLeap(pending.direction()));
+        }
+        if self
+            .active()
+            .is_some_and(|active| active.matches_key(released))
+        {
+            self.clear_active();
+            return Some(TuiInputIntent::EndLeap);
+        }
+        None
+    }
+
+    pub(super) fn modifier_press(
+        &mut self,
+        key: ModifierKeyCode,
+    ) -> ModifierPress {
+        if key == ModifierKeyCode::RightControl {
+            self.set_right_control_held(true);
+            if let Some(active) = self.active() {
+                return ModifierPress::Intent(TuiInputIntent::LeapAgainActive(
+                    active.direction(),
+                ));
+            }
+            if let Some(pending) = self.promote_pending() {
+                return ModifierPress::Intent(TuiInputIntent::LeapAgain(
+                    pending.direction(),
+                ));
+            }
+            return ModifierPress::Consumed;
+        }
+
+        if matches!(
+            key,
+            ModifierKeyCode::LeftShift | ModifierKeyCode::RightShift | ModifierKeyCode::RightAlt
+        ) {
+            return ModifierPress::Consumed;
+        }
+
+        let Some(direction) = leap_direction_from_modifier(key) else {
+            if self.has_pending() {
+                self.clear_pending();
+                return ModifierPress::Consumed;
+            }
+            return ModifierPress::Pass;
+        };
+
+        if self.right_control_held() && !self.has_active() {
+            self.clear_leaps();
+            self.suppress_one_leap_release();
+            return ModifierPress::Intent(TuiInputIntent::LeapAgain(direction));
+        }
+
+        if self.has_active() {
+            return ModifierPress::Consumed;
+        }
+
+        if let Some(pending) = self.pending() {
+            if pending.key() != key {
+                self.clear_pending();
+                self.suppress_leap_releases(2);
+                return ModifierPress::Intent(TuiInputIntent::ExtendLastLeapHighlight);
+            }
+            return ModifierPress::Consumed;
+        }
+
+        self.begin_pending(direction, key);
+        ModifierPress::Consumed
+    }
+
+    pub(super) fn pending_structural_intent(
+        &mut self,
+        key: KeyCode,
+    ) -> Option<TuiInputIntent> {
+        let pending = self.pending()?;
+        let intent = match (pending.direction(), key) {
+            (LeapDirection::Backward, KeyCode::Home)
+            | (LeapDirection::Forward, KeyCode::End) => {
+                TuiInputIntent::LeapDocumentBoundary(pending.direction())
+            }
+            (LeapDirection::Backward, KeyCode::PageUp)
+            | (LeapDirection::Forward, KeyCode::PageDown) => {
+                TuiInputIntent::LeapDocumentStart(pending.direction())
+            }
+            _ => return None,
+        };
+        self.clear_pending();
+        self.set_active(pending);
+        Some(intent)
+    }
+
+    pub(super) fn prepare_key(&mut self, key: KeyCode) -> ModifierPress {
+        if self.has_pending() && matches!(key, KeyCode::Modifier(_)) {
+            self.clear_pending();
+            return ModifierPress::Consumed;
+        }
+        if let Some(pending) = self.promote_pending() {
+            return ModifierPress::Intent(TuiInputIntent::BeginLeap(
+                pending.direction(),
+            ));
+        }
+        ModifierPress::Pass
+    }
 }
 
 pub(super) fn editing_action_from_key(key: &KeyEvent) -> Option<Action> {
@@ -178,5 +321,63 @@ mod tests {
             leap_direction_from_modifier(ModifierKeyCode::RightControl),
             None
         );
+    }
+
+
+    #[test]
+    fn modifier_state_machine_keeps_terminal_details_inside_adapter() {
+        let mut state = TuiInputState::default();
+
+        assert_eq!(
+            state.modifier_press(ModifierKeyCode::LeftAlt),
+            ModifierPress::Consumed
+        );
+        assert!(state.has_pending());
+
+        assert_eq!(
+            state.prepare_key(KeyCode::Char('x')),
+            ModifierPress::Intent(TuiInputIntent::BeginLeap(LeapDirection::Forward))
+        );
+        assert!(state.has_active());
+
+        let release = KeyEvent::new_with_kind(
+            KeyCode::Modifier(ModifierKeyCode::LeftAlt),
+            KeyModifiers::NONE,
+            KeyEventKind::Release,
+        );
+        assert_eq!(
+            state.release_intent(&release),
+            Some(TuiInputIntent::EndLeap)
+        );
+        assert!(!state.has_active());
+    }
+
+    #[test]
+    fn opposite_pending_leap_requests_cat_highlight_extension() {
+        let mut state = TuiInputState::default();
+        assert_eq!(
+            state.modifier_press(ModifierKeyCode::LeftAlt),
+            ModifierPress::Consumed
+        );
+        assert_eq!(
+            state.modifier_press(ModifierKeyCode::LeftControl),
+            ModifierPress::Intent(TuiInputIntent::ExtendLastLeapHighlight)
+        );
+        assert!(!state.has_pending());
+    }
+
+    #[test]
+    fn right_control_promotes_pending_leap_again() {
+        let mut state = TuiInputState::default();
+        assert_eq!(
+            state.modifier_press(ModifierKeyCode::LeftControl),
+            ModifierPress::Consumed
+        );
+        assert_eq!(
+            state.modifier_press(ModifierKeyCode::RightControl),
+            ModifierPress::Intent(TuiInputIntent::LeapAgain(LeapDirection::Backward))
+        );
+        assert!(state.has_active());
+        assert!(state.right_control_held());
     }
 }

@@ -26,7 +26,7 @@ use crossterm::terminal::{
     LeaveAlternateScreen,
 };
 use input::{
-    editing_action_from_key, emergency_kill_event, leap_direction_from_modifier, TuiInputState,
+    editing_action_from_key, emergency_kill_event, ModifierPress, TuiInputIntent, TuiInputState,
 };
 use pulldown_cmark::{
     Event as MarkdownEvent, Parser as MarkdownParser, Tag as MarkdownTag, TagEnd as MarkdownTagEnd,
@@ -448,6 +448,49 @@ impl ClipboardBridge {
     }
 }
 
+fn apply_input_intent(
+    app: &mut App,
+    dispatcher: &mut Dispatcher,
+    intent: TuiInputIntent,
+) -> Result<(), Box<dyn Error>> {
+    match intent {
+        TuiInputIntent::TapLeap(direction) => app.cat_tap_leap(direction),
+        TuiInputIntent::EndLeap => {
+            if matches!(app.mode, AppMode::Leap { .. }) {
+                app.dispatch_action(Action::EndLeap, Instant::now());
+            }
+        }
+        TuiInputIntent::LeapAgain(direction) => app.leap_again(direction),
+        TuiInputIntent::LeapAgainActive(direction) => {
+            if matches!(app.mode, AppMode::Leap { palette: false, .. }) {
+                app.leap_again_active();
+            } else {
+                app.leap_again_preserving_anchor(direction);
+            }
+        }
+        TuiInputIntent::ExtendLastLeapHighlight => {
+            if app.extend_last_leap_highlight() {
+                if let Some(text) = app.editor.selected_text() {
+                    if let Err(error) = dispatcher.clipboard.set_text(text) {
+                        app.status =
+                            format!("Cat highlight active; clipboard unavailable: {error}");
+                    }
+                }
+            }
+        }
+        TuiInputIntent::BeginLeap(direction) => {
+            app.dispatch_action(Action::BeginLeap(direction), Instant::now());
+        }
+        TuiInputIntent::LeapDocumentBoundary(direction) => {
+            app.leap_document_boundary(direction);
+        }
+        TuiInputIntent::LeapDocumentStart(direction) => {
+            app.leap_document_start(direction);
+        }
+    }
+    Ok(())
+}
+
 fn handle_key(
     app: &mut App,
     dispatcher: &mut Dispatcher,
@@ -455,35 +498,8 @@ fn handle_key(
     enhanced: bool,
 ) -> Result<(), Box<dyn Error>> {
     if key.kind == KeyEventKind::Release {
-        if let KeyCode::Modifier(released) = key.code {
-            if released == ModifierKeyCode::RightControl {
-                dispatcher.input.set_right_control_held(false);
-                return Ok(());
-            }
-            if matches!(
-                released,
-                ModifierKeyCode::LeftControl | ModifierKeyCode::LeftAlt
-            ) && dispatcher.input.consume_suppressed_leap_release()
-            {
-                return Ok(());
-            }
-            if dispatcher
-                .input
-                .pending()
-                .is_some_and(|pending| pending.matches_key(released))
-            {
-                let pending = dispatcher.input.take_pending().unwrap();
-                app.cat_tap_leap(pending.direction());
-            } else if dispatcher
-                .input
-                .active()
-                .is_some_and(|active| active.matches_key(released))
-            {
-                dispatcher.input.clear_active();
-                if matches!(app.mode, AppMode::Leap { .. }) {
-                    app.dispatch_action(Action::EndLeap, Instant::now());
-                }
-            }
+        if let Some(intent) = dispatcher.input.release_intent(&key) {
+            apply_input_intent(app, dispatcher, intent)?;
         }
         return Ok(());
     }
@@ -514,23 +530,6 @@ fn handle_key(
             app.execute(carta_tui::Command::NewDocument)?;
         }
         return Ok(());
-    }
-
-    if dispatcher.input.right_control_held()
-        && !dispatcher.input.has_active()
-        && enhanced
-        && key.kind == KeyEventKind::Press
-    {
-        if let KeyCode::Modifier(key @ (ModifierKeyCode::LeftControl | ModifierKeyCode::LeftAlt)) =
-            key.code
-        {
-            dispatcher.input.clear_leaps();
-            dispatcher.input.suppress_one_leap_release();
-            let direction =
-                leap_direction_from_modifier(key).expect("matched physical LEAP modifier");
-            app.leap_again(direction);
-            return Ok(());
-        }
     }
 
     if dispatcher.input.right_control_held()
@@ -689,25 +688,9 @@ fn handle_key(
     }
 
     if enhanced {
-        if let Some(pending) = dispatcher.input.pending() {
-            let handled = match (pending.direction(), key.code) {
-                (LeapDirection::Backward, KeyCode::Home)
-                | (LeapDirection::Forward, KeyCode::End) => {
-                    app.leap_document_boundary(pending.direction());
-                    true
-                }
-                (LeapDirection::Backward, KeyCode::PageUp)
-                | (LeapDirection::Forward, KeyCode::PageDown) => {
-                    app.leap_document_start(pending.direction());
-                    true
-                }
-                _ => false,
-            };
-            if handled {
-                dispatcher.input.clear_pending();
-                dispatcher.input.set_active(pending);
-                return Ok(());
-            }
+        if let Some(intent) = dispatcher.input.pending_structural_intent(key.code) {
+            apply_input_intent(app, dispatcher, intent)?;
+            return Ok(());
         }
     }
 
@@ -759,65 +742,22 @@ fn handle_key(
     }
 
     if enhanced && key.kind == KeyEventKind::Press {
-        match key.code {
-            KeyCode::Modifier(ModifierKeyCode::RightControl) => {
-                dispatcher.input.set_right_control_held(true);
-                if let Some(active) = dispatcher.input.active() {
-                    if matches!(app.mode, AppMode::Leap { palette: false, .. }) {
-                        app.leap_again_active();
-                    } else {
-                        app.leap_again_preserving_anchor(active.direction());
-                    }
-                } else if let Some(pending) = dispatcher.input.promote_pending() {
-                    app.leap_again(pending.direction());
-                }
-                return Ok(());
-            }
-            KeyCode::Modifier(
-                ModifierKeyCode::LeftShift
-                | ModifierKeyCode::RightShift
-                | ModifierKeyCode::RightAlt,
-            ) => {
-                return Ok(());
-            }
-            KeyCode::Modifier(key @ (ModifierKeyCode::LeftControl | ModifierKeyCode::LeftAlt)) => {
-                if dispatcher.input.has_active() {
-                    // Canon Cat: the opposite LEAP key is ignored while a LEAP query is active.
-                    // Extended highlighting is requested by pressing both LEAP keys after the LEAP.
+        if let KeyCode::Modifier(modifier) = key.code {
+            match dispatcher.input.modifier_press(modifier) {
+                ModifierPress::Consumed => return Ok(()),
+                ModifierPress::Intent(intent) => {
+                    apply_input_intent(app, dispatcher, intent)?;
                     return Ok(());
                 }
-                if let Some(pending) = dispatcher.input.pending() {
-                    if pending.key() != key {
-                        dispatcher.input.clear_pending();
-                        dispatcher.input.suppress_leap_releases(2);
-                        if app.extend_last_leap_highlight() {
-                            if let Some(text) = app.editor.selected_text() {
-                                if let Err(error) = dispatcher.clipboard.set_text(text) {
-                                    app.status = format!(
-                                        "Cat highlight active; clipboard unavailable: {error}"
-                                    );
-                                }
-                            }
-                        }
-                        return Ok(());
-                    }
-                    return Ok(());
-                }
-                let direction =
-                    leap_direction_from_modifier(key).expect("matched physical LEAP modifier");
-                dispatcher.input.begin_pending(direction, key);
-                return Ok(());
+                ModifierPress::Pass => {}
             }
-            _ => {}
         }
     }
 
-    if dispatcher.input.has_pending() && matches!(key.code, KeyCode::Modifier(_)) {
-        dispatcher.input.clear_pending();
-        return Ok(());
-    }
-    if let Some(pending) = dispatcher.input.promote_pending() {
-        app.dispatch_action(Action::BeginLeap(pending.direction()), Instant::now());
+    match dispatcher.input.prepare_key(key.code) {
+        ModifierPress::Consumed => return Ok(()),
+        ModifierPress::Intent(intent) => apply_input_intent(app, dispatcher, intent)?,
+        ModifierPress::Pass => {}
     }
 
     if let AppMode::Palette { query, selected } = &app.mode {
