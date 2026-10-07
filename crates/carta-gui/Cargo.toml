@@ -1,0 +1,18 @@
+[package]
+name = "carta-gui"
+version = "0.2.0"
+edition = "2021"
+rust-version = "1.88"
+license = "GPL-3.0-or-later"
+publish = false
+
+[dependencies]
+carta-app = { path = "../carta-app" }
+carta-core = { path = "../carta-core" }
+iced = { version = "=0.14.0", default-features = false, features = [
+    "advanced",
+    "wgpu",
+    "wayland",
+    "x11",
+    "thread-pool",
+] }

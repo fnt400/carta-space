@@ -1,0 +1,59 @@
+name: Carta GUI
+
+on:
+  push:
+    branches:
+      - opencode/v0.2
+    paths:
+      - "crates/carta-gui/**"
+      - "crates/carta-app/**"
+      - "crates/carta-core/**"
+      - "crates/carta-format/**"
+      - ".github/workflows/carta-gui.yml"
+  pull_request:
+    paths:
+      - "crates/carta-gui/**"
+      - "crates/carta-app/**"
+      - "crates/carta-core/**"
+      - "crates/carta-format/**"
+      - ".github/workflows/carta-gui.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build GUI (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+          - macos-15
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Linux development libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            libwayland-dev \
+            libxkbcommon-dev \
+            pkg-config
+
+      - name: Install current stable Rust
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+
+      - name: Check GUI formatting
+        run: cargo +stable fmt --manifest-path crates/carta-gui/Cargo.toml -- --check
+
+      - name: Clippy GUI
+        run: cargo +stable clippy --manifest-path crates/carta-gui/Cargo.toml --all-targets -- -D warnings
+
+      - name: Build GUI
+        run: cargo +stable build --manifest-path crates/carta-gui/Cargo.toml

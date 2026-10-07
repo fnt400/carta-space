@@ -7,7 +7,7 @@ members = [
     "crates/carta-tui",
     "crates/carta-publish",
 ]
-exclude = ["experiments/keyboard-events", "experiments/iced-input-probe"]
+exclude = ["crates/carta-gui", "experiments/keyboard-events", "experiments/iced-input-probe"]
 resolver = "2"
 
 [workspace.package]
