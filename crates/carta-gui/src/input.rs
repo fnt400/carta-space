@@ -210,7 +210,7 @@ impl GuiInputState {
             }
             Code::Tab if !in_leap => {
                 app.dispatch_action(Action::Indent, Instant::now());
-                return;
+                return Ok(());
             }
             _ => {}
         }
