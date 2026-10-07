@@ -2,10 +2,10 @@ use std::collections::VecDeque;
 
 use iced::advanced::input_method::Event as InputMethodEvent;
 use iced::event::{self, Status};
-use iced::keyboard::Event as KeyboardEvent;
 use iced::keyboard::key::{Code, Physical};
+use iced::keyboard::Event as KeyboardEvent;
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
-use iced::{Element, Event, Length, Subscription, window};
+use iced::{window, Element, Event, Length, Subscription};
 
 const MAX_LOG_LINES: usize = 160;
 
@@ -300,15 +300,30 @@ fn view(state: &Probe) -> Element<'_, Message> {
     .padding(10);
 
     let checks = column![
-        text(check_line("Left Ctrl DOWN + UP", state.left_control.complete())),
-        text(check_line("Right Ctrl DOWN + UP", state.right_control.complete())),
+        text(check_line(
+            "Left Ctrl DOWN + UP",
+            state.left_control.complete()
+        )),
+        text(check_line(
+            "Right Ctrl DOWN + UP",
+            state.right_control.complete()
+        )),
         text(check_line("Left Alt DOWN + UP", state.left_alt.complete())),
-        text(check_line("Right Alt DOWN + UP", state.right_alt.complete())),
+        text(check_line(
+            "Right Alt DOWN + UP",
+            state.right_alt.complete()
+        )),
         text(check_line("Normal text input", state.text_input_seen)),
         text(check_line("Unicode / non-ASCII input", state.unicode_seen)),
         text(check_line("AltGr produced text", state.altgr_text_seen)),
-        text(optional_check_line("IME preedit observed", state.ime_preedit_seen)),
-        text(optional_check_line("IME commit observed", state.ime_commit_seen)),
+        text(optional_check_line(
+            "IME preedit observed",
+            state.ime_preedit_seen
+        )),
+        text(optional_check_line(
+            "IME commit observed",
+            state.ime_commit_seen
+        )),
     ]
     .spacing(3);
 
