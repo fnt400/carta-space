@@ -594,9 +594,11 @@ If the target has been Wiped, the link remains unresolved.
 
 Backlinks are derived.
 
-`Show Backlinks` is available in v0.1 and reuses Search Results View rather than introducing a separate persistent panel or View type.
+`Show Backlinks` opens a transient dmenu-like selector rather than a persistent panel or View. It contains one row for each inbound link occurrence, showing the source Document label and the text line containing that link. Typing filters those rows with the same lightweight matching used by other selectors; confirming a row opens its source Document directly at the link occurrence. If there are no inbound links, the command reports `No backlinks` without changing View.
 
-No backlink list is canonical metadata.
+The reference implementation MAY keep a disposable persistent backlink cache outside the Archive. The cache is validated against source-file modification time and size, updated incrementally for Documents changed through Carta, and may be rebuilt from canonical Markdown at any time. Cache corruption, absence, or an incompatible cache version MUST NOT make the Archive invalid or lose authored data.
+
+No backlink list or backlink cache is canonical metadata.
 
 ---
 

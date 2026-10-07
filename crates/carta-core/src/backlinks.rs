@@ -102,11 +102,13 @@ impl BacklinkIndex {
     }
 
     pub(crate) fn enable_cache(&mut self, cache_root: PathBuf, archive: ArchiveId) {
-        self.cache_path = Some(
-            cache_root
-                .join("backlinks-v1")
-                .join(format!("{archive}.json")),
-        );
+        let path = cache_root
+            .join("backlinks-v1")
+            .join(format!("{archive}.json"));
+        if self.cache_path.as_ref() == Some(&path) {
+            return;
+        }
+        self.cache_path = Some(path);
         self.dirty = true;
         self.flush();
     }

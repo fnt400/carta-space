@@ -7,8 +7,8 @@ use carta_tui::app::{AppMode, View};
 use carta_tui::editor::{visual_ranges, Cursor};
 use carta_tui::help::{documents as help_documents, HelpKind};
 use carta_tui::session::{
-    current_host_name, data_root, default_archive_path, load_host_settings, load_session,
-    migrate_legacy_state, save_host_settings, save_session, HostSettings,
+    cache_root, current_host_name, data_root, default_archive_path, load_host_settings,
+    load_session, migrate_legacy_state, save_host_settings, save_session, HostSettings,
 };
 use carta_tui::App;
 use chrono::{Datelike, Local, Timelike};
@@ -209,6 +209,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let data = data_root()?;
     fs::create_dir_all(&data)?;
     migrate_legacy_state(&data)?;
+    let cache = cache_root().ok();
 
     let explicit_path = args.path.is_some();
     let path = match args.path {
@@ -222,9 +223,14 @@ fn run() -> Result<(), Box<dyn Error>> {
             return Ok(());
         };
         archive
+    } else if let Some(cache_root) = cache.as_deref() {
+        Archive::open_with_backlink_cache(&path, cache_root)?
     } else {
         Archive::open(&path)?
     };
+    if let Some(cache_root) = cache.as_deref() {
+        archive.enable_backlink_cache(cache_root);
+    }
     let startup_sync_status = if archive.is_dirty()? {
         None
     } else {
@@ -237,6 +243,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             Err(error) => Some(format!("Sync unavailable: {error}")),
         }
     };
+    archive.flush_backlink_cache();
     let (session, session_fallback_status) =
         match load_session(&data, archive.metadata().archive_id()) {
             Ok(session) => (session, None),

@@ -95,6 +95,7 @@ pub enum SelectAction {
     AddToWork,
     MoveAfter,
     InsertLink,
+    OpenBacklink,
     OpenSearchResult,
     RestoreHistory,
     RestoreHistoryAsNew,
@@ -1273,6 +1274,7 @@ impl App {
                 self.reload_view(None)?;
             }
             SelectAction::InsertLink => self.insert_link_choice(&value, &label)?,
+            SelectAction::OpenBacklink => self.open_backlink_choice(&value)?,
             _ => {}
         }
         Ok(())
@@ -2533,31 +2535,54 @@ impl App {
     fn show_backlinks(&mut self) -> AppResult {
         let id = self.current_document()?;
         let backlinks = self.archive.backlinks(CartaLinkTarget::Document(id))?;
-        let mut rows = Vec::new();
-        for backlink in backlinks {
-            let doc = self.archive.read_document(backlink.source())?;
-            let range = backlink.link().source_range();
-            let line_start = doc.content()[..range.start]
-                .rfind('\n')
-                .map_or(0, |i| i + 1);
-            let line_end = doc.content()[range.end..]
-                .find('\n')
-                .map_or(doc.content().len(), |i| range.end + i);
-            rows.push(ResultRow {
-                document: backlink.source(),
-                created: doc.metadata().created(),
-                label: doc.derived_label(),
-                context: doc.content()[line_start..line_end].to_owned(),
-                byte: range.start,
-            });
+        if backlinks.is_empty() {
+            self.status = "No backlinks".into();
+            self.mode = AppMode::Editing;
+            return Ok(());
         }
-        self.push_navigation();
-        self.search_results = rows;
-        self.view = View::Search {
-            query: "Backlinks".into(),
+
+        let choices = backlinks
+            .into_iter()
+            .map(|backlink| {
+                let range = backlink.link().source_range();
+                Choice {
+                    label: format!("{} · {}", backlink.label(), backlink.context()),
+                    value: format!("{}:{}", backlink.source(), range.start),
+                }
+            })
+            .collect::<Vec<_>>();
+        self.archive.flush_backlink_cache();
+        self.mode = AppMode::Selector {
+            title: format!("Backlinks ({})", choices.len()),
+            query: String::new(),
             selected: 0,
+            choices,
+            action: SelectAction::OpenBacklink,
         };
-        self.load_search_editor()?;
+        Ok(())
+    }
+
+    fn open_backlink_choice(&mut self, value: &str) -> AppResult {
+        let (document, byte) = value
+            .split_once(':')
+            .ok_or("invalid backlink selector value")?;
+        let document: DocumentId = document.parse()?;
+        let byte: usize = byte.parse()?;
+        self.open_document(document, true)?;
+        let Some(region) = self
+            .editor
+            .regions()
+            .iter()
+            .position(|region| region.document == document)
+        else {
+            return Err("backlink source is not visible after navigation".into());
+        };
+        let text = &self.editor.regions()[region].text;
+        let byte = byte.min(text.len());
+        if text.is_char_boundary(byte) {
+            self.editor
+                .set_cursor(Cursor { region, byte }, false);
+        }
         Ok(())
     }
     pub fn activate_link_shortcut(&mut self) -> AppResult {
@@ -2725,18 +2750,10 @@ impl App {
             details.push("  (none)".to_owned());
         } else {
             for backlink in impact.inbound_links() {
-                let source = self.archive.read_document(backlink.source())?;
-                let range = backlink.link().source_range();
-                let line_start = source.content()[..range.start]
-                    .rfind('\n')
-                    .map_or(0, |index| index + 1);
-                let line_end = source.content()[range.end..]
-                    .find('\n')
-                    .map_or(source.content().len(), |index| range.end + index);
                 details.push(format!(
                     "  {}: {}",
-                    source.derived_label(),
-                    source.content()[line_start..line_end].trim()
+                    backlink.label(),
+                    backlink.context()
                 ));
             }
         }
@@ -4870,6 +4887,55 @@ mod tests {
         app.execute(Command::UnlockDocument).unwrap();
         assert!(!app.archive.document_is_locked(document).unwrap());
         assert!(app.cat_insert("x"));
+    }
+
+    #[test]
+    fn backlinks_open_a_fuzzy_selector_and_jump_to_the_occurrence() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let target = archive.create_document("# Target").unwrap();
+        let source_text = format!(
+            "# Source\n\nalpha [first](carta:doc:{target})\n\nneedle [second](carta:doc:{target})"
+        );
+        let source = archive.create_document(&source_text).unwrap();
+        let second = source_text.find("[second]").unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        app.open_document(target, false).unwrap();
+
+        app.execute(Command::ShowBacklinks).unwrap();
+        let AppMode::Selector {
+            query,
+            choices,
+            action,
+            ..
+        } = &mut app.mode
+        else {
+            panic!("expected backlink selector")
+        };
+        assert_eq!(*action, SelectAction::OpenBacklink);
+        assert_eq!(choices.len(), 2);
+        assert!(choices.iter().any(|choice| choice.label.contains("alpha")));
+        assert!(choices.iter().any(|choice| choice.label.contains("needle")));
+        *query = "needle".into();
+
+        app.submit_selector().unwrap();
+
+        assert_eq!(app.editor.current_document(), Some(source));
+        assert_eq!(app.editor.cursor().byte, second);
+    }
+
+    #[test]
+    fn backlinks_with_no_matches_leave_the_document_in_place() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let document = app.current_document().unwrap();
+
+        app.execute(Command::ShowBacklinks).unwrap();
+
+        assert!(matches!(app.mode, AppMode::Editing));
+        assert_eq!(app.editor.current_document(), Some(document));
+        assert_eq!(app.status, "No backlinks");
     }
 
     #[test]

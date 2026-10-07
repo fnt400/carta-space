@@ -75,6 +75,22 @@ pub fn data_root() -> io::Result<PathBuf> {
     Ok(PathBuf::from(home).join(".local/share/carta"))
 }
 
+pub fn cache_root() -> io::Result<PathBuf> {
+    if let Some(path) = std::env::var_os("XDG_CACHE_HOME") {
+        let path = PathBuf::from(path);
+        if path.is_absolute() {
+            return Ok(path.join("carta"));
+        }
+    }
+    let home = std::env::var_os("HOME").ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            "HOME is unset and XDG_CACHE_HOME is not an absolute path",
+        )
+    })?;
+    Ok(PathBuf::from(home).join(".cache/carta"))
+}
+
 pub fn default_archive_path() -> io::Result<PathBuf> {
     Ok(data_root()?.join("archive"))
 }
