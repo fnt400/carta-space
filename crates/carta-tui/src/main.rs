@@ -2,6 +2,7 @@ mod theme;
 
 #[cfg(not(test))]
 use arboard::Clipboard;
+use carta_app::Action;
 use carta_core::{Archive, LeapDirection, SyncOutcome};
 use carta_tui::app::{AppMode, View};
 use carta_tui::editor::{visual_ranges, Cursor};
@@ -502,7 +503,7 @@ fn handle_key(
             {
                 dispatcher.active_leap = None;
                 if matches!(app.mode, AppMode::Leap { .. }) {
-                    app.end_leap();
+                    app.dispatch_action(Action::EndLeap, Instant::now());
                 }
             }
         }
@@ -646,8 +647,7 @@ fn handle_key(
                     }
                     Ok(text) => {
                         let text = normalize_clipboard_text(&text);
-                        if app.cat_insert(&text) {
-                            app.edited(Instant::now());
+                        if app.dispatch_action(Action::InsertText(text), Instant::now()) {
                             app.status.clear();
                         }
                     }
@@ -852,7 +852,7 @@ fn handle_key(
     }
     if let Some(pending) = dispatcher.pending_leap.take() {
         dispatcher.active_leap = Some(pending);
-        app.start_leap(pending.direction, false);
+        app.dispatch_action(Action::BeginLeap(pending.direction), Instant::now());
     }
 
     if let AppMode::Palette { query, selected } = &app.mode {
@@ -887,18 +887,17 @@ fn handle_key(
     match &mut app.mode {
         AppMode::Leap { .. } => match key.code {
             KeyCode::Char(c) => {
-                let mut encoded = [0_u8; 4];
-                app.leap_input(c.encode_utf8(&mut encoded));
+                app.dispatch_action(Action::LeapInput(c.to_string()), Instant::now());
             }
-            KeyCode::Backspace => app.leap_backspace(),
+            KeyCode::Backspace => {
+                app.dispatch_action(Action::LeapBackspace, Instant::now());
+            }
             KeyCode::Enter => {
-                if matches!(app.mode, AppMode::Leap { palette: true, .. }) {
-                    app.end_leap();
-                } else {
-                    app.leap_input("\n");
-                }
+                app.dispatch_action(Action::LeapEnter, Instant::now());
             }
-            KeyCode::Esc => app.cancel_leap(),
+            KeyCode::Esc => {
+                app.dispatch_action(Action::CancelLeap, Instant::now());
+            }
             _ => {}
         },
         AppMode::Palette { .. } => unreachable!(),
@@ -985,6 +984,20 @@ fn normalize_clipboard_text(text: &str) -> String {
     text.replace("\r\n", "\n").replace('\r', "\n")
 }
 
+fn editing_action_from_key(key: &KeyEvent) -> Option<Action> {
+    match key.code {
+        KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+            Some(Action::InsertText(c.to_string()))
+        }
+        KeyCode::Enter => Some(Action::InsertLineBreak),
+        KeyCode::Tab if key.modifiers.contains(KeyModifiers::SHIFT) => Some(Action::Outdent),
+        KeyCode::Tab => Some(Action::Indent),
+        KeyCode::Backspace => Some(Action::Backspace),
+        KeyCode::Delete => Some(Action::Erase),
+        _ => None,
+    }
+}
+
 fn handle_normal(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
     if key.code == KeyCode::Esc {
         if matches!(app.view, View::Help { .. }) {
@@ -1027,64 +1040,48 @@ fn handle_normal(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+    if let Some(action) = editing_action_from_key(&key) {
+        app.dispatch_action(action, Instant::now());
+        return Ok(());
+    }
+
     let (terminal_width, height) = crossterm::terminal::size().unwrap_or((80, 24));
     let width = editor_width(terminal_width);
     let page = usize::from(height.saturating_sub(2).max(1));
-    let changed = match key.code {
-        KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-            let mut encoded = [0_u8; 4];
-            app.cat_insert(c.encode_utf8(&mut encoded))
-        }
-        KeyCode::Enter => app.cat_insert_newline(),
-        KeyCode::Tab if shift => app.cat_indent_less(),
-        KeyCode::Tab => app.cat_insert("    "),
-        KeyCode::Backspace => app.cat_backspace(),
-        KeyCode::Delete => app.cat_erase(),
+    match key.code {
         KeyCode::Left => {
             app.editor.move_horizontal(false, false);
             app.cat_navigation();
-            false
         }
         KeyCode::Right => {
             app.editor.move_horizontal(true, false);
             app.cat_navigation();
-            false
         }
         KeyCode::Up => {
             app.editor.move_visual(false, width, false);
             app.cat_navigation();
-            false
         }
         KeyCode::Down => {
             app.editor.move_visual(true, width, false);
             app.cat_navigation();
-            false
         }
         KeyCode::Home => {
             app.editor.visual_home(width, false);
             app.cat_navigation();
-            false
         }
         KeyCode::End => {
             app.editor.visual_end(width, false);
             app.cat_navigation();
-            false
         }
         KeyCode::PageUp => {
             app.editor.page_visual(false, page, width, false);
             app.cat_navigation();
-            false
         }
         KeyCode::PageDown => {
             app.editor.page_visual(true, page, width, false);
             app.cat_navigation();
-            false
         }
-        _ => false,
-    };
-    if changed {
-        app.edited(Instant::now());
+        _ => {}
     }
     Ok(())
 }
@@ -4703,6 +4700,42 @@ mod tests {
         assert!(matches!(app.mode, AppMode::Editing));
         assert_eq!(app.editor.cursor().byte, 7);
         assert_eq!(app.editor.current_text(), Some(original.as_str()));
+    }
+
+    #[test]
+    fn editing_keys_translate_to_frontend_neutral_actions() {
+        assert_eq!(
+            editing_action_from_key(&KeyEvent::new(KeyCode::Char('É'), KeyModifiers::NONE)),
+            Some(Action::InsertText("É".into()))
+        );
+        assert_eq!(
+            editing_action_from_key(&KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
+            Some(Action::InsertLineBreak)
+        );
+        assert_eq!(
+            editing_action_from_key(&KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE)),
+            Some(Action::Indent)
+        );
+        assert_eq!(
+            editing_action_from_key(&KeyEvent::new(KeyCode::Tab, KeyModifiers::SHIFT)),
+            Some(Action::Outdent)
+        );
+        assert_eq!(
+            editing_action_from_key(&KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE)),
+            Some(Action::Backspace)
+        );
+        assert_eq!(
+            editing_action_from_key(&KeyEvent::new(KeyCode::Delete, KeyModifiers::NONE)),
+            Some(Action::Erase)
+        );
+        assert_eq!(
+            editing_action_from_key(&KeyEvent::new(KeyCode::Left, KeyModifiers::NONE)),
+            None
+        );
+        assert_eq!(
+            editing_action_from_key(&KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)),
+            None
+        );
     }
 
     #[test]

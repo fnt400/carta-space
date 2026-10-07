@@ -2,6 +2,7 @@ use crate::editor::{CompositeEditor, Cursor, Region};
 use crate::help::{documents as help_documents, HelpKind};
 use crate::palette;
 use crate::session::{Position, SavedView, Session};
+use carta_app::Action;
 use carta_core::{
     Archive, CartaLinkTarget, CheckpointKind, Conflict, ConflictChoice, DocumentId, LeapDirection,
     LeapPosition, LeapRuntime, LeapSession, SyncOutcome, Volume, WorkId, WorkRestoreOptions,
@@ -1308,6 +1309,53 @@ impl App {
 
     pub fn edited(&mut self, now: Instant) {
         self.scheduler.edited(now);
+    }
+
+    /// Apply a frontend-neutral semantic action.
+    ///
+    /// This is the first v0.2 input seam: platform frontends translate native
+    /// events into `Action` values before invoking Carta behavior.
+    pub fn dispatch_action(&mut self, action: Action, now: Instant) -> bool {
+        let changed = match action {
+            Action::InsertText(value) => self.cat_insert(&value),
+            Action::InsertLineBreak => self.cat_insert_newline(),
+            Action::Indent => self.cat_insert("    "),
+            Action::Outdent => self.cat_indent_less(),
+            Action::Backspace => self.cat_backspace(),
+            Action::Erase => self.cat_erase(),
+            Action::BeginLeap(direction) => {
+                self.start_leap(direction, false);
+                false
+            }
+            Action::EndLeap => {
+                self.end_leap();
+                false
+            }
+            Action::LeapInput(value) => {
+                self.leap_input(&value);
+                false
+            }
+            Action::LeapBackspace => {
+                self.leap_backspace();
+                false
+            }
+            Action::LeapEnter => {
+                if matches!(&self.mode, AppMode::Leap { palette: true, .. }) {
+                    self.end_leap();
+                } else {
+                    self.leap_input("\n");
+                }
+                false
+            }
+            Action::CancelLeap => {
+                self.cancel_leap();
+                false
+            }
+        };
+        if changed {
+            self.edited(now);
+        }
+        changed
     }
 
     pub fn autosave(&mut self) -> AppResult {
