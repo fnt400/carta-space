@@ -3830,10 +3830,8 @@ mod tests {
             KeyCode::Home,
             KeyCode::End,
         ] {
-            let mut dispatcher = Dispatcher {
-                right_control_held: true,
-                ..Dispatcher::default()
-            };
+            let mut dispatcher = Dispatcher::default();
+            dispatcher.input.right_control_held = true;
             handle_key(
                 &mut app,
                 &mut dispatcher,
