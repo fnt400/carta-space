@@ -1,5 +1,5 @@
 {
-  description = "Carta Space — writing-first terminal document environment";
+  description = "Carta Space — writing-first document environment";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
@@ -15,7 +15,7 @@
           inherit (pkgs) lib stdenv;
           cartaSpace = pkgs.rustPlatform.buildRustPackage {
             pname = "carta-space";
-            version = "0.1.1";
+            version = "0.2.0";
 
             src = self;
 
@@ -59,7 +59,7 @@
             '';
 
             meta = {
-              description = "Writing-first terminal document environment";
+              description = "Writing-first document environment";
               homepage = "https://github.com/fnt400/carta-space";
               license = lib.licenses.gpl3Plus;
               mainProgram = "carta";

@@ -1,62 +1,16 @@
-use carta_core::{ArchiveId, DocumentId, Volume, WorkId};
+pub use carta_app::{Position, SavedView, Session};
+use carta_core::ArchiveId;
+#[cfg(test)]
+use carta_core::Volume;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum SavedView {
-    #[serde(alias = "Chronological")]
-    CreationDate {
-        year: u16,
-        month: u8,
-    },
-    ModificationDate,
-    Work {
-        id: WorkId,
-    },
-    Search {
-        query: String,
-        selected: usize,
-    },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Position {
-    pub document: DocumentId,
-    pub byte: usize,
-    pub scroll: usize,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Session {
-    pub view: SavedView,
-    pub position: Option<Position>,
-    #[serde(default)]
-    pub work_positions: BTreeMap<WorkId, Position>,
-    #[serde(default)]
-    pub work_mru: Vec<WorkId>,
-}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HostSettings {
     #[serde(default)]
     pub portable_keyboard_mode: bool,
-}
-
-impl Session {
-    pub fn new(volume: Volume) -> Self {
-        Self {
-            view: SavedView::CreationDate {
-                year: volume.year(),
-                month: volume.month(),
-            },
-            position: None,
-            work_positions: BTreeMap::new(),
-            work_mru: Vec::new(),
-        }
-    }
 }
 
 pub fn data_root() -> io::Result<PathBuf> {
@@ -255,15 +209,15 @@ mod tests {
             portable_keyboard_mode: true,
         };
 
-        save_host_settings(dir.path(), "nixosvm", &enabled).unwrap();
+        save_host_settings(dir.path(), "example-host", &enabled).unwrap();
 
-        assert_eq!(load_host_settings(dir.path(), "nixosvm").unwrap(), enabled);
+        assert_eq!(load_host_settings(dir.path(), "example-host").unwrap(), enabled);
         assert_eq!(
-            load_host_settings(dir.path(), "fermi").unwrap(),
+            load_host_settings(dir.path(), "other-host").unwrap(),
             HostSettings::default()
         );
-        assert!(dir.path().join("host-nixosvm.json").exists());
-        assert!(!dir.path().join("host-fermi.json").exists());
+        assert!(dir.path().join("host-example-host.json").exists());
+        assert!(!dir.path().join("host-other-host.json").exists());
     }
 
     #[test]
@@ -271,14 +225,14 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         save_host_settings(
             dir.path(),
-            "nixos vm / ssh",
+            "example host / ssh",
             &HostSettings {
                 portable_keyboard_mode: true,
             },
         )
         .unwrap();
 
-        assert!(dir.path().join("host-nixos-vm-ssh.json").exists());
+        assert!(dir.path().join("host-example-host-ssh.json").exists());
     }
 
     #[test]

@@ -1,0 +1,12 @@
+[package]
+name = "carta-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+carta-core = { path = "../carta-core" }
+serde.workspace = true
+serde_json.workspace = true
+unicode-width = "0.2.0"

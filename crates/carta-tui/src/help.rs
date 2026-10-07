@@ -1,8 +1,4 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HelpKind {
-    Cheatsheet,
-    Manual,
-}
+pub use carta_app::HelpKind;
 
 #[derive(Debug, Clone, Copy)]
 pub struct HelpDocument {
