@@ -276,7 +276,9 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     while !app.quit {
         if redraw {
-            terminal.terminal.draw(|frame| draw(frame, &mut app, dispatcher.input.portable_enabled()))?;
+            terminal
+                .terminal
+                .draw(|frame| draw(frame, &mut app, dispatcher.input.portable_enabled()))?;
             redraw = false;
         }
         match input.recv_timeout(Duration::from_millis(100)) {
@@ -1215,7 +1217,7 @@ fn draw(frame: &mut ratatui::Frame<'_>, app: &mut App, portable_enabled: bool) {
             usize::from(chunks[1].width),
             portable_enabled,
         ))
-            .style(status_style(app)),
+        .style(status_style(app)),
         chunks[1],
     );
     draw_mode(frame, app, portable_enabled);
