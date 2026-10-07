@@ -518,3 +518,18 @@ Operations that require the host platform should eventually leave `carta-app` as
 **Why:** This keeps the interaction engine independently testable and makes additional desktop, web, or mobile surfaces possible without duplicating behavior.
 
 **Constraint:** Do not build a speculative generic platform framework. Introduce Action/Effect boundaries incrementally around real v0.2 requirements.
+
+
+---
+
+## DD-046 — Stop speculative extraction at the pre-GUI boundary
+
+**Decision:** The preparatory extraction from the terminal frontend is complete once the canonical `App`, editor, View/AppMode state, LEAP semantics, semantic `Action` values, shared prompt/confirmation/selector `ModeAction` handling, scheduler, session model, and help content live in `carta-app`, while Crossterm state, Portable Keyboard Mode, terminal clipboard integration, terminal-only palette extensions, and rendering-dependent navigation remain in `carta-tui`.
+
+Further abstraction must be driven by a concrete requirement from the second frontend rather than by a desire to make `carta-app` mechanically pure.
+
+**Why:** Without a second concrete frontend, moving filesystem effects, visual navigation geometry, clipboard behavior, or other platform operations behind generic interfaces would force Carta to guess at abstractions before their requirements are known. That risks complexity, leaky interfaces, and accidental encoding of terminal assumptions into supposedly portable APIs.
+
+The desktop GUI will provide the second implementation needed to determine which remaining concerns genuinely require shared contracts.
+
+**Consequence:** The next architectural milestone is the desktop input/rendering prototype. Before implementing it, compare candidate input/windowing/toolkit approaches with the user, beginning with physical modifier press/release fidelity, AltGr/IME behavior, Unicode text input, portability, rendering quality, dependency weight, and integration with the existing Rust layers.
