@@ -221,7 +221,6 @@ dependencies = [
  "carta-app",
  "arboard",
  "carta-core",
- "carta-publish",
  "chrono",
  "clap",
  "crossterm",
