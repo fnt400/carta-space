@@ -5,7 +5,7 @@
 > **Platforms:** Linux and macOS  
 > **License:** GPL-3.0-or-later (software); CC0-1.0 (original project documentation).
 >
-> **Interface status:** v0.1.2 is the final terminal release. Development from v0.2 moves to the graphical frontend.
+> **Interface status:** v0.1.2 is the final terminal release. The development branch is now v0.2, centered on a shared application layer and a graphical desktop frontend.
 
 Carta Space is an experimental document environment inspired by Jef Raskin's work on the Canon Cat and later humane-interface research.
 
@@ -125,17 +125,19 @@ The helper programs under `scripts/` are development and maintenance tools. They
 
 ## Reference implementation architecture
 
-The initial implementation is planned as a small set of separable Rust components:
+The Rust workspace is split so that Carta behavior is not owned by one presentation layer:
 
 - `carta-format` — format types, validation, serialization, and compatibility rules;
-- `carta-core` — archive operations, Documents, Volumes, Works, LEAP search, history, Trash/Wipe, import/export;
+- `carta-core` — canonical Archive/domain operations: Documents, Volumes, Works, retrieval/LEAP, history, synchronization, Trash/Wipe and backlinks;
+- `carta-app` — reusable interactive application primitives. The first v0.2 extraction contains the editor, Cat highlight/undo engine, session model, View model, scheduler and palette matching;
 - `carta-publish` — frontend-independent publication layer with a replaceable PDF backend; the first backend uses Typst;
-- `carta-cli` — scriptable Unix-style administrative commands, producing the optional `carta-cli` binary;
-- `carta-tui` — the first interactive frontend, built with Ratatui and Crossterm, producing the user-facing `carta` binary.
+- `carta-cli` — scriptable Unix-style administrative commands;
+- `carta-tui` — the frozen v0.1.x terminal frontend, retained as a compatibility frontend and regression oracle while v0.2 is developed;
+- `carta-gui` — planned graphical desktop frontend for v0.2. It will be added after a small keyboard prototype validates physical Left/Right Ctrl/Alt press/release, AltGr and normal text input.
 
-The TUI is the reference interactive environment, not the definition of Carta Space. Future GTK, Emacs, web, or other frontends should use the same core model rather than reimplementing archive semantics.
+The architectural rule is one Carta behavior with multiple possible surfaces. Desktop, terminal, web and mobile frontends should translate native events into shared application semantics and render shared state rather than reimplementing the editor.
 
-The reference terminal environment successfully distinguished physical left and right Control and reported separate press/release events through Crossterm enhanced keyboard reporting. The TUI uses them as the initial experimental bindings for the two momentary LEAP controls. Terminals without enhanced reporting use the approved palette LEAP commands instead. The key mapping is an implementation choice, not part of the archive format.
+The TUI demonstrated that enhanced terminal protocols can support the intended LEAP gesture in some terminals, but real Linux TTYs cannot portably expose the required physical modifier identity and release events without system-specific input access. For that reason v0.1.2 closes the terminal-first line. Portable Keyboard Mode remains a legacy compatibility mechanism, not the interaction model for v0.2.
 
 ## Interaction philosophy
 
@@ -280,7 +282,7 @@ If canonical Document content or Work structure changes externally while the TUI
 
 ## Current scope
 
-The current Rust workspace contains `carta-format`, `carta-core`, `carta-publish`, `carta-cli`, and `carta-tui`. The first usable v0.1 can create, read, validate, inspect, search, import, export, package, edit, navigate, recover, and administer Draft 0.1 Archives. It implements the Reader and Writer responsibilities, the accepted v0.1 interaction contract, and the explicitly scoped on-device Wipe guarantee. Draft 0.1 remains experimental and is not a stable 1.0 format.
+The current Rust workspace contains `carta-format`, `carta-core`, `carta-app`, `carta-publish`, `carta-cli`, and the frozen `carta-tui`. The first usable v0.1 can create, read, validate, inspect, search, import, export, package, edit, navigate, recover, and administer Draft 0.1 Archives. It implements the Reader and Writer responsibilities, the accepted v0.1 interaction contract, and the explicitly scoped on-device Wipe guarantee. Draft 0.1 remains experimental and is not a stable 1.0 format.
 
 The enhanced-keyboard-reporting experiment remains separate under `experiments/keyboard-events` as a diagnostic for terminal compatibility.
 

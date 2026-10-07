@@ -13,7 +13,7 @@ The user exercises Carta Space as a real writing environment and reports:
 - bugs;
 - interaction friction;
 - desired behavior changes;
-- terminal and keyboard observations;
+- terminal, GUI and keyboard observations;
 - failures that occur only in the real local environment.
 
 Dogfooding evidence has priority over speculative UX work.
@@ -43,9 +43,10 @@ OpenCode is normally responsible for operations that require the real local envi
 - Cargo tests;
 - builds;
 - reproducing runtime failures;
-- exercising the TUI;
-- keyboard-event probes;
-- terminal compatibility checks;
+- exercising the affected frontend;
+- physical-keyboard event probes;
+- terminal compatibility checks for the frozen TUI when relevant;
+- GUI window/input/rendering checks when relevant;
 - filesystem/Git/Distrobox-dependent checks;
 - reporting exact logs, backtraces, commands, and outcomes.
 
@@ -106,7 +107,7 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace
 ```
 
-Passing automated tests does not replace real runtime verification for terminal, keyboard, rendering, export, recovery, or other environment-dependent behavior.
+Passing automated tests does not replace real runtime verification for physical keyboard input, terminal/GUI rendering, export, recovery, or other environment-dependent behavior.
 
 ## Git discipline
 
@@ -124,4 +125,27 @@ Do not force-push, rewrite published history, or commit local temporary files.
 
 A change is not considered accepted merely because it was committed.
 
-For behavior visible in the TUI, acceptance requires the relevant local verification and, when appropriate, user dogfooding.
+For behavior visible in any frontend, acceptance requires the relevant local verification and, when appropriate, user dogfooding.
+
+
+## v0.2 architecture discipline
+
+The v0.1.2 terminal frontend is frozen. New v0.2 features must not be implemented only in `carta-tui`.
+
+Shared interaction behavior belongs in `carta-app` when it is independent of a specific presentation technology. Canonical Archive behavior remains in `carta-core`. Frontends should be adapters around those layers.
+
+The migration is incremental: do not move code merely to make directory diagrams look clean. Extract a behavior when its ownership is clear and preserve the frozen TUI as a regression oracle while the shared layer is being built.
+
+The intended next seam is:
+
+```text
+native input -> semantic Action -> carta-app -> state / Effect -> platform adapter
+```
+
+Do not design a large generic platform framework in advance. Introduce effects only for concrete host services such as clipboard, file selection/save, window integration or other operations that genuinely differ across desktop/web/mobile.
+
+## Privacy before push
+
+The GitHub repository is public. Before each push, review the diff as if it were being published immediately.
+
+Use synthetic test data. Do not commit private archive text, credentials, personal contact information, private infrastructure details, unnecessary hostnames/IPs, absolute personal paths, logs or screenshots containing local data. OpenCode failure reports must be sanitized before commit.

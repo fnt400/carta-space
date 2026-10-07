@@ -2,7 +2,9 @@
 
 > **Status:** accepted interaction contract for the first usable Carta Space frontend.
 >
-> This document specifies user-visible behavior for v0.1. It complements `SPECIFICATION.md`, which remains authoritative for the archive format. Frontends may differ visually, but they MUST NOT silently invent conflicting interaction semantics.
+> This document specifies user-visible behavior for v0.1 and is frozen as the behavioral baseline of the final v0.1.2 terminal release. It complements `SPECIFICATION.md`, which remains authoritative for the archive format. Frontends may differ visually, but they MUST NOT silently invent conflicting interaction semantics.
+>
+> **v0.2 note:** the graphical frontend may change presentation and remove terminal-only compatibility mechanisms from its normal interface, but the underlying writing, LEAP, Cat highlight, View, Work, history, Trash/Wipe and recovery semantics remain the starting contract unless a later accepted design decision explicitly supersedes them. Portable Keyboard Mode is a legacy TUI fallback, not the canonical v0.2 interaction.
 
 Carta Space v0.1 is writing-first. The normal path is: open, continue writing, retrieve or compose when necessary, and publish only when necessary.
 

@@ -280,6 +280,8 @@ This separation is also the foundation for possible future GTK, Emacs, web, or o
 
 ## DD-023 — The first interactive frontend is a TUI
 
+> **Historical status:** fulfilled by v0.1.2. The terminal-first line is frozen; see DD-043.
+
 **Decision:** The initial interactive frontend will be a full-screen terminal application built with Ratatui and Crossterm rather than GTK.
 
 **Why:** Carta Space is primarily a keyboard-driven text environment and deliberately separates writing from final page presentation. A terminal UI therefore matches the project's minimal interaction model, works naturally over SSH, has low runtime overhead, and discourages premature addition of toolbars, panels, and presentation-oriented controls.
@@ -291,6 +293,8 @@ A graphical frontend remains a possible future frontend, not a competing core im
 ---
 
 ## DD-024 — Left Control and Left Alt are the reference TUI LEAP bindings
+
+> **Historical status:** retained for the frozen v0.1.2 TUI. The physical gesture remains the target for the v0.2 desktop frontend; see DD-043.
 
 **Decision:** In the reference TUI, physical Left Control is the binding for LEAP backward and physical Left Alt is the binding for LEAP forward. Physical Right Alt/AltGr and Right Control are not LEAP keys.
 
@@ -467,3 +471,50 @@ A dedicated writing device with a keyboard and simple display is therefore a nat
 **Why:** Dogfooding showed that a subtle stable color makes it easier to distinguish Works at a glance without adding persistent panels, icons, or other organizational chrome. Storing the choice avoids visually reassigning Works when archive order changes.
 
 **Constraint:** Color is not Work identity or structural semantics. Frontends may ignore it, colors may repeat, and title/order/membership behavior must not depend on it. Older implementations preserve it through the existing unknown-member rule.
+
+
+---
+
+## DD-043 — v0.1.2 closes the terminal-first line; v0.2 becomes graphical
+
+**Decision:** v0.1.2 is the final feature release of the terminal frontend. From v0.2 the canonical interactive frontend will be graphical and designed for Linux, Windows, and macOS.
+
+**Why:** The momentary LEAP interaction depends on physical modifier identity and press/release events. Enhanced terminal protocols can expose those events in some emulators, but real TTYs and many terminal chains cannot do so portably without privileged or system-specific raw input access. Portable Keyboard Mode is useful as an emergency compatibility path but is not the intended Carta interaction.
+
+A graphical application receives a richer native input event stream and also provides a better foundation for Unicode/IME handling, HiDPI text rendering, platform clipboard integration, themes, and later desktop portability without making those concerns part of the Archive model.
+
+**Constraint:** "Graphical" does not mean adopting conventional editor chrome. The writing surface remains quiet; toolbars, tabs, sidebars, file browsers and persistent panels require a demonstrated need.
+
+**Consequence:** `carta-tui` is frozen except for critical maintenance. It remains useful as a regression oracle and compatibility frontend while v0.2 is built.
+
+---
+
+## DD-044 — Shared interactive semantics live in carta-app
+
+**Decision:** Introduce `carta-app` between `carta-core` and interactive frontends.
+
+`carta-core` continues to own canonical Archive/domain behavior. `carta-app` owns frontend-independent interactive state and behavior: editing, Cat highlight/undo, session/View models, and other interaction semantics as they are cleanly extracted. Frontends own native input translation, rendering and platform integration.
+
+**Why:** In v0.1 much of the real Carta interaction engine grew inside `carta-tui`. Copying that code into a GUI would create two divergent applications. A shared application layer lets desktop, terminal, and future web/mobile surfaces reuse the same behavior.
+
+**Constraint:** Extraction is incremental. Code must not be moved into `carta-app` merely because it is currently in the TUI; TUI-specific commands and platform assumptions stay outside until a genuinely shared contract exists.
+
+**Consequence:** The frozen TUI should increasingly consume `carta-app` through compatibility re-exports while preserving v0.1.2 behavior.
+
+---
+
+## DD-045 — Frontends translate native events into semantic actions
+
+**Decision:** The long-term frontend boundary is semantic rather than toolkit-specific:
+
+```text
+native input -> Action -> carta-app -> state / Effect -> frontend/platform adapter
+```
+
+Physical keys such as Left Control and Left Alt are interpreted by the frontend adapter. Shared application logic receives semantic LEAP/edit/navigation actions rather than Winit, Crossterm, browser, Android, or other native event types.
+
+Operations that require the host platform should eventually leave `carta-app` as explicit effects when a concrete need appears.
+
+**Why:** This keeps the interaction engine independently testable and makes additional desktop, web, or mobile surfaces possible without duplicating behavior.
+
+**Constraint:** Do not build a speculative generic platform framework. Introduce Action/Effect boundaries incrementally around real v0.2 requirements.

@@ -16,16 +16,19 @@ Do not silently change the format or accepted design decisions merely to simplif
 
 ## Current implementation architecture
 
-The reference implementation is written in Rust and should remain divided into independent layers:
+The reference implementation is written in Rust and is migrating toward explicit reusable layers:
 
 - `carta-format`: format types, parsing, serialization, validation, and compatibility rules.
-- `carta-core`: Documents, Volumes, Works, LEAP, Git history, Trash/Wipe, import/export, and archive operations.
-- `carta-cli`: Unix-style command-line interface.
-- `carta-tui`: interactive terminal frontend using Ratatui and Crossterm.
+- `carta-core`: canonical Archive/domain operations: Documents, Volumes, Works, LEAP retrieval, Git history, Trash/Wipe, synchronization and backlinks.
+- `carta-app`: frontend-independent interactive application primitives. It currently owns the editor/Cat highlight/undo model, session model, View model, scheduler and palette matching; more application semantics move here only when they are genuinely frontend-independent.
+- `carta-publish`: frontend-independent publication.
+- `carta-cli`: Unix-style administrative interface.
+- `carta-tui`: frozen terminal frontend from the v0.1.x line. It remains a regression harness and compatibility frontend, not the place for new v0.2 features.
+- `carta-gui`: planned canonical v0.2 desktop frontend, to be introduced only after the physical-keyboard input probe succeeds.
 
-Archive semantics belong in the core, not in the TUI.
+Archive semantics belong in `carta-core`. Reusable interaction semantics belong in `carta-app`. Platform input, rendering, clipboard, windowing and OS integration belong in frontend adapters.
 
-The TUI is only one frontend. The design must permit future GTK, Emacs, web, or other frontends without reimplementing archive semantics.
+No frontend may grow a second implementation of the editor, Cat selection, LEAP semantics, Views or other shared application behavior merely for convenience. Future desktop, web and mobile frontends should reuse `carta-app` and `carta-core` to the maximum practical extent.
 
 ## Interaction
 
@@ -34,9 +37,9 @@ Carta Space defines two momentary LEAP controls:
 - LEAP backward
 - LEAP forward
 
-The reference TUI currently maps them to physical Left Control for LEAP backward and physical Left Alt for LEAP forward. Physical Right Alt/AltGr is reserved for normal international text entry and must not trigger LEAP.
+The final v0.1 TUI maps them to physical Left Control for LEAP backward and physical Left Alt for LEAP forward when terminal event fidelity is sufficient. The v0.2 desktop frontend must preserve the real momentary LEAP gesture using physical press/release events and must keep Right Alt/AltGr available for normal international text entry.
 
-Do not encode those physical key bindings into the archive format or core domain model.
+Frontends translate physical input into semantic Carta actions. Do not encode platform key codes or toolkit events into the archive format, `carta-core`, or reusable editor state.
 
 ## Interaction philosophy
 
@@ -62,7 +65,6 @@ The guiding interaction rule is:
 - Preserve the writing-first interaction model: organization should normally follow content rather than precede it.
 - Do not add speculative features.
 - Do not invent v0.1 interaction behavior that is already decided in `INTERACTION-CONTRACT.md`; report contradictions or missing cases instead.
-- Do not implement Document split/merge in v0.1.
 - Treat Trash and Wipe as distinct operations with the semantics defined by the interaction contract and specification.
 - Do not add tags, AI features, synchronization, collaboration, bibliography, or asset systems unless explicitly requested.
 - Canonical authored data must remain recoverable from ordinary Markdown and JSON files.
@@ -128,16 +130,17 @@ When adding a new required system dependency, document it in the repository if i
 
 Prefer small, testable changes.
 
-Core behavior should be testable without launching the TUI.
+Core and shared application behavior should be testable without launching any frontend.
 
 When implementing a feature:
 
 1. identify which specification or design decision governs it;
-2. implement or extend the core behavior first;
-3. add automated tests;
-4. expose it through CLI or TUI only afterwards;
-5. run the relevant Rust test and lint suite;
-6. report any case where implementation experience suggests the specification itself may be wrong rather than silently changing it.
+2. place canonical Archive/domain behavior in `carta-core`;
+3. place reusable interactive behavior in `carta-app` rather than a frontend when practical;
+4. add automated tests at the lowest appropriate layer;
+5. keep frontend adapters thin: translate native input, execute platform effects, and render shared state;
+6. run the relevant Rust test and lint suite;
+7. report any case where implementation experience suggests the specification itself may be wrong rather than silently changing it.
 
 For Rust code, prefer conventional tooling and idiomatic project structure.
 
@@ -172,9 +175,9 @@ If a decision changes the format, archive semantics, LEAP interaction model, Tra
 
 The default workflow is defined in `DEVELOPMENT-WORKFLOW.md`.
 
-For the current v0.1 development cycle, design/review and repository implementation are normally handled in ChatGPT. ChatGPT may inspect the repository, edit tracked source and documentation, create focused commits, and push them to the active development branch.
+For the current v0.2 development cycle, design/review and repository implementation are normally handled in ChatGPT. ChatGPT may inspect the repository, edit tracked source and documentation, create focused commits, and push them to the active development branch.
 
-OpenCode is normally used as the local execution and runtime-verification agent. Unless a task explicitly says otherwise, it should not modify repository files. Its main responsibilities are to run builds, formatters, linters, automated tests, reproduce runtime failures, exercise the TUI, inspect terminal/keyboard behavior, and report exact results.
+OpenCode is normally used as the local execution and runtime-verification agent. Unless a task explicitly says otherwise, it should not modify repository files. Its main responsibilities are to run builds, formatters, linters, automated tests, reproduce runtime failures, exercise the affected frontend, inspect terminal or GUI keyboard behavior, and report exact results.
 
 The normal loop is therefore:
 
@@ -182,6 +185,15 @@ The normal loop is therefore:
 user/dogfooding -> ChatGPT implementation -> local pull -> OpenCode verification -> ChatGPT review/fix
 ```
 
-For current v0.1 work, the active development branch is `opencode/v0.1`. Do not write implementation commits to `main` unless explicitly requested.
+For current v0.2 work, the active development branch is `opencode/v0.2`. The final terminal snapshot is `release/v0.1.2-final`; do not develop new features there. Do not write implementation commits to `main` unless explicitly requested.
 
 If local verification requires a code change, OpenCode should report the failure rather than silently patching it unless the task explicitly authorizes edits.
+
+
+## Public repository privacy rule
+
+The repository is public even though it is currently used as a private development workspace. Treat every push as publication on the Internet.
+
+Before pushing, inspect the changed content for secrets and personal/local data. Do not commit real archive contents, private emails, credentials, tokens, SSH/WireGuard material, personal addresses, private IPs, unnecessary hostnames, absolute home paths, local logs, screenshots or OpenCode reports containing such data. Use synthetic fixtures and neutral examples.
+
+If sensitive material is discovered after a push, do not assume a later deletion commit is sufficient: report it immediately because history rewriting and secret rotation may be required.
