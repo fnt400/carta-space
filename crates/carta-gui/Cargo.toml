@@ -14,5 +14,5 @@ iced = { version = "=0.14.0", default-features = false, features = [
     "wgpu",
     "wayland",
     "x11",
-    "thread-pool",
+    "tokio",
 ] }

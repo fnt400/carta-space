@@ -1,14 +1,16 @@
 mod input;
+mod presentation;
 
 use carta_app::{App, AppMode};
 use carta_core::Archive;
 use iced::event::{self, Status};
-use iced::widget::{column, container, scrollable, text};
-use iced::{window, Element, Event, Length, Subscription};
+use iced::widget::{column, container, rich_text, scrollable, span, text};
+use iced::{color, window, Element, Event, Length, Subscription, Task};
 use input::GuiInputState;
+use presentation::SegmentKind;
 use std::env;
 use std::path::PathBuf;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 fn main() -> iced::Result {
     iced::application(Gui::load, update, view)
@@ -27,6 +29,7 @@ struct Gui {
 #[derive(Debug, Clone)]
 enum Message {
     Raw(Event),
+    Tick(Instant),
 }
 
 impl Gui {
@@ -64,27 +67,44 @@ impl Gui {
 impl Drop for Gui {
     fn drop(&mut self) {
         if let Some(app) = &mut self.app {
-            let _ = app.autosave();
+            if !app.kill_switch_triggered() {
+                if let Err(error) = app.autosave() {
+                    eprintln!("carta-gui: final autosave failed: {error}");
+                }
+            }
         }
     }
 }
 
 fn subscription(_state: &Gui) -> Subscription<Message> {
-    event::listen_raw(|event, _status: Status, _window: window::Id| {
+    let keyboard = event::listen_raw(|event, _status: Status, _window: window::Id| {
         matches!(event, Event::Keyboard(_)).then_some(Message::Raw(event))
-    })
+    });
+    // App::tick owns the shared autosave, checkpoint and sync schedule.
+    // Without an idle timer, a GUI that stops receiving keys never saves.
+    Subscription::batch([
+        keyboard,
+        iced::time::every(Duration::from_millis(250)).map(Message::Tick),
+    ])
 }
 
-fn update(state: &mut Gui, message: Message) {
-    let Message::Raw(Event::Keyboard(event)) = message else {
-        return;
-    };
+fn update(state: &mut Gui, message: Message) -> Task<Message> {
     let Some(app) = &mut state.app else {
-        return;
+        return Task::none();
     };
-
-    let _ = state.input.handle(app, event);
-    let _ = app.tick(Instant::now());
+    let result = match message {
+        Message::Raw(Event::Keyboard(event)) => state.input.handle(app, event),
+        Message::Tick(now) => app.tick(now).map(|_| ()),
+        _ => Ok(()),
+    };
+    if let Err(error) = result {
+        app.status = format!("Error: {error}");
+    }
+    if app.quit {
+        iced::exit()
+    } else {
+        Task::none()
+    }
 }
 
 fn view(state: &Gui) -> Element<'_, Message> {
@@ -107,23 +127,55 @@ fn view(state: &Gui) -> Element<'_, Message> {
         return container(text("Carta Space")).into();
     };
 
-    let document = app.editor.current_text().unwrap_or("");
-    let mode = mode_label(&app.mode);
     let archive = state
         .archive_path
         .as_ref()
         .map_or_else(String::new, |path| path.display().to_string());
+    let mode = mode_label(&app.mode);
+    let current = app.editor.cursor();
+    let document = app.editor.current_text().unwrap_or("");
+    let selection = app
+        .cat_render_highlight()
+        .or_else(|| app.editor.selection())
+        .and_then(|(start, end)| {
+            (start.region == current.region && end.region == current.region)
+                .then_some((start.byte, end.byte))
+        });
+    let spans: Vec<iced::widget::text::Span<'_, ()>> =
+        presentation::segments(document, current.byte, selection)
+            .into_iter()
+            .map(|segment| match segment.kind {
+                SegmentKind::Text => span(segment.content),
+                SegmentKind::Selection => span(segment.content)
+                    .background(color!(0xBFD5F2))
+                    .color(color!(0x182C45)),
+                SegmentKind::Caret => span("│").color(color!(0xA94730)),
+            })
+            .collect();
 
+    let editor = scrollable(
+        container(
+            rich_text(spans)
+                .on_link_click(iced::never)
+                .size(19)
+                .width(Length::Fill),
+        )
+        .padding(24)
+        .width(Length::Fill),
+    )
+    .height(Length::Fill)
+    .width(Length::Fill);
+
+    let save_state = if app.editor.is_dirty() {
+        " · Unsaved"
+    } else {
+        ""
+    };
     let body = column![
         text("Carta Space").size(28),
-        text(format!("{archive} · {mode}")).size(13),
-        scrollable(
-            container(text(document).size(19))
-                .padding(24)
-                .width(Length::Fill)
-        )
-        .height(Length::Fill)
-        .width(Length::Fill),
+        text(format!("{archive} · {mode}{save_state}")).size(13),
+        editor,
+        mode_panel(app),
         text(&app.status).size(13),
     ]
     .spacing(8)
@@ -136,6 +188,98 @@ fn view(state: &Gui) -> Element<'_, Message> {
         .into()
 }
 
+fn mode_panel(app: &App) -> Element<'_, Message> {
+    match &app.mode {
+        AppMode::Editing => text("Esc · Commands    Left Ctrl / Left Alt · LEAP")
+            .size(13)
+            .into(),
+        AppMode::Palette { query, selected } => {
+            let commands = app.palette_commands(query);
+            let mut panel = column![text(format!("Commands  › {query}")).size(18)].spacing(4);
+            if commands.is_empty() {
+                panel = panel.push(text("No matching commands").size(14));
+            }
+            for (index, command) in commands
+                .iter()
+                .enumerate()
+                .skip(selected.saturating_sub(5))
+                .take(11)
+            {
+                let marker = if index == *selected { "▶" } else { " " };
+                panel = panel.push(text(format!("{marker} {}", command.label())).size(15));
+            }
+            container(panel).padding(12).width(Length::Fill).into()
+        }
+        AppMode::Prompt {
+            title,
+            input,
+            cursor,
+            details,
+            ..
+        } => {
+            let mut panel = column![text(title).size(18)].spacing(5);
+            for detail in details {
+                panel = panel.push(text(detail).size(14));
+            }
+            panel = panel.push(text(format!("› {}", with_caret(input, *cursor))).size(16));
+            container(panel).padding(12).width(Length::Fill).into()
+        }
+        AppMode::Confirm { title, details, .. } => {
+            let mut panel = column![text(title).size(18)].spacing(5);
+            for detail in details {
+                panel = panel.push(text(detail).size(14));
+            }
+            panel = panel.push(text("Y · Confirm      N / Esc · Cancel").size(14));
+            container(panel).padding(12).width(Length::Fill).into()
+        }
+        AppMode::Selector {
+            title,
+            query,
+            selected,
+            choices,
+            ..
+        } => {
+            let matches: Vec<_> = choices
+                .iter()
+                .filter(|choice| carta_app::palette::matches(query, &choice.label))
+                .collect();
+            let mut panel = column![text(format!("{title}  › {query}")).size(18)].spacing(4);
+            if matches.is_empty() {
+                panel = panel.push(text("No matching items").size(14));
+            }
+            for (index, choice) in matches
+                .iter()
+                .enumerate()
+                .skip(selected.saturating_sub(5))
+                .take(11)
+            {
+                let marker = if index == *selected { "▶" } else { " " };
+                panel = panel.push(text(format!("{marker} {}", choice.label)).size(15));
+            }
+            container(panel).padding(12).width(Length::Fill).into()
+        }
+        AppMode::Leap { session, .. } => {
+            let direction = match session.direction() {
+                carta_core::LeapDirection::Forward => "Forward",
+                carta_core::LeapDirection::Backward => "Backward",
+            };
+            text(format!("LEAP {direction}  › {}", session.query()))
+                .size(17)
+                .into()
+        }
+    }
+}
+
+fn with_caret(input: &str, cursor: usize) -> String {
+    let mut cursor = cursor.min(input.len());
+    while !input.is_char_boundary(cursor) {
+        cursor -= 1;
+    }
+    let mut value = input.to_owned();
+    value.insert(cursor, '│');
+    value
+}
+
 fn mode_label(mode: &AppMode) -> &'static str {
     match mode {
         AppMode::Editing => "Editing",
@@ -144,5 +288,17 @@ fn mode_label(mode: &AppMode) -> &'static str {
         AppMode::Confirm { .. } => "Confirm",
         AppMode::Selector { .. } => "Selector",
         AppMode::Leap { .. } => "LEAP",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn prompt_caret_is_utf8_safe() {
+        assert_eq!(with_caret("caffè", 4), "caff│è");
+        assert_eq!(with_caret("é", 1), "│é");
+        assert_eq!(with_caret("é", 2), "é│");
     }
 }
