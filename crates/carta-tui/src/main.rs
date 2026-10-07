@@ -1,8 +1,13 @@
+mod input;
 mod theme;
 
 #[cfg(not(test))]
 use arboard::Clipboard;
 use carta_app::Action;
+use input::{
+    editing_action_from_key, emergency_kill_event, leap_direction_from_modifier, PendingLeap,
+    TuiInputState,
+};
 use carta_core::{Archive, LeapDirection, SyncOutcome};
 use carta_tui::app::{AppMode, View};
 use carta_tui::editor::{visual_ranges, Cursor};
@@ -124,24 +129,6 @@ fn spawn_input_reader(enhancements: bool) -> mpsc::Receiver<io::Result<Event>> {
         }
     });
     receiver
-}
-
-fn emergency_kill_event(event: &Event, right_control_held: &mut bool) -> bool {
-    let Event::Key(key) = event else {
-        return false;
-    };
-    if key.code == KeyCode::Modifier(ModifierKeyCode::RightControl) {
-        if matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) {
-            *right_control_held = true;
-        } else if key.kind == KeyEventKind::Release {
-            *right_control_held = false;
-        }
-        return false;
-    }
-    *right_control_held
-        && matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat)
-        && key.modifiers.contains(KeyModifiers::CONTROL)
-        && matches!(key.code, KeyCode::Char('g' | 'G'))
 }
 
 fn emergency_terminal_exit(enhancements: bool) -> ! {
@@ -411,10 +398,7 @@ fn initialize_default_archive(path: &Path) -> Result<Option<Archive>, Box<dyn Er
 
 #[derive(Default)]
 struct Dispatcher {
-    pending_leap: Option<PendingLeap>,
-    active_leap: Option<PendingLeap>,
-    suppressed_leap_releases: u8,
-    right_control_held: bool,
+    input: TuiInputState,
     clipboard: ClipboardBridge,
 }
 
@@ -465,12 +449,6 @@ impl ClipboardBridge {
     }
 }
 
-#[derive(Clone, Copy)]
-struct PendingLeap {
-    direction: LeapDirection,
-    key: ModifierKeyCode,
-}
-
 fn handle_key(
     app: &mut App,
     dispatcher: &mut Dispatcher,
@@ -480,28 +458,28 @@ fn handle_key(
     if key.kind == KeyEventKind::Release {
         if let KeyCode::Modifier(released) = key.code {
             if released == ModifierKeyCode::RightControl {
-                dispatcher.right_control_held = false;
+                dispatcher.input.right_control_held = false;
                 return Ok(());
             }
             if matches!(
                 released,
                 ModifierKeyCode::LeftControl | ModifierKeyCode::LeftAlt
-            ) && dispatcher.suppressed_leap_releases > 0
+            ) && dispatcher.input.suppressed_leap_releases > 0
             {
-                dispatcher.suppressed_leap_releases -= 1;
+                dispatcher.input.suppressed_leap_releases -= 1;
                 return Ok(());
             }
             if dispatcher
                 .pending_leap
                 .is_some_and(|pending| pending.key == released)
             {
-                let pending = dispatcher.pending_leap.take().unwrap();
+                let pending = dispatcher.input.pending_leap.take().unwrap();
                 app.cat_tap_leap(pending.direction);
             } else if dispatcher
                 .active_leap
                 .is_some_and(|active| active.key == released)
             {
-                dispatcher.active_leap = None;
+                dispatcher.input.active_leap = None;
                 if matches!(app.mode, AppMode::Leap { .. }) {
                     app.dispatch_action(Action::EndLeap, Instant::now());
                 }
@@ -513,21 +491,21 @@ fn handle_key(
         return Ok(());
     }
 
-    if dispatcher.right_control_held
+    if dispatcher.input.right_control_held
         && key.modifiers.contains(KeyModifiers::CONTROL)
         && matches!(key.code, KeyCode::Char('g' | 'G'))
     {
-        dispatcher.pending_leap = None;
-        dispatcher.active_leap = None;
+        dispatcher.input.pending_leap = None;
+        dispatcher.input.active_leap = None;
         app.trigger_kill_switch();
         return Ok(());
     }
 
-    if dispatcher.right_control_held
+    if dispatcher.input.right_control_held
         && key.modifiers.contains(KeyModifiers::CONTROL)
         && matches!(key.code, KeyCode::Char('n' | 'N'))
     {
-        dispatcher.pending_leap = None;
+        dispatcher.input.pending_leap = None;
         if matches!(app.mode, AppMode::Editing)
             && matches!(
                 app.view,
@@ -539,33 +517,30 @@ fn handle_key(
         return Ok(());
     }
 
-    if dispatcher.right_control_held
-        && dispatcher.active_leap.is_none()
+    if dispatcher.input.right_control_held
+        && dispatcher.input.active_leap.is_none()
         && enhanced
         && key.kind == KeyEventKind::Press
     {
         if let KeyCode::Modifier(key @ (ModifierKeyCode::LeftControl | ModifierKeyCode::LeftAlt)) =
             key.code
         {
-            dispatcher.pending_leap = None;
-            dispatcher.active_leap = None;
-            dispatcher.suppressed_leap_releases =
-                dispatcher.suppressed_leap_releases.saturating_add(1);
-            let direction = if key == ModifierKeyCode::LeftControl {
-                LeapDirection::Backward
-            } else {
-                LeapDirection::Forward
-            };
+            dispatcher.input.pending_leap = None;
+            dispatcher.input.active_leap = None;
+            dispatcher.input.suppressed_leap_releases =
+                dispatcher.input.suppressed_leap_releases.saturating_add(1);
+            let direction = leap_direction_from_modifier(key)
+                .expect("matched physical LEAP modifier");
             app.leap_again(direction);
             return Ok(());
         }
     }
 
-    if dispatcher.right_control_held
+    if dispatcher.input.right_control_held
         && key.modifiers.contains(KeyModifiers::CONTROL)
         && matches!(key.code, KeyCode::Char('b' | 'B' | 'i' | 'I'))
     {
-        dispatcher.pending_leap = None;
+        dispatcher.input.pending_leap = None;
         if matches!(app.mode, AppMode::Editing)
             && matches!(
                 app.view,
@@ -586,11 +561,11 @@ fn handle_key(
         return Ok(());
     }
 
-    if dispatcher.right_control_held
+    if dispatcher.input.right_control_held
         && key.modifiers.contains(KeyModifiers::CONTROL)
         && matches!(key.code, KeyCode::Char('w' | 'W' | 'l' | 'L' | 'm' | 'M'))
     {
-        dispatcher.pending_leap = None;
+        dispatcher.input.pending_leap = None;
         if matches!(app.mode, AppMode::Editing) {
             match key.code {
                 KeyCode::Char('w' | 'W') => app.execute(carta_tui::Command::OpenWork)?,
@@ -604,11 +579,11 @@ fn handle_key(
         return Ok(());
     }
 
-    if dispatcher.right_control_held
+    if dispatcher.input.right_control_held
         && key.modifiers.contains(KeyModifiers::CONTROL)
         && matches!(key.code, KeyCode::Char('z' | 'Z' | 'r' | 'R'))
     {
-        dispatcher.pending_leap = None;
+        dispatcher.input.pending_leap = None;
         if matches!(app.mode, AppMode::Editing)
             && matches!(
                 app.view,
@@ -626,11 +601,11 @@ fn handle_key(
         return Ok(());
     }
 
-    if dispatcher.right_control_held
+    if dispatcher.input.right_control_held
         && key.modifiers.contains(KeyModifiers::CONTROL)
         && matches!(key.code, KeyCode::Char('c' | 'C'))
     {
-        dispatcher.pending_leap = None;
+        dispatcher.input.pending_leap = None;
         if matches!(app.mode, AppMode::Editing)
             && matches!(
                 app.view,
@@ -660,14 +635,14 @@ fn handle_key(
         return Ok(());
     }
 
-    if !dispatcher.right_control_held
+    if !dispatcher.input.right_control_held
         && key.kind == KeyEventKind::Press
         && key.modifiers.contains(KeyModifiers::CONTROL)
         && matches!(key.code, KeyCode::Char('p' | 'P'))
         && app.portable_keyboard_mode()
     {
-        dispatcher.pending_leap = None;
-        dispatcher.active_leap = None;
+        dispatcher.input.pending_leap = None;
+        dispatcher.input.active_leap = None;
         return handle_key(
             app,
             dispatcher,
@@ -677,7 +652,7 @@ fn handle_key(
     }
 
     if app.portable_keyboard_mode()
-        && !dispatcher.right_control_held
+        && !dispatcher.input.right_control_held
         && key.kind == KeyEventKind::Press
         && key.modifiers.contains(KeyModifiers::CONTROL)
         && matches!(key.code, KeyCode::Char('r' | 'R'))
@@ -696,7 +671,7 @@ fn handle_key(
     }
 
     if app.portable_keyboard_mode()
-        && !dispatcher.right_control_held
+        && !dispatcher.input.right_control_held
         && key.kind == KeyEventKind::Press
         && key.modifiers.contains(KeyModifiers::CONTROL)
         && matches!(key.code, KeyCode::Char('b' | 'B' | 'f' | 'F'))
@@ -707,8 +682,8 @@ fn handle_key(
         )
         && !app.editor.regions().is_empty()
     {
-        dispatcher.pending_leap = None;
-        dispatcher.active_leap = None;
+        dispatcher.input.pending_leap = None;
+        dispatcher.input.active_leap = None;
         let direction = if matches!(key.code, KeyCode::Char('b' | 'B')) {
             LeapDirection::Backward
         } else {
@@ -719,7 +694,7 @@ fn handle_key(
     }
 
     if enhanced {
-        if let Some(pending) = dispatcher.pending_leap {
+        if let Some(pending) = dispatcher.input.pending_leap {
             let handled = match (pending.direction, key.code) {
                 (LeapDirection::Backward, KeyCode::Home)
                 | (LeapDirection::Forward, KeyCode::End) => {
@@ -734,8 +709,8 @@ fn handle_key(
                 _ => false,
             };
             if handled {
-                dispatcher.pending_leap = None;
-                dispatcher.active_leap = Some(pending);
+                dispatcher.input.pending_leap = None;
+                dispatcher.input.active_leap = Some(pending);
                 return Ok(());
             }
         }
@@ -743,8 +718,8 @@ fn handle_key(
 
     if key.modifiers.contains(KeyModifiers::CONTROL)
         && (!enhanced
-            || dispatcher.right_control_held
-            || (dispatcher.pending_leap.is_none() && dispatcher.active_leap.is_none()))
+            || dispatcher.input.right_control_held
+            || (dispatcher.input.pending_leap.is_none() && dispatcher.input.active_leap.is_none()))
     {
         let editable = matches!(app.mode, AppMode::Editing)
             && matches!(
@@ -753,7 +728,7 @@ fn handle_key(
             );
         match key.code {
             KeyCode::PageUp if !key.modifiers.contains(KeyModifiers::SHIFT) => {
-                dispatcher.pending_leap = None;
+                dispatcher.input.pending_leap = None;
                 if editable {
                     app.editor.move_document(false);
                     app.cat_navigation();
@@ -761,7 +736,7 @@ fn handle_key(
                 return Ok(());
             }
             KeyCode::PageDown if !key.modifiers.contains(KeyModifiers::SHIFT) => {
-                dispatcher.pending_leap = None;
+                dispatcher.input.pending_leap = None;
                 if editable {
                     app.editor.move_document(true);
                     app.cat_navigation();
@@ -769,7 +744,7 @@ fn handle_key(
                 return Ok(());
             }
             KeyCode::Home if !key.modifiers.contains(KeyModifiers::SHIFT) => {
-                dispatcher.pending_leap = None;
+                dispatcher.input.pending_leap = None;
                 if editable {
                     app.editor.document_home(false);
                     app.cat_navigation();
@@ -777,7 +752,7 @@ fn handle_key(
                 return Ok(());
             }
             KeyCode::End if !key.modifiers.contains(KeyModifiers::SHIFT) => {
-                dispatcher.pending_leap = None;
+                dispatcher.input.pending_leap = None;
                 if editable {
                     app.editor.document_end(false);
                     app.cat_navigation();
@@ -791,15 +766,15 @@ fn handle_key(
     if enhanced && key.kind == KeyEventKind::Press {
         match key.code {
             KeyCode::Modifier(ModifierKeyCode::RightControl) => {
-                dispatcher.right_control_held = true;
-                if let Some(active) = dispatcher.active_leap {
+                dispatcher.input.right_control_held = true;
+                if let Some(active) = dispatcher.input.active_leap {
                     if matches!(app.mode, AppMode::Leap { palette: false, .. }) {
                         app.leap_again_active();
                     } else {
                         app.leap_again_preserving_anchor(active.direction);
                     }
-                } else if let Some(pending) = dispatcher.pending_leap.take() {
-                    dispatcher.active_leap = Some(pending);
+                } else if let Some(pending) = dispatcher.input.pending_leap.take() {
+                    dispatcher.input.active_leap = Some(pending);
                     app.leap_again(pending.direction);
                 }
                 return Ok(());
@@ -812,15 +787,15 @@ fn handle_key(
                 return Ok(());
             }
             KeyCode::Modifier(key @ (ModifierKeyCode::LeftControl | ModifierKeyCode::LeftAlt)) => {
-                if dispatcher.active_leap.is_some() {
+                if dispatcher.input.active_leap.is_some() {
                     // Canon Cat: the opposite LEAP key is ignored while a LEAP query is active.
                     // Extended highlighting is requested by pressing both LEAP keys after the LEAP.
                     return Ok(());
                 }
-                if let Some(pending) = dispatcher.pending_leap {
+                if let Some(pending) = dispatcher.input.pending_leap {
                     if pending.key != key {
-                        dispatcher.pending_leap = None;
-                        dispatcher.suppressed_leap_releases = 2;
+                        dispatcher.input.pending_leap = None;
+                        dispatcher.input.suppressed_leap_releases = 2;
                         if app.extend_last_leap_highlight() {
                             if let Some(text) = app.editor.selected_text() {
                                 if let Err(error) = dispatcher.clipboard.set_text(text) {
@@ -834,24 +809,21 @@ fn handle_key(
                     }
                     return Ok(());
                 }
-                let direction = if key == ModifierKeyCode::LeftControl {
-                    LeapDirection::Backward
-                } else {
-                    LeapDirection::Forward
-                };
-                dispatcher.pending_leap = Some(PendingLeap { direction, key });
+                let direction = leap_direction_from_modifier(key)
+                    .expect("matched physical LEAP modifier");
+                dispatcher.input.pending_leap = Some(PendingLeap { direction, key });
                 return Ok(());
             }
             _ => {}
         }
     }
 
-    if dispatcher.pending_leap.is_some() && matches!(key.code, KeyCode::Modifier(_)) {
-        dispatcher.pending_leap = None;
+    if dispatcher.input.pending_leap.is_some() && matches!(key.code, KeyCode::Modifier(_)) {
+        dispatcher.input.pending_leap = None;
         return Ok(());
     }
-    if let Some(pending) = dispatcher.pending_leap.take() {
-        dispatcher.active_leap = Some(pending);
+    if let Some(pending) = dispatcher.input.pending_leap.take() {
+        dispatcher.input.active_leap = Some(pending);
         app.dispatch_action(Action::BeginLeap(pending.direction), Instant::now());
     }
 
@@ -982,20 +954,6 @@ fn next_char_boundary(text: &str, cursor: usize) -> usize {
 
 fn normalize_clipboard_text(text: &str) -> String {
     text.replace("\r\n", "\n").replace('\r', "\n")
-}
-
-fn editing_action_from_key(key: &KeyEvent) -> Option<Action> {
-    match key.code {
-        KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-            Some(Action::InsertText(c.to_string()))
-        }
-        KeyCode::Enter => Some(Action::InsertLineBreak),
-        KeyCode::Tab if key.modifiers.contains(KeyModifiers::SHIFT) => Some(Action::Outdent),
-        KeyCode::Tab => Some(Action::Indent),
-        KeyCode::Backspace => Some(Action::Backspace),
-        KeyCode::Delete => Some(Action::Erase),
-        _ => None,
-    }
 }
 
 fn handle_normal(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
@@ -3351,7 +3309,7 @@ mod tests {
                 true,
             )
             .unwrap();
-            assert!(dispatcher.pending_leap.is_some());
+            assert!(dispatcher.input.pending_leap.is_some());
 
             handle_key(
                 &mut app,
@@ -3364,7 +3322,7 @@ mod tests {
             )
             .unwrap();
 
-            assert!(dispatcher.pending_leap.is_none());
+            assert!(dispatcher.input.pending_leap.is_none());
             assert_eq!(app.editor.cursor().byte, expected);
 
             handle_key(
@@ -3415,7 +3373,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(app.editor.cursor(), Cursor { region: 2, byte: 0 });
-        assert!(dispatcher.active_leap.is_some());
+        assert!(dispatcher.input.active_leap.is_some());
 
         handle_key(
             &mut app,
@@ -3886,7 +3844,7 @@ mod tests {
             )
             .unwrap();
 
-            assert!(dispatcher.pending_leap.is_none());
+            assert!(dispatcher.input.pending_leap.is_none());
             assert!(matches!(app.mode, AppMode::Editing));
             assert_eq!(app.leap.remembered_query(), Some("alpha"));
         }
@@ -4165,7 +4123,7 @@ mod tests {
                 true,
             )
             .unwrap();
-            assert!(dispatcher.pending_leap.is_some());
+            assert!(dispatcher.input.pending_leap.is_some());
 
             handle_key(
                 &mut app,
@@ -4177,7 +4135,7 @@ mod tests {
                 true,
             )
             .unwrap();
-            assert!(dispatcher.pending_leap.is_some());
+            assert!(dispatcher.input.pending_leap.is_some());
 
             handle_key(
                 &mut app,
@@ -4241,7 +4199,7 @@ mod tests {
             true,
         )
         .unwrap();
-        assert!(dispatcher.pending_leap.is_some());
+        assert!(dispatcher.input.pending_leap.is_some());
 
         handle_key(
             &mut app,
@@ -4410,7 +4368,7 @@ mod tests {
         .unwrap();
 
         assert!(matches!(app.mode, AppMode::Leap { .. }));
-        assert!(dispatcher.active_leap.is_some());
+        assert!(dispatcher.input.active_leap.is_some());
         assert_eq!(app.editor.cursor().byte, 2);
         assert!(app.editor.cat_highlight().is_none());
 
@@ -4511,7 +4469,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(app.mode, AppMode::Editing));
-        assert!(dispatcher.active_leap.is_none());
+        assert!(dispatcher.input.active_leap.is_none());
 
         handle_key(
             &mut app,
@@ -4623,7 +4581,7 @@ mod tests {
             true,
         )
         .unwrap();
-        assert!(dispatcher.pending_leap.is_none());
+        assert!(dispatcher.input.pending_leap.is_none());
         handle_key(
             &mut app,
             &mut dispatcher,
@@ -4634,7 +4592,7 @@ mod tests {
             true,
         )
         .unwrap();
-        assert!(dispatcher.pending_leap.is_none());
+        assert!(dispatcher.input.pending_leap.is_none());
         handle_key(
             &mut app,
             &mut dispatcher,
