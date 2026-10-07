@@ -4,8 +4,26 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, Mod
 
 #[derive(Clone, Copy)]
 pub(super) struct PendingLeap {
-    pub(super) direction: LeapDirection,
-    pub(super) key: ModifierKeyCode,
+    direction: LeapDirection,
+    key: ModifierKeyCode,
+}
+
+impl PendingLeap {
+    fn new(direction: LeapDirection, key: ModifierKeyCode) -> Self {
+        Self { direction, key }
+    }
+
+    pub(super) fn direction(self) -> LeapDirection {
+        self.direction
+    }
+
+    pub(super) fn matches_key(self, key: ModifierKeyCode) -> bool {
+        self.key == key
+    }
+
+    pub(super) fn key(self) -> ModifierKeyCode {
+        self.key
+    }
 }
 
 /// Crossterm-specific state used while translating physical terminal input.
@@ -15,10 +33,87 @@ pub(super) struct PendingLeap {
 /// the terminal adapter rather than to Carta's shared application semantics.
 #[derive(Default)]
 pub(super) struct TuiInputState {
-    pub(super) pending_leap: Option<PendingLeap>,
-    pub(super) active_leap: Option<PendingLeap>,
-    pub(super) suppressed_leap_releases: u8,
-    pub(super) right_control_held: bool,
+    pending_leap: Option<PendingLeap>,
+    active_leap: Option<PendingLeap>,
+    suppressed_leap_releases: u8,
+    right_control_held: bool,
+}
+
+impl TuiInputState {
+    pub(super) fn right_control_held(&self) -> bool {
+        self.right_control_held
+    }
+
+    pub(super) fn set_right_control_held(&mut self, held: bool) {
+        self.right_control_held = held;
+    }
+
+    pub(super) fn pending(&self) -> Option<PendingLeap> {
+        self.pending_leap
+    }
+
+    pub(super) fn active(&self) -> Option<PendingLeap> {
+        self.active_leap
+    }
+
+    pub(super) fn has_pending(&self) -> bool {
+        self.pending_leap.is_some()
+    }
+
+    pub(super) fn has_active(&self) -> bool {
+        self.active_leap.is_some()
+    }
+
+    pub(super) fn no_leap_key_active(&self) -> bool {
+        self.pending_leap.is_none() && self.active_leap.is_none()
+    }
+
+    pub(super) fn clear_pending(&mut self) {
+        self.pending_leap = None;
+    }
+
+    pub(super) fn clear_active(&mut self) {
+        self.active_leap = None;
+    }
+
+    pub(super) fn clear_leaps(&mut self) {
+        self.pending_leap = None;
+        self.active_leap = None;
+    }
+
+    pub(super) fn begin_pending(&mut self, direction: LeapDirection, key: ModifierKeyCode) {
+        self.pending_leap = Some(PendingLeap::new(direction, key));
+    }
+
+    pub(super) fn take_pending(&mut self) -> Option<PendingLeap> {
+        self.pending_leap.take()
+    }
+
+    pub(super) fn promote_pending(&mut self) -> Option<PendingLeap> {
+        let pending = self.pending_leap.take()?;
+        self.active_leap = Some(pending);
+        Some(pending)
+    }
+
+    pub(super) fn set_active(&mut self, leap: PendingLeap) {
+        self.active_leap = Some(leap);
+    }
+
+    pub(super) fn suppress_one_leap_release(&mut self) {
+        self.suppressed_leap_releases = self.suppressed_leap_releases.saturating_add(1);
+    }
+
+    pub(super) fn suppress_leap_releases(&mut self, count: u8) {
+        self.suppressed_leap_releases = count;
+    }
+
+    pub(super) fn consume_suppressed_leap_release(&mut self) -> bool {
+        if self.suppressed_leap_releases == 0 {
+            return false;
+        }
+        self.suppressed_leap_releases -= 1;
+        true
+    }
 }
 
 pub(super) fn editing_action_from_key(key: &KeyEvent) -> Option<Action> {
