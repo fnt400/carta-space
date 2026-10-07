@@ -1233,6 +1233,36 @@ impl App {
             Action::Outdent => self.cat_indent_less(),
             Action::Backspace => self.cat_backspace(),
             Action::Erase => self.cat_erase(),
+            Action::MoveCharacterBackward => {
+                self.editor.move_horizontal(false, false);
+                self.cat_navigation();
+                false
+            }
+            Action::MoveCharacterForward => {
+                self.editor.move_horizontal(true, false);
+                self.cat_navigation();
+                false
+            }
+            Action::PreviousDocument => {
+                self.editor.move_document(false);
+                self.cat_navigation();
+                false
+            }
+            Action::NextDocument => {
+                self.editor.move_document(true);
+                self.cat_navigation();
+                false
+            }
+            Action::DocumentStart => {
+                self.editor.document_home(false);
+                self.cat_navigation();
+                false
+            }
+            Action::DocumentEnd => {
+                self.editor.document_end(false);
+                self.cat_navigation();
+                false
+            }
             Action::BeginLeap(direction) => {
                 self.start_leap(direction, false);
                 false

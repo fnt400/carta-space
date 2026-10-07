@@ -708,32 +708,28 @@ fn handle_key(
             KeyCode::PageUp if !key.modifiers.contains(KeyModifiers::SHIFT) => {
                 dispatcher.input.clear_pending();
                 if editable {
-                    app.editor.move_document(false);
-                    app.cat_navigation();
+                    app.dispatch_action(Action::PreviousDocument, Instant::now());
                 }
                 return Ok(());
             }
             KeyCode::PageDown if !key.modifiers.contains(KeyModifiers::SHIFT) => {
                 dispatcher.input.clear_pending();
                 if editable {
-                    app.editor.move_document(true);
-                    app.cat_navigation();
+                    app.dispatch_action(Action::NextDocument, Instant::now());
                 }
                 return Ok(());
             }
             KeyCode::Home if !key.modifiers.contains(KeyModifiers::SHIFT) => {
                 dispatcher.input.clear_pending();
                 if editable {
-                    app.editor.document_home(false);
-                    app.cat_navigation();
+                    app.dispatch_action(Action::DocumentStart, Instant::now());
                 }
                 return Ok(());
             }
             KeyCode::End if !key.modifiers.contains(KeyModifiers::SHIFT) => {
                 dispatcher.input.clear_pending();
                 if editable {
-                    app.editor.document_end(false);
-                    app.cat_navigation();
+                    app.dispatch_action(Action::DocumentEnd, Instant::now());
                 }
                 return Ok(());
             }
@@ -918,12 +914,10 @@ fn handle_normal(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
     if app.collapsed {
         match key.code {
             KeyCode::Up | KeyCode::PageUp => {
-                app.editor.move_document(false);
-                app.cat_navigation();
+                app.dispatch_action(Action::PreviousDocument, Instant::now());
             }
             KeyCode::Down | KeyCode::PageDown => {
-                app.editor.move_document(true);
-                app.cat_navigation();
+                app.dispatch_action(Action::NextDocument, Instant::now());
             }
             KeyCode::Enter => app.execute(carta_tui::Command::ExpandView)?,
             _ => {}
@@ -941,12 +935,10 @@ fn handle_normal(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
     let page = usize::from(height.saturating_sub(2).max(1));
     match key.code {
         KeyCode::Left => {
-            app.editor.move_horizontal(false, false);
-            app.cat_navigation();
+            app.dispatch_action(Action::MoveCharacterBackward, Instant::now());
         }
         KeyCode::Right => {
-            app.editor.move_horizontal(true, false);
-            app.cat_navigation();
+            app.dispatch_action(Action::MoveCharacterForward, Instant::now());
         }
         KeyCode::Up => {
             app.editor.move_visual(false, width, false);
