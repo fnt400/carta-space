@@ -87,9 +87,7 @@ impl GuiInputState {
     }
 
     fn handle_release(&mut self, app: &mut App, code: Code) {
-        if matches!(code, Code::ControlLeft | Code::AltLeft)
-            && self.suppressed_leap_releases > 0
-        {
+        if matches!(code, Code::ControlLeft | Code::AltLeft) && self.suppressed_leap_releases > 0 {
             self.suppressed_leap_releases -= 1;
             return;
         }
@@ -103,10 +101,7 @@ impl GuiInputState {
             return;
         }
 
-        if self
-            .active_leap
-            .is_some_and(|active| active.code == code)
-        {
+        if self.active_leap.is_some_and(|active| active.code == code) {
             self.active_leap = None;
             if matches!(app.mode, AppMode::Leap { .. }) {
                 app.dispatch_action(Action::EndLeap, Instant::now());
