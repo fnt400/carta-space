@@ -135,6 +135,7 @@ The v0.1.2 terminal frontend is frozen. New v0.2 features must not be implemente
 Shared interaction behavior belongs in `carta-app` when it is independent of a specific presentation technology. Canonical Archive behavior remains in `carta-core`. Frontends should be adapters around those layers.
 
 In the TUI, Crossterm-specific input state and key mapping belong in `crates/carta-tui/src/input.rs`. Keep physical-key quirks there rather than promoting them into shared application semantics.
+Keep the adapter state encapsulated: callers should use its API rather than reaching into pending/active modifier fields. This makes terminal-specific refactors independently testable.
 
 The migration is incremental: do not move code merely to make directory diagrams look clean. Extract a behavior when its ownership is clear and preserve the frozen TUI as a regression oracle while the shared layer is being built.
 
