@@ -1,6 +1,6 @@
 # Installing Carta Space
 
-Carta Space v0.1.1 supports Linux and macOS. The interactive program is `carta`; the optional administrative CLI is `carta-cli`.
+Carta Space v0.1.2 is the final terminal-interface release. It supports Linux and macOS. The interactive program is `carta`; the optional administrative CLI is `carta-cli`. Development from v0.2 moves to the graphical frontend.
 
 Git is a runtime dependency because Carta archives use Git for history and synchronization.
 
@@ -19,15 +19,15 @@ Built-in PDF publication requires Typst 0.15.1 or newer on `PATH`. This is an op
 
 ## 1. Prebuilt Linux x86_64 release
 
-The v0.1.1 release contains `carta` and `carta-cli`.
+The v0.1.2 release contains `carta` and `carta-cli`.
 
 ```bash
-wget https://github.com/fnt400/carta-space/releases/download/v0.1.1/carta-v0.1.1-linux-x86_64.tar.gz
-wget https://github.com/fnt400/carta-space/releases/download/v0.1.1/carta-v0.1.1-linux-x86_64.tar.gz.sha256
+wget https://github.com/fnt400/carta-space/releases/download/v0.1.2/carta-v0.1.2-linux-x86_64.tar.gz
+wget https://github.com/fnt400/carta-space/releases/download/v0.1.2/carta-v0.1.2-linux-x86_64.tar.gz.sha256
 
-sha256sum -c carta-v0.1.1-linux-x86_64.tar.gz.sha256
-tar -xzf carta-v0.1.1-linux-x86_64.tar.gz
-cd carta-v0.1.1-linux-x86_64
+sha256sum -c carta-v0.1.2-linux-x86_64.tar.gz.sha256
+tar -xzf carta-v0.1.2-linux-x86_64.tar.gz
+cd carta-v0.1.2-linux-x86_64
 
 install -Dm755 carta ~/.local/bin/carta
 install -Dm755 carta-cli ~/.local/bin/carta-cli   # optional
@@ -39,7 +39,7 @@ Make sure `~/.local/bin` is in your `PATH`, then run:
 carta
 ```
 
-The v0.1.1 Linux binary is dynamically linked and built/tested on Ubuntu 20.04 (glibc 2.31, Git 2.25.1). NixOS does not run generic dynamically linked Linux binaries directly; use the Nix method below. On systems with older glibc, musl-based systems such as Alpine, or other architectures, build from source.
+The v0.1.2 Linux binary is dynamically linked and built/tested on Ubuntu 20.04 (glibc 2.31, Git 2.25.1). NixOS does not run generic dynamically linked Linux binaries directly; use the Nix method below. On systems with older glibc, musl-based systems such as Alpine, or other architectures, build from source.
 
 ## 2. Prebuilt macOS binaries
 
@@ -48,21 +48,21 @@ Download the package matching your CPU.
 Apple Silicon:
 
 ```bash
-curl -LO https://github.com/fnt400/carta-space/releases/download/v0.1.1/carta-v0.1.1-macos-arm64.tar.gz
-curl -LO https://github.com/fnt400/carta-space/releases/download/v0.1.1/carta-v0.1.1-macos-arm64.tar.gz.sha256
-shasum -a 256 -c carta-v0.1.1-macos-arm64.tar.gz.sha256
-tar -xzf carta-v0.1.1-macos-arm64.tar.gz
-cd carta-v0.1.1-macos-arm64
+curl -LO https://github.com/fnt400/carta-space/releases/download/v0.1.2/carta-v0.1.2-macos-arm64.tar.gz
+curl -LO https://github.com/fnt400/carta-space/releases/download/v0.1.2/carta-v0.1.2-macos-arm64.tar.gz.sha256
+shasum -a 256 -c carta-v0.1.2-macos-arm64.tar.gz.sha256
+tar -xzf carta-v0.1.2-macos-arm64.tar.gz
+cd carta-v0.1.2-macos-arm64
 ```
 
 Intel:
 
 ```bash
-curl -LO https://github.com/fnt400/carta-space/releases/download/v0.1.1/carta-v0.1.1-macos-x86_64.tar.gz
-curl -LO https://github.com/fnt400/carta-space/releases/download/v0.1.1/carta-v0.1.1-macos-x86_64.tar.gz.sha256
-shasum -a 256 -c carta-v0.1.1-macos-x86_64.tar.gz.sha256
-tar -xzf carta-v0.1.1-macos-x86_64.tar.gz
-cd carta-v0.1.1-macos-x86_64
+curl -LO https://github.com/fnt400/carta-space/releases/download/v0.1.2/carta-v0.1.2-macos-x86_64.tar.gz
+curl -LO https://github.com/fnt400/carta-space/releases/download/v0.1.2/carta-v0.1.2-macos-x86_64.tar.gz.sha256
+shasum -a 256 -c carta-v0.1.2-macos-x86_64.tar.gz.sha256
+tar -xzf carta-v0.1.2-macos-x86_64.tar.gz
+cd carta-v0.1.2-macos-x86_64
 ```
 
 Then install either build with:
@@ -133,7 +133,7 @@ Install Rust 1.85 or newer with rustup, and make sure `git --version` works.
 Then install Carta on either Linux or macOS:
 
 ```bash
-git clone --depth 1 --branch v0.1.1 https://github.com/fnt400/carta-space.git
+git clone --depth 1 --branch v0.1.2 https://github.com/fnt400/carta-space.git
 cd carta-space
 
 cargo install --locked --path crates/carta-tui
