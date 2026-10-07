@@ -36,13 +36,11 @@ ChatGPT must keep changes scoped and must not silently change archive-format or 
 
 ### OpenCode — local verification agent
 
-OpenCode is normally responsible for operations that require the real local environment:
+Routine formatter, Clippy, workspace test and build checks run automatically in GitHub Actions on every push to `opencode/v0.2`.
 
-- `cargo fmt --check`;
-- Clippy;
-- Cargo tests;
-- builds;
-- reproducing runtime failures;
+OpenCode is reserved for operations that require the real local environment or direct hardware interaction:
+
+- reproducing runtime failures that CI cannot reproduce;
 - exercising the affected frontend;
 - physical-keyboard event probes;
 - terminal compatibility checks for the frozen TUI when relevant;
@@ -59,9 +57,9 @@ user/dogfooding
     ↓
 ChatGPT: analyse + implement + tests + commit + push
     ↓
-local: git pull --ff-only origin opencode/v0.2
+GitHub Actions: fmt + Clippy + tests + builds + portability
     ↓
-OpenCode: verify without modifying files
+only when needed: local/OpenCode runtime or hardware verification
     ↓
 ChatGPT: review evidence and fix if required
 ```
@@ -99,15 +97,15 @@ The Carta crates live inside this workspace; verification should not assume sepa
 
 ## Rust verification baseline
 
-When applicable, local verification uses:
+The automatic quality gate uses:
 
 ```bash
-cargo fmt --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo test --workspace --locked
 ```
 
-Passing automated tests does not replace real runtime verification for physical keyboard input, terminal/GUI rendering, export, recovery, or other environment-dependent behavior.
+Do not ask the user to relay these routine checks through OpenCode. Passing automated tests does not replace real runtime verification for physical keyboard input, terminal/GUI rendering, export, recovery, or other environment-dependent behavior.
 
 ## Git discipline
 

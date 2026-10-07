@@ -41,9 +41,10 @@ The v0.2 shared layer currently owns:
 - the autosave/checkpoint/sync `Scheduler`;
 - palette matching;
 - application modes for Editing, palette, prompt, confirmation, selector and LEAP;
-- frontend-neutral `Action` values for text editing, LEAP input, horizontal character navigation, document navigation and document boundaries.
+- frontend-neutral `Action` values for text editing, LEAP input, horizontal character navigation, document navigation and document boundaries;
+- the main `App` application controller and shared help/cheatsheet content.
 
-The v0.1 TUI keeps compatibility re-exports so the extraction does not intentionally change behavior.
+`carta-tui/src/app.rs` and `carta-tui/src/help.rs` are now compatibility re-exports of `carta-app`; the terminal frontend no longer owns the canonical application controller or help content.
 
 `carta-app` must not depend on Ratatui, Crossterm, Winit, a GUI widget toolkit, browser APIs, Android APIs or other frontend technology.
 
@@ -58,7 +59,7 @@ During the v0.2 migration it serves two purposes:
 1. compatibility frontend for existing terminal users;
 2. regression oracle showing that extracting shared code did not change established Carta behavior.
 
-TUI-specific compatibility mechanisms, including Portable Keyboard Mode, must not leak into shared application semantics merely because they already exist.
+TUI-specific compatibility mechanisms, including Portable Keyboard Mode, remain inside the terminal adapter. Portable mode state and its palette toggle are not part of `carta-app`.
 
 ### carta-gui
 
@@ -117,7 +118,7 @@ The editor, session values, View, scheduler and palette matching have been extra
 
 ### Stage B — semantic application actions
 
-Status: started.
+Status: substantially complete for the pre-GUI preparation.
 
 `carta-app::Action` now carries the first frontend-neutral editing intents and LEAP input intents. The TUI translates ordinary text-editing keys into these actions, and physical LEAP start/end/query handling already crosses the same semantic seam before invoking application behavior.
 
@@ -129,7 +130,7 @@ That adapter state is now encapsulated: its representation is private and `main.
 
 This distinction is deliberate: `TuiInputIntent` is not a second shared command model. It is an adapter-internal interpretation layer for Crossterm quirks. Only behavior that is genuinely frontend-independent should graduate to `carta-app::Action`.
 
-`main.rs` still owns terminal compatibility shortcuts, clipboard execution, mode dispatch and rendering-dependent navigation. Future extraction should continue reducing orchestration size without moving terminal-specific concepts into `carta-app`.
+`main.rs` now primarily owns terminal compatibility shortcuts, clipboard execution, prompt/selector key handling and rendering-dependent navigation. The canonical `App` controller lives in `carta-app`. Further extraction should happen only when a second frontend provides a concrete shared requirement.
 
 Visual Up/Down/Home/End/PageUp/PageDown are deliberately not generalized yet: their current semantics depend on visual layout width/height. Layout-independent character-left/right, previous/next-document and document-start/end operations already cross the shared `Action` boundary. Do not encode terminal columns or future GUI pixel/font assumptions into `Action` merely to move code. Decide the shared layout/navigation contract only when the graphical text renderer gives us the second concrete implementation.
 
@@ -139,11 +140,13 @@ Do not move terminal-only compatibility commands merely to make the crate diagra
 
 ### Stage C — concrete platform effects
 
-When desktop work requires clipboard, file dialogs or similar host services, introduce the minimum explicit effect boundary needed for those operations.
+Status: intentionally deferred until the graphical frontend exists.
+
+The shared controller still contains native filesystem-oriented import/export/package operations. This is acceptable for the current native desktop transition, but GUI file dialogs and any future web/mobile frontend must introduce the minimum explicit effect boundary required by real platform needs. Do not design that abstraction speculatively before the second frontend exists.
 
 ### Stage D — graphical shell
 
-Add the desktop frontend after the physical-keyboard probe succeeds.
+This is now the next architectural milestone. Add the desktop frontend only after the physical-keyboard probe succeeds.
 
 Start with the smallest complete slice: window, text rendering, cursor/Cat highlight, text input and true momentary LEAP. Add palette, Views, Works and other surfaces by consuming the same shared application state.
 

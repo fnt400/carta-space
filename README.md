@@ -129,10 +129,10 @@ The Rust workspace is split so that Carta behavior is not owned by one presentat
 
 - `carta-format` — format types, validation, serialization, and compatibility rules;
 - `carta-core` — canonical Archive/domain operations: Documents, Volumes, Works, retrieval/LEAP, history, synchronization, Trash/Wipe and backlinks;
-- `carta-app` — reusable interactive application primitives. The first v0.2 extraction contains the editor, Cat highlight/undo engine, session model, View model, scheduler, palette matching and the initial semantic `Action` boundary for editing/LEAP;
+- `carta-app` — reusable interactive application layer containing the editor, Cat highlight/undo engine, session/View/AppMode models, scheduler, palette matching, semantic `Action` boundary, shared help content, and the canonical `App` controller;
 - `carta-publish` — frontend-independent publication layer with a replaceable PDF backend; the first backend uses Typst;
 - `carta-cli` — scriptable Unix-style administrative commands;
-- `carta-tui` — the frozen v0.1.x terminal frontend, retained as a compatibility frontend and regression oracle while v0.2 is developed;
+- `carta-tui` — the frozen v0.1.x terminal adapter, retained as a compatibility frontend and regression oracle; it consumes `carta-app` rather than owning a second application controller;
 - `carta-gui` — planned graphical desktop frontend for v0.2. It will be added after a small keyboard prototype validates physical Left/Right Ctrl/Alt press/release, AltGr and normal text input.
 
 The architectural rule is one Carta behavior with multiple possible surfaces. Desktop, terminal, web and mobile frontends should translate native events into shared application semantics and render shared state rather than reimplementing the editor.
