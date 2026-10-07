@@ -153,3 +153,19 @@ Do not design a large generic platform framework in advance. Introduce effects o
 The GitHub repository is public. Before each push, review the diff as if it were being published immediately.
 
 Use synthetic test data. Do not commit private archive text, credentials, personal contact information, private infrastructure details, unnecessary hostnames/IPs, absolute personal paths, logs or screenshots containing local data. OpenCode failure reports must be sanitized before commit.
+
+
+## Automatic quality gate
+
+The `Portability` workflow is also the automatic code-quality gate for active development branches.
+
+Every push to `opencode/v0.2` must run:
+
+```bash
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+```
+
+in addition to the existing multi-platform workspace tests and release builds.
+
+Do not ask the user to relay routine formatter/Clippy failures between ChatGPT and OpenCode when GitHub Actions can expose them directly. Inspect and fix CI failures before requesting another local verification pass.
