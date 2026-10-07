@@ -1,0 +1,49 @@
+name: Iced input probe
+
+on:
+  push:
+    branches:
+      - opencode/v0.2
+    paths:
+      - "Cargo.toml"
+      - "experiments/iced-input-probe/**"
+      - ".github/workflows/iced-input-probe.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "experiments/iced-input-probe/**"
+      - ".github/workflows/iced-input-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build probe (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+          - macos-15
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Linux development libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            libwayland-dev \
+            libxkbcommon-dev \
+            pkg-config
+
+      - name: Install current stable Rust
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Build isolated Iced probe
+        run: cargo +stable build --manifest-path experiments/iced-input-probe/Cargo.toml
