@@ -127,8 +127,10 @@ impl Archive {
     }
 
     pub fn enable_backlink_cache(&mut self, cache_root: impl AsRef<Path>) {
-        self.backlink_index
-            .enable_cache(cache_root.as_ref().to_path_buf(), self.metadata.archive_id());
+        self.backlink_index.enable_cache(
+            cache_root.as_ref().to_path_buf(),
+            self.metadata.archive_id(),
+        );
     }
 
     pub fn flush_backlink_cache(&mut self) {

@@ -112,7 +112,9 @@ fn resolves_links_and_derives_backlinks_from_disposable_index() {
         .unwrap();
     assert_eq!(backlinks.len(), 2);
     assert!(backlinks.iter().all(|backlink| backlink.source() == source));
-    assert!(backlinks.iter().all(|backlink| backlink.label().contains("one")));
+    assert!(backlinks
+        .iter()
+        .all(|backlink| backlink.label().contains("one")));
     assert!(backlinks
         .iter()
         .all(|backlink| backlink.context().contains("carta:doc:")));
@@ -124,7 +126,10 @@ fn resolves_links_and_derives_backlinks_from_disposable_index() {
         .backlinks(CartaLinkTarget::Document(target))
         .unwrap();
     assert_eq!(backlinks.len(), 1);
-    assert_eq!(backlinks[0].context(), format!("[only](carta:doc:{target})"));
+    assert_eq!(
+        backlinks[0].context(),
+        format!("[only](carta:doc:{target})")
+    );
 }
 
 #[test]
@@ -146,10 +151,9 @@ fn persistent_backlink_cache_is_reused_rebuilt_and_disposable() {
             .len(),
         1
     );
-    let cache_path = cache_root.join("backlinks-v1").join(format!(
-        "{}.json",
-        archive.metadata().archive_id()
-    ));
+    let cache_path = cache_root
+        .join("backlinks-v1")
+        .join(format!("{}.json", archive.metadata().archive_id()));
     assert!(cache_path.is_file());
     let source_path = archive
         .documents()
@@ -161,9 +165,7 @@ fn persistent_backlink_cache_is_reused_rebuilt_and_disposable() {
 
     std::fs::write(
         &source_path,
-        format!(
-            "# Source changed\n\n[first](carta:doc:{target}) [second](carta:doc:{target})\n"
-        ),
+        format!("# Source changed\n\n[first](carta:doc:{target}) [second](carta:doc:{target})\n"),
     )
     .unwrap();
     let archive = Archive::open_with_backlink_cache(&root, &cache_root).unwrap();
@@ -185,10 +187,9 @@ fn persistent_backlink_cache_is_reused_rebuilt_and_disposable() {
             .len(),
         2
     );
-    assert!(serde_json::from_slice::<serde_json::Value>(
-        &std::fs::read(&cache_path).unwrap()
-    )
-    .is_ok());
+    assert!(
+        serde_json::from_slice::<serde_json::Value>(&std::fs::read(&cache_path).unwrap()).is_ok()
+    );
 
     std::fs::remove_file(&cache_path).unwrap();
     let archive = Archive::open_with_backlink_cache(&root, &cache_root).unwrap();

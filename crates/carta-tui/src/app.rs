@@ -2580,8 +2580,7 @@ impl App {
         let text = &self.editor.regions()[region].text;
         let byte = byte.min(text.len());
         if text.is_char_boundary(byte) {
-            self.editor
-                .set_cursor(Cursor { region, byte }, false);
+            self.editor.set_cursor(Cursor { region, byte }, false);
         }
         Ok(())
     }
@@ -2750,11 +2749,7 @@ impl App {
             details.push("  (none)".to_owned());
         } else {
             for backlink in impact.inbound_links() {
-                details.push(format!(
-                    "  {}: {}",
-                    backlink.label(),
-                    backlink.context()
-                ));
+                details.push(format!("  {}: {}", backlink.label(), backlink.context()));
             }
         }
         let document = self.current_document()?;

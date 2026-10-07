@@ -8,9 +8,7 @@ use carta_format::{ArchiveId, DocumentId};
 use serde::{Deserialize, Serialize};
 
 use crate::archive::atomic_replace;
-use crate::{
-    extract_markdown_links, Backlink, CartaLinkTarget, DocumentInfo, Error, MarkdownLink,
-};
+use crate::{extract_markdown_links, Backlink, CartaLinkTarget, DocumentInfo, Error, MarkdownLink};
 
 const CACHE_VERSION: u32 = 1;
 
@@ -74,9 +72,7 @@ impl BacklinkIndex {
         for (id, info) in documents {
             let fingerprint = fingerprint(&info.path.join("content.md"));
             let source = match previous.remove(id) {
-                Some(source)
-                    if fingerprint.is_some() && source.fingerprint == fingerprint =>
-                {
+                Some(source) if fingerprint.is_some() && source.fingerprint == fingerprint => {
                     source
                 }
                 _ => {
@@ -121,9 +117,7 @@ impl BacklinkIndex {
         for (id, info) in documents {
             let fingerprint = fingerprint(&info.path.join("content.md"));
             let source = match previous.remove(id) {
-                Some(source)
-                    if fingerprint.is_some() && source.fingerprint == fingerprint =>
-                {
+                Some(source) if fingerprint.is_some() && source.fingerprint == fingerprint => {
                     source
                 }
                 _ => {
@@ -147,10 +141,7 @@ impl BacklinkIndex {
         if let Some(previous) = self.sources.remove(&id) {
             self.remove_source_from_inverse(id, &previous);
         }
-        let source = CachedSource::from_info(
-            info,
-            fingerprint(&info.path.join("content.md")),
-        );
+        let source = CachedSource::from_info(info, fingerprint(&info.path.join("content.md")));
         add_source_to_inverse(&mut self.inverse, id, &source);
         self.sources.insert(id, source);
         self.dirty = true;
@@ -204,9 +195,8 @@ impl BacklinkIndex {
             version: CACHE_VERSION,
             sources: self.sources.values().cloned().collect(),
         };
-        let bytes = serde_json::to_vec(&cache).map_err(|error| {
-            Error::io(path, io::Error::new(io::ErrorKind::InvalidData, error))
-        })?;
+        let bytes = serde_json::to_vec(&cache)
+            .map_err(|error| Error::io(path, io::Error::new(io::ErrorKind::InvalidData, error)))?;
         let parent = path
             .parent()
             .expect("backlink cache path always has a parent");
@@ -256,16 +246,17 @@ fn add_source_to_inverse(
     }
     for target in touched {
         if let Some(entries) = inverse.get_mut(&target) {
-            entries.sort_by_key(|backlink| {
-                (backlink.source(), backlink.link().source_range().start)
-            });
+            entries
+                .sort_by_key(|backlink| (backlink.source(), backlink.link().source_range().start));
         }
     }
 }
 
 fn line_context(content: &str, link: &MarkdownLink) -> String {
     let range = link.source_range();
-    let start = content[..range.start].rfind('\n').map_or(0, |index| index + 1);
+    let start = content[..range.start]
+        .rfind('\n')
+        .map_or(0, |index| index + 1);
     let end = content[range.end..]
         .find('\n')
         .map_or(content.len(), |index| range.end + index);
