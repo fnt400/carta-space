@@ -1210,7 +1210,11 @@ fn draw(frame: &mut ratatui::Frame<'_>, app: &mut App, portable_enabled: bool) {
         }
     }
     frame.render_widget(
-        Paragraph::new(rendered_status_line(app, usize::from(chunks[1].width)))
+        Paragraph::new(rendered_status_line(
+            app,
+            usize::from(chunks[1].width),
+            portable_enabled,
+        ))
             .style(status_style(app)),
         chunks[1],
     );
@@ -1897,7 +1901,7 @@ fn draw_mode(frame: &mut ratatui::Frame<'_>, app: &App, portable_enabled: bool) 
     }
 }
 
-fn rendered_status_line(app: &App, width: usize) -> String {
+fn rendered_status_line(app: &App, width: usize, portable_enabled: bool) -> String {
     if width == 0 {
         return String::new();
     }
@@ -1906,7 +1910,7 @@ fn rendered_status_line(app: &App, width: usize) -> String {
     }
 
     let inner_width = width - 2;
-    let left = status_line(app);
+    let left = status_line(app, portable_enabled);
     let right = status_view_label(app);
     if right.is_empty() {
         let left = truncate_display(&left, inner_width, true);
@@ -2018,7 +2022,7 @@ fn status_flags(app: &App, portable_enabled: bool) -> String {
     flags.join(" ")
 }
 
-fn status_line(app: &App) -> String {
+fn status_line(app: &App, portable_enabled: bool) -> String {
     let flags = status_flags(app, portable_enabled);
     if !app.status.is_empty() {
         return if flags.is_empty() {
@@ -2392,7 +2396,7 @@ mod tests {
         assert!(display_width(header.text(&app)) <= 80);
 
         app.editor.set_cursor(Cursor { region: 0, byte: 0 }, false);
-        let status = rendered_status_line(&app, 80);
+        let status = rendered_status_line(&app, 80, false);
         assert!(status.starts_with(' '));
         assert!(status.ends_with("Creation Date "));
         assert_eq!(display_width(&status), 80);
@@ -2472,7 +2476,7 @@ mod tests {
 
         assert_eq!(app.view, View::ModificationDate);
         assert_eq!(app.editor.regions().last().unwrap().document, first);
-        assert!(rendered_status_line(&app, 80).ends_with("Modification Date "));
+        assert!(rendered_status_line(&app, 80, false).ends_with("Modification Date "));
         assert_ne!(status_style(&app).bg, creation_style.bg);
     }
 
@@ -2498,19 +2502,17 @@ mod tests {
     fn portable_mode_is_visible_in_status_bar() {
         let (_temporary, mut app) = app_with_documents(&["text"], false);
 
-        assert!(!rendered_status_line(&app, 80).contains("[PORTABLE]"));
-
-        dispatcher.input.set_portable_enabled(true);
-        assert!(rendered_status_line(&app, 80).contains("[PORTABLE]"));
+        assert!(!rendered_status_line(&app, 80, false).contains("[PORTABLE]"));
+        assert!(rendered_status_line(&app, 80, true).contains("[PORTABLE]"));
 
         app.status = "Temporary message".into();
-        assert!(rendered_status_line(&app, 80).contains("[PORTABLE]"));
+        assert!(rendered_status_line(&app, 80, true).contains("[PORTABLE]"));
     }
 
     #[test]
     fn editable_view_name_is_right_aligned_in_status_bar() {
         let (_temporary, chronological) = app_with_documents(&["text"], false);
-        let chronological_status = rendered_status_line(&chronological, 80);
+        let chronological_status = rendered_status_line(&chronological, 80, false);
         assert!(chronological_status.starts_with(' '));
         assert!(chronological_status.ends_with("Creation Date "));
         assert_eq!(display_width(&chronological_status), 80);
@@ -2521,7 +2523,7 @@ mod tests {
         };
         let title = work.archive.work(*work_id).unwrap().title();
         let expected_suffix = format!("{title} ");
-        let work_status = rendered_status_line(&work, 80);
+        let work_status = rendered_status_line(&work, 80, false);
         assert!(work_status.starts_with(' '));
         assert!(work_status.ends_with(expected_suffix.as_str()));
         assert_eq!(display_width(&work_status), 80);
@@ -4706,14 +4708,14 @@ mod tests {
             document,
             selected: 0,
         };
-        let history = status_line(&app);
+        let history = status_line(&app, false);
         assert!(history.contains("History · Label · 1/1"));
         assert!(history.starts_with(&date_only(app.history[0].checkpoint().created())));
 
         app.archive.trash_document(document).unwrap();
         app.trash = Some(app.archive.trash_inventory().unwrap());
         app.view = View::Trash { selected: 0 };
-        let trash = status_line(&app);
+        let trash = status_line(&app, false);
         assert!(trash.contains("Trash · Document: Label · 1/1"));
         assert!(trash.starts_with(&date_only(
             app.trash.as_ref().unwrap().documents()[0].created()
@@ -4734,7 +4736,7 @@ mod tests {
         app.view = View::Trash { selected: 0 };
 
         assert_eq!(status_flags(&app, false), "");
-        assert!(!status_line(&app).contains("[LOCK"));
+        assert!(!status_line(&app, false).contains("[LOCK"));
     }
 
     #[test]
@@ -4747,7 +4749,7 @@ mod tests {
         app.autosave().unwrap();
         app.archive.set_document_locked(document, true).unwrap();
 
-        assert!(status_line(&app).contains("[LOCK DOC]"));
+        assert!(status_line(&app, false).contains("[LOCK DOC]"));
         let metadata = view_document_metadata(&app);
         assert!(
             date_view_separator(&app, document, &metadata[&document], 80, false)
