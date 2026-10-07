@@ -149,7 +149,9 @@ The shared controller still contains native filesystem-oriented import/export/pa
 
 ### Stage D — graphical shell
 
-This is now the next architectural milestone and the point where user input is required for toolkit/input-layer selection. Add the desktop frontend only after the physical-keyboard probe succeeds.
+Status: toolkit/input layer selected.
+
+Iced 0.14 is the canonical v0.2 desktop toolkit after the isolated input probe passed on the target Linux/Wayland desktop and compiled on Linux, macOS and Windows. The first `carta-gui` shell remains isolated from the Rust 1.85 workspace while the GUI stabilizes; it must consume `carta-app` rather than reimplement application behavior. Add the desktop frontend only after the physical-keyboard probe succeeds.
 
 Start with the smallest complete slice: window, text rendering, cursor/Cat highlight, text input and true momentary LEAP. Add palette, Views, Works and other surfaces by consuming the same shared application state.
 

@@ -533,3 +533,27 @@ Further abstraction must be driven by a concrete requirement from the second fro
 The desktop GUI will provide the second implementation needed to determine which remaining concerns genuinely require shared contracts.
 
 **Consequence:** The next architectural milestone is the desktop input/rendering prototype. Before implementing it, compare candidate input/windowing/toolkit approaches with the user, beginning with physical modifier press/release fidelity, AltGr/IME behavior, Unicode text input, portability, rendering quality, dependency weight, and integration with the existing Rust layers.
+
+
+---
+
+## DD-047 — Iced is the canonical v0.2 desktop GUI toolkit
+
+**Decision:** Carta Space v0.2 uses Iced 0.14 for the canonical desktop GUI, with Winit-backed native window/input events and WGPU as the initial renderer.
+
+The decision follows a dedicated isolated probe rather than API assumptions. The probe builds on Linux, macOS and Windows, and the target Linux/Wayland keyboard test confirmed all required behaviors:
+
+- distinct physical Left Ctrl, Right Ctrl, Left Alt and Right Alt events;
+- reliable DOWN and UP events for all four modifiers;
+- Left Ctrl and Left Alt can therefore retain momentary LEAP semantics;
+- Right Alt remains independent for AltGr;
+- ordinary text, Unicode/non-ASCII input and AltGr-produced text work together;
+- no stuck modifier state was observed.
+
+IME event support remains part of the adapter contract even though no configured IME was present during the initial manual validation.
+
+**Architecture:** Iced is a frontend only. The canonical editor, LEAP semantics, Cat selection, View/AppMode state and application behavior remain in `carta-app`. The GUI translates native Iced/Winit events into shared `Action` and `ModeAction` values and renders shared state. It must not introduce a second editor model.
+
+**MSRV:** Iced 0.14 requires Rust 1.88 or newer. During the initial shell/prototype stage, `carta-gui` remains isolated from the main Rust 1.85 workspace so the existing v0.1 compatibility targets are not raised prematurely. Integrating `carta-gui` into the main workspace and raising the v0.2 MSRV will be a separate deliberate step once the graphical shell is stable.
+
+**Why Iced:** It provides the best balance for Carta between implementation simplicity, runtime performance, modern desktop presentation, cross-platform support and the physical keyboard fidelity required by LEAP.

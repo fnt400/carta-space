@@ -133,7 +133,7 @@ The Rust workspace is split so that Carta behavior is not owned by one presentat
 - `carta-publish` — frontend-independent publication layer with a replaceable PDF backend; the first backend uses Typst;
 - `carta-cli` — scriptable Unix-style administrative commands;
 - `carta-tui` — the frozen v0.1.x terminal adapter, retained as a compatibility frontend and regression oracle; it consumes `carta-app` rather than owning a second application controller;
-- `carta-gui` — planned graphical desktop frontend for v0.2. It will be added after a small keyboard prototype validates physical Left/Right Ctrl/Alt press/release, AltGr and normal text input.
+- `carta-gui` — Iced 0.14 graphical desktop frontend for v0.2. A dedicated input probe has validated physical Left/Right Ctrl/Alt press/release, normal Unicode input and AltGr behavior; the initial GUI shell is being developed separately from the frozen v0.1 compatibility workspace.
 
 The architectural rule is one Carta behavior with multiple possible surfaces. Desktop, terminal, web and mobile frontends should translate native events into shared application semantics and render shared state rather than reimplementing the editor.
 
