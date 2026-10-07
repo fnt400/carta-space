@@ -31,7 +31,7 @@ struct Location {
     scroll: usize,
 }
 
-pub use crate::{AppMode, Choice, ConfirmAction, PromptAction, ResultRow, SelectAction};
+pub use crate::{AppMode, Choice, ConfirmAction, ModeAction, PromptAction, ResultRow, SelectAction};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
@@ -503,6 +503,135 @@ impl App {
     pub fn cancel_mode(&mut self) {
         self.mode = AppMode::Editing;
         self.status.clear();
+    }
+
+    pub fn dispatch_mode_action(&mut self, action: ModeAction) -> AppResult<bool> {
+        match action {
+            ModeAction::Cancel => match self.mode {
+                AppMode::Prompt { .. } | AppMode::Selector { .. } => {
+                    self.cancel_mode();
+                    Ok(true)
+                }
+                AppMode::Confirm { .. } => {
+                    self.submit_confirmation(false)?;
+                    Ok(true)
+                }
+                _ => Ok(false),
+            },
+            ModeAction::Submit => match self.mode {
+                AppMode::Prompt { .. } => {
+                    self.submit_prompt()?;
+                    Ok(true)
+                }
+                AppMode::Selector { .. } => {
+                    self.submit_selector()?;
+                    Ok(true)
+                }
+                _ => Ok(false),
+            },
+            ModeAction::Confirm(confirmed) => {
+                if matches!(self.mode, AppMode::Confirm { .. }) {
+                    self.submit_confirmation(confirmed)?;
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            }
+            ModeAction::InsertText(value) => match &mut self.mode {
+                AppMode::Prompt { input, cursor, .. } => {
+                    input.insert_str(*cursor, &value);
+                    *cursor += value.len();
+                    Ok(true)
+                }
+                AppMode::Selector {
+                    query, selected, ..
+                } => {
+                    query.push_str(&value);
+                    *selected = 0;
+                    Ok(true)
+                }
+                _ => Ok(false),
+            },
+            ModeAction::Backspace => match &mut self.mode {
+                AppMode::Prompt { input, cursor, .. } => {
+                    let previous = previous_char_boundary(input, *cursor);
+                    if previous < *cursor {
+                        input.replace_range(previous..*cursor, "");
+                        *cursor = previous;
+                    }
+                    Ok(true)
+                }
+                AppMode::Selector {
+                    query, selected, ..
+                } => {
+                    query.pop();
+                    *selected = 0;
+                    Ok(true)
+                }
+                _ => Ok(false),
+            },
+            ModeAction::Delete => match &mut self.mode {
+                AppMode::Prompt { input, cursor, .. } => {
+                    let next = next_char_boundary(input, *cursor);
+                    if next > *cursor {
+                        input.replace_range(*cursor..next, "");
+                    }
+                    Ok(true)
+                }
+                _ => Ok(false),
+            },
+            ModeAction::CursorBackward => match &mut self.mode {
+                AppMode::Prompt { input, cursor, .. } => {
+                    *cursor = previous_char_boundary(input, *cursor);
+                    Ok(true)
+                }
+                _ => Ok(false),
+            },
+            ModeAction::CursorForward => match &mut self.mode {
+                AppMode::Prompt { input, cursor, .. } => {
+                    *cursor = next_char_boundary(input, *cursor);
+                    Ok(true)
+                }
+                _ => Ok(false),
+            },
+            ModeAction::CursorStart => match &mut self.mode {
+                AppMode::Prompt { cursor, .. } => {
+                    *cursor = 0;
+                    Ok(true)
+                }
+                _ => Ok(false),
+            },
+            ModeAction::CursorEnd => match &mut self.mode {
+                AppMode::Prompt { input, cursor, .. } => {
+                    *cursor = input.len();
+                    Ok(true)
+                }
+                _ => Ok(false),
+            },
+            ModeAction::SelectionPrevious => match &mut self.mode {
+                AppMode::Selector { selected, .. } => {
+                    *selected = selected.saturating_sub(1);
+                    Ok(true)
+                }
+                _ => Ok(false),
+            },
+            ModeAction::SelectionNext => match &mut self.mode {
+                AppMode::Selector {
+                    query,
+                    selected,
+                    choices,
+                    ..
+                } => {
+                    let len = choices
+                        .iter()
+                        .filter(|choice| palette::matches(query, &choice.label))
+                        .count();
+                    *selected = (*selected + 1).min(len.saturating_sub(1));
+                    Ok(true)
+                }
+                _ => Ok(false),
+            },
+        }
     }
 
     pub fn execute(&mut self, command: Command) -> AppResult {
@@ -3127,6 +3256,21 @@ fn default_creation_date_view(archive: &Archive, position: Option<&Position>) ->
     View::CreationDate(volume)
 }
 
+fn previous_char_boundary(text: &str, cursor: usize) -> usize {
+    text[..cursor.min(text.len())]
+        .char_indices()
+        .next_back()
+        .map_or(0, |(index, _)| index)
+}
+
+fn next_char_boundary(text: &str, cursor: usize) -> usize {
+    let cursor = cursor.min(text.len());
+    text[cursor..]
+        .chars()
+        .next()
+        .map_or(text.len(), |character| cursor + character.len_utf8())
+}
+
 fn current_volume() -> Volume {
     let now = Local::now();
     Volume::new(now.year() as u16, now.month() as u8).unwrap()
@@ -4750,6 +4894,75 @@ mod tests {
         assert!(matches!(app.mode, AppMode::Editing));
         assert_eq!(app.editor.current_document(), Some(document));
         assert_eq!(app.status, "No backlinks");
+    }
+
+    #[test]
+    fn prompt_mode_actions_follow_utf8_character_boundaries() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        app.mode = AppMode::Prompt {
+            title: "Prompt".into(),
+            input: "aèz".into(),
+            cursor: 3,
+            details: Vec::new(),
+            action: PromptAction::Search,
+        };
+
+        assert!(app
+            .dispatch_mode_action(ModeAction::CursorBackward)
+            .unwrap());
+        let AppMode::Prompt { cursor, .. } = &app.mode else {
+            panic!("expected prompt")
+        };
+        assert_eq!(*cursor, 1);
+
+        assert!(app
+            .dispatch_mode_action(ModeAction::Delete)
+            .unwrap());
+        let AppMode::Prompt { input, cursor, .. } = &app.mode else {
+            panic!("expected prompt")
+        };
+        assert_eq!(input, "az");
+        assert_eq!(*cursor, 1);
+    }
+
+    #[test]
+    fn selector_mode_actions_filter_and_move_selection() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        app.mode = AppMode::Selector {
+            title: "Select".into(),
+            query: String::new(),
+            selected: 0,
+            choices: vec![
+                Choice {
+                    label: "Alpha".into(),
+                    value: "a".into(),
+                },
+                Choice {
+                    label: "Beta".into(),
+                    value: "b".into(),
+                },
+            ],
+            action: SelectAction::OpenWork,
+        };
+
+        assert!(app
+            .dispatch_mode_action(ModeAction::InsertText("be".into()))
+            .unwrap());
+        assert!(app
+            .dispatch_mode_action(ModeAction::SelectionNext)
+            .unwrap());
+        let AppMode::Selector {
+            query, selected, ..
+        } = &app.mode
+        else {
+            panic!("expected selector")
+        };
+        assert_eq!(query, "be");
+        assert_eq!(*selected, 0);
     }
 
     #[test]

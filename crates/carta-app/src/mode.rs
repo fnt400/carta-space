@@ -60,6 +60,22 @@ pub struct ResultRow {
     pub byte: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ModeAction {
+    Cancel,
+    Submit,
+    InsertText(String),
+    Backspace,
+    Delete,
+    CursorBackward,
+    CursorForward,
+    CursorStart,
+    CursorEnd,
+    SelectionPrevious,
+    SelectionNext,
+    Confirm(bool),
+}
+
 #[derive(Debug, Clone)]
 pub enum AppMode {
     Editing,

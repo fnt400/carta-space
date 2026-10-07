@@ -3,7 +3,7 @@ mod theme;
 
 #[cfg(not(test))]
 use arboard::Clipboard;
-use carta_app::Action;
+use carta_app::{Action, ModeAction};
 use carta_core::{Archive, LeapDirection, SyncOutcome};
 use carta_tui::app::{AppMode, View};
 use carta_tui::editor::{visual_ranges, Cursor};
@@ -868,83 +868,54 @@ fn handle_key(
             _ => {}
         },
         AppMode::Palette { .. } => unreachable!(),
-        AppMode::Prompt { input, cursor, .. } => match key.code {
-            KeyCode::Esc => app.cancel_mode(),
-            KeyCode::Enter => app.submit_prompt()?,
-            KeyCode::Left => *cursor = previous_char_boundary(input, *cursor),
-            KeyCode::Right => *cursor = next_char_boundary(input, *cursor),
-            KeyCode::Home => *cursor = 0,
-            KeyCode::End => *cursor = input.len(),
-            KeyCode::Backspace => {
-                let previous = previous_char_boundary(input, *cursor);
-                if previous < *cursor {
-                    input.replace_range(previous..*cursor, "");
-                    *cursor = previous;
+        AppMode::Prompt { .. } => {
+            let action = match key.code {
+                KeyCode::Esc => Some(ModeAction::Cancel),
+                KeyCode::Enter => Some(ModeAction::Submit),
+                KeyCode::Left => Some(ModeAction::CursorBackward),
+                KeyCode::Right => Some(ModeAction::CursorForward),
+                KeyCode::Home => Some(ModeAction::CursorStart),
+                KeyCode::End => Some(ModeAction::CursorEnd),
+                KeyCode::Backspace => Some(ModeAction::Backspace),
+                KeyCode::Delete => Some(ModeAction::Delete),
+                KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    Some(ModeAction::InsertText(c.to_string()))
                 }
+                _ => None,
+            };
+            if let Some(action) = action {
+                app.dispatch_mode_action(action)?;
             }
-            KeyCode::Delete => {
-                let next = next_char_boundary(input, *cursor);
-                if next > *cursor {
-                    input.replace_range(*cursor..next, "");
+        }
+        AppMode::Confirm { .. } => {
+            let action = match key.code {
+                KeyCode::Char('y' | 'Y') => Some(ModeAction::Confirm(true)),
+                KeyCode::Char('n' | 'N') | KeyCode::Esc | KeyCode::Enter => {
+                    Some(ModeAction::Confirm(false))
                 }
+                _ => None,
+            };
+            if let Some(action) = action {
+                app.dispatch_mode_action(action)?;
             }
-            KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                input.insert(*cursor, c);
-                *cursor += c.len_utf8();
+        }
+        AppMode::Selector { .. } => {
+            let action = match key.code {
+                KeyCode::Esc => Some(ModeAction::Cancel),
+                KeyCode::Enter => Some(ModeAction::Submit),
+                KeyCode::Backspace => Some(ModeAction::Backspace),
+                KeyCode::Char(c) => Some(ModeAction::InsertText(c.to_string())),
+                KeyCode::Up => Some(ModeAction::SelectionPrevious),
+                KeyCode::Down => Some(ModeAction::SelectionNext),
+                _ => None,
+            };
+            if let Some(action) = action {
+                app.dispatch_mode_action(action)?;
             }
-            _ => {}
-        },
-        AppMode::Confirm { .. } => match key.code {
-            KeyCode::Char('y' | 'Y') => app.submit_confirmation(true)?,
-            KeyCode::Char('n' | 'N') | KeyCode::Esc | KeyCode::Enter => {
-                app.submit_confirmation(false)?
-            }
-            _ => {}
-        },
-        AppMode::Selector {
-            query,
-            selected,
-            choices,
-            ..
-        } => match key.code {
-            KeyCode::Esc => app.cancel_mode(),
-            KeyCode::Enter => app.submit_selector()?,
-            KeyCode::Backspace => {
-                query.pop();
-                *selected = 0;
-            }
-            KeyCode::Char(c) => {
-                query.push(c);
-                *selected = 0;
-            }
-            KeyCode::Up => *selected = selected.saturating_sub(1),
-            KeyCode::Down => {
-                let len = choices
-                    .iter()
-                    .filter(|c| carta_tui::palette::matches(query, &c.label))
-                    .count();
-                *selected = (*selected + 1).min(len.saturating_sub(1));
-            }
-            _ => {}
         },
         AppMode::Editing => handle_normal(app, key)?,
     }
     Ok(())
-}
-
-fn previous_char_boundary(text: &str, cursor: usize) -> usize {
-    text[..cursor.min(text.len())]
-        .char_indices()
-        .next_back()
-        .map_or(0, |(index, _)| index)
-}
-
-fn next_char_boundary(text: &str, cursor: usize) -> usize {
-    let cursor = cursor.min(text.len());
-    text[cursor..]
-        .chars()
-        .next()
-        .map_or(text.len(), |character| cursor + character.len_utf8())
 }
 
 fn normalize_clipboard_text(text: &str) -> String {
@@ -2273,15 +2244,6 @@ mod tests {
         );
         assert_eq!(editor_width(160), 80);
         assert_eq!(editor_width(70), 70);
-    }
-
-    #[test]
-    fn prompt_cursor_moves_on_utf8_character_boundaries() {
-        let text = "aèz";
-        assert_eq!(next_char_boundary(text, 0), 1);
-        assert_eq!(next_char_boundary(text, 1), 3);
-        assert_eq!(previous_char_boundary(text, 3), 1);
-        assert_eq!(previous_char_boundary(text, 1), 0);
     }
 
     #[test]

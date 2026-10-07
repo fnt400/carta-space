@@ -42,7 +42,8 @@ The v0.2 shared layer currently owns:
 - palette matching;
 - application modes for Editing, palette, prompt, confirmation, selector and LEAP;
 - frontend-neutral `Action` values for text editing, LEAP input, horizontal character navigation, document navigation and document boundaries;
-- the main `App` application controller and shared help/cheatsheet content.
+- the main `App` application controller and shared help/cheatsheet content;
+- frontend-neutral prompt, confirmation, and selector editing/navigation through `ModeAction`.
 
 `carta-tui/src/app.rs` and `carta-tui/src/help.rs` are now compatibility re-exports of `carta-app`; the terminal frontend no longer owns the canonical application controller or help content.
 
@@ -130,7 +131,7 @@ That adapter state is now encapsulated: its representation is private and `main.
 
 This distinction is deliberate: `TuiInputIntent` is not a second shared command model. It is an adapter-internal interpretation layer for Crossterm quirks. Only behavior that is genuinely frontend-independent should graduate to `carta-app::Action`.
 
-`main.rs` now primarily owns terminal compatibility shortcuts, clipboard execution, prompt/selector key handling and rendering-dependent navigation. The canonical `App` controller lives in `carta-app`. Further extraction should happen only when a second frontend provides a concrete shared requirement.
+`main.rs` now primarily owns terminal compatibility shortcuts, clipboard execution, the TUI-specific command palette extension, and rendering-dependent navigation. Prompt/confirmation/selector editing semantics are shared through `ModeAction`. The canonical `App` controller lives in `carta-app`. Further extraction should happen only when a second frontend provides a concrete shared requirement.
 
 Visual Up/Down/Home/End/PageUp/PageDown are deliberately not generalized yet: their current semantics depend on visual layout width/height. Layout-independent character-left/right, previous/next-document and document-start/end operations already cross the shared `Action` boundary. Do not encode terminal columns or future GUI pixel/font assumptions into `Action` merely to move code. Decide the shared layout/navigation contract only when the graphical text renderer gives us the second concrete implementation.
 
