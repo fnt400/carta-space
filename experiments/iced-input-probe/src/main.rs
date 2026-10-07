@@ -232,7 +232,7 @@ fn update(state: &mut Probe, message: Message) {
                     if state.right_alt.pressed {
                         state.altgr_text_seen = true;
                     }
-                    if produced_text.chars().any(|character| !character.is_ascii()) {
+                    if !produced_text.is_ascii() {
                         state.unicode_seen = true;
                     }
                 }
@@ -250,7 +250,7 @@ fn update(state: &mut Probe, message: Message) {
                 state.ime_preedit.clear();
                 state.last_ime_commit.clone_from(&value);
                 state.ime_commit_seen = true;
-                if value.chars().any(|character| !character.is_ascii()) {
+                if !value.is_ascii() {
                     state.unicode_seen = true;
                 }
                 push_log(state, format!("IME COMMIT {value:?} status={status}"));
@@ -266,7 +266,7 @@ fn update(state: &mut Probe, message: Message) {
                 if state.right_alt.pressed {
                     state.altgr_text_seen = true;
                 }
-                if value.chars().any(|character| !character.is_ascii()) {
+                if !value.is_ascii() {
                     state.unicode_seen = true;
                 }
             }
