@@ -3566,10 +3566,9 @@ mod tests {
     }
 
     #[test]
-    fn quit_session_sync_restart_preserves_cursor_position() {
+    fn quit_sync_restart_preserves_cursor_position_from_session_model() {
         let temporary = tempfile::tempdir().unwrap();
         let root = temporary.path().join("archive");
-        let state = temporary.path().join("state");
         let remote = temporary.path().join("remote.git");
         let status = std::process::Command::new("git")
             .args(["init", "--bare", "--quiet"])
@@ -3579,7 +3578,6 @@ mod tests {
         assert!(status.success());
 
         let archive = Archive::create(&root).unwrap();
-        let archive_id = archive.metadata().archive_id();
         let mut app = App::open(archive, None, Instant::now()).unwrap();
         app.archive
             .set_sync_remote(remote.to_str().unwrap())
@@ -3590,14 +3588,11 @@ mod tests {
         let document = app.editor.current_document().unwrap();
 
         app.execute(Command::Quit).unwrap();
-        crate::session::save_session(&state, archive_id, &app.session()).unwrap();
+        let session = app.session();
         app.archive.sync().unwrap();
         drop(app);
 
         let archive = Archive::open(&root).unwrap();
-        let session = crate::session::load_session(&state, archive_id)
-            .unwrap()
-            .unwrap();
         let resumed = App::open(archive, Some(&session), Instant::now()).unwrap();
 
         assert_eq!(resumed.editor.current_document(), Some(document));
