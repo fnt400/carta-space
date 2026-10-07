@@ -5,10 +5,18 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SavedView {
     #[serde(alias = "Chronological")]
-    CreationDate { year: u16, month: u8 },
+    CreationDate {
+        year: u16,
+        month: u8,
+    },
     ModificationDate,
-    Work { id: WorkId },
-    Search { query: String, selected: usize },
+    Work {
+        id: WorkId,
+    },
+    Search {
+        query: String,
+        selected: usize,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -52,7 +60,10 @@ mod tests {
         let session: Session = serde_json::from_str(json).unwrap();
         assert_eq!(
             session.view,
-            SavedView::CreationDate { year: 2026, month: 9 }
+            SavedView::CreationDate {
+                year: 2026,
+                month: 9
+            }
         );
     }
 
@@ -61,7 +72,10 @@ mod tests {
         let session = Session::new(Volume::new(2026, 9).unwrap());
         assert_eq!(
             session.view,
-            SavedView::CreationDate { year: 2026, month: 9 }
+            SavedView::CreationDate {
+                year: 2026,
+                month: 9
+            }
         );
         assert!(session.position.is_none());
         assert!(session.work_positions.is_empty());

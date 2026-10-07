@@ -211,7 +211,10 @@ mod tests {
 
         save_host_settings(dir.path(), "example-host", &enabled).unwrap();
 
-        assert_eq!(load_host_settings(dir.path(), "example-host").unwrap(), enabled);
+        assert_eq!(
+            load_host_settings(dir.path(), "example-host").unwrap(),
+            enabled
+        );
         assert_eq!(
             load_host_settings(dir.path(), "other-host").unwrap(),
             HostSettings::default()

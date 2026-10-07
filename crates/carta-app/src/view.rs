@@ -7,12 +7,28 @@ pub enum View {
     CreationDate(Volume),
     ModificationDate,
     Work(WorkId),
-    Search { query: String, selected: usize },
-    History { document: DocumentId, selected: usize },
-    WorkHistory { work: WorkId, selected: usize },
-    Trash { selected: usize },
-    Conflicts { selected: usize },
-    Help { kind: HelpKind, selected: usize },
+    Search {
+        query: String,
+        selected: usize,
+    },
+    History {
+        document: DocumentId,
+        selected: usize,
+    },
+    WorkHistory {
+        work: WorkId,
+        selected: usize,
+    },
+    Trash {
+        selected: usize,
+    },
+    Conflicts {
+        selected: usize,
+    },
+    Help {
+        kind: HelpKind,
+        selected: usize,
+    },
 }
 
 pub struct Scheduler {
@@ -38,7 +54,9 @@ impl Scheduler {
         }
     }
 
-    pub fn edited(&mut self, now: Instant) { self.last_edit = Some(now); }
+    pub fn edited(&mut self, now: Instant) {
+        self.last_edit = Some(now);
+    }
 
     pub fn autosave_due(&self, now: Instant, dirty: bool) -> bool {
         dirty
@@ -51,17 +69,25 @@ impl Scheduler {
         now.duration_since(self.last_checkpoint) >= self.checkpoint_after
     }
 
-    pub fn saved(&mut self) { self.last_edit = None; }
+    pub fn saved(&mut self) {
+        self.last_edit = None;
+    }
 
-    pub fn checkpointed(&mut self, now: Instant) { self.last_checkpoint = now; }
+    pub fn checkpointed(&mut self, now: Instant) {
+        self.last_checkpoint = now;
+    }
 
     pub fn sync_due(&self, now: Instant) -> bool {
         self.sync_pending || now.duration_since(self.last_sync) >= self.sync_after
     }
 
-    pub fn sync_pending(&mut self) { self.sync_pending = true; }
+    pub fn sync_pending(&mut self) {
+        self.sync_pending = true;
+    }
 
-    pub fn is_sync_pending(&self) -> bool { self.sync_pending }
+    pub fn is_sync_pending(&self) -> bool {
+        self.sync_pending
+    }
 
     pub fn sync_attempted(&mut self, now: Instant) {
         self.last_sync = now;
