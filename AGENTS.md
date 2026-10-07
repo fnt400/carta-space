@@ -20,7 +20,7 @@ The reference implementation is written in Rust and is migrating toward explicit
 
 - `carta-format`: format types, parsing, serialization, validation, and compatibility rules.
 - `carta-core`: canonical Archive/domain operations: Documents, Volumes, Works, LEAP retrieval, Git history, Trash/Wipe, synchronization and backlinks.
-- `carta-app`: frontend-independent interactive application primitives. It currently owns the editor/Cat highlight/undo model, session model, View model, scheduler, palette matching and the first semantic `Action` values; more application semantics move here only when they are genuinely frontend-independent.
+- `carta-app`: frontend-independent interactive application primitives. It currently owns the editor/Cat highlight/undo model, session model, View and AppMode models, scheduler, palette matching, and semantic `Action` values for shared editing/LEAP/layout-independent navigation; more application semantics move here only when they are genuinely frontend-independent.
 - `carta-publish`: frontend-independent publication.
 - `carta-cli`: Unix-style administrative interface.
 - `carta-tui`: frozen terminal frontend from the v0.1.x line. It remains a regression harness and compatibility frontend, not the place for new v0.2 features.
@@ -30,7 +30,7 @@ Archive semantics belong in `carta-core`. Reusable interaction semantics belong 
 
 For the frozen TUI, Crossterm-specific keyboard interpretation belongs in `crates/carta-tui/src/input.rs`, not in `carta-app`. Pending/active physical LEAP keys, suppressed key-release quirks, Right Control tracking and terminal keycode mapping are adapter state.
 The internal fields of that adapter state are private. Other TUI modules should use its transition methods rather than manipulating pending/active LEAP or modifier bookkeeping directly.
-The adapter may emit TUI-local intents for interpreted terminal gestures. These intents are not automatically shared application actions; promote one into `carta-app::Action` only when its semantics are independent of Crossterm and presentation technology.
+The adapter may emit TUI-local intents for interpreted terminal gestures. These intents are not automatically shared application actions; promote one into `carta-app::Action` only when its semantics are independent of Crossterm and presentation technology. Portable Keyboard Mode remains a TUI-only legacy compatibility concern.
 
 No frontend may grow a second implementation of the editor, Cat selection, LEAP semantics, Views or other shared application behavior merely for convenience. Future desktop, web and mobile frontends should reuse `carta-app` and `carta-core` to the maximum practical extent.
 

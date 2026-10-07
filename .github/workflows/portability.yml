@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: portability-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     name: Rust quality (fmt + Clippy)
@@ -37,6 +41,13 @@ jobs:
 
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+      - name: Enforce carta-app frontend independence
+        run: |
+          if cargo tree -p carta-app --edges normal | grep -E '(^|[[:space:]])(crossterm|ratatui|winit|slint)([[:space:]]|$)'; then
+            echo "carta-app must not depend on a frontend or windowing toolkit"
+            exit 1
+          fi
 
   linux-glibc:
     name: Linux x86_64 (Ubuntu 20.04 baseline)

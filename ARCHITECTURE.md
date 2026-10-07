@@ -32,7 +32,7 @@ Provides conventional administrative/scriptable operations.
 
 `carta-app` is the reusable interactive application layer between the domain core and presentation frontends.
 
-The first extraction in v0.2 owns:
+The v0.2 shared layer currently owns:
 
 - `CompositeEditor`, `Cursor` and `Region`;
 - Cat highlight, copy/move/erase and undo/redo behavior implemented by the editor;
@@ -40,7 +40,8 @@ The first extraction in v0.2 owns:
 - `View`;
 - the autosave/checkpoint/sync `Scheduler`;
 - palette matching;
-- the first frontend-neutral `Action` values for text editing and LEAP input.
+- application modes for Editing, palette, prompt, confirmation, selector and LEAP;
+- frontend-neutral `Action` values for text editing, LEAP input, horizontal character navigation, document navigation and document boundaries.
 
 The v0.1 TUI keeps compatibility re-exports so the extraction does not intentionally change behavior.
 
@@ -130,11 +131,11 @@ This distinction is deliberate: `TuiInputIntent` is not a second shared command 
 
 `main.rs` still owns terminal compatibility shortcuts, clipboard execution, mode dispatch and rendering-dependent navigation. Future extraction should continue reducing orchestration size without moving terminal-specific concepts into `carta-app`.
 
-Up/Down/Home/End/PageUp/PageDown are deliberately not generalized yet: their current semantics depend on visual layout width/height. Do not encode terminal columns or future GUI pixel/font assumptions into `Action` merely to move code. Decide the shared layout/navigation contract only when the graphical text renderer gives us the second concrete implementation.
+Visual Up/Down/Home/End/PageUp/PageDown are deliberately not generalized yet: their current semantics depend on visual layout width/height. Layout-independent character-left/right, previous/next-document and document-start/end operations already cross the shared `Action` boundary. Do not encode terminal columns or future GUI pixel/font assumptions into `Action` merely to move code. Decide the shared layout/navigation contract only when the graphical text renderer gives us the second concrete implementation.
 
 Move additional command/application behavior into `carta-app` only where the ownership is genuinely frontend-independent.
 
-Do not move terminal-only compatibility commands merely to make the crate diagram look cleaner.
+Do not move terminal-only compatibility commands merely to make the crate diagram look cleaner. In particular, Portable Keyboard Mode remains a frozen TUI concern until a concrete second frontend demonstrates a genuinely shared need.
 
 ### Stage C — concrete platform effects
 
