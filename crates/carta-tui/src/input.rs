@@ -167,21 +167,14 @@ impl TuiInputState {
         None
     }
 
-    pub(super) fn modifier_press(
-        &mut self,
-        key: ModifierKeyCode,
-    ) -> ModifierPress {
+    pub(super) fn modifier_press(&mut self, key: ModifierKeyCode) -> ModifierPress {
         if key == ModifierKeyCode::RightControl {
             self.set_right_control_held(true);
             if let Some(active) = self.active() {
-                return ModifierPress::Intent(TuiInputIntent::LeapAgainActive(
-                    active.direction(),
-                ));
+                return ModifierPress::Intent(TuiInputIntent::LeapAgainActive(active.direction()));
             }
             if let Some(pending) = self.promote_pending() {
-                return ModifierPress::Intent(TuiInputIntent::LeapAgain(
-                    pending.direction(),
-                ));
+                return ModifierPress::Intent(TuiInputIntent::LeapAgain(pending.direction()));
             }
             return ModifierPress::Consumed;
         }
@@ -224,10 +217,7 @@ impl TuiInputState {
         ModifierPress::Consumed
     }
 
-    pub(super) fn pending_structural_intent(
-        &mut self,
-        key: KeyCode,
-    ) -> Option<TuiInputIntent> {
+    pub(super) fn pending_structural_intent(&mut self, key: KeyCode) -> Option<TuiInputIntent> {
         let pending = self.pending()?;
         let intent = match (pending.direction(), key) {
             (LeapDirection::Backward, KeyCode::Home)
@@ -251,9 +241,7 @@ impl TuiInputState {
             return ModifierPress::Consumed;
         }
         if let Some(pending) = self.promote_pending() {
-            return ModifierPress::Intent(TuiInputIntent::BeginLeap(
-                pending.direction(),
-            ));
+            return ModifierPress::Intent(TuiInputIntent::BeginLeap(pending.direction()));
         }
         ModifierPress::Pass
     }
