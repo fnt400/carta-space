@@ -58,4 +58,6 @@ The probe passes only if all of the following are true:
 - IME preedit/commit events are observable when an IME is available.
 - No stuck modifier state appears after release.
 
-If any criterion fails on the target desktop environment, Iced must not be adopted for Carta's canonical GUI without first resolving the failure.
+The window includes an **Automatic observations** section. After the test, the four modifier checks, normal text, Unicode and AltGr-produced-text checks should all read `PASS`. IME checks are informational when no IME is configured.
+
+If any required criterion fails on the target desktop environment, Iced must not be adopted for Carta's canonical GUI without first resolving the failure.
