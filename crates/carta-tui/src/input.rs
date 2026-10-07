@@ -1,8 +1,6 @@
 use carta_app::Action;
 use carta_core::LeapDirection;
-use crossterm::event::{
-    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, ModifierKeyCode,
-};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, ModifierKeyCode};
 
 #[derive(Clone, Copy)]
 pub(super) struct PendingLeap {

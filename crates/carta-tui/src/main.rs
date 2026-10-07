@@ -4,10 +4,6 @@ mod theme;
 #[cfg(not(test))]
 use arboard::Clipboard;
 use carta_app::Action;
-use input::{
-    editing_action_from_key, emergency_kill_event, leap_direction_from_modifier, PendingLeap,
-    TuiInputState,
-};
 use carta_core::{Archive, LeapDirection, SyncOutcome};
 use carta_tui::app::{AppMode, View};
 use carta_tui::editor::{visual_ranges, Cursor};
@@ -28,6 +24,10 @@ use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, supports_keyboard_enhancement, EnterAlternateScreen,
     LeaveAlternateScreen,
+};
+use input::{
+    editing_action_from_key, emergency_kill_event, leap_direction_from_modifier, PendingLeap,
+    TuiInputState,
 };
 use pulldown_cmark::{
     Event as MarkdownEvent, Parser as MarkdownParser, Tag as MarkdownTag, TagEnd as MarkdownTagEnd,
@@ -469,12 +469,16 @@ fn handle_key(
                 dispatcher.input.suppressed_leap_releases -= 1;
                 return Ok(());
             }
-            if dispatcher.input.pending_leap
+            if dispatcher
+                .input
+                .pending_leap
                 .is_some_and(|pending| pending.key == released)
             {
                 let pending = dispatcher.input.pending_leap.take().unwrap();
                 app.cat_tap_leap(pending.direction);
-            } else if dispatcher.input.active_leap
+            } else if dispatcher
+                .input
+                .active_leap
                 .is_some_and(|active| active.key == released)
             {
                 dispatcher.input.active_leap = None;
@@ -527,8 +531,8 @@ fn handle_key(
             dispatcher.input.active_leap = None;
             dispatcher.input.suppressed_leap_releases =
                 dispatcher.input.suppressed_leap_releases.saturating_add(1);
-            let direction = leap_direction_from_modifier(key)
-                .expect("matched physical LEAP modifier");
+            let direction =
+                leap_direction_from_modifier(key).expect("matched physical LEAP modifier");
             app.leap_again(direction);
             return Ok(());
         }
@@ -807,8 +811,8 @@ fn handle_key(
                     }
                     return Ok(());
                 }
-                let direction = leap_direction_from_modifier(key)
-                    .expect("matched physical LEAP modifier");
+                let direction =
+                    leap_direction_from_modifier(key).expect("matched physical LEAP modifier");
                 dispatcher.input.pending_leap = Some(PendingLeap { direction, key });
                 return Ok(());
             }
