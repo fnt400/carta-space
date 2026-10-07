@@ -20,7 +20,7 @@ The reference implementation is written in Rust and is migrating toward explicit
 
 - `carta-format`: format types, parsing, serialization, validation, and compatibility rules.
 - `carta-core`: canonical Archive/domain operations: Documents, Volumes, Works, LEAP retrieval, Git history, Trash/Wipe, synchronization and backlinks.
-- `carta-app`: frontend-independent interactive application layer. It owns the editor/Cat highlight/undo model, session model, View and AppMode models, scheduler, palette matching, semantic `Action` values, shared help content, and the canonical `App` controller.
+- `carta-app`: frontend-independent interactive application layer. It owns the editor/Cat highlight/undo model, session model, View and AppMode models, scheduler, palette matching, semantic `Action` values, shared `ModeAction` handling for prompts/confirmations/selectors, shared help content, and the canonical `App` controller.
 - `carta-publish`: frontend-independent publication.
 - `carta-cli`: Unix-style administrative interface.
 - `carta-tui`: frozen terminal adapter from the v0.1.x line. Its `app.rs`/`help.rs` are compatibility re-exports; terminal-specific input, rendering, clipboard and host settings stay here.
@@ -33,6 +33,8 @@ The internal fields of that adapter state are private. Other TUI modules should 
 The adapter may emit TUI-local intents for interpreted terminal gestures. These intents are not automatically shared application actions; promote one into `carta-app::Action` only when its semantics are independent of Crossterm and presentation technology. Portable Keyboard Mode remains a TUI-only legacy compatibility concern.
 
 Do not move native filesystem effects into a speculative abstraction merely to make `carta-app` look pure. File dialog/save effects should be introduced when the graphical frontend supplies the second concrete platform implementation.
+
+The pre-GUI extraction phase is now considered complete. Do not keep moving TUI code merely for aesthetic purity. Further shared abstractions must be justified by a concrete second frontend, beginning with the desktop GUI input/rendering prototype.
 
 No frontend may grow a second implementation of the editor, Cat selection, LEAP semantics, Views or other shared application behavior merely for convenience. Future desktop, web and mobile frontends should reuse `carta-app` and `carta-core` to the maximum practical extent.
 

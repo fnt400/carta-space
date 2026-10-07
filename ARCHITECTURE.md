@@ -119,7 +119,7 @@ The editor, session values, View, scheduler and palette matching have been extra
 
 ### Stage B — semantic application actions
 
-Status: substantially complete for the pre-GUI preparation.
+Status: complete for the pre-GUI preparation.
 
 `carta-app::Action` now carries the first frontend-neutral editing intents and LEAP input intents. The TUI translates ordinary text-editing keys into these actions, and physical LEAP start/end/query handling already crosses the same semantic seam before invoking application behavior.
 
@@ -135,7 +135,9 @@ This distinction is deliberate: `TuiInputIntent` is not a second shared command 
 
 Visual Up/Down/Home/End/PageUp/PageDown are deliberately not generalized yet: their current semantics depend on visual layout width/height. Layout-independent character-left/right, previous/next-document and document-start/end operations already cross the shared `Action` boundary. Do not encode terminal columns or future GUI pixel/font assumptions into `Action` merely to move code. Decide the shared layout/navigation contract only when the graphical text renderer gives us the second concrete implementation.
 
-Move additional command/application behavior into `carta-app` only where the ownership is genuinely frontend-independent.
+Prompt, confirmation, and selector editing/navigation are now shared through `ModeAction`. The TUI-specific palette extension remains local because it includes Portable Keyboard Mode.
+
+Do not move additional command/application behavior merely for architectural tidiness. Further shared abstractions should be driven by the second frontend.
 
 Do not move terminal-only compatibility commands merely to make the crate diagram look cleaner. In particular, Portable Keyboard Mode remains a frozen TUI concern until a concrete second frontend demonstrates a genuinely shared need.
 
@@ -147,7 +149,7 @@ The shared controller still contains native filesystem-oriented import/export/pa
 
 ### Stage D — graphical shell
 
-This is now the next architectural milestone. Add the desktop frontend only after the physical-keyboard probe succeeds.
+This is now the next architectural milestone and the point where user input is required for toolkit/input-layer selection. Add the desktop frontend only after the physical-keyboard probe succeeds.
 
 Start with the smallest complete slice: window, text rendering, cursor/Cat highlight, text input and true momentary LEAP. Add palette, Views, Works and other surfaces by consuming the same shared application state.
 

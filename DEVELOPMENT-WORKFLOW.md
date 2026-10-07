@@ -144,6 +144,8 @@ The intended next seam is:
 native input -> semantic Action -> carta-app -> state / Effect -> platform adapter
 ```
 
+Prompt, confirmation, and selector editing/navigation are already shared through `ModeAction`. The TUI-specific palette extension for Portable Keyboard Mode remains in `carta-tui`.
+
 Do not design a large generic platform framework in advance. Introduce effects only for concrete host services such as clipboard, file selection/save, window integration or other operations that genuinely differ across desktop/web/mobile.
 
 ## Privacy before push
@@ -167,3 +169,15 @@ cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 in addition to the existing multi-platform workspace tests and release builds.
 
 Do not ask the user to relay routine formatter/Clippy failures between ChatGPT and OpenCode when GitHub Actions can expose them directly. Inspect and fix CI failures before requesting another local verification pass.
+
+
+## Pre-GUI preparation stop point
+
+The structural extraction phase is complete when:
+
+- the canonical `App`, editor, View/AppMode state, LEAP semantics, prompt/confirmation/selector semantics, help content, and reusable actions live in `carta-app`;
+- Crossterm modifier state, Portable Keyboard Mode, terminal clipboard integration, and terminal rendering remain in `carta-tui`;
+- `carta-app` has no frontend/toolkit dependency;
+- the automatic quality and portability workflow is green.
+
+Once these conditions are satisfied, do not continue speculative refactoring. The next work item is the desktop keyboard/input probe and requires an explicit toolkit/input-layer decision with the user.

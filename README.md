@@ -17,7 +17,7 @@ This is a form of **distraction-free architecture**, not merely a visually minim
 
 Carta Space stores documents as ordinary UTF-8 Markdown, gives every document a stable identity, arranges newly created documents in automatic monthly volumes, and allows documents to be assembled into larger **Works** without copying or moving them. A Work can therefore span months or years while remaining editable as a single continuous view.
 
-The reference implementation is written in Rust and is explicitly split into a frontend-independent core, a Unix-style command-line interface, and a terminal user interface. The format remains independent of Rust and of any particular frontend.
+The reference implementation is written in Rust and is explicitly split into frontend-independent format/core/application layers, a Unix-style command-line interface, and presentation adapters. The frozen terminal frontend is the first adapter; v0.2 development targets a graphical desktop frontend. The format remains independent of Rust and of any particular frontend.
 
 ## Install and run
 
@@ -129,7 +129,7 @@ The Rust workspace is split so that Carta behavior is not owned by one presentat
 
 - `carta-format` — format types, validation, serialization, and compatibility rules;
 - `carta-core` — canonical Archive/domain operations: Documents, Volumes, Works, retrieval/LEAP, history, synchronization, Trash/Wipe and backlinks;
-- `carta-app` — reusable interactive application layer containing the editor, Cat highlight/undo engine, session/View/AppMode models, scheduler, palette matching, semantic `Action` boundary, shared help content, and the canonical `App` controller;
+- `carta-app` — reusable interactive application layer containing the editor, Cat highlight/undo engine, session/View/AppMode models, scheduler, palette matching, semantic `Action` and `ModeAction` boundaries, shared help content, and the canonical `App` controller;
 - `carta-publish` — frontend-independent publication layer with a replaceable PDF backend; the first backend uses Typst;
 - `carta-cli` — scriptable Unix-style administrative commands;
 - `carta-tui` — the frozen v0.1.x terminal adapter, retained as a compatibility frontend and regression oracle; it consumes `carta-app` rather than owning a second application controller;
