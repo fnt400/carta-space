@@ -30,6 +30,7 @@ Archive semantics belong in `carta-core`. Reusable interaction semantics belong 
 
 For the frozen TUI, Crossterm-specific keyboard interpretation belongs in `crates/carta-tui/src/input.rs`, not in `carta-app`. Pending/active physical LEAP keys, suppressed key-release quirks, Right Control tracking and terminal keycode mapping are adapter state.
 The internal fields of that adapter state are private. Other TUI modules should use its transition methods rather than manipulating pending/active LEAP or modifier bookkeeping directly.
+The adapter may emit TUI-local intents for interpreted terminal gestures. These intents are not automatically shared application actions; promote one into `carta-app::Action` only when its semantics are independent of Crossterm and presentation technology.
 
 No frontend may grow a second implementation of the editor, Cat selection, LEAP semantics, Views or other shared application behavior merely for convenience. Future desktop, web and mobile frontends should reuse `carta-app` and `carta-core` to the maximum practical extent.
 

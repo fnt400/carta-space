@@ -124,7 +124,11 @@ Status: started.
 
 That adapter state is now encapsulated: its representation is private and `main.rs` accesses it only through a small transition API (`pending`, `active`, `begin_pending`, `promote_pending`, `clear_*`, release suppression, and Right Control accessors). This makes later changes to terminal state handling local to the adapter.
 
-`main.rs` still orchestrates the higher-level transition logic around that API and still owns terminal compatibility behavior, clipboard execution and rendering-dependent navigation. The next extraction should move only cohesive transition behavior that remains clearly terminal-specific, without changing Carta semantics.
+`input.rs` now also owns the terminal modifier state machine. Physical press/release sequences are reduced to TUI-local intents such as `TapLeap`, `BeginLeap`, `LeapAgain`, `ExtendLastLeapHighlight`, and structural LEAP intents. `main.rs` applies those intents to the shared/application behavior and performs platform effects such as clipboard writes.
+
+This distinction is deliberate: `TuiInputIntent` is not a second shared command model. It is an adapter-internal interpretation layer for Crossterm quirks. Only behavior that is genuinely frontend-independent should graduate to `carta-app::Action`.
+
+`main.rs` still owns terminal compatibility shortcuts, clipboard execution, mode dispatch and rendering-dependent navigation. Future extraction should continue reducing orchestration size without moving terminal-specific concepts into `carta-app`.
 
 Up/Down/Home/End/PageUp/PageDown are deliberately not generalized yet: their current semantics depend on visual layout width/height. Do not encode terminal columns or future GUI pixel/font assumptions into `Action` merely to move code. Decide the shared layout/navigation contract only when the graphical text renderer gives us the second concrete implementation.
 

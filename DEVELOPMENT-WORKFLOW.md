@@ -136,6 +136,7 @@ Shared interaction behavior belongs in `carta-app` when it is independent of a s
 
 In the TUI, Crossterm-specific input state and key mapping belong in `crates/carta-tui/src/input.rs`. Keep physical-key quirks there rather than promoting them into shared application semantics.
 Keep the adapter state encapsulated: callers should use its API rather than reaching into pending/active modifier fields. This makes terminal-specific refactors independently testable.
+When splitting input logic, keep a distinction between TUI-local interpreted intents and shared `carta-app::Action` values. Do not promote terminal gestures into shared actions merely to reduce `main.rs`.
 
 The migration is incremental: do not move code merely to make directory diagrams look clean. Extract a behavior when its ownership is clear and preserve the frozen TUI as a regression oracle while the shared layer is being built.
 
