@@ -83,7 +83,7 @@ fn update(state: &mut Gui, message: Message) {
         return;
     };
 
-    state.input.handle(app, event);
+    let _ = state.input.handle(app, event);
     let _ = app.tick(Instant::now());
 }
 
