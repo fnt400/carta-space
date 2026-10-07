@@ -1,4 +1,4 @@
-use carta_app::{Action, App, AppMode};
+use carta_app::{Action, App, AppMode, ModeAction, View};
 use carta_core::LeapDirection;
 use iced::keyboard::key::{Code, Physical};
 use iced::keyboard::Event as KeyboardEvent;
@@ -18,7 +18,7 @@ pub struct GuiInputState {
 }
 
 impl GuiInputState {
-    pub fn handle(&mut self, app: &mut App, event: KeyboardEvent) {
+    pub fn handle(&mut self, app: &mut App, event: KeyboardEvent) -> carta_app::AppResult {
         match event {
             KeyboardEvent::KeyPressed {
                 physical_key,
@@ -27,28 +27,29 @@ impl GuiInputState {
                 ..
             } => {
                 let Physical::Code(code) = physical_key else {
-                    return;
+                    return Ok(());
                 };
 
                 if !repeat && self.handle_leap_press(app, code) {
-                    return;
+                    return Ok(());
                 }
 
                 if is_neutral_modifier(code) {
-                    return;
+                    return Ok(());
                 }
 
                 self.activate_pending(app);
-                self.handle_key_press(app, code, text.as_deref());
+                self.handle_key_press(app, code, text.as_deref())?;
             }
             KeyboardEvent::KeyReleased { physical_key, .. } => {
                 let Physical::Code(code) = physical_key else {
-                    return;
+                    return Ok(());
                 };
                 self.handle_release(app, code);
             }
             KeyboardEvent::ModifiersChanged(_) => {}
         }
+        Ok(())
     }
 
     fn handle_leap_press(&mut self, app: &mut App, code: Code) -> bool {
@@ -109,7 +110,60 @@ impl GuiInputState {
         }
     }
 
-    fn handle_key_press(&mut self, app: &mut App, code: Code, text: Option<&str>) {
+    fn handle_key_press(
+        &mut self,
+        app: &mut App,
+        code: Code,
+        text: Option<&str>,
+    ) -> carta_app::AppResult {
+        if self.handle_mode_key(app, code, text)? {
+            return Ok(());
+        }
+
+        if matches!(app.mode, AppMode::Editing) && code == Code::Escape {
+            if matches!(app.view, View::Help { .. }) {
+                app.execute(carta_app::Command::ReturnToPreviousView)?;
+            } else {
+                app.open_palette();
+            }
+            return Ok(());
+        }
+
+        if matches!(
+            app.view,
+            View::Search { .. }
+                | View::History { .. }
+                | View::WorkHistory { .. }
+                | View::Trash { .. }
+                | View::Conflicts { .. }
+                | View::Help { .. }
+        ) && matches!(app.mode, AppMode::Editing)
+        {
+            match code {
+                Code::ArrowUp => app.move_list_selection(false),
+                Code::ArrowDown => app.move_list_selection(true),
+                Code::Enter | Code::NumpadEnter => app.open_selected()?,
+                _ => {}
+            }
+            return Ok(());
+        }
+
+        if app.collapsed && matches!(app.mode, AppMode::Editing) {
+            match code {
+                Code::ArrowUp | Code::PageUp => {
+                    app.dispatch_action(Action::PreviousDocument, Instant::now());
+                }
+                Code::ArrowDown | Code::PageDown => {
+                    app.dispatch_action(Action::NextDocument, Instant::now());
+                }
+                Code::Enter | Code::NumpadEnter => {
+                    app.execute(carta_app::Command::ExpandView)?;
+                }
+                _ => {}
+            }
+            return Ok(());
+        }
+
         let in_leap = matches!(app.mode, AppMode::Leap { .. });
         match code {
             Code::Backspace => {
@@ -119,7 +173,7 @@ impl GuiInputState {
                     Action::Backspace
                 };
                 app.dispatch_action(action, Instant::now());
-                return;
+                return Ok(());
             }
             Code::Enter | Code::NumpadEnter => {
                 let action = if in_leap {
@@ -128,31 +182,31 @@ impl GuiInputState {
                     Action::InsertLineBreak
                 };
                 app.dispatch_action(action, Instant::now());
-                return;
+                return Ok(());
             }
             Code::Escape if in_leap => {
                 app.dispatch_action(Action::CancelLeap, Instant::now());
-                return;
+                return Ok(());
             }
             Code::Delete if !in_leap => {
                 app.dispatch_action(Action::Erase, Instant::now());
-                return;
+                return Ok(());
             }
             Code::ArrowLeft if !in_leap => {
                 app.dispatch_action(Action::MoveCharacterBackward, Instant::now());
-                return;
+                return Ok(());
             }
             Code::ArrowRight if !in_leap => {
                 app.dispatch_action(Action::MoveCharacterForward, Instant::now());
-                return;
+                return Ok(());
             }
             Code::Home if !in_leap => {
                 app.dispatch_action(Action::DocumentStart, Instant::now());
-                return;
+                return Ok(());
             }
             Code::End if !in_leap => {
                 app.dispatch_action(Action::DocumentEnd, Instant::now());
-                return;
+                return Ok(());
             }
             Code::Tab if !in_leap => {
                 app.dispatch_action(Action::Indent, Instant::now());
@@ -162,7 +216,7 @@ impl GuiInputState {
         }
 
         let Some(text) = text.filter(|text| !text.is_empty()) else {
-            return;
+            return Ok(());
         };
         let action = if in_leap {
             Action::LeapInput(text.to_owned())
@@ -170,6 +224,91 @@ impl GuiInputState {
             Action::InsertText(text.to_owned())
         };
         app.dispatch_action(action, Instant::now());
+        Ok(())
+    }
+
+    fn handle_mode_key(
+        &mut self,
+        app: &mut App,
+        code: Code,
+        text: Option<&str>,
+    ) -> carta_app::AppResult<bool> {
+        if let AppMode::Palette { query, selected } = &app.mode {
+            let commands = app.palette_commands(query);
+            let chosen = commands.get(*selected).copied();
+            match code {
+                Code::Escape => app.cancel_mode(),
+                Code::Backspace => {
+                    if let AppMode::Palette { query, selected } = &mut app.mode {
+                        query.pop();
+                        *selected = 0;
+                    }
+                }
+                Code::ArrowUp => {
+                    if let AppMode::Palette { selected, .. } = &mut app.mode {
+                        *selected = selected.saturating_sub(1);
+                    }
+                }
+                Code::ArrowDown => {
+                    if let AppMode::Palette { selected, .. } = &mut app.mode {
+                        *selected = (*selected + 1).min(commands.len().saturating_sub(1));
+                    }
+                }
+                Code::Enter | Code::NumpadEnter => {
+                    if let Some(command) = chosen {
+                        app.mode = AppMode::Editing;
+                        app.execute(command)?;
+                    }
+                }
+                _ => {
+                    if let Some(value) = text.filter(|value| !value.is_empty()) {
+                        if let AppMode::Palette { query, selected } = &mut app.mode {
+                            query.push_str(value);
+                            *selected = 0;
+                        }
+                    }
+                }
+            }
+            return Ok(true);
+        }
+
+        let action = match &app.mode {
+            AppMode::Prompt { .. } => match code {
+                Code::Escape => Some(ModeAction::Cancel),
+                Code::Enter | Code::NumpadEnter => Some(ModeAction::Submit),
+                Code::ArrowLeft => Some(ModeAction::CursorBackward),
+                Code::ArrowRight => Some(ModeAction::CursorForward),
+                Code::Home => Some(ModeAction::CursorStart),
+                Code::End => Some(ModeAction::CursorEnd),
+                Code::Backspace => Some(ModeAction::Backspace),
+                Code::Delete => Some(ModeAction::Delete),
+                _ => text
+                    .filter(|value| !value.is_empty())
+                    .map(|value| ModeAction::InsertText(value.to_owned())),
+            },
+            AppMode::Confirm { .. } => match code {
+                Code::KeyY => Some(ModeAction::Confirm(true)),
+                Code::KeyN | Code::Escape | Code::Enter | Code::NumpadEnter => {
+                    Some(ModeAction::Confirm(false))
+                }
+                _ => None,
+            },
+            AppMode::Selector { .. } => match code {
+                Code::Escape => Some(ModeAction::Cancel),
+                Code::Enter | Code::NumpadEnter => Some(ModeAction::Submit),
+                Code::Backspace => Some(ModeAction::Backspace),
+                Code::ArrowUp => Some(ModeAction::SelectionPrevious),
+                Code::ArrowDown => Some(ModeAction::SelectionNext),
+                _ => text
+                    .filter(|value| !value.is_empty())
+                    .map(|value| ModeAction::InsertText(value.to_owned())),
+            },
+            _ => return Ok(false),
+        };
+        if let Some(action) = action {
+            app.dispatch_mode_action(action)?;
+        }
+        Ok(true)
     }
 }
 
