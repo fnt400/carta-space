@@ -19,11 +19,7 @@ pub struct Segment<'a> {
 /// The caret is a zero-width position in the application model; the GUI
 /// represents it with a dedicated glyph. The returned text spans reconstruct
 /// the original document byte-for-byte, including embedded newlines.
-pub fn segments(
-    text: &str,
-    cursor: usize,
-    selection: Option<(usize, usize)>,
-) -> Vec<Segment<'_>> {
+pub fn segments(text: &str, cursor: usize, selection: Option<(usize, usize)>) -> Vec<Segment<'_>> {
     let cursor = boundary_at_or_before(text, cursor);
     let selection = selection.and_then(|(start, end)| {
         if start < end
@@ -100,14 +96,28 @@ mod tests {
         let text = "caffè\n東京";
         let spans = segments(text, 6, Some((4, 6)));
         assert_eq!(
-            spans.iter().filter(|s| s.kind == SegmentKind::Selection).map(|s| s.content).collect::<String>(),
+            spans
+                .iter()
+                .filter(|s| s.kind == SegmentKind::Selection)
+                .map(|s| s.content)
+                .collect::<String>(),
             "è"
         );
         assert_eq!(
-            spans.iter().filter(|s| s.kind != SegmentKind::Caret).map(|s| s.content).collect::<String>(),
+            spans
+                .iter()
+                .filter(|s| s.kind != SegmentKind::Caret)
+                .map(|s| s.content)
+                .collect::<String>(),
             text
         );
-        assert_eq!(spans.iter().filter(|s| s.kind == SegmentKind::Caret).count(), 1);
+        assert_eq!(
+            spans
+                .iter()
+                .filter(|s| s.kind == SegmentKind::Caret)
+                .count(),
+            1
+        );
     }
 
     #[test]

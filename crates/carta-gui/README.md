@@ -13,7 +13,9 @@ During this first stage it is excluded from the main Rust 1.85 workspace because
 - translate physical Left Ctrl / Left Alt into the shared LEAP behavior;
 - pass LEAP query text and basic editing keys through `carta_app::Action`;
 - preserve Right Alt/AltGr as ordinary text input;
-- show the shared command palette, prompts, confirmations, selectors and LEAP query;\n- tick the shared scheduler while idle for autosave/checkpoints/sync;\n- autosave dirty state when the shell exits.
+- show the shared command palette, prompts, confirmations, selectors and LEAP query;
+- tick the shared scheduler while idle for autosave/checkpoints/sync;
+- autosave dirty state when the shell exits.
 
 This is not yet the finished editor surface. Visual vertical navigation, full multi-document view projection, clipboard integration, pointer-based editing and final styling remain subsequent GUI work.
 
