@@ -31,7 +31,9 @@ struct Location {
     scroll: usize,
 }
 
-pub use crate::{AppMode, Choice, ConfirmAction, ModeAction, PromptAction, ResultRow, SelectAction};
+pub use crate::{
+    AppMode, Choice, ConfirmAction, ModeAction, PromptAction, ResultRow, SelectAction,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
@@ -4917,9 +4919,7 @@ mod tests {
         };
         assert_eq!(*cursor, 1);
 
-        assert!(app
-            .dispatch_mode_action(ModeAction::Delete)
-            .unwrap());
+        assert!(app.dispatch_mode_action(ModeAction::Delete).unwrap());
         let AppMode::Prompt { input, cursor, .. } = &app.mode else {
             panic!("expected prompt")
         };
@@ -4952,9 +4952,7 @@ mod tests {
         assert!(app
             .dispatch_mode_action(ModeAction::InsertText("be".into()))
             .unwrap());
-        assert!(app
-            .dispatch_mode_action(ModeAction::SelectionNext)
-            .unwrap());
+        assert!(app.dispatch_mode_action(ModeAction::SelectionNext).unwrap());
         let AppMode::Selector {
             query, selected, ..
         } = &app.mode

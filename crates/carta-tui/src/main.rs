@@ -912,7 +912,7 @@ fn handle_key(
             if let Some(action) = action {
                 app.dispatch_mode_action(action)?;
             }
-        },
+        }
         AppMode::Editing => handle_normal(app, key)?,
     }
     Ok(())
