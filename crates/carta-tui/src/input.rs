@@ -220,8 +220,7 @@ impl TuiInputState {
     pub(super) fn pending_structural_intent(&mut self, key: KeyCode) -> Option<TuiInputIntent> {
         let pending = self.pending()?;
         let intent = match (pending.direction(), key) {
-            (LeapDirection::Backward, KeyCode::Home)
-            | (LeapDirection::Forward, KeyCode::End) => {
+            (LeapDirection::Backward, KeyCode::Home) | (LeapDirection::Forward, KeyCode::End) => {
                 TuiInputIntent::LeapDocumentBoundary(pending.direction())
             }
             (LeapDirection::Backward, KeyCode::PageUp)
