@@ -10,6 +10,7 @@ use carta_format::{
     MIMETYPE,
 };
 
+use crate::backlinks::BacklinkIndex;
 use crate::validation::{scan_archive, scan_archive_with_recovery_documents};
 use crate::{
     extract_markdown_links, Backlink, CartaLinkTarget, Document, DocumentInfo, Error,
@@ -23,6 +24,7 @@ pub struct Archive {
     metadata: ArchiveMetadata,
     pub(crate) documents: BTreeMap<DocumentId, DocumentInfo>,
     pub(crate) works: BTreeMap<WorkId, Work>,
+    backlink_index: BacklinkIndex,
 }
 
 impl Archive {
@@ -78,7 +80,18 @@ impl Archive {
     }
 
     pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
-        let root = path.as_ref().to_path_buf();
+        Self::open_impl(path.as_ref(), None)
+    }
+
+    pub fn open_with_backlink_cache(
+        path: impl AsRef<Path>,
+        cache_root: impl AsRef<Path>,
+    ) -> Result<Self, Error> {
+        Self::open_impl(path.as_ref(), Some(cache_root.as_ref()))
+    }
+
+    fn open_impl(path: &Path, cache_root: Option<&Path>) -> Result<Self, Error> {
+        let root = path.to_path_buf();
         crate::package::cleanup_registered_temporaries(&root)?;
         crate::transaction::recover(&root)?;
         recover_git_omitted_empty_roots(&root)?;
@@ -87,11 +100,17 @@ impl Archive {
             &root,
             crate::conflict::missing_document_infos(&root)?,
         )?;
+        let cache_path = cache_root.map(|root| {
+            root.join("backlinks-v1")
+                .join(format!("{}.json", scanned.metadata.archive_id()))
+        });
+        let backlink_index = BacklinkIndex::load(&scanned.documents, cache_path);
         Ok(Self {
             root,
             metadata: scanned.metadata,
             documents: scanned.documents,
             works: scanned.works,
+            backlink_index,
         })
     }
 
@@ -105,6 +124,15 @@ impl Archive {
 
     pub fn metadata(&self) -> &ArchiveMetadata {
         &self.metadata
+    }
+
+    pub fn enable_backlink_cache(&mut self, cache_root: impl AsRef<Path>) {
+        self.backlink_index
+            .enable_cache(cache_root.as_ref().to_path_buf(), self.metadata.archive_id());
+    }
+
+    pub fn flush_backlink_cache(&mut self) {
+        self.backlink_index.flush();
     }
 
     pub fn documents(&self) -> impl Iterator<Item = &DocumentInfo> {
@@ -179,6 +207,8 @@ impl Archive {
                 path: destination.clone(),
             },
         );
+        self.backlink_index
+            .update_document(self.documents.get(&id).expect("Document was just inserted"));
         Ok(destination)
     }
 
@@ -299,6 +329,11 @@ impl Archive {
                         content_bytes: after.into_bytes(),
                     },
                 );
+                self.backlink_index.update_document(
+                    self.documents
+                        .get(&target)
+                        .expect("split Document was just inserted"),
+                );
                 transaction.commit()?;
                 Ok(target)
             }
@@ -321,6 +356,7 @@ impl Archive {
         self.metadata = scanned.metadata;
         self.documents = scanned.documents;
         self.works = scanned.works;
+        self.backlink_index.refresh(&self.documents);
         Ok(())
     }
 
@@ -381,6 +417,11 @@ impl Archive {
         info.metadata = metadata;
         info.metadata_bytes = metadata_bytes;
         info.content_bytes = content;
+        self.backlink_index.update_document(
+            self.documents
+                .get(&id)
+                .expect("edited Document must remain indexed"),
+        );
         Ok(())
     }
 
@@ -480,15 +521,7 @@ impl Archive {
     }
 
     pub fn backlinks(&self, target: CartaLinkTarget) -> Result<Vec<Backlink>, Error> {
-        let mut backlinks = Vec::new();
-        for info in self.documents.values() {
-            for link in self.document_links(info.id())? {
-                if link.carta_target() == Some(target) {
-                    backlinks.push(Backlink::new(info.id(), link));
-                }
-            }
-        }
-        Ok(backlinks)
+        Ok(self.backlink_index.backlinks(target))
     }
 
     pub fn search(&self, query: &str) -> Result<Vec<SearchResult>, Error> {
@@ -606,6 +639,11 @@ impl Archive {
                         metadata_bytes,
                         content_bytes: b"\n".to_vec(),
                     },
+                );
+                self.backlink_index.update_document(
+                    self.documents
+                        .get(&target)
+                        .expect("linked Document was just inserted"),
                 );
                 transaction.commit()?;
                 Ok(target)

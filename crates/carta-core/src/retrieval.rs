@@ -10,11 +10,23 @@ use crate::MarkdownLink;
 pub struct Backlink {
     source: DocumentId,
     link: MarkdownLink,
+    label: String,
+    context: String,
 }
 
 impl Backlink {
-    pub(crate) fn new(source: DocumentId, link: MarkdownLink) -> Self {
-        Self { source, link }
+    pub(crate) fn new(
+        source: DocumentId,
+        link: MarkdownLink,
+        label: String,
+        context: String,
+    ) -> Self {
+        Self {
+            source,
+            link,
+            label,
+            context,
+        }
     }
 
     pub fn source(&self) -> DocumentId {
@@ -23,6 +35,14 @@ impl Backlink {
 
     pub fn link(&self) -> &MarkdownLink {
         &self.link
+    }
+
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    pub fn context(&self) -> &str {
+        &self.context
     }
 }
 

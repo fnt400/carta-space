@@ -81,7 +81,7 @@ fn parses_only_commonmark_links_and_canonical_carta_targets() {
 }
 
 #[test]
-fn resolves_links_and_derives_backlinks_by_scanning_active_documents() {
+fn resolves_links_and_derives_backlinks_from_disposable_index() {
     let (_temporary, mut archive) = create_archive();
     let target = archive.create_document("target").unwrap();
     let work = archive.create_empty_work("Target work".to_owned()).unwrap();
@@ -112,6 +112,93 @@ fn resolves_links_and_derives_backlinks_by_scanning_active_documents() {
         .unwrap();
     assert_eq!(backlinks.len(), 2);
     assert!(backlinks.iter().all(|backlink| backlink.source() == source));
+    assert!(backlinks.iter().all(|backlink| backlink.label().contains("one")));
+    assert!(backlinks
+        .iter()
+        .all(|backlink| backlink.context().contains("carta:doc:")));
+
+    archive
+        .edit_document(source, &format!("[only](carta:doc:{target})"))
+        .unwrap();
+    let backlinks = archive
+        .backlinks(CartaLinkTarget::Document(target))
+        .unwrap();
+    assert_eq!(backlinks.len(), 1);
+    assert_eq!(backlinks[0].context(), format!("[only](carta:doc:{target})"));
+}
+
+#[test]
+fn persistent_backlink_cache_is_reused_rebuilt_and_disposable() {
+    let (temporary, mut archive) = create_archive();
+    let root = archive.root().to_path_buf();
+    let cache_root = temporary.path().join("cache");
+    let target = archive.create_document("# Target").unwrap();
+    let source = archive
+        .create_document(&format!("# Source\n\n[first](carta:doc:{target})"))
+        .unwrap();
+    drop(archive);
+
+    let archive = Archive::open_with_backlink_cache(&root, &cache_root).unwrap();
+    assert_eq!(
+        archive
+            .backlinks(CartaLinkTarget::Document(target))
+            .unwrap()
+            .len(),
+        1
+    );
+    let cache_path = cache_root.join("backlinks-v1").join(format!(
+        "{}.json",
+        archive.metadata().archive_id()
+    ));
+    assert!(cache_path.is_file());
+    let source_path = archive
+        .documents()
+        .find(|info| info.id() == source)
+        .unwrap()
+        .path()
+        .join("content.md");
+    drop(archive);
+
+    std::fs::write(
+        &source_path,
+        format!(
+            "# Source changed\n\n[first](carta:doc:{target}) [second](carta:doc:{target})\n"
+        ),
+    )
+    .unwrap();
+    let archive = Archive::open_with_backlink_cache(&root, &cache_root).unwrap();
+    assert_eq!(
+        archive
+            .backlinks(CartaLinkTarget::Document(target))
+            .unwrap()
+            .len(),
+        2
+    );
+    drop(archive);
+
+    std::fs::write(&cache_path, b"{ definitely not valid json").unwrap();
+    let archive = Archive::open_with_backlink_cache(&root, &cache_root).unwrap();
+    assert_eq!(
+        archive
+            .backlinks(CartaLinkTarget::Document(target))
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(serde_json::from_slice::<serde_json::Value>(
+        &std::fs::read(&cache_path).unwrap()
+    )
+    .is_ok());
+
+    std::fs::remove_file(&cache_path).unwrap();
+    let archive = Archive::open_with_backlink_cache(&root, &cache_root).unwrap();
+    assert_eq!(
+        archive
+            .backlinks(CartaLinkTarget::Document(target))
+            .unwrap()
+            .len(),
+        2
+    );
 }
 
 #[test]

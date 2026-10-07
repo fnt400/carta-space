@@ -3,14 +3,15 @@ use std::str::FromStr;
 
 use carta_format::{DocumentId, Timestamp, WorkId};
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CartaLinkTarget {
     Document(DocumentId),
     Work(WorkId),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MarkdownLink {
     source_range: Range<usize>,
     destination: String,

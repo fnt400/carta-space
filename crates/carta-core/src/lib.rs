@@ -1,4 +1,5 @@
 mod archive;
+mod backlinks;
 mod conflict;
 mod content;
 mod document;
