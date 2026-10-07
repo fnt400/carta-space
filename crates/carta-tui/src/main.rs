@@ -469,14 +469,12 @@ fn handle_key(
                 dispatcher.input.suppressed_leap_releases -= 1;
                 return Ok(());
             }
-            if dispatcher
-                .pending_leap
+            if dispatcher.input.pending_leap
                 .is_some_and(|pending| pending.key == released)
             {
                 let pending = dispatcher.input.pending_leap.take().unwrap();
                 app.cat_tap_leap(pending.direction);
-            } else if dispatcher
-                .active_leap
+            } else if dispatcher.input.active_leap
                 .is_some_and(|active| active.key == released)
             {
                 dispatcher.input.active_leap = None;
