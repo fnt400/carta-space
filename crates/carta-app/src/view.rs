@@ -61,6 +61,8 @@ impl Scheduler {
 
     pub fn sync_pending(&mut self) { self.sync_pending = true; }
 
+    pub fn is_sync_pending(&self) -> bool { self.sync_pending }
+
     pub fn sync_attempted(&mut self, now: Instant) {
         self.last_sync = now;
         self.sync_pending = false;

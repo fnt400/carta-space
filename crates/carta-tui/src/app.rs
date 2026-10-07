@@ -3552,7 +3552,7 @@ mod tests {
 
         app.tick(now).unwrap();
 
-        assert!(!app.scheduler.sync_pending);
+        assert!(!app.scheduler.is_sync_pending());
         assert!(!app.scheduler.sync_due(Instant::now()));
         assert!(!app.status.starts_with("Sync unavailable:"));
     }
@@ -3574,7 +3574,7 @@ mod tests {
         let after = app.session();
 
         assert_eq!(after, before);
-        assert!(app.scheduler.sync_pending);
+        assert!(app.scheduler.is_sync_pending());
     }
 
     #[test]
