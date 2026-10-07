@@ -155,7 +155,7 @@ checksum = "72f5acc6cb2ba439de613abc23857ec3d78374d8ed5ac84e9d11336e87da8649"
 
 [[package]]
 name = "carta-cli"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "assert_cmd",
  "carta-core",
@@ -166,7 +166,7 @@ dependencies = [
 
 [[package]]
 name = "carta-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "carta-format",
  "pulldown-cmark",
@@ -182,7 +182,7 @@ dependencies = [
 
 [[package]]
 name = "carta-format"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "serde",
@@ -195,7 +195,7 @@ dependencies = [
 
 [[package]]
 name = "carta-publish"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "pulldown-cmark",
  "tempfile",
@@ -203,7 +203,7 @@ dependencies = [
 
 [[package]]
 name = "carta-tui"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "arboard",
  "carta-core",
