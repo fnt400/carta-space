@@ -39,7 +39,8 @@ The first extraction in v0.2 owns:
 - frontend-independent session values (`Session`, `SavedView`, `Position`);
 - `View`;
 - the autosave/checkpoint/sync `Scheduler`;
-- palette matching.
+- palette matching;
+- the first frontend-neutral `Action` values for text editing and LEAP input.
 
 The v0.1 TUI keeps compatibility re-exports so the extraction does not intentionally change behavior.
 
@@ -109,13 +110,19 @@ Archive persistence and Git-backed canonical operations remain domain concerns i
 
 ### Stage A — shared primitives
 
-Status: started.
+Status: initial slice complete.
 
-Extract clearly frontend-neutral code from `carta-tui` without changing user-visible behavior. The editor, session values, View, scheduler and palette matching are the first slice.
+The editor, session values, View, scheduler and palette matching have been extracted from `carta-tui` without intentionally changing v0.1.2 behavior.
 
 ### Stage B — semantic application actions
 
-Refactor TUI input handling so native Crossterm events are translated into semantic actions before they change shared application state.
+Status: started.
+
+`carta-app::Action` now carries the first frontend-neutral editing intents and LEAP input intents. The TUI translates ordinary text-editing keys into these actions, and physical LEAP start/end/query handling already crosses the same semantic seam before invoking application behavior.
+
+The TUI still owns physical modifier bookkeeping, terminal compatibility behavior and rendering-dependent navigation.
+
+Up/Down/Home/End/PageUp/PageDown are deliberately not generalized yet: their current semantics depend on visual layout width/height. Do not encode terminal columns or future GUI pixel/font assumptions into `Action` merely to move code. Decide the shared layout/navigation contract only when the graphical text renderer gives us the second concrete implementation.
 
 Move additional command/application behavior into `carta-app` only where the ownership is genuinely frontend-independent.
 
@@ -144,7 +151,7 @@ The immediate requirement is to keep editing and interaction semantics reusable.
 - No frontend owns a second editor implementation.
 - No frontend owns a second LEAP state machine.
 - Canonical Archive data and Draft 0.1 format remain unchanged by this refactor.
-- `carta-app` contains no toolkit-specific event types.
+- `carta-app` contains no toolkit-specific event types or presentation geometry.
 - Presentation choices such as theme, font size, pixel layout and window chrome are frontend concerns.
 - Right Alt/AltGr must remain ordinary text input, not LEAP.
 - The GUI may be modern without becoming a conventional panel-heavy editor.

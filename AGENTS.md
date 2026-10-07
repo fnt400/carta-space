@@ -20,7 +20,7 @@ The reference implementation is written in Rust and is migrating toward explicit
 
 - `carta-format`: format types, parsing, serialization, validation, and compatibility rules.
 - `carta-core`: canonical Archive/domain operations: Documents, Volumes, Works, LEAP retrieval, Git history, Trash/Wipe, synchronization and backlinks.
-- `carta-app`: frontend-independent interactive application primitives. It currently owns the editor/Cat highlight/undo model, session model, View model, scheduler and palette matching; more application semantics move here only when they are genuinely frontend-independent.
+- `carta-app`: frontend-independent interactive application primitives. It currently owns the editor/Cat highlight/undo model, session model, View model, scheduler, palette matching and the first semantic `Action` values; more application semantics move here only when they are genuinely frontend-independent.
 - `carta-publish`: frontend-independent publication.
 - `carta-cli`: Unix-style administrative interface.
 - `carta-tui`: frozen terminal frontend from the v0.1.x line. It remains a regression harness and compatibility frontend, not the place for new v0.2 features.
@@ -78,6 +78,7 @@ The guiding interaction rule is:
 - Document boundaries in composite views are structural and non-editable.
 - Preserve unknown future metadata wherever possible.
 - Keep UI, storage format, and core behavior cleanly separated.
+- Do not put terminal columns, GUI pixels, font metrics, Crossterm/Winit key types, or other presentation geometry into shared `Action` values. Visual navigation needs an explicit cross-frontend contract before extraction.
 - Prefer small, explicit interfaces between crates.
 - Avoid introducing hidden global state when a clear domain object or explicit dependency is possible.
 - Use one deterministic Carta XDG data root: `$XDG_DATA_HOME/carta`, falling back to `~/.local/share/carta`. The default Archive is `archive/` below that root; device-local session sidecars live below the same root but outside the Archive Git working tree. An explicit startup/archive path may override the default; do not reintroduce a last-used Archive pointer.
