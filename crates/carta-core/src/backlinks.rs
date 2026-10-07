@@ -58,18 +58,17 @@ impl BacklinkIndex {
             .as_deref()
             .and_then(load_cache)
             .filter(|cache| cache.version == CACHE_VERSION);
-        let mut previous: BTreeMap<_, _> = cached
-            .as_ref()
-            .map(|cache| {
+        let (mut previous, mut changed): (BTreeMap<_, _>, bool) = match cached {
+            Some(cache) => (
                 cache
                     .sources
-                    .iter()
-                    .cloned()
+                    .into_iter()
                     .map(|source| (source.document, source))
-                    .collect()
-            })
-            .unwrap_or_default();
-        let mut changed = cached.is_none();
+                    .collect(),
+                false,
+            ),
+            None => (BTreeMap::new(), true),
+        };
         let mut sources = BTreeMap::new();
 
         for (id, info) in documents {
@@ -150,7 +149,7 @@ impl BacklinkIndex {
             info,
             fingerprint(&info.path.join("content.md")),
         );
-        self.add_source_to_inverse(id, &source);
+        add_source_to_inverse(&mut self.inverse, id, &source);
         self.sources.insert(id, source);
         self.dirty = true;
     }
@@ -169,15 +168,11 @@ impl BacklinkIndex {
     }
 
     fn rebuild_inverse(&mut self) {
-        self.inverse.clear();
-        let sources: Vec<_> = self
-            .sources
-            .iter()
-            .map(|(id, source)| (*id, source.clone()))
-            .collect();
-        for (id, source) in sources {
-            self.add_source_to_inverse(id, &source);
+        let mut inverse = HashMap::new();
+        for (id, source) in &self.sources {
+            add_source_to_inverse(&mut inverse, *id, source);
         }
+        self.inverse = inverse;
     }
 
     fn remove_source_from_inverse(&mut self, id: DocumentId, source: &CachedSource) {
@@ -195,29 +190,6 @@ impl BacklinkIndex {
             };
             if empty {
                 self.inverse.remove(&target);
-            }
-        }
-    }
-
-    fn add_source_to_inverse(&mut self, id: DocumentId, source: &CachedSource) {
-        let mut touched = HashSet::new();
-        for cached in &source.links {
-            let Some(target) = cached.link.carta_target() else {
-                continue;
-            };
-            touched.insert(target);
-            self.inverse.entry(target).or_default().push(Backlink::new(
-                id,
-                cached.link.clone(),
-                source.label.clone(),
-                cached.context.clone(),
-            ));
-        }
-        for target in touched {
-            if let Some(entries) = self.inverse.get_mut(&target) {
-                entries.sort_by_key(|backlink| {
-                    (backlink.source(), backlink.link().source_range().start)
-                });
             }
         }
     }
@@ -258,6 +230,33 @@ impl CachedSource {
             fingerprint,
             label: info.derived_label(content),
             links,
+        }
+    }
+}
+
+fn add_source_to_inverse(
+    inverse: &mut HashMap<CartaLinkTarget, Vec<Backlink>>,
+    id: DocumentId,
+    source: &CachedSource,
+) {
+    let mut touched = HashSet::new();
+    for cached in &source.links {
+        let Some(target) = cached.link.carta_target() else {
+            continue;
+        };
+        touched.insert(target);
+        inverse.entry(target).or_default().push(Backlink::new(
+            id,
+            cached.link.clone(),
+            source.label.clone(),
+            cached.context.clone(),
+        ));
+    }
+    for target in touched {
+        if let Some(entries) = inverse.get_mut(&target) {
+            entries.sort_by_key(|backlink| {
+                (backlink.source(), backlink.link().source_range().start)
+            });
         }
     }
 }
