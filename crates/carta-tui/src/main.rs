@@ -12,7 +12,7 @@ use carta_tui::session::{
     cache_root, current_host_name, data_root, default_archive_path, load_host_settings,
     load_session, migrate_legacy_state, save_host_settings, save_session, HostSettings,
 };
-use carta_tui::App;
+use carta_tui::{App, Command};
 use chrono::{Datelike, Local, Timelike};
 use clap::Parser;
 use crossterm::cursor::{Hide, Show};
@@ -245,7 +245,10 @@ fn run() -> Result<(), Box<dyn Error>> {
     let host_name = current_host_name();
     let host_settings = load_host_settings(&data, &host_name)?;
     let mut app = App::open(archive, session.as_ref(), Instant::now())?;
-    app.set_portable_keyboard_mode(host_settings.portable_keyboard_mode);
+    let mut dispatcher = Dispatcher::default();
+    dispatcher
+        .input
+        .set_portable_enabled(host_settings.portable_keyboard_mode);
     for status in [startup_sync_status, session_fallback_status]
         .into_iter()
         .flatten()
@@ -260,26 +263,25 @@ fn run() -> Result<(), Box<dyn Error>> {
         if !app.status.is_empty() {
             app.status.push_str(" · ");
         }
-        app.status.push_str(if app.portable_keyboard_mode() {
+        app.status.push_str(if dispatcher.input.portable_enabled() {
             "Compatibility keyboard mode · Portable Keyboard Mode restored"
         } else {
             "Compatibility keyboard mode: enable Portable Keyboard Mode from the palette"
         });
     }
     let input = spawn_input_reader(terminal.enhancements);
-    let mut dispatcher = Dispatcher::default();
     let mut last_session_save = Instant::now();
     let mut last_saved_session = session;
     let mut redraw = true;
 
     while !app.quit {
         if redraw {
-            terminal.terminal.draw(|frame| draw(frame, &mut app))?;
+            terminal.terminal.draw(|frame| draw(frame, &mut app, dispatcher.input.portable_enabled()))?;
             redraw = false;
         }
         match input.recv_timeout(Duration::from_millis(100)) {
             Ok(Ok(Event::Key(key))) => {
-                let portable_before = app.portable_keyboard_mode();
+                let portable_before = dispatcher.input.portable_enabled();
                 if let Err(error) =
                     handle_key(&mut app, &mut dispatcher, key, terminal.enhancements)
                 {
@@ -287,12 +289,12 @@ fn run() -> Result<(), Box<dyn Error>> {
                     app.mode = AppMode::Editing;
                     let _ = app.reveal_conflicts();
                 }
-                if app.portable_keyboard_mode() != portable_before {
+                if dispatcher.input.portable_enabled() != portable_before {
                     save_host_settings(
                         &data,
                         &host_name,
                         &HostSettings {
-                            portable_keyboard_mode: app.portable_keyboard_mode(),
+                            portable_keyboard_mode: dispatcher.input.portable_enabled(),
                         },
                     )?;
                 }
@@ -399,6 +401,63 @@ fn initialize_default_archive(path: &Path) -> Result<Option<Archive>, Box<dyn Er
 struct Dispatcher {
     input: TuiInputState,
     clipboard: ClipboardBridge,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PaletteEntry {
+    App(Command),
+    SetPortableKeyboard(bool),
+}
+
+impl PaletteEntry {
+    fn label(self) -> &'static str {
+        match self {
+            Self::App(command) => command.label(),
+            Self::SetPortableKeyboard(true) => "Enable Portable Keyboard Mode",
+            Self::SetPortableKeyboard(false) => "Disable Portable Keyboard Mode",
+        }
+    }
+}
+
+fn tui_palette_commands(app: &App, portable_enabled: bool, query: &str) -> Vec<PaletteEntry> {
+    let mut entries: Vec<_> = app.commands().into_iter().map(PaletteEntry::App).collect();
+    entries.push(PaletteEntry::SetPortableKeyboard(!portable_enabled));
+    entries
+        .into_iter()
+        .filter(|entry| carta_tui::palette::matches(query, entry.label()))
+        .collect()
+}
+
+fn execute_palette_entry(
+    app: &mut App,
+    dispatcher: &mut Dispatcher,
+    entry: PaletteEntry,
+) -> Result<(), Box<dyn Error>> {
+    match entry {
+        PaletteEntry::App(command) => {
+            if dispatcher.input.portable_enabled() {
+                match command {
+                    Command::LeapForward => dispatcher
+                        .input
+                        .remember_portable_direction(LeapDirection::Forward),
+                    Command::LeapBackward => dispatcher
+                        .input
+                        .remember_portable_direction(LeapDirection::Backward),
+                    _ => {}
+                }
+            }
+            app.execute(command)?;
+        }
+        PaletteEntry::SetPortableKeyboard(enabled) => {
+            dispatcher.input.set_portable_enabled(enabled);
+            app.status = if enabled {
+                "Portable keyboard mode enabled: C-b = LEAP backward, C-f = LEAP forward".into()
+            } else {
+                "Portable keyboard mode disabled".into()
+            };
+        }
+    }
+    Ok(())
 }
 
 #[derive(Default)]
@@ -635,7 +694,7 @@ fn handle_key(
         && key.kind == KeyEventKind::Press
         && key.modifiers.contains(KeyModifiers::CONTROL)
         && matches!(key.code, KeyCode::Char('p' | 'P'))
-        && app.portable_keyboard_mode()
+        && dispatcher.input.portable_enabled()
     {
         dispatcher.input.clear_leaps();
         return handle_key(
@@ -646,7 +705,7 @@ fn handle_key(
         );
     }
 
-    if app.portable_keyboard_mode()
+    if dispatcher.input.portable_enabled()
         && !dispatcher.input.right_control_held()
         && key.kind == KeyEventKind::Press
         && key.modifiers.contains(KeyModifiers::CONTROL)
@@ -658,14 +717,18 @@ fn handle_key(
                 return Ok(());
             }
             AppMode::Editing => {
-                app.portable_leap_again();
+                if let Some(direction) = dispatcher.input.portable_direction() {
+                    app.leap_again(direction);
+                } else {
+                    app.status = "No portable LEAP direction to repeat".into();
+                }
                 return Ok(());
             }
             _ => {}
         }
     }
 
-    if app.portable_keyboard_mode()
+    if dispatcher.input.portable_enabled()
         && !dispatcher.input.right_control_held()
         && key.kind == KeyEventKind::Press
         && key.modifiers.contains(KeyModifiers::CONTROL)
@@ -683,7 +746,8 @@ fn handle_key(
         } else {
             LeapDirection::Forward
         };
-        app.start_portable_leap(direction);
+        dispatcher.input.remember_portable_direction(direction);
+        app.start_leap(direction, true);
         return Ok(());
     }
 
@@ -759,7 +823,7 @@ fn handle_key(
     if let AppMode::Palette { query, selected } = &app.mode {
         let query_value = query.clone();
         let selected_value = *selected;
-        let commands = app.palette_commands(&query_value);
+        let commands = tui_palette_commands(app, dispatcher.input.portable_enabled(), &query_value);
         let mut execute = None;
         if let AppMode::Palette { query, selected } = &mut app.mode {
             match key.code {
@@ -778,9 +842,9 @@ fn handle_key(
                 _ => {}
             }
         }
-        if let Some(command) = execute {
+        if let Some(entry) = execute {
             app.mode = AppMode::Editing;
-            app.execute(command)?;
+            execute_palette_entry(app, dispatcher, entry)?;
         }
         return Ok(());
     }
@@ -969,7 +1033,7 @@ fn handle_normal(app: &mut App, key: KeyEvent) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn draw(frame: &mut ratatui::Frame<'_>, app: &mut App) {
+fn draw(frame: &mut ratatui::Frame<'_>, app: &mut App, portable_enabled: bool) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(1), Constraint::Length(1)])
@@ -1150,7 +1214,7 @@ fn draw(frame: &mut ratatui::Frame<'_>, app: &mut App) {
             .style(status_style(app)),
         chunks[1],
     );
-    draw_mode(frame, app);
+    draw_mode(frame, app, portable_enabled);
 }
 
 struct VisualLine {
@@ -1699,12 +1763,15 @@ fn draw_list(
     );
 }
 
-fn draw_mode(frame: &mut ratatui::Frame<'_>, app: &App) {
+fn draw_mode(frame: &mut ratatui::Frame<'_>, app: &App, portable_enabled: bool) {
     let area = centered(frame.area(), 70, 45);
     match &app.mode {
         AppMode::Palette { query, selected } => {
-            let commands = app.palette_commands(query);
-            let items: Vec<_> = commands.iter().map(|c| ListItem::new(c.label())).collect();
+            let commands = tui_palette_commands(app, portable_enabled, query);
+            let items: Vec<_> = commands
+                .iter()
+                .map(|entry| ListItem::new(entry.label()))
+                .collect();
             frame.render_widget(Clear, area);
             let mut state = ListState::default().with_selected(Some(*selected));
             frame.render_stateful_widget(
@@ -1921,9 +1988,9 @@ fn parse_rgb(color: &str) -> Option<(u8, u8, u8)> {
     ))
 }
 
-fn status_flags(app: &App) -> String {
+fn status_flags(app: &App, portable_enabled: bool) -> String {
     let mut flags = Vec::new();
-    if app.portable_keyboard_mode() {
+    if portable_enabled {
         flags.push("[PORTABLE]");
     }
 
@@ -1952,7 +2019,7 @@ fn status_flags(app: &App) -> String {
 }
 
 fn status_line(app: &App) -> String {
-    let flags = status_flags(app);
+    let flags = status_flags(app, portable_enabled);
     if !app.status.is_empty() {
         return if flags.is_empty() {
             app.status.clone()
@@ -2433,7 +2500,7 @@ mod tests {
 
         assert!(!rendered_status_line(&app, 80).contains("[PORTABLE]"));
 
-        app.set_portable_keyboard_mode(true);
+        dispatcher.input.set_portable_enabled(true);
         assert!(rendered_status_line(&app, 80).contains("[PORTABLE]"));
 
         app.status = "Temporary message".into();
@@ -3817,7 +3884,7 @@ mod tests {
 
         assert!(matches!(app.mode, AppMode::Editing));
         assert_eq!(app.editor.cursor(), original_cursor);
-        assert!(!app.portable_keyboard_mode());
+        assert!(!dispatcher.input.portable_enabled());
     }
 
     #[test]
@@ -3855,8 +3922,7 @@ mod tests {
     fn portable_keyboard_mode_maps_control_b_and_f_to_palette_leap() {
         let (_temporary, mut app) = app_with_documents(&["alpha beta gamma"], false);
         let mut dispatcher = Dispatcher::default();
-        app.execute(carta_tui::Command::EnablePortableKeyboardMode)
-            .unwrap();
+        dispatcher.input.set_portable_enabled(true);
 
         app.editor.set_cursor(
             Cursor {
@@ -3932,8 +3998,7 @@ mod tests {
     fn portable_control_r_repeats_active_and_finished_leap_direction() {
         let (_temporary, mut app) = app_with_documents(&["one one one"], false);
         let mut dispatcher = Dispatcher::default();
-        app.execute(carta_tui::Command::EnablePortableKeyboardMode)
-            .unwrap();
+        dispatcher.input.set_portable_enabled(true);
 
         handle_key(
             &mut app,
@@ -3982,8 +4047,7 @@ mod tests {
     fn portable_control_p_cancels_active_leap_like_escape() {
         let (_temporary, mut app) = app_with_documents(&["alpha beta"], false);
         let mut dispatcher = Dispatcher::default();
-        app.execute(carta_tui::Command::EnablePortableKeyboardMode)
-            .unwrap();
+        dispatcher.input.set_portable_enabled(true);
 
         handle_key(
             &mut app,
@@ -4669,7 +4733,7 @@ mod tests {
         app.trash = Some(app.archive.trash_inventory().unwrap());
         app.view = View::Trash { selected: 0 };
 
-        assert_eq!(status_flags(&app), "");
+        assert_eq!(status_flags(&app, false), "");
         assert!(!status_line(&app).contains("[LOCK"));
     }
 

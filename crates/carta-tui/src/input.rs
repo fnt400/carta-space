@@ -56,6 +56,8 @@ pub(super) struct TuiInputState {
     active_leap: Option<PendingLeap>,
     suppressed_leap_releases: u8,
     right_control_held: bool,
+    portable_enabled: bool,
+    portable_leap_direction: Option<LeapDirection>,
 }
 
 impl TuiInputState {
@@ -65,6 +67,25 @@ impl TuiInputState {
 
     pub(super) fn set_right_control_held(&mut self, held: bool) {
         self.right_control_held = held;
+    }
+
+    pub(super) fn portable_enabled(&self) -> bool {
+        self.portable_enabled
+    }
+
+    pub(super) fn set_portable_enabled(&mut self, enabled: bool) {
+        self.portable_enabled = enabled;
+        if !enabled {
+            self.portable_leap_direction = None;
+        }
+    }
+
+    pub(super) fn remember_portable_direction(&mut self, direction: LeapDirection) {
+        self.portable_leap_direction = Some(direction);
+    }
+
+    pub(super) fn portable_direction(&self) -> Option<LeapDirection> {
+        self.portable_leap_direction
     }
 
     pub(super) fn pending(&self) -> Option<PendingLeap> {
