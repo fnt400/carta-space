@@ -323,7 +323,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn modifier_state_machine_keeps_terminal_details_inside_adapter() {
         let mut state = TuiInputState::default();
@@ -364,6 +363,31 @@ mod tests {
             ModifierPress::Intent(TuiInputIntent::ExtendLastLeapHighlight)
         );
         assert!(!state.has_pending());
+    }
+
+    #[test]
+    fn cat_highlight_extension_suppresses_both_leap_key_releases() {
+        let mut state = TuiInputState::default();
+        assert_eq!(
+            state.modifier_press(ModifierKeyCode::LeftAlt),
+            ModifierPress::Consumed
+        );
+        assert_eq!(
+            state.modifier_press(ModifierKeyCode::LeftControl),
+            ModifierPress::Intent(TuiInputIntent::ExtendLastLeapHighlight)
+        );
+
+        for released in [ModifierKeyCode::LeftControl, ModifierKeyCode::LeftAlt] {
+            let release = KeyEvent::new_with_kind(
+                KeyCode::Modifier(released),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
+            );
+            assert_eq!(state.release_intent(&release), None);
+        }
+
+        assert!(!state.has_pending());
+        assert!(!state.has_active());
     }
 
     #[test]
