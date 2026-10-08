@@ -2,14 +2,14 @@ use carta_app::{App, AppMode, View};
 use chrono::{DateTime, Local};
 use iced::theme::Mode as ThemeMode;
 use iced::widget::{column, container, rich_text, row, scrollable, span, stack, text};
-use iced::{color, Color, Element, Font, Length, Theme};
+use iced::{color, Color, Element, Font, Length};
 
 use crate::presentation::SegmentKind;
 use crate::{Gui, Message};
 
 const IOSEVKA: Font = Font::with_name("Iosevka");
-const EDITOR_SIZE: u16 = 18;
-const STATUS_SIZE: u16 = 14;
+const EDITOR_SIZE: f32 = 18.0;
+const STATUS_SIZE: f32 = 14.0;
 const EDITOR_MAX_WIDTH: f32 = 820.0;
 
 pub(crate) fn view(state: &Gui) -> Element<'_, Message> {
