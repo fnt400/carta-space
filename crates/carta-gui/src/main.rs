@@ -46,6 +46,7 @@ pub(crate) struct Gui {
     pointer: Option<Point>,
     pointer_down: bool,
     sync_active: bool,
+    quit_sync_active: bool,
     sync_ready: Option<StagedSync>,
     next_sync_at: Instant,
     last_user_input: Instant,
@@ -68,6 +69,7 @@ pub(crate) enum Message {
     PointerReleased,
     Scrolled(f32),
     SyncFinished(Result<StagedSync, String>),
+    QuitSyncFinished(Result<SyncOutcome, String>),
 }
 
 impl Gui {
@@ -104,6 +106,7 @@ impl Gui {
             pointer: None,
             pointer_down: false,
             sync_active: false,
+            quit_sync_active: false,
             sync_ready: None,
             next_sync_at: Instant::now(),
             last_user_input: Instant::now(),
@@ -155,6 +158,7 @@ impl Gui {
             pointer: None,
             pointer_down: false,
             sync_active: false,
+            quit_sync_active: false,
             sync_ready: None,
             next_sync_at: Instant::now(),
             last_user_input: Instant::now(),
@@ -401,12 +405,66 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
     )
 }
 
+/// Finish Quit only after the final committed HEAD has been offered to the
+/// configured remote. A failed transfer keeps the window open with a visible
+/// error; quitting never silently abandons an unpublished checkpoint.
+fn finish_remote_quit(state: &mut Gui) -> Task<Message> {
+    if state.quit_sync_active || state.sync_active {
+        return Task::none();
+    }
+    let Some(app) = state.app.as_ref() else {
+        return iced::exit();
+    };
+    let remote = match app.archive.sync_remote() {
+        Ok(remote) => remote,
+        Err(error) => {
+            if let Some(app) = state.app.as_mut() {
+                app.quit = false;
+            }
+            state.sync_error = Some(format!("Quit sync: {error}"));
+            return Task::none();
+        }
+    };
+    if remote.is_none() {
+        return iced::exit();
+    }
+    let root = app.archive.root().to_path_buf();
+    state.quit_sync_active = true;
+    Task::perform(
+        async move {
+            match tokio::task::spawn_blocking(move || stage_sync(root)).await {
+                Ok(Ok(stage)) => Ok(stage.outcome()),
+                Ok(Err(error)) => Err(error.to_string()),
+                Err(error) => Err(format!("Quit sync worker failed: {error}")),
+            }
+        },
+        Message::QuitSyncFinished,
+    )
+}
+
 fn normalize_clipboard(value: &str) -> String {
     value.replace("\r\n", "\n").replace('\r', "\n")
 }
 
 fn update(state: &mut Gui, message: Message) -> Task<Message> {
     match message {
+        Message::QuitSyncFinished(result) => {
+            state.quit_sync_active = false;
+            match result {
+                Ok(SyncOutcome::Conflict) => {
+                    state.sync_error = Some("Quit: conflitto Git remoto".into());
+                }
+                Err(error) => {
+                    state.sync_error = Some(format!("Quit: push Git fallito: {error}"));
+                }
+                Ok(_) => return iced::exit(),
+            }
+            if let Some(app) = state.app.as_mut() {
+                app.quit = false;
+                app.status = "Quit annullato: sincronizzazione non riuscita".into();
+            }
+            Task::none()
+        }
         Message::SyncFinished(result) => {
             state.sync_active = false;
             let now = Instant::now();
@@ -450,6 +508,9 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                     // Crucially, do not acknowledge sync_pending after failure.
                     // It must remain queued through all retry attempts.
                 }
+            }
+            if state.app.as_ref().is_some_and(|app| app.quit) {
+                return finish_remote_quit(state);
             }
             return service_tick(state, now);
         }
@@ -626,7 +687,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                 || app.editor.regions().len() != before_region_count
                 || std::mem::discriminant(&app.view) != before_view));
     if app.quit {
-        iced::exit()
+        finish_remote_quit(state)
     } else {
         let auto_sync = service_tick(state, Instant::now());
         if follow_caret {
