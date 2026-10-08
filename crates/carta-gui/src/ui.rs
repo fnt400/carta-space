@@ -338,6 +338,7 @@ fn status_bar<'a>(
     mode: ThemeMode,
     sync_error: Option<&'a str>,
 ) -> Element<'a, Message> {
+    let failed = sync_error.is_some();
     let status = app.status_bar();
     let right = text(status.right).font(IOSEVKA).size(STATUS_SIZE);
     let left = if let Some(error) = sync_error {
@@ -361,12 +362,12 @@ fn status_bar<'a>(
         .width(Length::Fill)
         .style(move |_| {
             iced::widget::container::Style::default()
-                .background(if sync_error.is_some() {
+                .background(if failed {
                     sync_error_background(mode)
                 } else {
                     status_background(mode)
                 })
-                .color(if sync_error.is_some() {
+                .color(if failed {
                     color!(0xFFFFFF)
                 } else {
                     status_foreground(mode)
