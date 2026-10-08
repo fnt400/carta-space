@@ -4,17 +4,20 @@ on:
     branches: [opencode/v0.2]
     paths: [.github/workflows/gui-lock-once.yml]
 permissions:
-  contents: read
+  contents: write
 jobs:
   generate:
+    if: github.repository == 'fnt400/carta-space'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
       - uses: dtolnay/rust-toolchain@stable
-      - name: Generate GUI Cargo.lock for reproducible Nix build
+      - name: Generate and commit reproducible GUI Cargo.lock
         run: |
+          set -euo pipefail
           cargo generate-lockfile --manifest-path crates/carta-gui/Cargo.toml
-          echo "CARTA_GUI_LOCK_BEGIN"
-          base64 -w 0 crates/carta-gui/Cargo.lock
-          echo
-          echo "CARTA_GUI_LOCK_END"
+          git add -f crates/carta-gui/Cargo.lock
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Track GUI Cargo.lock for reproducible Nix builds'
+          git push origin HEAD:opencode/v0.2
