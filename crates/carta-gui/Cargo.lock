@@ -431,6 +431,8 @@ dependencies = [
  "carta-core",
  "chrono",
  "iced",
+ "pulldown-cmark",
+ "serde_json",
 ]
 
 [[package]]
