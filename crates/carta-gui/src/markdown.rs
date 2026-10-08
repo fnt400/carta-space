@@ -146,6 +146,14 @@ impl Cache {
     /// Generations are incremented by the viewport layout only for changed
     /// Documents. Normal navigation never hashes or reparses whole Documents.
     pub fn ranges(&mut self, id: DocumentId, text: &str, generation: u64) -> &[Range] {
+        // Syntax state is entirely disposable. Bound its lifetime footprint
+        // even when the user visits thousands of different Documents.
+        const MAX_CACHED_DOCUMENTS: usize = 128;
+        if self.documents.len() >= MAX_CACHED_DOCUMENTS && !self.documents.contains_key(&id) {
+            if let Some(oldest) = self.documents.keys().next().copied() {
+                self.documents.remove(&oldest);
+            }
+        }
         let entry = self.documents.entry(id).or_insert_with(|| (generation, resolve(parse(text))));
         if entry.0 != generation {
             *entry = (generation, resolve(parse(text)));
