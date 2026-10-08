@@ -35,7 +35,9 @@ pub fn visual_rows(text: &str, byte: usize, width: usize) -> usize {
     let mut column = 0;
     let width = width.max(1);
     let mut byte = byte.min(text.len());
-    while !text.is_char_boundary(byte) { byte -= 1; }
+    while !text.is_char_boundary(byte) {
+        byte -= 1;
+    }
     for ch in text[..byte].chars() {
         if ch == '\n' {
             rows += 1;
@@ -72,7 +74,10 @@ pub fn caret_row(app: &App, width: usize) -> usize {
     let cursor = app.editor.cursor();
     let mut rows = 0;
     for (index, region) in app.editor.regions().iter().enumerate() {
-        let locked = app.archive.document_is_locked(region.document).unwrap_or(false);
+        let locked = app
+            .archive
+            .document_is_locked(region.document)
+            .unwrap_or(false);
         rows += prefix_rows(&app.view, index, locked);
         if index == cursor.region {
             rows += visual_rows(&region.text, cursor.byte, width);
@@ -96,7 +101,9 @@ fn byte_at_cell(text: &str, target_row: usize, target_col: usize, width: usize) 
     let mut col = 0;
     for (byte, ch) in text.char_indices() {
         if ch == '\n' {
-            if row == target_row { return byte; }
+            if row == target_row {
+                return byte;
+            }
             row += 1;
             col = 0;
             continue;
@@ -115,8 +122,15 @@ fn byte_at_cell(text: &str, target_row: usize, target_col: usize, width: usize) 
 
 /// `point` is relative to the centered full-width page row, at the beginning
 /// of the actual text sheet (not including the top virtual scroll spacer).
-pub fn hit_test(app: &App, point: iced::Point, window_width: f32, font_size: f32) -> Option<Cursor> {
-    if app.editor.regions().is_empty() { return None; }
+pub fn hit_test(
+    app: &App,
+    point: iced::Point,
+    window_width: f32,
+    font_size: f32,
+) -> Option<Cursor> {
+    if app.editor.regions().is_empty() {
+        return None;
+    }
     let width = columns(window_width, font_size);
     let page_width = window_width.min(PAGE_WIDTH);
     let left = ((window_width - page_width) / 2.0) + HORIZONTAL_PADDING;
@@ -126,10 +140,16 @@ pub fn hit_test(app: &App, point: iced::Point, window_width: f32, font_size: f32
     let mut row = (y / line_height(font_size)).floor().max(0.0) as usize;
     let regions = app.editor.regions();
     for (index, region) in regions.iter().enumerate() {
-        let locked = app.archive.document_is_locked(region.document).unwrap_or(false);
+        let locked = app
+            .archive
+            .document_is_locked(region.document)
+            .unwrap_or(false);
         let prefix = prefix_rows(&app.view, index, locked);
         if row < prefix {
-            return Some(Cursor { region: index, byte: 0 });
+            return Some(Cursor {
+                region: index,
+                byte: 0,
+            });
         }
         row -= prefix;
         let last_row = visual_rows(&region.text, region.text.len(), width);

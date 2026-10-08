@@ -100,7 +100,9 @@ impl Gui {
             .map_err(|error| error.to_string())
             .and_then(|archive| {
                 let previous = root.as_deref().and_then(|root| {
-                    session::load(root, archive.metadata().archive_id()).ok().flatten()
+                    session::load(root, archive.metadata().archive_id())
+                        .ok()
+                        .flatten()
                 });
                 App::open(archive, previous.as_ref(), Instant::now())
                     .map(|app| (app, previous))
@@ -140,7 +142,6 @@ impl Gui {
         }
         Ok(())
     }
-
 }
 
 impl Drop for Gui {
@@ -178,7 +179,9 @@ fn subscription(state: &Gui) -> Subscription<Message> {
     let mouse_release = event::listen_raw(|event, _status, _window| {
         matches!(
             event,
-            Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left))
+            Event::Mouse(iced::mouse::Event::ButtonReleased(
+                iced::mouse::Button::Left
+            ))
         )
         .then_some(Message::PointerReleased)
     });
@@ -222,9 +225,14 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                 if let Some(app) = &mut state.app {
                     if matches!(app.mode, AppMode::Editing)
                         && !app.collapsed
-                        && matches!(app.view, View::CreationDate(_) | View::ModificationDate | View::Work(_))
+                        && matches!(
+                            app.view,
+                            View::CreationDate(_) | View::ModificationDate | View::Work(_)
+                        )
                     {
-                        if let Some(cursor) = viewport::hit_test(app, point, state.window_size.width, state.font_size) {
+                        if let Some(cursor) =
+                            viewport::hit_test(app, point, state.window_size.width, state.font_size)
+                        {
                             if cursor != app.editor.cursor() {
                                 app.editor.set_cursor(cursor, true);
                             }
@@ -235,13 +243,20 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
             return Task::none();
         }
         Message::PointerPressed => {
-            let Some(point) = state.pointer else { return Task::none(); };
+            let Some(point) = state.pointer else {
+                return Task::none();
+            };
             if let Some(app) = &mut state.app {
                 if matches!(app.mode, AppMode::Editing)
                     && !app.collapsed
-                    && matches!(app.view, View::CreationDate(_) | View::ModificationDate | View::Work(_))
+                    && matches!(
+                        app.view,
+                        View::CreationDate(_) | View::ModificationDate | View::Work(_)
+                    )
                 {
-                    if let Some(cursor) = viewport::hit_test(app, point, state.window_size.width, state.font_size) {
+                    if let Some(cursor) =
+                        viewport::hit_test(app, point, state.window_size.width, state.font_size)
+                    {
                         app.cat_navigation();
                         app.editor.set_cursor(cursor, false);
                         state.pointer_down = true;
@@ -347,10 +362,11 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
     if let Err(error) = result {
         app.status = format!("Error: {error}");
     }
-    let follow_caret = zoomed || (keyboard_event
-        && (app.editor.cursor() != before_cursor
-            || app.editor.regions().len() != before_region_count
-            || std::mem::discriminant(&app.view) != before_view));
+    let follow_caret = zoomed
+        || (keyboard_event
+            && (app.editor.cursor() != before_cursor
+                || app.editor.regions().len() != before_region_count
+                || std::mem::discriminant(&app.view) != before_view));
     if app.quit {
         iced::exit()
     } else if follow_caret {

@@ -1,7 +1,9 @@
 use carta_app::{App, AppMode, View};
 use chrono::{DateTime, Local};
 use iced::theme::Mode as ThemeMode;
-use iced::widget::{column, container, mouse_area, rich_text, row, scrollable, space, span, stack, text, Id};
+use iced::widget::{
+    column, container, mouse_area, rich_text, row, scrollable, space, span, stack, text, Id,
+};
 use iced::{color, Color, Element, Font, Length};
 use std::time::Instant;
 
@@ -66,8 +68,12 @@ fn build_view(state: &Gui) -> Element<'_, Message> {
     }
 }
 
-
-fn editor_view<'a>(state: &Gui, app: &'a App, mode: ThemeMode, window: iced::Size) -> Element<'a, Message> {
+fn editor_view<'a>(
+    state: &Gui,
+    app: &'a App,
+    mode: ThemeMode,
+    window: iced::Size,
+) -> Element<'a, Message> {
     let columns = viewport::columns(window.width, state.font_size);
     let spans = editor_spans(app, mode, columns, &mut state.markdown.borrow_mut());
     let text_view = rich_text(spans)
@@ -134,12 +140,17 @@ fn editor_spans<'a>(
     let cursor = app.editor.cursor();
     // Explicit Cat/conventional selection must outrank the implicit at-point
     // Cat highlight; otherwise mouse dragging would remain visually hidden.
-    let selection = app.editor.selection().or_else(|| app.cat_render_highlight());
+    let selection = app
+        .editor
+        .selection()
+        .or_else(|| app.cat_render_highlight());
     let extended = app.editor.cat_highlight().is_some() || app.editor.selection().is_some();
 
     for (index, region) in app.editor.regions().iter().enumerate() {
         if let Some(separator) = separator_for_region(app, index, columns) {
-            if index > 0 { spans.push(span("\n")); }
+            if index > 0 {
+                spans.push(span("\n"));
+            }
             spans.push(span(separator).font(IOSEVKA).color(secondary_text(mode)));
             spans.push(span("\n\n"));
         } else if index > 0 {
@@ -149,20 +160,35 @@ fn editor_spans<'a>(
         let value = region.text.as_str();
         let styles = cache.ranges(region.document, value);
         let selected = selection.and_then(|(start, end)| {
-            if index < start.region || index > end.region { return None; }
+            if index < start.region || index > end.region {
+                return None;
+            }
             let first = if index == start.region { start.byte } else { 0 };
-            let last = if index == end.region { end.byte } else { value.len() };
+            let last = if index == end.region {
+                end.byte
+            } else {
+                value.len()
+            };
             (first < last).then_some((first, last))
         });
         let caret = (index == cursor.region).then_some(cursor.byte);
         let caret_end = caret.map(|byte| {
-            value[byte..].chars().next().map_or(byte, |ch| byte + ch.len_utf8())
+            value[byte..]
+                .chars()
+                .next()
+                .map_or(byte, |ch| byte + ch.len_utf8())
         });
 
         let mut boundaries = vec![0, value.len()];
-        if let Some(byte) = caret { boundaries.push(byte); }
-        if let Some(byte) = caret_end { boundaries.push(byte); }
-        if let Some((start, end)) = selected { boundaries.extend([start, end]); }
+        if let Some(byte) = caret {
+            boundaries.push(byte);
+        }
+        if let Some(byte) = caret_end {
+            boundaries.push(byte);
+        }
+        if let Some((start, end)) = selected {
+            boundaries.extend([start, end]);
+        }
         for range in styles {
             boundaries.extend([range.start, range.end]);
         }
@@ -171,34 +197,50 @@ fn editor_spans<'a>(
 
         for pair in boundaries.windows(2) {
             let (start, end) = (pair[0], pair[1]);
-            if end <= start { continue; }
+            if end <= start {
+                continue;
+            }
             let fragment = &value[start..end];
             let is_caret = caret == Some(start);
             let newline_caret = is_caret && fragment == "\n";
             let display = if newline_caret { " " } else { fragment };
             let mut styled = span(display).font(IOSEVKA);
             if is_caret {
-                styled = styled.background(caret_color(mode)).color(caret_foreground(mode));
+                styled = styled
+                    .background(caret_color(mode))
+                    .color(caret_foreground(mode));
             } else if selected.is_some_and(|(first, last)| first < end && start < last) {
                 styled = styled
-                    .background(if extended { selection_background(mode) } else { cat_highlight_background(mode) })
+                    .background(if extended {
+                        selection_background(mode)
+                    } else {
+                        cat_highlight_background(mode)
+                    })
                     .color(selection_foreground(mode));
             } else if let Some(syntax) = markdown::syntax_at(styles, start, end) {
                 styled = styled.color(syntax_color(mode, syntax));
             }
             spans.push(styled);
-            if newline_caret { spans.push(span("\n").font(IOSEVKA)); }
+            if newline_caret {
+                spans.push(span("\n").font(IOSEVKA));
+            }
         }
         if caret == Some(value.len()) {
             spans.push(
-                span(" ").font(IOSEVKA)
+                span(" ")
+                    .font(IOSEVKA)
                     .background(caret_color(mode))
                     .color(caret_foreground(mode)),
             );
         }
     }
     if spans.is_empty() {
-        spans.push(span(" ").font(IOSEVKA).background(caret_color(mode)).color(caret_foreground(mode)));
+        spans.push(
+            span(" ")
+                .font(IOSEVKA)
+                .background(caret_color(mode))
+                .color(caret_foreground(mode)),
+        );
     }
     spans
 }

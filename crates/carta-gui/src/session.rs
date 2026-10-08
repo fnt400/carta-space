@@ -13,9 +13,8 @@ pub fn data_root() -> io::Result<PathBuf> {
             return Ok(dir.join("carta"));
         }
     }
-    let home = std::env::var_os("HOME").ok_or_else(|| {
-        io::Error::new(io::ErrorKind::NotFound, "HOME is unset")
-    })?;
+    let home = std::env::var_os("HOME")
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "HOME is unset"))?;
     Ok(PathBuf::from(home).join(".local/share/carta"))
 }
 
@@ -29,7 +28,9 @@ pub fn session_path(root: &Path, id: ArchiveId) -> PathBuf {
 
 pub fn load(root: &Path, id: ArchiveId) -> io::Result<Option<Session>> {
     match fs::read(session_path(root, id)) {
-        Ok(bytes) => serde_json::from_slice(&bytes).map(Some).map_err(io::Error::other),
+        Ok(bytes) => serde_json::from_slice(&bytes)
+            .map(Some)
+            .map_err(io::Error::other),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(error),
     }
@@ -39,7 +40,10 @@ pub fn save(root: &Path, id: ArchiveId, session: &Session) -> io::Result<()> {
     fs::create_dir_all(root)?;
     let path = session_path(root, id);
     let temp = path.with_extension("tmp");
-    fs::write(&temp, serde_json::to_vec_pretty(session).map_err(io::Error::other)?)?;
+    fs::write(
+        &temp,
+        serde_json::to_vec_pretty(session).map_err(io::Error::other)?,
+    )?;
     fs::rename(temp, path)
 }
 
@@ -50,7 +54,8 @@ mod tests {
 
     #[test]
     fn same_session_roundtrips_with_same_archive_id() {
-        let root = std::env::temp_dir().join(format!("carta-gui-session-test-{}", ArchiveId::new_v7()));
+        let root =
+            std::env::temp_dir().join(format!("carta-gui-session-test-{}", ArchiveId::new_v7()));
         let archive_id = ArchiveId::new_v7();
         let value = Session::new(Volume::new(2026, 10).unwrap());
         save(&root, archive_id, &value).unwrap();
