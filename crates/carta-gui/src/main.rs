@@ -275,7 +275,12 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
     const INTERVAL: Duration = Duration::from_secs(180);
     let idle = now.saturating_duration_since(state.last_user_input) >= QUIET && !state.pointer_down;
 
-    if idle {
+    let can_integrate = state.app.as_ref().is_some_and(|app| {
+        !app.editor.is_dirty()
+            && matches!(app.mode, AppMode::Editing)
+            && app.conflicts.is_empty()
+    });
+    if idle && can_integrate {
         if let Some(staged) = state.sync_ready.take() {
             let result = if let Some(app) = state.app.as_mut() {
                 app.apply_background_sync(&staged)
