@@ -145,11 +145,14 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
         Message::Tick(now) => {
             // Canon Cat: about 3 Hz when saved, about 1 Hz when dirty.
             let half_period_ms = if app.editor.is_dirty() { 500 } else { 167 };
-            state.caret_visible =
-                (now.saturating_duration_since(state.blink_origin).as_millis()
-                    / half_period_ms) % 2 == 0;
+            state.caret_visible = (now
+                .saturating_duration_since(state.blink_origin)
+                .as_millis()
+                / half_period_ms)
+                % 2
+                == 0;
             app.tick(now).map(|_| ())
-        },
+        }
         Message::Raw(_) | Message::SystemTheme(_) | Message::FontLoaded(_) => Ok(()),
     };
 

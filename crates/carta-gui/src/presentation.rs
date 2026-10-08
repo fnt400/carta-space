@@ -105,13 +105,7 @@ mod tests {
                 .collect::<String>(),
             "è"
         );
-        assert_eq!(
-            spans
-                .iter()
-                .map(|s| s.content)
-                .collect::<String>(),
-            text
-        );
+        assert_eq!(spans.iter().map(|s| s.content).collect::<String>(), text);
         assert_eq!(
             spans
                 .iter()
@@ -125,19 +119,42 @@ mod tests {
     fn newline_caret_keeps_original_line_break() {
         let spans = segments("first\nsecond", 5, None);
         assert_eq!(
-            spans.iter().find(|s| s.kind == SegmentKind::Caret).unwrap().content,
+            spans
+                .iter()
+                .find(|s| s.kind == SegmentKind::Caret)
+                .unwrap()
+                .content,
             "\n"
         );
-        assert_eq!(spans.iter().map(|s| s.content).collect::<String>(), "first\nsecond");
+        assert_eq!(
+            spans.iter().map(|s| s.content).collect::<String>(),
+            "first\nsecond"
+        );
     }
 
     #[test]
     fn caret_uses_original_character_without_shifting_following_text() {
         let original = "abè文z";
         let result = segments(original, 2, None);
-        assert_eq!(result.iter().filter(|s| s.kind == SegmentKind::Caret).count(), 1);
-        assert_eq!(result.iter().find(|s| s.kind == SegmentKind::Caret).unwrap().content, "è");
-        assert_eq!(result.iter().map(|s| s.content).collect::<String>(), original);
+        assert_eq!(
+            result
+                .iter()
+                .filter(|s| s.kind == SegmentKind::Caret)
+                .count(),
+            1
+        );
+        assert_eq!(
+            result
+                .iter()
+                .find(|s| s.kind == SegmentKind::Caret)
+                .unwrap()
+                .content,
+            "è"
+        );
+        assert_eq!(
+            result.iter().map(|s| s.content).collect::<String>(),
+            original
+        );
     }
 
     #[test]
