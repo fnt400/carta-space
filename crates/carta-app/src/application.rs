@@ -2260,27 +2260,29 @@ impl App {
         }
     }
 
-    /// The frontend schedules the network part on a dedicated worker, but
-    /// local autosave and checkpoint creation remain owned by the App.
-    /// Never snapshot an in-memory dirty editor, a provisional Document, or
-    /// an unresolved-conflict Archive.
+    /// Called before scheduling a worker. Publishing a committed HEAD never
+    /// requires a clean in-memory editor, a particular View, or a persistent
+    /// current Document. Those restrictions apply only to *incoming* changes.
+    /// A new checkpoint of the current buffer is created only when safe.
     pub fn prepare_background_sync(&mut self) -> AppResult<bool> {
-        if self.quit
-            || self.editor.is_dirty()
-            || self.provisional.is_some()
-            || !matches!(self.mode, AppMode::Editing)
-            || !matches!(
+        if self.quit || self.archive.sync_remote()?.is_none() {
+            return Ok(false);
+        }
+        if !self.editor.is_dirty()
+            && self.provisional.is_none()
+            && matches!(self.mode, AppMode::Editing)
+            && matches!(
                 self.view,
                 View::CreationDate(_) | View::ModificationDate | View::Work(_)
             )
-            || !self.conflicts.is_empty()
-            || self.archive.sync_remote()?.is_none()
+            && self.conflicts.is_empty()
+            && self.archive.is_dirty()?
         {
-            return Ok(false);
-        }
-        if self.archive.is_dirty()? {
             self.checkpoint(CheckpointKind::Automatic, Some("Prepared background sync"))?;
         }
+        // The worker reads only the last committed snapshot. Uncommitted
+        // writing is neither uploaded nor modified. It must never delay a
+        // previously committed checkpoint's outbound push.
         Ok(true)
     }
 
