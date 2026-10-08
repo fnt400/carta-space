@@ -4,7 +4,7 @@ on:
     branches: [opencode/v0.2]
     paths: [".github/workflows/sync-verify-once.yml"]
 permissions:
-  contents: write
+  contents: read
 jobs:
   verify:
     if: github.repository == 'fnt400/carta-space'
@@ -19,33 +19,15 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends pkg-config libwayland-dev
-      - name: Verify workspace and GUI, capture sanitized report
+      - name: Verify workspace and GUI
         shell: bash
         run: |
-          set +e
-          cargo fmt --all > /tmp/carta-format.log 2>&1
-          cargo fmt --manifest-path crates/carta-gui/Cargo.toml >> /tmp/carta-format.log 2>&1
+          set -u
+          cargo fmt --all
+          cargo fmt --manifest-path crates/carta-gui/Cargo.toml
           timeout 1800 bash scripts/verify-carta.sh > /tmp/carta-verify.log 2>&1
-          rc=$?
-          set -e
-          mkdir -p bugfixes
-          {
-            echo "# Background sync compile/test verification"
-            echo
-            echo "Tested base: ${GITHUB_SHA}"
-            echo "Date: 2026-10-08"
-            echo "Exit code: ${rc}"
-            echo
-            if [ "$rc" -eq 0 ]; then
-              echo "Result: PASS"
-            else
-              echo "Result: FAIL or BLOCKED — inspect below"
-            fi
-            echo
-            printf '~~~text\n'
-            tail -n 120 /tmp/carta-verify.log | sed -E 's|/home/runner/[^ /]+|/home/runner/REDACTED|g'
-            printf '~~~\n'
-          } > bugfixes/background-sync-ci-result.md
-          git add bugfixes/background-sync-ci-result.md crates/carta-app/src crates/carta-core/src crates/carta-gui/src
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Record background sync build verification result'
-          git push origin HEAD:opencode/v0.2
+          result=$?
+          echo "CARTA_VERIFY_EXIT_CODE=$result"
+          echo "=== Tail of full verification ==="
+          tail -n 160 /tmp/carta-verify.log
+          exit "$result"
