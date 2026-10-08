@@ -1,0 +1,20 @@
+name: Generate standalone GUI Cargo lock
+on:
+  push:
+    branches: [opencode/v0.2]
+    paths: [.github/workflows/gui-lock-once.yml]
+permissions:
+  contents: read
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Generate GUI Cargo.lock for reproducible Nix build
+        run: |
+          cargo generate-lockfile --manifest-path crates/carta-gui/Cargo.toml
+          echo "CARTA_GUI_LOCK_BEGIN"
+          base64 -w 0 crates/carta-gui/Cargo.lock
+          echo
+          echo "CARTA_GUI_LOCK_END"
