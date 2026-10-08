@@ -120,6 +120,17 @@ the tracked working files and may generate disk I/O; ordinary already-synced
 cycles and fast-forward uploads avoid this cost. Measure these separately;
 do not claim that this implementation makes *all* disk work asynchronous.
 
+**Known outstanding behavior (audit):** When the active view contains a
+new empty, provisional Document, the Archive has an intentionally
+uncommitted draft. Automatic pull and push are therefore deferred until
+that Document becomes persistent; this may prevent initial synchronization
+on a newly opened or empty month. This must be resolved without committing
+empty drafts to the remote or discarding text. When both machines edit the
+same Document and Git cannot merge, both histories are preserved but the
+GUI does not yet provide a native three-way Git merge conflict resolver.
+These two cases require explicit release acceptance; a passing CI suite
+does not imply the full automatic-sync experience is complete.
+
 
 ### Virtual View renderer — sustained responsiveness
 
