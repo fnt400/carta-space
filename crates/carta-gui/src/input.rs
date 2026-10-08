@@ -353,8 +353,7 @@ impl GuiInputState {
                 if app.editor.cat_highlight().is_some() {
                     app.copy_cat_highlight();
                 } else {
-                    app.status =
-                        "System clipboard paste is not yet available in carta-gui".into();
+                    app.status = "System clipboard paste is not yet available in carta-gui".into();
                 }
             }
             RightControlIntent::PreviousDocument if editing && editable_view => {
@@ -463,7 +462,6 @@ impl GuiInputState {
 fn is_neutral_modifier(code: Code) -> bool {
     matches!(code, Code::ShiftLeft | Code::ShiftRight | Code::AltRight)
 }
-
 
 #[cfg(test)]
 mod tests {

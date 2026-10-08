@@ -40,10 +40,7 @@ pub(crate) enum Message {
 
 impl Gui {
     fn boot() -> (Self, Task<Message>) {
-        (
-            Self::load(),
-            system::theme().map(Message::SystemTheme),
-        )
+        (Self::load(), system::theme().map(Message::SystemTheme))
     }
 
     fn load() -> Self {

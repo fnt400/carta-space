@@ -1,9 +1,7 @@
 use carta_app::{App, AppMode, View};
 use chrono::{DateTime, Local};
 use iced::theme::Mode as ThemeMode;
-use iced::widget::{
-    column, container, rich_text, row, scrollable, span, stack, text,
-};
+use iced::widget::{column, container, rich_text, row, scrollable, span, stack, text};
 use iced::{color, Color, Element, Font, Length, Theme};
 
 use crate::presentation::SegmentKind;
@@ -73,10 +71,7 @@ fn editor_view(app: &App, mode: ThemeMode) -> Element<'_, Message> {
         .into()
 }
 
-fn editor_spans<'a>(
-    app: &'a App,
-    mode: ThemeMode,
-) -> Vec<iced::widget::text::Span<'a, ()>> {
+fn editor_spans<'a>(app: &'a App, mode: ThemeMode) -> Vec<iced::widget::text::Span<'a, ()>> {
     let mut spans = Vec::new();
     let cursor = app.editor.cursor();
     let selection = app
@@ -88,11 +83,7 @@ fn editor_spans<'a>(
             if region_index > 0 {
                 spans.push(span("\n"));
             }
-            spans.push(
-                span(separator)
-                    .font(IOSEVKA)
-                    .color(secondary_text(mode)),
-            );
+            spans.push(span(separator).font(IOSEVKA).color(secondary_text(mode)));
             spans.push(span("\n\n"));
         } else if region_index > 0 {
             spans.push(span("\n\n"));
@@ -113,9 +104,7 @@ fn editor_spans<'a>(
                             .font(IOSEVKA)
                             .background(selection_background(mode))
                             .color(selection_foreground(mode)),
-                        SegmentKind::Caret => span("▯▯")
-                            .font(IOSEVKA)
-                            .color(caret_color(mode)),
+                        SegmentKind::Caret => span("▯▯").font(IOSEVKA).color(caret_color(mode)),
                     }),
             );
         } else {
@@ -182,9 +171,7 @@ fn leap_line(app: &App) -> Option<Element<'_, Message>> {
 
 fn status_bar(app: &App, mode: ThemeMode) -> Element<'_, Message> {
     let status = app.status_bar();
-    let right = text(status.right)
-        .font(IOSEVKA)
-        .size(STATUS_SIZE);
+    let right = text(status.right).font(IOSEVKA).size(STATUS_SIZE);
     let line = row![
         text(status.left)
             .font(IOSEVKA)
@@ -210,18 +197,11 @@ fn modal_overlay(app: &App, mode: ThemeMode) -> Option<Element<'_, Message>> {
         AppMode::Editing | AppMode::Leap { .. } => return None,
         AppMode::Palette { query, selected } => {
             let commands = app.palette_commands(query);
-            let mut content = column![
-                text(format!("> {query}"))
-                    .font(IOSEVKA)
-                    .size(EDITOR_SIZE),
-            ]
-            .spacing(4);
+            let mut content =
+                column![text(format!("> {query}")).font(IOSEVKA).size(EDITOR_SIZE),].spacing(4);
             if commands.is_empty() {
-                content = content.push(
-                    text("No matching commands")
-                        .font(IOSEVKA)
-                        .size(EDITOR_SIZE),
-                );
+                content =
+                    content.push(text("No matching commands").font(IOSEVKA).size(EDITOR_SIZE));
             } else {
                 for (index, command) in commands.iter().enumerate().take(14) {
                     let marker = if index == *selected { "▶ " } else { "  " };
@@ -245,11 +225,9 @@ fn modal_overlay(app: &App, mode: ThemeMode) -> Option<Element<'_, Message>> {
                 .iter()
                 .filter(|choice| carta_app::palette::matches(query, &choice.label))
                 .collect();
-            let mut content = column![
-                text(format!("{title}: {query}"))
-                    .font(IOSEVKA)
-                    .size(EDITOR_SIZE),
-            ]
+            let mut content = column![text(format!("{title}: {query}"))
+                .font(IOSEVKA)
+                .size(EDITOR_SIZE),]
             .spacing(4);
             for (index, choice) in matches.iter().enumerate().take(14) {
                 let marker = if index == *selected { "▶ " } else { "  " };
@@ -268,14 +246,9 @@ fn modal_overlay(app: &App, mode: ThemeMode) -> Option<Element<'_, Message>> {
             details,
             ..
         } => {
-            let mut content = column![
-                text(title).font(IOSEVKA).size(EDITOR_SIZE),
-            ]
-            .spacing(7);
+            let mut content = column![text(title).font(IOSEVKA).size(EDITOR_SIZE),].spacing(7);
             for detail in details {
-                content = content.push(
-                    text(detail).font(IOSEVKA).size(STATUS_SIZE),
-                );
+                content = content.push(text(detail).font(IOSEVKA).size(STATUS_SIZE));
             }
             content = content.push(
                 text(format!("> {}", with_caret(input, *cursor)))
@@ -285,12 +258,10 @@ fn modal_overlay(app: &App, mode: ThemeMode) -> Option<Element<'_, Message>> {
             modal_box(content, mode)
         }
         AppMode::Confirm { title, details, .. } => {
-            let mut content = column![
-                text(title)
-                    .font(IOSEVKA)
-                    .size(EDITOR_SIZE)
-                    .color(color!(0xFF7777)),
-            ]
+            let mut content = column![text(title)
+                .font(IOSEVKA)
+                .size(EDITOR_SIZE)
+                .color(color!(0xFF7777)),]
             .spacing(7);
             for detail in details {
                 content = content.push(
