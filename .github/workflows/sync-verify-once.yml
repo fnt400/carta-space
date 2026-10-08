@@ -23,6 +23,8 @@ jobs:
         shell: bash
         run: |
           set +e
+          cargo fmt --all > /tmp/carta-format.log 2>&1
+          cargo fmt --manifest-path crates/carta-gui/Cargo.toml >> /tmp/carta-format.log 2>&1
           timeout 1800 bash scripts/verify-carta.sh > /tmp/carta-verify.log 2>&1
           rc=$?
           set -e
@@ -40,10 +42,10 @@ jobs:
               echo "Result: FAIL or BLOCKED — inspect below"
             fi
             echo
-            echo "```text"
+            printf '~~~text\n'
             tail -n 120 /tmp/carta-verify.log | sed -E 's|/home/runner/[^ /]+|/home/runner/REDACTED|g'
-            echo "```"
+            printf '~~~\n'
           } > bugfixes/background-sync-ci-result.md
-          git add bugfixes/background-sync-ci-result.md
+          git add bugfixes/background-sync-ci-result.md crates/carta-app/src crates/carta-core/src crates/carta-gui/src
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Record background sync build verification result'
           git push origin HEAD:opencode/v0.2
