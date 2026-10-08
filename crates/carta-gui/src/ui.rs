@@ -370,7 +370,7 @@ fn caret_foreground(mode: ThemeMode) -> Color {
 
 fn cat_highlight_background(mode: ThemeMode) -> Color {
     match mode {
-        ThemeMode::Light => color!(0x666666),
+        ThemeMode::Light => color!(0xDDDDDD),
         ThemeMode::Dark | ThemeMode::None => color!(0x555555),
     }
 }
