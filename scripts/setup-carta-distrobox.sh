@@ -135,7 +135,7 @@ Distrobox pronta: $BOX_NAME
 Carta Space non è stata installata nel container.
 Dal repository puoi verificare il workspace e la GUI con:
 
-  scripts/verify-carta.sh
+  bash scripts/verify-carta.sh
 
 Per entrare manualmente nell'ambiente:
 
