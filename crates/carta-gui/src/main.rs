@@ -138,11 +138,11 @@ impl Gui {
             Archive::open(&path)
                 .map_err(|error| error.to_string())
                 .and_then(|archive| {
-                let previous = root.as_deref().and_then(|root| {
-                    session::load(root, archive.metadata().archive_id())
-                        .ok()
-                        .flatten()
-                });
+                    let previous = root.as_deref().and_then(|root| {
+                        session::load(root, archive.metadata().archive_id())
+                            .ok()
+                            .flatten()
+                    });
                     App::open(archive, previous.as_ref(), Instant::now())
                         .map(|mut app| {
                             app.enable_background_sync();
@@ -215,7 +215,7 @@ impl Gui {
         let result = path
             .parent()
             .map(std::fs::create_dir_all)
-            .transpose()
+            .unwrap_or(Ok(()))
             .map_err(|error| error.to_string())
             .and_then(|()| Archive::create(path).map_err(|error| error.to_string()));
         match result {
