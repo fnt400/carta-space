@@ -28,7 +28,10 @@ pub fn visual_rows(text: &str, byte: usize, width: usize) -> usize {
     let mut column = 0;
     let width = width.max(1);
     let byte = byte.min(text.len());
-    let byte = (0..=byte).rev().find(|&i| text.is_char_boundary(i)).unwrap_or(0);
+    let byte = (0..=byte)
+        .rev()
+        .find(|&i| text.is_char_boundary(i))
+        .unwrap_or(0);
     for ch in text[..byte].chars() {
         if ch == '\n' {
             rows += 1;
@@ -48,7 +51,10 @@ pub fn caret_row(app: &App, width: usize) -> usize {
     let cursor = app.editor.cursor();
     let mut rows = 0;
     for (index, region) in app.editor.regions().iter().enumerate() {
-        let locked = app.archive.document_is_locked(region.document).unwrap_or(false);
+        let locked = app
+            .archive
+            .document_is_locked(region.document)
+            .unwrap_or(false);
         let separator = match &app.view {
             View::CreationDate(_) | View::ModificationDate => true,
             View::Work(_) => index > 0 || locked,

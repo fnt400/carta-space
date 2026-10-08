@@ -68,14 +68,21 @@ fn editor_view(app: &App, mode: ThemeMode, window: iced::Size) -> Element<'_, Me
     let page = container(text_view)
         .width(Length::Fill)
         .max_width(EDITOR_MAX_WIDTH)
-        .padding([viewport::VERTICAL_PADDING as u16, viewport::HORIZONTAL_PADDING as u16]);
+        .padding([
+            viewport::VERTICAL_PADDING as u16,
+            viewport::HORIZONTAL_PADDING as u16,
+        ]);
 
     let height = viewport::writing_area_height(window.height);
     let top_padding = space().height(height * (2.0 / 3.0));
     let bottom_padding = space().height(height * (2.0 / 3.0));
-    let sheet = column![top_padding, container(page).center_x(Length::Fill), bottom_padding]
-        .spacing(0)
-        .width(Length::Fill);
+    let sheet = column![
+        top_padding,
+        container(page).center_x(Length::Fill),
+        bottom_padding
+    ]
+    .spacing(0)
+    .width(Length::Fill);
 
     scrollable(sheet)
         .id(Id::new(EDITOR_SCROLL_ID))
@@ -193,7 +200,10 @@ fn separator_for_region(app: &App, region_index: usize, columns: usize) -> Optio
 
 fn work_rule(columns: usize, locked: bool) -> String {
     let prefix = if locked { "[LOCKED] " } else { "" };
-    format!("{prefix}{}", "─".repeat(columns.saturating_sub(prefix.chars().count())))
+    format!(
+        "{prefix}{}",
+        "─".repeat(columns.saturating_sub(prefix.chars().count()))
+    )
 }
 
 fn local_date_time(timestamp: carta_core::Timestamp) -> String {

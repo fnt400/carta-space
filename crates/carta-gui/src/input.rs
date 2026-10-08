@@ -100,9 +100,9 @@ impl GuiInputState {
                 }
 
                 self.activate_pending(app);
-                let is_backward = self.active_leap.is_some_and(|leap| {
-                    leap.direction == LeapDirection::Backward
-                });
+                let is_backward = self
+                    .active_leap
+                    .is_some_and(|leap| leap.direction == LeapDirection::Backward);
                 let fallback = leap_query_text(text.as_deref(), &modified_key, is_backward);
                 self.handle_key_press(app, code, fallback.as_deref(), columns)?;
             }
@@ -165,7 +165,8 @@ impl GuiInputState {
                 self.pending_leap = None;
                 self.suppressed_leap_releases = 2;
                 if app.extend_last_leap_highlight() {
-                    self.clipboard_request = app.editor.selected_text().map(ClipboardRequest::Write);
+                    self.clipboard_request =
+                        app.editor.selected_text().map(ClipboardRequest::Write);
                 }
             }
             return true;
@@ -294,7 +295,8 @@ impl GuiInputState {
                 return Ok(());
             }
             Code::ArrowUp | Code::ArrowDown if !in_leap => {
-                app.editor.move_visual(code == Code::ArrowDown, columns, false);
+                app.editor
+                    .move_visual(code == Code::ArrowDown, columns, false);
                 app.cat_navigation();
                 return Ok(());
             }
@@ -514,10 +516,22 @@ mod tests {
 
     #[test]
     fn backward_leap_recovers_modified_key_when_control_suppresses_text() {
-        assert_eq!(leap_query_text(None, &Key::Character("é".into()), true), Some("é".into()));
-        assert_eq!(leap_query_text(Some("\u{1}"), &Key::Character("A".into()), true), Some("A".into()));
-        assert_eq!(leap_query_text(None, &Key::Character("a".into()), false), None);
-        assert_eq!(leap_query_text(Some("à"), &Key::Character("a".into()), false), Some("à".into()));
+        assert_eq!(
+            leap_query_text(None, &Key::Character("é".into()), true),
+            Some("é".into())
+        );
+        assert_eq!(
+            leap_query_text(Some("\u{1}"), &Key::Character("A".into()), true),
+            Some("A".into())
+        );
+        assert_eq!(
+            leap_query_text(None, &Key::Character("a".into()), false),
+            None
+        );
+        assert_eq!(
+            leap_query_text(Some("à"), &Key::Character("a".into()), false),
+            Some("à".into())
+        );
     }
 
     #[test]

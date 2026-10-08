@@ -8,8 +8,8 @@ use carta_app::App;
 use carta_core::Archive;
 use iced::event::{self, Status};
 use iced::theme::Mode as ThemeMode;
-use iced::{system, window, Event, Font, Settings, Size, Subscription, Task, Theme};
 use iced::widget::operation::{self, AbsoluteOffset};
+use iced::{system, window, Event, Font, Settings, Size, Subscription, Task, Theme};
 use input::{ClipboardRequest, GuiInputState};
 use std::env;
 use std::path::PathBuf;
@@ -126,14 +126,13 @@ fn scroll_to_caret(state: &Gui) -> Task<Message> {
     let Some(app) = &state.app else {
         return Task::none();
     };
-    let offset = viewport::scroll_offset(
-        app,
-        state.window_size.width,
-        state.window_size.height,
-    );
+    let offset = viewport::scroll_offset(app, state.window_size.width, state.window_size.height);
     operation::scroll_to(
         ui::EDITOR_SCROLL_ID,
-        AbsoluteOffset { x: None, y: Some(offset) },
+        AbsoluteOffset {
+            x: None,
+            y: Some(offset),
+        },
     )
 }
 
