@@ -26,6 +26,8 @@ enum RightControlIntent {
     NextDocument,
     DocumentStart,
     DocumentEnd,
+    ZoomIn,
+    ZoomOut,
 }
 
 fn right_control_intent(code: Code) -> Option<RightControlIntent> {
@@ -44,6 +46,8 @@ fn right_control_intent(code: Code) -> Option<RightControlIntent> {
         Code::PageDown => Some(RightControlIntent::NextDocument),
         Code::Home => Some(RightControlIntent::DocumentStart),
         Code::End => Some(RightControlIntent::DocumentEnd),
+        Code::Minus => Some(RightControlIntent::ZoomOut),
+        Code::Equal => Some(RightControlIntent::ZoomIn),
         _ => None,
     }
 }
@@ -61,11 +65,16 @@ pub struct GuiInputState {
     suppressed_leap_releases: u8,
     right_control_held: bool,
     clipboard_request: Option<ClipboardRequest>,
+    zoom_request: i8,
 }
 
 impl GuiInputState {
     pub fn take_clipboard_request(&mut self) -> Option<ClipboardRequest> {
         self.clipboard_request.take()
+    }
+
+    pub fn take_zoom_request(&mut self) -> i8 {
+        std::mem::take(&mut self.zoom_request)
     }
 
     pub fn handle(
@@ -380,6 +389,8 @@ impl GuiInputState {
             }
             RightControlIntent::Undo if editable => app.execute(Command::Undo)?,
             RightControlIntent::Redo if editable => app.execute(Command::Redo)?,
+            RightControlIntent::ZoomIn => self.zoom_request = 1,
+            RightControlIntent::ZoomOut => self.zoom_request = -1,
             RightControlIntent::CopyOrPaste if editable => {
                 if app.editor.cat_highlight().is_some() {
                     app.copy_cat_highlight();
@@ -551,6 +562,8 @@ mod tests {
             (Code::PageDown, RightControlIntent::NextDocument),
             (Code::Home, RightControlIntent::DocumentStart),
             (Code::End, RightControlIntent::DocumentEnd),
+            (Code::Minus, RightControlIntent::ZoomOut),
+            (Code::Equal, RightControlIntent::ZoomIn),
         ];
 
         for (code, intent) in expected {
