@@ -2,6 +2,7 @@ mod input;
 mod presentation;
 mod ui;
 
+use base64::Engine as _;
 use carta_app::App;
 use carta_core::Archive;
 use iced::event::{self, Status};
@@ -17,7 +18,7 @@ fn main() -> iced::Result {
         .title("Carta Space")
         .theme(theme)
         .settings(Settings {
-            default_font: Font::MONOSPACE,
+            default_font: Font::with_name("Iosevka"),
             ..Settings::default()
         })
         .subscription(subscription)
@@ -38,11 +39,22 @@ pub(crate) enum Message {
     Raw(Event),
     Tick(Instant),
     SystemTheme(ThemeMode),
+    FontLoaded(bool),
 }
 
 impl Gui {
     fn boot() -> (Self, Task<Message>) {
-        (Self::load(), system::theme().map(Message::SystemTheme))
+        // Keep the desktop appearance independent of installed system fonts.
+        let font_bytes = base64::engine::general_purpose::STANDARD
+            .decode(include_str!("../assets/iosevka-regular.ttf.b64").trim())
+            .expect("bundled Iosevka font must be valid base64");
+        (
+            Self::load(),
+            Task::batch([
+                system::theme().map(Message::SystemTheme),
+                iced::font::load(font_bytes).map(|result| Message::FontLoaded(result.is_ok())),
+            ]),
+        )
     }
 
     fn load() -> Self {
@@ -111,6 +123,14 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
         state.theme_mode = mode;
         return Task::none();
     }
+    if let Message::FontLoaded(success) = message {
+        if !success {
+            if let Some(app) = &mut state.app {
+                app.status = "Bundled Iosevka font could not be loaded".into();
+            }
+        }
+        return Task::none();
+    }
 
     let Some(app) = &mut state.app else {
         return Task::none();
@@ -130,7 +150,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                     / half_period_ms) % 2 == 0;
             app.tick(now).map(|_| ())
         },
-        Message::Raw(_) | Message::SystemTheme(_) => Ok(()),
+        Message::Raw(_) | Message::SystemTheme(_) | Message::FontLoaded(_) => Ok(()),
     };
 
     if let Err(error) = result {
