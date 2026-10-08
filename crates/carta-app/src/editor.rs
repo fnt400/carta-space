@@ -1072,6 +1072,25 @@ mod tests {
     }
 
     #[test]
+    fn content_revisions_change_only_after_text_mutations() {
+        let mut editor = editor();
+        let first = editor.current_document().unwrap();
+        let initial = editor.content_revision();
+        editor.move_horizontal(true, false);
+        assert_eq!(editor.content_revision(), initial);
+        assert_eq!(editor.document_revision(first), 0);
+        assert!(editor.insert("X"));
+        let after_insert = editor.content_revision();
+        assert!(after_insert > initial);
+        assert_eq!(editor.document_revision(first), after_insert);
+        editor.move_horizontal(false, false);
+        assert_eq!(editor.content_revision(), after_insert);
+        assert!(editor.undo());
+        assert!(editor.content_revision() > after_insert);
+        assert_eq!(editor.document_revision(first), editor.content_revision());
+    }
+
+    #[test]
     fn cursor_crosses_but_backspace_cannot_remove_boundary() {
         let mut e = editor();
         e.end(false);
