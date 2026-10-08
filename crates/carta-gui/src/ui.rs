@@ -34,7 +34,7 @@ pub(crate) fn view(state: &Gui) -> Element<'_, Message> {
         return container(text("Carta Space").font(IOSEVKA)).into();
     };
 
-    let editor = editor_view(app, state.theme_mode, state.caret_visible, state.window_size);
+    let editor = editor_view(app, state.theme_mode, state.window_size);
     let leap = leap_line(app);
     let status = status_bar(app, state.theme_mode);
 
@@ -56,9 +56,9 @@ pub(crate) fn view(state: &Gui) -> Element<'_, Message> {
     }
 }
 
-fn editor_view(app: &App, mode: ThemeMode, caret_visible: bool, window: iced::Size) -> Element<'_, Message> {
+fn editor_view(app: &App, mode: ThemeMode, window: iced::Size) -> Element<'_, Message> {
     let columns = viewport::columns(window.width);
-    let spans = editor_spans(app, mode, caret_visible, columns);
+    let spans = editor_spans(app, mode, columns);
     let text_view = rich_text(spans)
         .font(IOSEVKA)
         .size(EDITOR_SIZE)
@@ -87,7 +87,6 @@ fn editor_view(app: &App, mode: ThemeMode, caret_visible: bool, window: iced::Si
 fn editor_spans<'a>(
     app: &'a App,
     mode: ThemeMode,
-    caret_visible: bool,
     columns: usize,
 ) -> Vec<iced::widget::text::Span<'a, ()>> {
     let mut spans = Vec::new();
@@ -140,21 +139,9 @@ fn editor_spans<'a>(
                                         segment.content
                                     };
                                 let caret = span(content).font(IOSEVKA);
-                                if caret_visible {
-                                    caret
-                                        .background(caret_color(mode))
-                                        .color(caret_foreground(mode))
-                                } else if extended
-                                    && selected.is_some_and(|(start, end)| {
-                                        cursor.byte >= start && cursor.byte < end
-                                    })
-                                {
-                                    caret
-                                        .background(selection_background(mode))
-                                        .color(selection_foreground(mode))
-                                } else {
-                                    caret
-                                }
+                                caret
+                                    .background(caret_color(mode))
+                                    .color(caret_foreground(mode))
                             }
                         };
                         if newline_caret {
@@ -171,13 +158,11 @@ fn editor_spans<'a>(
 
     if spans.is_empty() {
         let caret = span(" ").font(IOSEVKA);
-        spans.push(if caret_visible {
+        spans.push(
             caret
                 .background(caret_color(mode))
-                .color(caret_foreground(mode))
-        } else {
-            caret
-        });
+                .color(caret_foreground(mode)),
+        );
     }
 
     spans
