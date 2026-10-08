@@ -209,25 +209,34 @@ fn archive_search_is_literal_grouped_contextual_and_newest_first() {
         .create_document("# First\n\nBefore Straße after\nsecond STRASSE")
         .unwrap();
     let second = archive.create_document("Newest strasse context").unwrap();
-    archive.create_document("strasse\nnext").unwrap();
+    let third = archive.create_document("strasse\nnext").unwrap();
 
     let results = archive.search("  STRASSE  ").unwrap();
     assert_eq!(results.len(), 3);
+
+    // Creation timestamps and UUIDv7 IDs can be ordered differently within
+    // rapid test fixtures. Assert the documented ordering by (created, ID),
+    // not the BTreeMap iteration order (which only sorts by ID).
+    let mut expected = [first, second, third];
+    expected.sort_by_key(|id| {
+        std::cmp::Reverse((archive.document_info(*id).unwrap().created(), *id))
+    });
+    let actual: Vec<_> = results.iter().map(|result| result.document()).collect();
+    assert_eq!(actual, expected);
+
+    let first_result = results
+        .iter()
+        .find(|result| result.document() == first)
+        .unwrap();
+    assert_eq!(first_result.label(), "First");
     assert_eq!(
-        results[0].document(),
-        archive.documents().last().unwrap().id()
-    );
-    assert_eq!(results[1].document(), second);
-    assert_eq!(results[2].document(), first);
-    assert_eq!(results[2].label(), "First");
-    assert_eq!(
-        &archive.read_document(first).unwrap().content()[results[2].occurrence()],
+        &archive.read_document(first).unwrap().content()[first_result.occurrence()],
         "Straße"
     );
-    assert_eq!(results[2].context(), "Before Straße after");
+    assert_eq!(first_result.context(), "Before Straße after");
     assert_eq!(
-        &archive.read_document(first).unwrap().content()[results[2].context_range()],
-        results[2].context()
+        &archive.read_document(first).unwrap().content()[first_result.context_range()],
+        first_result.context()
     );
     assert!(matches!(
         archive.search("Straße after\nsecond"),
