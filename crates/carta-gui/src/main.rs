@@ -15,9 +15,13 @@ use std::time::{Duration, Instant};
 fn main() -> iced::Result {
     iced::application(Gui::load, update, view)
         .title("Carta Space")
-        .theme(|_| Theme::Light)
+        .theme(theme)
         .subscription(subscription)
         .run()
+}
+
+fn theme(_: &Gui) -> Theme {
+    Theme::Light
 }
 
 struct Gui {
