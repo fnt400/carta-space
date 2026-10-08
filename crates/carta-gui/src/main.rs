@@ -8,7 +8,7 @@ mod viewport;
 
 use base64::Engine as _;
 use carta_app::{App, AppMode, Session, View};
-use carta_core::{stage_sync, Archive, StagedSync, SyncApply};
+use carta_core::{stage_sync, Archive, StagedSync, SyncApply, SyncOutcome};
 use iced::event::{self, Status};
 use iced::theme::Mode as ThemeMode;
 use iced::widget::operation::{self, AbsoluteOffset};
@@ -50,6 +50,8 @@ pub(crate) struct Gui {
     next_sync_at: Instant,
     last_user_input: Instant,
     sync_failures: u32,
+    sync_started_generation: u64,
+    pub(crate) sync_error: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -106,6 +108,8 @@ impl Gui {
             next_sync_at: Instant::now(),
             last_user_input: Instant::now(),
             sync_failures: 0,
+            sync_started_generation: 0,
+            sync_error: None,
         };
         let Some(path) = env::args_os()
             .nth(1)
@@ -155,6 +159,8 @@ impl Gui {
             next_sync_at: Instant::now(),
             last_user_input: Instant::now(),
             sync_failures: 0,
+            sync_started_generation: 0,
+            sync_error: None,
         }
     }
 
@@ -274,90 +280,105 @@ fn indexed_hit_test(
     layout.hit_test(app, row, col)
 }
 
-/// Two-phase sync orchestration. Network Git is confined to a private
-/// copy on a Tokio blocking worker. The GUI integrates local results only
-/// after a quiet period, with source HEAD/dirty-state validation.
+/// Background transfers are NOT gated by keyboard idleness. Each committed
+/// change queues a push of the immutable Git HEAD even if the user continues
+/// typing or the current Document is provisional. Only the *integration* of
+/// remote changes may wait for a safe moment.
 fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
     const QUIET: Duration = Duration::from_secs(2);
     const INTERVAL: Duration = Duration::from_secs(180);
-    let idle = now.saturating_duration_since(state.last_user_input) >= QUIET && !state.pointer_down;
+    let idle = now.saturating_duration_since(state.last_user_input) >= QUIET
+        && !state.pointer_down;
 
-    let can_integrate = state.app.as_ref().is_some_and(|app| {
-        !app.editor.is_dirty() && matches!(app.mode, AppMode::Editing) && app.conflicts.is_empty()
-    });
-    if idle && can_integrate {
-        if let Some(staged) = state.sync_ready.take() {
-            let result = if let Some(app) = state.app.as_mut() {
-                app.apply_background_sync(&staged)
-            } else {
-                return Task::none();
-            };
-            match result {
-                Ok(SyncApply::Updated) => {
-                    // Recreate only disposable rendering indices after a
-                    // remote update replaced the underlying Document data.
-                    *state.layout.borrow_mut() = layout::Layout::default();
-                    *state.markdown.borrow_mut() = markdown::Cache::default();
-                    state.next_sync_at = now + INTERVAL;
-                    return scroll_to_caret(state);
-                }
-                Ok(SyncApply::Unchanged | SyncApply::Conflict) => {
-                    state.next_sync_at = now + INTERVAL;
-                }
-                Ok(SyncApply::Stale) => {
-                    // Local writing/checkpoint progressed since worker start.
-                    // Resnapshot after a short quiet window, never overwrite.
-                    if let Some(app) = &mut state.app {
-                        app.scheduler.sync_attempted(now);
-                    }
-                    state.next_sync_at = now + Duration::from_secs(5);
+    if state.sync_ready.is_some() {
+        let current_generation = state
+            .app
+            .as_ref()
+            .map(|app| app.scheduler.sync_generation())
+            .unwrap_or_default();
+
+        // A newer checkpoint supersedes an incoming snapshot while the
+        // editor is busy. Preserve the new pending push and redo the remote
+        // merge using the new committed base.
+        if current_generation != state.sync_started_generation {
+            state.sync_ready = None;
+            state.next_sync_at = now;
+        } else {
+            let can_integrate = state.app.as_ref().is_some_and(|app| {
+                !app.editor.is_dirty()
+                    && matches!(app.mode, AppMode::Editing)
+                    && app.conflicts.is_empty()
+            });
+            if idle && can_integrate {
+                let staged = state.sync_ready.take().expect("checked above");
+                let result = if let Some(app) = state.app.as_mut() {
+                    app.apply_background_sync(&staged)
+                } else {
                     return Task::none();
-                }
-                Err(error) => {
-                    if let Some(app) = &mut state.app {
-                        app.status = format!("Sync integration unavailable: {error}");
-                        app.scheduler.sync_attempted(now);
+                };
+                match result {
+                    Ok(SyncApply::Updated) => {
+                        state.sync_error = None;
+                        state.sync_failures = 0;
+                        *state.layout.borrow_mut() = layout::Layout::default();
+                        *state.markdown.borrow_mut() = markdown::Cache::default();
+                        state.next_sync_at = now + INTERVAL;
+                        return scroll_to_caret(state);
                     }
-                    state.next_sync_at = now + Duration::from_secs(30);
-                    return Task::none();
+                    Ok(SyncApply::Unchanged) => {
+                        state.sync_error = None;
+                        state.sync_failures = 0;
+                        state.next_sync_at = now + INTERVAL;
+                    }
+                    Ok(SyncApply::Conflict) => {
+                        state.sync_error = Some(
+                            "Conflitto Git: modifiche simultanee da risolvere".into()
+                        );
+                        state.next_sync_at = now + INTERVAL;
+                    }
+                    Ok(SyncApply::Stale) => {
+                        state.next_sync_at = now + Duration::from_secs(5);
+                    }
+                    Err(error) => {
+                        state.sync_error = Some(format!("Sync: {error}"));
+                        state.sync_failures = state.sync_failures.saturating_add(1);
+                        state.next_sync_at = now + Duration::from_secs(30);
+                    }
                 }
             }
         }
     }
 
-    if state.sync_active || state.sync_ready.is_some() || !idle {
+    if state.sync_active || state.sync_ready.is_some() {
         return Task::none();
     }
     let Some(app) = &mut state.app else {
         return Task::none();
     };
-    // A newly saved checkpoint or explicit Sync Now is processed as soon as
-    // the user is idle. A failed job must respect its retry backoff.
-    let pending = app.scheduler.is_sync_pending() && state.sync_failures == 0;
-    if now < state.next_sync_at && !pending {
+    let pending = app.scheduler.is_sync_pending();
+    if now < state.next_sync_at && (state.sync_failures > 0 || !pending) {
         return Task::none();
     }
 
-    // For this phase only local operations are permitted. In particular,
-    // checkpoint before launching a worker so it sees an immutable commit.
+    // Before starting an outbound transfer we may checkpoint a fully saved,
+    // non-provisional buffer. Otherwise publish only already committed data.
     match app.prepare_background_sync() {
         Ok(true) => {}
         Ok(false) => {
-            // For example: missing remote, provisional Document or another
-            // modal view. Do not busy-loop on sync_pending.
-            app.scheduler.sync_attempted(now);
-            state.next_sync_at = now + Duration::from_secs(15);
+            state.next_sync_at = now + INTERVAL;
+            // No remote configured is an explicit opt-out, not a failed push.
+            app.scheduler.sync_finished(app.scheduler.sync_generation(), now);
             return Task::none();
         }
         Err(error) => {
-            app.status = format!("Sync preparation unavailable: {error}");
-            app.scheduler.sync_attempted(now);
+            state.sync_error = Some(format!("Sync: {error}"));
             state.sync_failures = state.sync_failures.saturating_add(1);
             state.next_sync_at = now + Duration::from_secs(30);
             return Task::none();
         }
     }
 
+    state.sync_started_generation = app.scheduler.sync_generation();
     let root = app.archive.root().to_path_buf();
     state.sync_active = true;
     state.next_sync_at = now + INTERVAL;
@@ -381,23 +402,45 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
     match message {
         Message::SyncFinished(result) => {
             state.sync_active = false;
+            let now = Instant::now();
             match result {
-                Ok(stage) => {
-                    state.sync_failures = 0;
-                    state.sync_ready = Some(stage);
-                }
+                Ok(stage) => match stage.outcome() {
+                    // No live files need changing. Mark the published/synced
+                    // committed snapshot successful immediately, even while
+                    // typing, and keep subsequent commits queued.
+                    SyncOutcome::Synced | SyncOutcome::Published => {
+                        state.sync_error = None;
+                        state.sync_failures = 0;
+                        if let Some(app) = &mut state.app {
+                            app.scheduler.sync_finished(state.sync_started_generation, now);
+                        }
+                        state.next_sync_at = now + Duration::from_secs(180);
+                    }
+                    SyncOutcome::Conflict => {
+                        state.sync_error = Some(
+                            "Conflitto Git: modifiche concorrenti sul server".into()
+                        );
+                        if let Some(app) = &mut state.app {
+                            app.scheduler.sync_finished(state.sync_started_generation, now);
+                        }
+                        state.next_sync_at = now + Duration::from_secs(180);
+                    }
+                    _ => {
+                        // The worker downloaded/merged data. Wait until the
+                        // editor is safe before updating the live Archive.
+                        state.sync_ready = Some(stage);
+                    }
+                },
                 Err(error) => {
+                    state.sync_error = Some(format!("Push/pull Git fallito: {error}"));
                     state.sync_failures = state.sync_failures.saturating_add(1);
                     let delay = 30_u64.saturating_mul(1_u64 << state.sync_failures.min(4));
-                    state.next_sync_at = Instant::now() + Duration::from_secs(delay);
-                    if let Some(app) = &mut state.app {
-                        app.scheduler.sync_attempted(Instant::now());
-                        app.status =
-                            format!("Automatic sync unavailable; retry scheduled: {error}");
-                    }
+                    state.next_sync_at = now + Duration::from_secs(delay);
+                    // Crucially, do not acknowledge sync_pending after failure.
+                    // It must remain queued through all retry attempts.
                 }
             }
-            return service_tick(state, Instant::now());
+            return service_tick(state, now);
         }
         Message::Scrolled(offset) => {
             // Native wheel and scrollbar position remains the source of truth.
