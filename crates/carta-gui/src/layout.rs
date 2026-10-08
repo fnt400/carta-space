@@ -245,6 +245,29 @@ mod tests {
     }
 
     #[test]
+    fn indexing_many_documents_does_not_increase_visible_render_work() {
+        let mut layout = Layout::default();
+        for _ in 0..20_000 {
+            layout.docs.push(DocumentRows {
+                starts: vec![0, 12, 24],
+                start: 0,
+                content_start: 0,
+                prefix: 3,
+                locked: false,
+                generation: 1,
+                content_version: 0,
+            });
+        }
+        layout.recalculate_starts();
+        assert_eq!(layout.total_rows(), 120_000);
+        let (first, last) = layout.window(1_200_000.0, 720.0, 22.0, 480.0);
+        assert!(last - first < 120, "the rendered row count cannot scale with Document count");
+        assert!(first > 0 && last < layout.total_rows());
+        // Rebuilding the virtual total uses only the cached number of rows,
+        // not the source text itself.
+    }
+
+    #[test]
     fn stable_window_size_is_independent_of_archive_length() {
         let layout = Layout { total_rows: 1_000_000, ..Layout::default() };
         let (first, last) = layout.window(640_000.0, 800.0, 22.0, 500.0);
