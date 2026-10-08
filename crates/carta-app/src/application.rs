@@ -1347,13 +1347,11 @@ impl App {
                 false
             }
             Action::DocumentStart => {
-                self.editor.document_home(false);
-                self.cat_navigation();
+                self.leap_to_document_edge(false);
                 false
             }
             Action::DocumentEnd => {
-                self.editor.document_end(false);
-                self.cat_navigation();
+                self.leap_to_document_edge(true);
                 false
             }
             Action::BeginLeap(direction) => {
@@ -1972,6 +1970,26 @@ impl App {
             return false;
         };
         self.leap_to_cursor(direction, destination, preserve_anchor)
+    }
+
+    /// HOME and END are structural LEAP movements, even without a held LEAP
+    /// key. Preserve the Cat selection anchor and existing highlight behavior.
+    fn leap_to_document_edge(&mut self, end: bool) {
+        let origin = self.editor.cursor();
+        let Some(region) = self.editor.regions().get(origin.region) else {
+            return;
+        };
+        let destination = Cursor {
+            region: origin.region,
+            byte: if end { region.text.len() } else { 0 },
+        };
+        let direction = if end {
+            LeapDirection::Forward
+        } else {
+            LeapDirection::Backward
+        };
+        self.remember_structural_leap(StructuralLeap::DocumentBoundary);
+        self.leap_to_cursor(direction, destination, false);
     }
 
     pub fn leap_document_boundary(&mut self, direction: LeapDirection) {
