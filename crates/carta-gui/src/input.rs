@@ -1,6 +1,6 @@
 use carta_app::{Action, App, AppMode, Command, ModeAction, View};
 use carta_core::LeapDirection;
-use iced::keyboard::key::{Code, Physical};
+use iced::keyboard::key::{Code, Key, Physical};
 use iced::keyboard::Event as KeyboardEvent;
 use std::time::Instant;
 
@@ -48,19 +48,36 @@ fn right_control_intent(code: Code) -> Option<RightControlIntent> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClipboardRequest {
+    Read,
+    Write(String),
+}
+
 #[derive(Debug, Default)]
 pub struct GuiInputState {
     pending_leap: Option<PendingLeap>,
     active_leap: Option<PendingLeap>,
     suppressed_leap_releases: u8,
     right_control_held: bool,
+    clipboard_request: Option<ClipboardRequest>,
 }
 
 impl GuiInputState {
-    pub fn handle(&mut self, app: &mut App, event: KeyboardEvent) -> carta_app::AppResult {
+    pub fn take_clipboard_request(&mut self) -> Option<ClipboardRequest> {
+        self.clipboard_request.take()
+    }
+
+    pub fn handle(
+        &mut self,
+        app: &mut App,
+        event: KeyboardEvent,
+        columns: usize,
+    ) -> carta_app::AppResult {
         match event {
             KeyboardEvent::KeyPressed {
                 physical_key,
+                modified_key,
                 text,
                 repeat,
                 ..
@@ -83,7 +100,11 @@ impl GuiInputState {
                 }
 
                 self.activate_pending(app);
-                self.handle_key_press(app, code, text.as_deref())?;
+                let is_backward = self.active_leap.is_some_and(|leap| {
+                    leap.direction == LeapDirection::Backward
+                });
+                let fallback = leap_query_text(text.as_deref(), &modified_key, is_backward);
+                self.handle_key_press(app, code, fallback.as_deref(), columns)?;
             }
             KeyboardEvent::KeyReleased { physical_key, .. } => {
                 let Physical::Code(code) = physical_key else {
@@ -143,7 +164,9 @@ impl GuiInputState {
             if pending.code != code {
                 self.pending_leap = None;
                 self.suppressed_leap_releases = 2;
-                app.extend_last_leap_highlight();
+                if app.extend_last_leap_highlight() {
+                    self.clipboard_request = app.editor.selected_text().map(ClipboardRequest::Write);
+                }
             }
             return true;
         }
@@ -188,6 +211,7 @@ impl GuiInputState {
         app: &mut App,
         code: Code,
         text: Option<&str>,
+        columns: usize,
     ) -> carta_app::AppResult {
         if self.right_control_held && self.handle_right_control_chord(app, code)? {
             return Ok(());
@@ -267,6 +291,11 @@ impl GuiInputState {
             }
             Code::Delete if !in_leap => {
                 app.dispatch_action(Action::Erase, Instant::now());
+                return Ok(());
+            }
+            Code::ArrowUp | Code::ArrowDown if !in_leap => {
+                app.editor.move_visual(code == Code::ArrowDown, columns, false);
+                app.cat_navigation();
                 return Ok(());
             }
             Code::ArrowLeft if !in_leap => {
@@ -353,7 +382,7 @@ impl GuiInputState {
                 if app.editor.cat_highlight().is_some() {
                     app.copy_cat_highlight();
                 } else {
-                    app.status = "System clipboard paste is not yet available in carta-gui".into();
+                    self.clipboard_request = Some(ClipboardRequest::Read);
                 }
             }
             RightControlIntent::PreviousDocument if editing && editable_view => {
@@ -459,6 +488,22 @@ impl GuiInputState {
     }
 }
 
+/// Winit may suppress the typed text when Left Control is held. The
+/// modified logical key retains the user's keyboard layout and Shift state,
+/// unlike converting physical key codes to hard-coded US characters.
+fn leap_query_text(text: Option<&str>, key: &Key, backward: bool) -> Option<String> {
+    if backward {
+        if let Key::Character(character) = key {
+            let value = character.as_str();
+            if !value.is_empty() && !value.chars().any(char::is_control) {
+                return Some(value.to_owned());
+            }
+        }
+    }
+    text.filter(|value| !value.is_empty() && !value.chars().any(char::is_control))
+        .map(str::to_owned)
+}
+
 fn is_neutral_modifier(code: Code) -> bool {
     matches!(code, Code::ShiftLeft | Code::ShiftRight | Code::AltRight)
 }
@@ -466,6 +511,14 @@ fn is_neutral_modifier(code: Code) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn backward_leap_recovers_modified_key_when_control_suppresses_text() {
+        assert_eq!(leap_query_text(None, &Key::Character("é".into()), true), Some("é".into()));
+        assert_eq!(leap_query_text(Some("\u{1}"), &Key::Character("A".into()), true), Some("A".into()));
+        assert_eq!(leap_query_text(None, &Key::Character("a".into()), false), None);
+        assert_eq!(leap_query_text(Some("à"), &Key::Character("a".into()), false), Some("à".into()));
+    }
 
     #[test]
     fn right_control_chords_match_the_interaction_contract() {
