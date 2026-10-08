@@ -17,8 +17,8 @@ pub struct Segment<'a> {
 /// Splits a UTF-8 document into text, selection and caret spans.
 ///
 /// The caret is a zero-width position in the application model; the GUI
-/// paints the character at that position without inserting a glyph into the text. The returned text spans reconstruct
-/// the original document byte-for-byte, including embedded newlines.
+/// paints the character at that position without inserting a glyph into the text.
+/// All returned spans reconstruct the original document, including embedded newlines.
 pub fn segments(text: &str, cursor: usize, selection: Option<(usize, usize)>) -> Vec<Segment<'_>> {
     let cursor = boundary_at_or_before(text, cursor);
     let selection = selection.and_then(|(start, end)| {
@@ -108,7 +108,6 @@ mod tests {
         assert_eq!(
             spans
                 .iter()
-                .filter(|s| s.kind != SegmentKind::Caret)
                 .map(|s| s.content)
                 .collect::<String>(),
             text
@@ -120,6 +119,16 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn newline_caret_keeps_original_line_break() {
+        let spans = segments("first\nsecond", 5, None);
+        assert_eq!(
+            spans.iter().find(|s| s.kind == SegmentKind::Caret).unwrap().content,
+            "\n"
+        );
+        assert_eq!(spans.iter().map(|s| s.content).collect::<String>(), "first\nsecond");
     }
 
     #[test]
