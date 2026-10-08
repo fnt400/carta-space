@@ -216,7 +216,9 @@ impl StagedSync {
         let clone = clone_path.to_string_lossy();
         crate::history::git_output(
             archive.root(), "import staged background sync result",
-            &["fetch", "--quiet", "--no-tags", "--", clone.as_ref(), "refs/heads/carta"],
+            // The staging clone retains the local Archive's branch name, which
+            // need not be "carta". Always import its pinned checked-out HEAD.
+            &["fetch", "--quiet", "--no-tags", "--", clone.as_ref(), "HEAD"],
         )?;
         let fetched = git_text(archive.root(), "verify staged background sync result", &[
             "rev-parse", "--verify", "FETCH_HEAD",
