@@ -72,14 +72,12 @@ pub fn caret_row(app: &App, width: usize) -> usize {
 }
 
 pub fn scroll_offset(app: &App, window_width: f32, window_height: f32) -> f32 {
-    let height = writing_area_height(window_height);
+    let _ = window_height; // Padding tracks the viewport height in the widget.
     let row = caret_row(app, columns(window_width)) as f32;
-    // Virtual space before the first and after the last authored line lets
-    // the writing point stay at two thirds even at document boundaries.
-    let top_space = height * (2.0 / 3.0);
-    (top_space + VERTICAL_PADDING + row * LINE_HEIGHT
-        - height * (2.0 / 3.0))
-        .max(0.0)
+    // The scrollable begins with a virtual top spacer at two-thirds viewport
+    // height. Remove the row's physical displacement, leaving that spacer
+    // as the writing position on screen (including at document boundaries).
+    (VERTICAL_PADDING + row * LINE_HEIGHT).max(0.0)
 }
 
 #[cfg(test)]
