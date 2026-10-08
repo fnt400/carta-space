@@ -65,8 +65,8 @@ CARTA_GUI_PROFILE=1 cargo run --release --manifest-path crates/carta-gui/Cargo.t
 ```
 
 Every 15 seconds of reported activity, the GUI prints anonymized timing
-counts, average and worst times (milliseconds) for `view` widget construction,
-`scroll` row calculations and `maintenance` handling. It never prints archive
+counts, average and worst times (milliseconds) for `input` dispatch,
+`view` widget construction, `scroll` row calculations and `maintenance` handling. It never prints archive
 text, names, paths, search queries or keys. There is no profiling overhead
 unless the environment flag is enabled.
 
