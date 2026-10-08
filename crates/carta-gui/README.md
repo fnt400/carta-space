@@ -32,6 +32,8 @@ The editor paints the character at the logical caret without inserting fake Unic
 
 ### GUI interactions and persistence
 
+PageUp/PageDown move to the beginning of the preceding/following Document without wrapping. Like Home/End, these are structural LEAP movements (also while holding a physical LEAP key). Collapse View renders only the first three **visual** rows of each Document, with separators intact. The status bar keeps a view-specific color: neutral gray for Creation Date, blue for Modification Date, and each Work's stored accent with automatically selected contrasting text. Navigation and mode/collapse transitions re-anchor the writing window on the caret.
+
 The source remains Markdown; syntax color applies to the source text and
 delimiters. Selection and the Cat caret take precedence over syntax colors.
 Only the editor writing font is zoomed; modal/status typography remains fixed.

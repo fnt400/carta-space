@@ -361,6 +361,11 @@ fn leap_line(app: &App) -> Option<Element<'_, Message>> {
 fn status_bar<'a>(app: &App, mode: ThemeMode, sync_error: Option<&'a str>) -> Element<'a, Message> {
     let failed = sync_error.is_some();
     let status = app.status_bar();
+    let (background, foreground) = if failed {
+        (sync_error_background(mode), color!(0xFFFFFF))
+    } else {
+        status_palette(app, mode)
+    };
     let right = text(status.right).font(IOSEVKA).size(STATUS_SIZE);
     let left = if let Some(error) = sync_error {
         // Keep the error persistent, independently of expiring App statuses.
@@ -383,16 +388,8 @@ fn status_bar<'a>(app: &App, mode: ThemeMode, sync_error: Option<&'a str>) -> El
         .width(Length::Fill)
         .style(move |_| {
             iced::widget::container::Style::default()
-                .background(if failed {
-                    sync_error_background(mode)
-                } else {
-                    status_background(mode)
-                })
-                .color(if failed {
-                    color!(0xFFFFFF)
-                } else {
-                    status_foreground(mode)
-                })
+                .background(background)
+                .color(foreground)
         })
         .into()
 }
@@ -562,6 +559,60 @@ fn status_background(mode: ThemeMode) -> Color {
     }
 }
 
+fn status_palette(app: &App, mode: ThemeMode) -> (Color, Color) {
+    match &app.view {
+        View::ModificationDate => {
+            let background = color!(0x315EAB);
+            (background, readable_status_text(background))
+        }
+        View::Work(id) => {
+            let background = app
+                .archive
+                .work(*id)
+                .and_then(|work| work.color())
+                .and_then(parse_status_hex)
+                .unwrap_or_else(|| status_background(mode));
+            (background, readable_status_text(background))
+        }
+        _ => (status_background(mode), status_foreground(mode)),
+    }
+}
+
+fn parse_status_hex(value: &str) -> Option<Color> {
+    let hex = value.strip_prefix('#')?;
+    if hex.len() != 6 {
+        return None;
+    }
+    let red = u8::from_str_radix(&hex[..2], 16).ok()?;
+    let green = u8::from_str_radix(&hex[2..4], 16).ok()?;
+    let blue = u8::from_str_radix(&hex[4..6], 16).ok()?;
+    Some(Color {
+        r: f32::from(red) / 255.0,
+        g: f32::from(green) / 255.0,
+        b: f32::from(blue) / 255.0,
+        a: 1.0,
+    })
+}
+
+fn status_luminance(color: Color) -> f32 {
+    fn linear(value: f32) -> f32 {
+        if value <= 0.04045 {
+            value / 12.92
+        } else {
+            ((value + 0.055) / 1.055).powf(2.4)
+        }
+    }
+    0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b)
+}
+
+fn readable_status_text(background: Color) -> Color {
+    if status_luminance(background) > 0.179 {
+        color!(0x000000)
+    } else {
+        color!(0xFFFFFF)
+    }
+}
+
 fn sync_error_background(mode: ThemeMode) -> Color {
     match mode {
         ThemeMode::Light => color!(0xB42318),
@@ -602,6 +653,23 @@ mod tests {
             assert!(red.r > red.b * 1.5);
             assert_ne!(red, status_background(mode));
         }
+    }
+
+    #[test]
+    fn work_accent_foreground_meets_wcag_aa_contrast() {
+        for hex in ["#236B61", "#3F5794", "#B5B9A4", "#FFFFFF", "#000000"] {
+            let background = parse_status_hex(hex).expect("valid stored accent");
+            let foreground = readable_status_text(background);
+            let luminance = status_luminance(background);
+            let contrast = if foreground == color!(0x000000) {
+                (luminance + 0.05) / 0.05
+            } else {
+                1.05 / (luminance + 0.05)
+            };
+            assert!(contrast >= 4.5, "{hex} contrast {contrast}");
+        }
+        assert!(parse_status_hex("#xyzxyz").is_none());
+        assert_ne!(color!(0x315EAB), status_background(ThemeMode::Dark));
     }
 
     #[test]

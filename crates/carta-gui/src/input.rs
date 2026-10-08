@@ -262,10 +262,10 @@ impl GuiInputState {
         if app.collapsed && matches!(app.mode, AppMode::Editing) {
             match code {
                 Code::ArrowUp | Code::PageUp => {
-                    app.dispatch_action(Action::PreviousDocument, Instant::now());
+                    app.leap_document_start(LeapDirection::Backward);
                 }
                 Code::ArrowDown | Code::PageDown => {
-                    app.dispatch_action(Action::NextDocument, Instant::now());
+                    app.leap_document_start(LeapDirection::Forward);
                 }
                 Code::Enter | Code::NumpadEnter => {
                     app.execute(carta_app::Command::ExpandView)?;
@@ -315,6 +315,18 @@ impl GuiInputState {
             }
             Code::ArrowRight if !in_leap => {
                 app.dispatch_action(Action::MoveCharacterForward, Instant::now());
+                return Ok(());
+            }
+            Code::PageUp | Code::PageDown => {
+                // Page keys are structural LEAP targets, including with a held LEAP.
+                if in_leap {
+                    app.end_leap();
+                }
+                app.leap_document_start(if code == Code::PageUp {
+                    LeapDirection::Backward
+                } else {
+                    LeapDirection::Forward
+                });
                 return Ok(());
             }
             Code::Home => {
@@ -409,10 +421,10 @@ impl GuiInputState {
                 }
             }
             RightControlIntent::PreviousDocument if editing && editable_view => {
-                app.dispatch_action(Action::PreviousDocument, Instant::now());
+                app.leap_document_start(LeapDirection::Backward);
             }
             RightControlIntent::NextDocument if editing && editable_view => {
-                app.dispatch_action(Action::NextDocument, Instant::now());
+                app.leap_document_start(LeapDirection::Forward);
             }
             RightControlIntent::DocumentStart if editing && editable_view => {
                 app.dispatch_action(Action::DocumentStart, Instant::now());

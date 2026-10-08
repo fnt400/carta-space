@@ -767,7 +767,9 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
     }
     let before_cursor = app.editor.cursor();
     let before_region_count = app.editor.regions().len();
-    let before_view = std::mem::discriminant(&app.view);
+    let before_view = app.view.clone();
+    let before_collapsed = app.collapsed;
+    let before_mode = std::mem::discriminant(&app.mode);
     let mut clipboard = Task::none();
     let mut zoomed = false;
     let result = match message {
@@ -801,7 +803,9 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
         || (keyboard_event
             && (app.editor.cursor() != before_cursor
                 || app.editor.regions().len() != before_region_count
-                || std::mem::discriminant(&app.view) != before_view));
+                || app.view != before_view
+                || app.collapsed != before_collapsed
+                || std::mem::discriminant(&app.mode) != before_mode));
     if app.quit {
         finish_remote_quit(state)
     } else {

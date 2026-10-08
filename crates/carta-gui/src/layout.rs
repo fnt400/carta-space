@@ -37,6 +37,7 @@ pub struct Layout {
     editor_revision: u64,
     columns: usize,
     view_kind: u8,
+    collapsed: bool,
     docs: Vec<DocumentRows>,
     indices: HashMap<DocumentId, usize>,
     totals: RowTotals,
@@ -128,6 +129,14 @@ fn row_starts(text: &str, width: usize) -> Vec<usize> {
         .collect()
 }
 
+fn displayed_rows(rows: usize, collapsed: bool) -> usize {
+    if collapsed {
+        rows.min(3)
+    } else {
+        rows
+    }
+}
+
 impl Layout {
     fn next_generation(&mut self) -> u64 {
         self.serial = self.serial.wrapping_add(1);
@@ -142,7 +151,8 @@ impl Layout {
         let rebuild = self.editor_ptr != ptr
             || self.region_count != regions.len()
             || self.columns != columns
-            || self.view_kind != kind;
+            || self.view_kind != kind
+            || self.collapsed != app.collapsed;
 
         if !rebuild && self.editor_revision == revision {
             return;
@@ -168,7 +178,11 @@ impl Layout {
                 self.indices.insert(region.document, i);
             }
             self.totals
-                .reset(self.docs.iter().map(|doc| doc.prefix + doc.starts.len()));
+                .reset(
+                    self.docs
+                        .iter()
+                        .map(|doc| doc.prefix + displayed_rows(doc.starts.len(), app.collapsed)),
+                );
         } else {
             // Editing a Document invalidates its rows, not all other Documents.
             // Dirty IDs are supplied by the canonical editor. The current
@@ -184,8 +198,8 @@ impl Layout {
                     }
                     let generation = self.next_generation();
                     let new_rows = row_starts(&regions[index].text, columns);
-                    let previous = self.docs[index].starts.len() as i64;
-                    let updated = new_rows.len() as i64;
+                    let previous = displayed_rows(self.docs[index].starts.len(), app.collapsed) as i64;
+                    let updated = displayed_rows(new_rows.len(), app.collapsed) as i64;
                     self.docs[index].starts = new_rows;
                     self.docs[index].generation = generation;
                     self.docs[index].content_version = version;
@@ -199,6 +213,7 @@ impl Layout {
         self.editor_revision = revision;
         self.columns = columns;
         self.view_kind = kind;
+        self.collapsed = app.collapsed;
     }
 
     pub fn total_rows(&self) -> usize {
@@ -219,7 +234,9 @@ impl Layout {
         let visual_row = starts
             .partition_point(|&start| start <= byte)
             .saturating_sub(1);
-        self.totals.prefix(cursor.region) + doc.prefix + visual_row
+        self.totals.prefix(cursor.region)
+            + doc.prefix
+            + visual_row.min(displayed_rows(starts.len(), self.collapsed).saturating_sub(1))
     }
 
     pub fn row(&self, app: &App, row: usize) -> Option<Row> {
@@ -241,6 +258,8 @@ impl Layout {
         }
 
         let visual = local - doc.prefix;
+        // Keep the following row boundary even when only three rows are
+        // shown: the third row must not absorb the hidden Document tail.
         let start = doc.starts[visual];
         let text = &app.editor.regions()[index].text;
         let next = doc.starts.get(visual + 1).copied().unwrap_or(text.len());
@@ -311,6 +330,20 @@ mod tests {
         assert_eq!(row_starts("", 10), vec![0]);
         assert_eq!(row_starts("one two three", 7), vec![0, 4, 8]);
         assert_eq!(row_starts("prima éé dopo", 8), vec![0, 6]);
+    }
+
+    #[test]
+    fn collapsed_documents_show_only_first_three_visual_rows() {
+        let text = "first\nsecond\nthird\nfourth\n";
+        let starts = row_starts(text, 80);
+        assert!(starts.len() > 3);
+        assert_eq!(displayed_rows(starts.len(), true), 3);
+        assert_eq!(displayed_rows(starts.len(), false), starts.len());
+        assert_eq!(&text[starts[2]..starts[3]], "third\n");
+
+        let wrapped = row_starts("one two three four five six seven eight", 6);
+        assert!(wrapped.len() > 3);
+        assert_eq!(displayed_rows(wrapped.len(), true), 3);
     }
 
     #[test]
