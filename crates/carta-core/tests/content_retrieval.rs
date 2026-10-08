@@ -218,9 +218,8 @@ fn archive_search_is_literal_grouped_contextual_and_newest_first() {
     // rapid test fixtures. Assert the documented ordering by (created, ID),
     // not the BTreeMap iteration order (which only sorts by ID).
     let mut expected = [first, second, third];
-    expected.sort_by_key(|id| {
-        std::cmp::Reverse((archive.document_info(*id).unwrap().created(), *id))
-    });
+    expected
+        .sort_by_key(|id| std::cmp::Reverse((archive.document_info(*id).unwrap().created(), *id)));
     let actual: Vec<_> = results.iter().map(|result| result.document()).collect();
     assert_eq!(actual, expected);
 
