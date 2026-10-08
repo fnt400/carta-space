@@ -104,7 +104,7 @@ fn editor_spans<'a>(app: &'a App, mode: ThemeMode) -> Vec<iced::widget::text::Sp
                             .font(IOSEVKA)
                             .background(selection_background(mode))
                             .color(selection_foreground(mode)),
-                        SegmentKind::Caret => span("▯▯").font(IOSEVKA).color(caret_color(mode)),
+                        SegmentKind::Caret => span("□□").font(IOSEVKA).color(caret_color(mode)),
                     }),
             );
         } else {
@@ -113,7 +113,7 @@ fn editor_spans<'a>(app: &'a App, mode: ThemeMode) -> Vec<iced::widget::text::Sp
     }
 
     if spans.is_empty() {
-        spans.push(span("▯▯").font(IOSEVKA).color(caret_color(mode)));
+        spans.push(span("□□").font(IOSEVKA).color(caret_color(mode)));
     }
 
     spans
@@ -304,7 +304,7 @@ fn with_caret(input: &str, cursor: usize) -> String {
         cursor -= 1;
     }
     let mut value = input.to_owned();
-    value.insert_str(cursor, "▯▯");
+    value.insert_str(cursor, "□□");
     value
 }
 
@@ -370,8 +370,8 @@ mod tests {
 
     #[test]
     fn prompt_caret_is_utf8_safe() {
-        assert_eq!(with_caret("caffè", 4), "caff▯▯è");
-        assert_eq!(with_caret("é", 1), "▯▯é");
-        assert_eq!(with_caret("é", 2), "é▯▯");
+        assert_eq!(with_caret("caffè", 4), "caff□□è");
+        assert_eq!(with_caret("é", 1), "□□é");
+        assert_eq!(with_caret("é", 2), "é□□");
     }
 }
