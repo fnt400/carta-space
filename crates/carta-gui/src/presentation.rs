@@ -17,7 +17,7 @@ pub struct Segment<'a> {
 /// Splits a UTF-8 document into text, selection and caret spans.
 ///
 /// The caret is a zero-width position in the application model; the GUI
-/// represents it with a dedicated glyph. The returned text spans reconstruct
+/// paints the character at that position without inserting a glyph into the text. The returned text spans reconstruct
 /// the original document byte-for-byte, including embedded newlines.
 pub fn segments(text: &str, cursor: usize, selection: Option<(usize, usize)>) -> Vec<Segment<'_>> {
     let cursor = boundary_at_or_before(text, cursor);
@@ -33,7 +33,13 @@ pub fn segments(text: &str, cursor: usize, selection: Option<(usize, usize)>) ->
         }
     });
 
-    let mut boundaries = vec![0, cursor, text.len()];
+    // Paint the character at the insertion point instead of inserting a cursor
+    // glyph into the text flow (which would move all subsequent characters).
+    let caret_end = text[cursor..]
+        .chars()
+        .next()
+        .map_or(cursor, |ch| cursor + ch.len_utf8());
+    let mut boundaries = vec![0, cursor, caret_end, text.len()];
     if let Some((start, end)) = selection {
         boundaries.extend([start, end]);
     }
@@ -44,15 +50,11 @@ pub fn segments(text: &str, cursor: usize, selection: Option<(usize, usize)>) ->
     for pair in boundaries.windows(2) {
         let start = pair[0];
         let end = pair[1];
-        if start == cursor {
-            result.push(Segment {
-                content: "",
-                kind: SegmentKind::Caret,
-            });
-        }
         result.push(Segment {
             content: &text[start..end],
-            kind: if selection.is_some_and(|(a, b)| start >= a && end <= b) {
+            kind: if start == cursor {
+                SegmentKind::Caret
+            } else if selection.is_some_and(|(a, b)| start >= a && end <= b) {
                 SegmentKind::Selection
             } else {
                 SegmentKind::Text
@@ -118,6 +120,15 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn caret_uses_original_character_without_shifting_following_text() {
+        let original = "abè文z";
+        let result = segments(original, 2, None);
+        assert_eq!(result.iter().filter(|s| s.kind == SegmentKind::Caret).count(), 1);
+        assert_eq!(result.iter().find(|s| s.kind == SegmentKind::Caret).unwrap().content, "è");
+        assert_eq!(result.iter().map(|s| s.content).collect::<String>(), original);
     }
 
     #[test]
