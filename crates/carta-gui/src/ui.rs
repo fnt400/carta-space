@@ -264,9 +264,7 @@ fn modal_overlay(app: &App, mode: ThemeMode) -> Option<Element<'_, Message>> {
                 .color(color!(0xFF7777)),]
             .spacing(7);
             for detail in details {
-                content = content.push(
-                    text(detail).font(IOSEVKA).size(STATUS_SIZE),
-                );
+                content = content.push(text(detail).font(IOSEVKA).size(STATUS_SIZE));
             }
             content = content.push(
                 text("Press y to confirm; n or Esc to cancel.")
