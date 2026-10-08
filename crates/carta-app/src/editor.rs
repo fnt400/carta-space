@@ -804,7 +804,9 @@ impl CompositeEditor {
                 .find(|region| region.document == state.document)
             {
                 region.text = state.text;
-                self.dirty_documents.insert(state.document);
+                // Undo/redo replaces a Document without calling changed().
+                // Frontend row and syntax projections must be invalidated too.
+                self.mark_document_dirty(state.document);
             }
         }
         self.cursor = snapshot.cursor;
