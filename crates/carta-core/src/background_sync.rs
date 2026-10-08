@@ -6,6 +6,8 @@
 //! clean, the live working tree is clean and its HEAD still matches the base.
 //! Never use this as a generic concurrent git-sync of the live worktree.
 use crate::{Archive, Error, SyncOutcome};
+use carta_format::ArchiveMetadata;
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
@@ -90,21 +92,43 @@ pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
     if remote_head == Some(base_head.as_str()) {
         return Ok(simple_stage(source, remote, base_head, SyncOutcome::Synced));
     }
-    // Git's non-force push rejects stale remote heads and concurrently
-    // advanced branches. Retrying through the merge path is then safe.
-    let refspec = format!("{base_head}:refs/heads/carta");
-    let pushed = Command::new("git")
-        .current_dir(&source)
-        .args(["push", "--quiet", "carta-sync", &refspec])
-        .output()
-        .map_err(|error| Error::io(&source, error))?;
-    if pushed.status.success() {
-        return Ok(simple_stage(
-            source,
-            remote,
-            base_head,
-            SyncOutcome::Published,
-        ));
+    // The ordinary Archive::sync path validates Archive IDs before a
+    // nonempty-remote push. The fast path must preserve that invariant.
+    // When the remote commit is unknown locally, do not push optimistically:
+    // use the isolated clone and the existing validated merge path instead.
+    let can_fast_push = match remote_head {
+        Some(remote_commit) => {
+            let object = format!("{remote_commit}^{{commit}}");
+            let present = Command::new("git")
+                .current_dir(&source)
+                .args(["cat-file", "-e", &object])
+                .status()
+                .map_err(|error| Error::io(&source, error))?
+                .success();
+            if present {
+                validate_committed_archive_ids(&source, &base_head, remote_commit)?;
+            }
+            present
+        }
+        None => true, // Truly empty remote; no existing Archive to replace.
+    };
+    if can_fast_push {
+        // Git's non-force push rejects stale remote heads and concurrently
+        // advanced branches. Retrying through the merge path is then safe.
+        let refspec = format!("{base_head}:refs/heads/carta");
+        let pushed = Command::new("git")
+            .current_dir(&source)
+            .args(["push", "--quiet", "carta-sync", &refspec])
+            .output()
+            .map_err(|error| Error::io(&source, error))?;
+        if pushed.status.success() {
+            return Ok(simple_stage(
+                source,
+                remote,
+                base_head,
+                SyncOutcome::Published,
+            ));
+        }
     }
 
     // tempfile creates the staging directory with owner-only access (0700
@@ -160,6 +184,34 @@ pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
             clone: Some(clone),
         }),
     })
+}
+
+/// Validate the immutable source and remote Git objects before a fast push.
+/// This function never reads mutable working files or changes Git refs.
+fn validate_committed_archive_ids(
+    source: &Path,
+    local_head: &str,
+    remote_head: &str,
+) -> Result<(), Error> {
+    let read = |commit: &str| -> Result<ArchiveMetadata, Error> {
+        let object = format!("{commit}:carta.json");
+        let output = crate::history::git_output(
+            source,
+            "read committed Archive identity",
+            &["show", &object],
+        )?;
+        ArchiveMetadata::read_from(Cursor::new(output.stdout))
+            .map_err(|error| Error::InvalidSyncRemote(error.to_string()))
+    };
+    let local = read(local_head)?.archive_id();
+    let remote = read(remote_head)?.archive_id();
+    if local != remote {
+        return Err(Error::SyncArchiveMismatch {
+            local: local.to_string(),
+            remote: remote.to_string(),
+        });
+    }
+    Ok(())
 }
 
 fn simple_stage(
