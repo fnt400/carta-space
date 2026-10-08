@@ -11,6 +11,7 @@ pub mod help;
 pub mod mode;
 pub mod palette;
 pub mod session;
+pub mod status;
 pub mod view;
 
 pub use action::Action;
@@ -19,4 +20,5 @@ pub use editor::{CompositeEditor, Cursor, Region};
 pub use help::HelpKind;
 pub use mode::{AppMode, Choice, ConfirmAction, ModeAction, PromptAction, ResultRow, SelectAction};
 pub use session::{Position, SavedView, Session};
+pub use status::StatusBar;
 pub use view::{Scheduler, View};
