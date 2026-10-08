@@ -1,5 +1,5 @@
 name: One-time background sync verification
-# Re-run after correcting local branch and bare-repository assumptions.
+# Re-run after correcting staged fetch for archives with non-carta local branches.
 on:
   push:
     branches: [opencode/v0.2]
