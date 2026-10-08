@@ -3480,6 +3480,34 @@ mod tests {
     use super::*;
 
     #[test]
+    fn home_end_create_cat_leap_span_without_changing_document_text() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let document = archive.create_document("alpha beta").unwrap();
+        archive
+            .checkpoint(CheckpointKind::Structural, Some("Initial document"))
+            .unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let region = app
+            .editor
+            .regions()
+            .iter()
+            .position(|region| region.document == document)
+            .unwrap();
+        app.editor.set_cursor(Cursor { region, byte: 5 }, false);
+        app.dispatch_action(Action::DocumentStart, Instant::now());
+        assert_eq!(app.editor.cursor(), Cursor { region, byte: 0 });
+        assert!(app.last_leap_span.is_some());
+        app.dispatch_action(Action::DocumentEnd, Instant::now());
+        assert_eq!(
+            app.editor.cursor().byte,
+            app.editor.regions()[region].text.len()
+        );
+        assert!(app.last_leap_span.is_some());
+        assert_eq!(app.editor.regions()[region].text, "alpha beta");
+    }
+
+    #[test]
     fn palette_commands_go_to_start_and_end_of_view() {
         let temporary = tempfile::tempdir().unwrap();
         let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
