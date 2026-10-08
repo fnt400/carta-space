@@ -87,7 +87,11 @@ impl Gui {
             pointer: None,
             pointer_down: false,
         };
-        let Some(path) = env::args_os().nth(1).map(PathBuf::from) else {
+        let Some(path) = env::args_os()
+            .nth(1)
+            .map(PathBuf::from)
+            .or_else(|| session::default_archive_path().ok())
+        else {
             return missing();
         };
 
