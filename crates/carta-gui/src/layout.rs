@@ -309,6 +309,8 @@ mod tests {
         assert_eq!(row_starts("abc\ndef", 3), vec![0, 4]);
         assert_eq!(row_starts("abc\n", 20), vec![0, 4]);
         assert_eq!(row_starts("", 10), vec![0]);
+        assert_eq!(row_starts("one two three", 7), vec![0, 4, 8]);
+        assert_eq!(row_starts("prima éé dopo", 8), vec![0, 6]);
     }
 
     #[test]
