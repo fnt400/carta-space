@@ -297,6 +297,9 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
                 Ok(SyncApply::Stale) => {
                     // Local writing/checkpoint progressed since worker start.
                     // Resnapshot after a short quiet window, never overwrite.
+                    if let Some(app) = &mut state.app {
+                        app.scheduler.sync_attempted(now);
+                    }
                     state.next_sync_at = now + Duration::from_secs(5);
                     return Task::none();
                 }
@@ -318,7 +321,10 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
     let Some(app) = &mut state.app else {
         return Task::none();
     };
-    if now < state.next_sync_at && !app.scheduler.sync_due(now) {
+    // A newly saved checkpoint or explicit Sync Now is processed as soon as
+    // the user is idle. A failed job must respect its retry backoff.
+    let pending = app.scheduler.is_sync_pending() && state.sync_failures == 0;
+    if now < state.next_sync_at && !pending {
         return Task::none();
     }
 
@@ -327,11 +333,16 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
     match app.prepare_background_sync() {
         Ok(true) => {}
         Ok(false) => {
+            // For example: missing remote, provisional Document or another
+            // modal view. Do not busy-loop on sync_pending.
+            app.scheduler.sync_attempted(now);
             state.next_sync_at = now + Duration::from_secs(15);
             return Task::none();
         }
         Err(error) => {
             app.status = format!("Sync preparation unavailable: {error}");
+            app.scheduler.sync_attempted(now);
+            state.sync_failures = state.sync_failures.saturating_add(1);
             state.next_sync_at = now + Duration::from_secs(30);
             return Task::none();
         }
