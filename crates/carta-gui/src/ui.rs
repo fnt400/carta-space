@@ -101,7 +101,7 @@ fn editor_spans<'a>(app: &'a App, mode: ThemeMode, caret_visible: bool) -> Vec<i
                     .into_iter()
                     .flat_map(|segment| {
                         let newline_caret = segment.kind == SegmentKind::Caret
-                            && segment.content == "\\n";
+                            && segment.content == "\n";
                         let styled = match segment.kind {
                         SegmentKind::Text => span(segment.content).font(IOSEVKA),
                         SegmentKind::Selection => span(segment.content)
@@ -115,7 +115,7 @@ fn editor_spans<'a>(app: &'a App, mode: ThemeMode, caret_visible: bool) -> Vec<i
                         SegmentKind::Caret => {
                             // A newline has no printable cell, so give its caret
                             // a stable one-cell placeholder before the LF.
-                            let content = if segment.content.is_empty() || segment.content == "\\n" {
+                            let content = if segment.content.is_empty() || segment.content == "\n" {
                                 " "
                             } else {
                                 segment.content
@@ -134,7 +134,7 @@ fn editor_spans<'a>(app: &'a App, mode: ThemeMode, caret_visible: bool) -> Vec<i
                             }
                         };
                         if newline_caret {
-                            vec![styled, span("\\n").font(IOSEVKA)]
+                            vec![styled, span("\n").font(IOSEVKA)]
                         } else {
                             vec![styled]
                         }
