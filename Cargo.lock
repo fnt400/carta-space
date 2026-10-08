@@ -218,8 +218,8 @@ dependencies = [
 name = "carta-tui"
 version = "0.2.0"
 dependencies = [
- "carta-app",
  "arboard",
+ "carta-app",
  "carta-core",
  "chrono",
  "clap",
