@@ -105,6 +105,11 @@ and memory usage are core product requirements, not optional polish.
   unbounded blocking operations in the GUI event loop.
 - Avoid unnecessary periodic re-layout/re-rendering and rescanning whole
   Documents for operations that can use derived, disposable state.
+- The GUI must never submit the entire multi-Document View to a single
+  rich-text layout or rasterization pass: only a bounded visible-row window
+  is eligible for rendering. Keep the disposable row index and Markdown
+  style cache invalidated by per-Document content revisions, and preserve
+  native scroll offsets with virtual spacer heights.
 - Prefer eliminating useless work over micro-optimizations or opaque caches.
 - Evaluate graphical responsiveness using an optimized **release** build;
   debug-mode software rendering is not representative.
