@@ -1,4 +1,5 @@
 mod input;
+mod layout;
 mod markdown;
 mod profile;
 mod session;
@@ -38,6 +39,8 @@ pub(crate) struct Gui {
     pub(crate) window_size: Size,
     pub(crate) font_size: f32,
     pub(crate) markdown: RefCell<markdown::Cache>,
+    pub(crate) layout: RefCell<layout::Layout>,
+    pub(crate) scroll_y: f32,
     session_root: Option<PathBuf>,
     last_saved_session: Option<Session>,
     pointer: Option<Point>,
@@ -56,6 +59,7 @@ pub(crate) enum Message {
     PointerMoved(Point),
     PointerPressed,
     PointerReleased,
+    Scrolled(f32),
 }
 
 impl Gui {
@@ -82,6 +86,8 @@ impl Gui {
             window_size: Size::new(1024.0, 768.0),
             font_size: viewport::FONT_SIZE,
             markdown: RefCell::new(markdown::Cache::default()),
+            layout: RefCell::new(layout::Layout::default()),
+            scroll_y: 0.0,
             session_root: None,
             last_saved_session: None,
             pointer: None,
@@ -121,6 +127,8 @@ impl Gui {
             window_size: Size::new(1024.0, 768.0),
             font_size: viewport::FONT_SIZE,
             markdown: RefCell::new(markdown::Cache::default()),
+            layout: RefCell::new(layout::Layout::default()),
+            scroll_y: 0.0,
             session_root: root,
             last_saved_session: previous,
             pointer: None,
@@ -195,22 +203,46 @@ fn subscription(state: &Gui) -> Subscription<Message> {
     ])
 }
 
-fn scroll_to_caret(state: &Gui) -> Task<Message> {
-    let Some(app) = &state.app else {
-        return Task::none();
-    };
+fn scroll_to_caret(state: &mut Gui) -> Task<Message> {
+    let Some(app) = &state.app else { return Task::none(); };
     let started = profile::enabled().then(Instant::now);
-    let offset = viewport::scroll_offset(app, state.window_size.width, state.font_size);
+    let mut layout = state.layout.borrow_mut();
+    layout.sync(app, viewport::columns(state.window_size.width, state.font_size));
+    let row = layout.caret_row(app);
+    let offset = viewport::VERTICAL_PADDING + row as f32 * viewport::line_height(state.font_size);
+    drop(layout);
+    state.scroll_y = offset;
     if let Some(started) = started {
         profile::record("scroll", started);
     }
     operation::scroll_to(
         ui::EDITOR_SCROLL_ID,
-        AbsoluteOffset {
-            x: None,
-            y: Some(offset),
-        },
+        AbsoluteOffset { x: None, y: Some(offset) },
     )
+}
+
+/// Map pointer coordinates in the *rendered window* to the Archive's
+/// canonical insertion point. No scanning over preceding Documents.
+fn indexed_hit_test(
+    app: &App,
+    cache: &RefCell<layout::Layout>,
+    scroll_y: f32,
+    point: Point,
+    window: Size,
+    font_size: f32,
+) -> Option<carta_app::Cursor> {
+    let line_height = viewport::line_height(font_size);
+    let height = viewport::writing_area_height(window.height);
+    let top = height * (2.0 / 3.0) + viewport::VERTICAL_PADDING;
+    let mut layout = cache.borrow_mut();
+    layout.sync(app, viewport::columns(window.width, font_size));
+    let (first, _) = layout.window(scroll_y, height, line_height, top);
+    let row = first.saturating_add((point.y.max(0.0) / line_height) as usize);
+    let left = (window.width - window.width.min(viewport::PAGE_WIDTH)) / 2.0
+        + viewport::HORIZONTAL_PADDING;
+    let col = ((point.x - left).max(0.0) / viewport::mono_advance(font_size))
+        .round() as usize;
+    layout.hit_test(app, row, col)
 }
 
 fn normalize_clipboard(value: &str) -> String {
@@ -219,6 +251,12 @@ fn normalize_clipboard(value: &str) -> String {
 
 fn update(state: &mut Gui, message: Message) -> Task<Message> {
     match message {
+        Message::Scrolled(offset) => {
+            // Native wheel and scrollbar position remains the source of truth.
+            // Only the bounded visible-row window is recomputed.
+            state.scroll_y = offset.max(0.0);
+            return Task::none();
+        }
         Message::PointerMoved(point) => {
             state.pointer = Some(point);
             if state.pointer_down {
@@ -231,7 +269,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                         )
                     {
                         if let Some(cursor) =
-                            viewport::hit_test(app, point, state.window_size.width, state.font_size)
+                            indexed_hit_test(app, &state.layout, state.scroll_y, point, state.window_size, state.font_size)
                         {
                             if cursor != app.editor.cursor() {
                                 app.editor.set_cursor(cursor, true);
@@ -255,7 +293,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                     )
                 {
                     if let Some(cursor) =
-                        viewport::hit_test(app, point, state.window_size.width, state.font_size)
+                        indexed_hit_test(app, &state.layout, state.scroll_y, point, state.window_size, state.font_size)
                     {
                         app.cat_navigation();
                         app.editor.set_cursor(cursor, false);
