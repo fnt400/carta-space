@@ -123,7 +123,8 @@ impl Gui {
             sync_error: None,
         };
         let explicit_archive = env::args_os().nth(1);
-        let Some(path) = explicit_archive.clone()
+        let Some(path) = explicit_archive
+            .clone()
             .map(PathBuf::from)
             .or_else(|| session::default_archive_path().ok())
         else {
@@ -531,8 +532,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                 async move {
                     match tokio::task::spawn_blocking(move || {
                         if let Some(parent) = path.parent() {
-                            std::fs::create_dir_all(parent)
-                                .map_err(|error| error.to_string())?;
+                            std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
                         }
                         Archive::clone_sync_remote(&remote, &path)
                             .map(|_| ())
