@@ -1,17 +1,20 @@
 mod input;
+mod markdown;
 mod presentation;
 mod profile;
+mod session;
 mod ui;
 mod viewport;
 
 use base64::Engine as _;
-use carta_app::App;
+use carta_app::{App, AppMode, Session, View};
 use carta_core::Archive;
 use iced::event::{self, Status};
 use iced::theme::Mode as ThemeMode;
 use iced::widget::operation::{self, AbsoluteOffset};
-use iced::{system, window, Event, Font, Settings, Size, Subscription, Task, Theme};
+use iced::{system, window, Event, Font, Point, Settings, Size, Subscription, Task, Theme};
 use input::{ClipboardRequest, GuiInputState};
+use std::cell::RefCell;
 use std::env;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -34,6 +37,12 @@ pub(crate) struct Gui {
     pub(crate) error: Option<String>,
     pub(crate) theme_mode: ThemeMode,
     pub(crate) window_size: Size,
+    pub(crate) font_size: f32,
+    pub(crate) markdown: RefCell<markdown::Cache>,
+    session_root: Option<PathBuf>,
+    last_saved_session: Option<Session>,
+    pointer: Option<Point>,
+    pointer_down: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -45,6 +54,9 @@ pub(crate) enum Message {
     WindowOpened(window::Id),
     WindowSize(Size),
     PasteText(Option<String>),
+    PointerMoved(Point),
+    PointerPressed,
+    PointerReleased,
 }
 
 impl Gui {
@@ -63,37 +75,69 @@ impl Gui {
     }
 
     fn load() -> Self {
+        let missing = || Self {
+            app: None,
+            input: GuiInputState::default(),
+            error: Some("Usage: carta-gui <archive-path>".into()),
+            theme_mode: ThemeMode::Dark,
+            window_size: Size::new(1024.0, 768.0),
+            font_size: viewport::FONT_SIZE,
+            markdown: RefCell::new(markdown::Cache::default()),
+            session_root: None,
+            last_saved_session: None,
+            pointer: None,
+            pointer_down: false,
+        };
         let Some(path) = env::args_os().nth(1).map(PathBuf::from) else {
-            return Self {
-                app: None,
-                input: GuiInputState::default(),
-                error: Some("Usage: carta-gui <archive-path>".into()),
-                theme_mode: ThemeMode::Dark,
-                window_size: Size::new(1024.0, 768.0),
-            };
+            return missing();
         };
 
-        match Archive::open(&path)
+        let root = session::data_root().ok();
+        let result = Archive::open(&path)
             .map_err(|error| error.to_string())
             .and_then(|archive| {
-                App::open(archive, None, Instant::now()).map_err(|error| error.to_string())
-            }) {
-            Ok(app) => Self {
-                app: Some(app),
-                input: GuiInputState::default(),
-                error: None,
-                theme_mode: ThemeMode::Dark,
-                window_size: Size::new(1024.0, 768.0),
-            },
-            Err(error) => Self {
-                app: None,
-                input: GuiInputState::default(),
-                error: Some(error),
-                theme_mode: ThemeMode::Dark,
-                window_size: Size::new(1024.0, 768.0),
-            },
+                let previous = root.as_deref().and_then(|root| {
+                    session::load(root, archive.metadata().archive_id()).ok().flatten()
+                });
+                App::open(archive, previous.as_ref(), Instant::now())
+                    .map(|app| (app, previous))
+                    .map_err(|error| error.to_string())
+            });
+
+        let (app, error, previous) = match result {
+            Ok((app, previous)) => (Some(app), None, previous),
+            Err(error) => (None, Some(error), None),
+        };
+        Self {
+            app,
+            input: GuiInputState::default(),
+            error,
+            theme_mode: ThemeMode::Dark,
+            window_size: Size::new(1024.0, 768.0),
+            font_size: viewport::FONT_SIZE,
+            markdown: RefCell::new(markdown::Cache::default()),
+            session_root: root,
+            last_saved_session: previous,
+            pointer: None,
+            pointer_down: false,
         }
     }
+
+    fn save_session(&mut self) -> std::io::Result<()> {
+        let (Some(root), Some(app)) = (&self.session_root, &self.app) else {
+            return Ok(());
+        };
+        if app.kill_switch_triggered() {
+            return Ok(());
+        }
+        let current = app.session();
+        if self.last_saved_session.as_ref() != Some(&current) {
+            session::save(root, app.archive.metadata().archive_id(), &current)?;
+            self.last_saved_session = Some(current);
+        }
+        Ok(())
+    }
+
 }
 
 impl Drop for Gui {
@@ -104,6 +148,9 @@ impl Drop for Gui {
                     eprintln!("carta-gui: final autosave failed: {error}");
                 }
             }
+        }
+        if let Err(error) = self.save_session() {
+            eprintln!("carta-gui: final session save failed: {error}");
         }
     }
 }
@@ -137,7 +184,7 @@ fn scroll_to_caret(state: &Gui) -> Task<Message> {
         return Task::none();
     };
     let started = profile::enabled().then(Instant::now);
-    let offset = viewport::scroll_offset(app, state.window_size.width, state.window_size.height);
+    let offset = viewport::scroll_offset(app, state.window_size.width, state.font_size);
     if let Some(started) = started {
         profile::record("scroll", started);
     }
@@ -156,6 +203,61 @@ fn normalize_clipboard(value: &str) -> String {
 
 fn update(state: &mut Gui, message: Message) -> Task<Message> {
     match message {
+        Message::PointerMoved(point) => {
+            state.pointer = Some(point);
+            if state.pointer_down {
+                if let Some(app) = &mut state.app {
+                    if matches!(app.mode, AppMode::Editing)
+                        && !app.collapsed
+                        && matches!(app.view, View::CreationDate(_) | View::ModificationDate | View::Work(_))
+                    {
+                        if let Some(cursor) = viewport::hit_test(app, point, state.window_size.width, state.font_size) {
+                            if cursor != app.editor.cursor() {
+                                app.editor.set_cursor(cursor, true);
+                            }
+                        }
+                    }
+                }
+            }
+            return Task::none();
+        }
+        Message::PointerPressed => {
+            let Some(point) = state.pointer else { return Task::none(); };
+            if let Some(app) = &mut state.app {
+                if matches!(app.mode, AppMode::Editing)
+                    && !app.collapsed
+                    && matches!(app.view, View::CreationDate(_) | View::ModificationDate | View::Work(_))
+                {
+                    if let Some(cursor) = viewport::hit_test(app, point, state.window_size.width, state.font_size) {
+                        app.cat_navigation();
+                        app.editor.set_cursor(cursor, false);
+                        state.pointer_down = true;
+                    }
+                }
+            }
+            return Task::none();
+        }
+        Message::PointerReleased => {
+            state.pointer_down = false;
+            return Task::none();
+        }
+        Message::Tick(now) => {
+            if let Some(app) = &mut state.app {
+                let started = profile::enabled().then(Instant::now);
+                if let Err(error) = app.tick_without_remote_sync(now) {
+                    app.status = format!("Error: {error}");
+                }
+                if let Some(started) = started {
+                    profile::record("maintenance", started);
+                }
+            }
+            if let Err(error) = state.save_session() {
+                if let Some(app) = &mut state.app {
+                    app.status = format!("Session save: {error}");
+                }
+            }
+            return Task::none();
+        }
         Message::SystemTheme(mode) => {
             state.theme_mode = mode;
             return Task::none();
@@ -195,7 +297,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
         _ => {}
     }
 
-    let columns = viewport::columns(state.window_size.width);
+    let columns = viewport::columns(state.window_size.width, state.font_size);
     let Some(app) = &mut state.app else {
         return Task::none();
     };
@@ -204,10 +306,18 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
     let before_region_count = app.editor.regions().len();
     let before_view = std::mem::discriminant(&app.view);
     let mut clipboard = Task::none();
+    let mut zoomed = false;
     let result = match message {
         Message::Raw(Event::Keyboard(event)) => {
             let started = profile::enabled().then(Instant::now);
             let result = state.input.handle(app, event, columns);
+            let zoom = state.input.take_zoom_request();
+            if zoom != 0 {
+                let next = (state.font_size + f32::from(zoom) * viewport::FONT_STEP)
+                    .clamp(viewport::MIN_FONT_SIZE, viewport::MAX_FONT_SIZE);
+                zoomed = next != state.font_size;
+                state.font_size = next;
+            }
             if let Some(started) = started {
                 profile::record("input", started);
             }
@@ -218,25 +328,15 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
             };
             result
         }
-        Message::Tick(now) => {
-            let started = profile::enabled().then(Instant::now);
-            // Remote Git/SSH can block for an unbounded time; it is not safe
-            // to run automatic network synchronization inside the UI loop.
-            let result = app.tick_without_remote_sync(now).map(|_| ());
-            if let Some(started) = started {
-                profile::record("maintenance", started);
-            }
-            result
-        }
         _ => Ok(()),
     };
     if let Err(error) = result {
         app.status = format!("Error: {error}");
     }
-    let follow_caret = keyboard_event
+    let follow_caret = zoomed || (keyboard_event
         && (app.editor.cursor() != before_cursor
             || app.editor.regions().len() != before_region_count
-            || std::mem::discriminant(&app.view) != before_view);
+            || std::mem::discriminant(&app.view) != before_view));
     if app.quit {
         iced::exit()
     } else if follow_caret {
