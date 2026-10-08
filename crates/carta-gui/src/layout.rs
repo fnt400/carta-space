@@ -7,7 +7,6 @@ use std::collections::HashMap;
 
 #[derive(Debug)]
 struct DocumentRows {
-    id: DocumentId,
     starts: Vec<usize>, // byte start of each soft/hard wrapped visual row
     start: usize,       // absolute first row, including generated separator
     content_start: usize,
@@ -113,7 +112,6 @@ impl Layout {
                 let prefix = prefix_rows(&app.view, i, locked);
                 let generation = self.next_generation();
                 self.docs.push(DocumentRows {
-                    id: region.document,
                     starts: row_starts(&region.text, columns),
                     start: 0,
                     content_start: 0,
