@@ -2,7 +2,8 @@ use carta_app::{App, AppMode, View};
 use chrono::{DateTime, Local};
 use iced::theme::Mode as ThemeMode;
 use iced::widget::{
-    column, container, mouse_area, rich_text, row, scrollable, space, span, stack, text, Id,
+    button, column, container, mouse_area, rich_text, row, scrollable, space, span, stack, text,
+    text_input, Id,
 };
 use iced::{color, Color, Element, Font, Length};
 use std::time::Instant;
@@ -29,6 +30,28 @@ pub(crate) fn view(state: &Gui) -> Element<'_, Message> {
 }
 
 fn build_view(state: &Gui) -> Element<'_, Message> {
+    if let Some(path) = &state.setup_path {
+        let mut content = column![
+            text("Carta Space").font(IOSEVKA).size(24),
+            text("Nessun archivio nella posizione standard").font(IOSEVKA).size(16),
+            text(path.display().to_string()).font(IOSEVKA).size(14),
+            button("Crea nuovo archivio").on_press(Message::CreateDefaultArchive),
+            text("Oppure clona un archivio Git esistente:").font(IOSEVKA),
+            text_input("URL del repository Git", &state.clone_url)
+                .on_input(Message::CloneUrlChanged)
+                .on_submit(Message::CloneDefaultArchive),
+            button("Clona archivio").on_press(Message::CloneDefaultArchive),
+        ]
+        .spacing(12)
+        .padding(24);
+        if let Some(error) = &state.error {
+            content = content.push(text(error).font(IOSEVKA));
+        }
+        return container(content)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into();
+    }
     if let Some(error) = &state.error {
         return container(
             column![
