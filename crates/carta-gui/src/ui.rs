@@ -570,6 +570,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn failed_remote_sync_has_red_status_background_in_both_themes() {
+        for mode in [ThemeMode::Light, ThemeMode::Dark] {
+            let red = sync_error_background(mode);
+            assert!(red.r > red.g * 2.0);
+            assert!(red.r > red.b * 1.5);
+            assert_ne!(red, status_background(mode));
+        }
+    }
+
+    #[test]
     fn work_rule_is_continuous_at_each_window_width() {
         assert_eq!(work_rule(40, false), "─".repeat(40));
         assert_eq!(work_rule(80, true).chars().count(), 80);
