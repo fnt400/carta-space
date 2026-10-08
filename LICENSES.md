@@ -24,14 +24,20 @@ The intent is that the Carta Space format can be described, quoted, adapted, and
 
 Carta's PDF publication backend embeds Source Serif 4, Source Code Pro, and selected Noto Sans families so publication is deterministic and does not depend on system fonts. These font files are distributed under the SIL Open Font License 1.1.
 
+The graphical desktop frontend also bundles Iosevka Regular, distributed under the same SIL Open Font License 1.1, to maintain consistent typography without requiring a system-wide font install.
+
 The corresponding license texts are:
 
+- `LICENSES/OFL-iosevka.txt`;
 - `LICENSES/OFL-source-serif.txt`;
 - `LICENSES/OFL-source-code-pro.txt`;
 - `LICENSES/OFL-noto-fonts.txt`;
 - `LICENSES/OFL-noto-cjk.txt`.
 
 The fonts remain third-party works; embedding them in Carta's binary does not relicense them under GPL or CC0.
+
+
+The GUI's font data is stored as base64 text in `crates/carta-gui/assets/iosevka-regular.ttf.b64` and decoded when the application starts. Its source is `chrissimpkins/codeface`, `fonts/iosevka/iosevka-regular.ttf` (Git blob `29812489f2aaf7f9f0d6f45d4a12467277ade5ff`); original typeface by Renzhi Li (Belleve Invis). This packaging preserves upstream OFL terms and does not install fonts system-wide. Terminal typography continues to be controlled by the terminal emulator.
 
 ## Third-party material
 
