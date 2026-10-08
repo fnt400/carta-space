@@ -1,16 +1,19 @@
 use carta_app::{App, AppMode, View};
 use chrono::{DateTime, Local};
 use iced::theme::Mode as ThemeMode;
-use iced::widget::{column, container, rich_text, row, scrollable, span, stack, text};
+use iced::widget::{column, container, rich_text, row, scrollable, space, span, stack, text};
 use iced::{color, Color, Element, Font, Length};
 
 use crate::presentation::SegmentKind;
+use crate::viewport;
 use crate::{Gui, Message};
 
 const IOSEVKA: Font = Font::with_name("Iosevka");
-const EDITOR_SIZE: f32 = 18.0;
+const EDITOR_SIZE: f32 = viewport::FONT_SIZE;
 const STATUS_SIZE: f32 = 14.0;
-const EDITOR_MAX_WIDTH: f32 = 820.0;
+const EDITOR_MAX_WIDTH: f32 = viewport::PAGE_WIDTH;
+
+pub(crate) const EDITOR_SCROLL_ID: &str = "carta-editor-scroll";
 
 pub(crate) fn view(state: &Gui) -> Element<'_, Message> {
     if let Some(error) = &state.error {
@@ -31,7 +34,7 @@ pub(crate) fn view(state: &Gui) -> Element<'_, Message> {
         return container(text("Carta Space").font(IOSEVKA)).into();
     };
 
-    let editor = editor_view(app, state.theme_mode, state.caret_visible);
+    let editor = editor_view(app, state.theme_mode, state.caret_visible, state.window_size);
     let leap = leap_line(app);
     let status = status_bar(app, state.theme_mode);
 
@@ -53,19 +56,29 @@ pub(crate) fn view(state: &Gui) -> Element<'_, Message> {
     }
 }
 
-fn editor_view(app: &App, mode: ThemeMode, caret_visible: bool) -> Element<'_, Message> {
-    let spans = editor_spans(app, mode, caret_visible);
+fn editor_view(app: &App, mode: ThemeMode, caret_visible: bool, window: iced::Size) -> Element<'_, Message> {
+    let columns = viewport::columns(window.width);
+    let spans = editor_spans(app, mode, caret_visible, columns);
     let text_view = rich_text(spans)
         .font(IOSEVKA)
         .size(EDITOR_SIZE)
+        .line_height(iced::Pixels(viewport::LINE_HEIGHT))
         .width(Length::Fill);
 
     let page = container(text_view)
         .width(Length::Fill)
         .max_width(EDITOR_MAX_WIDTH)
-        .padding([26, 18]);
+        .padding([viewport::VERTICAL_PADDING as u16, viewport::HORIZONTAL_PADDING as u16]);
 
-    scrollable(container(page).center_x(Length::Fill))
+    let height = viewport::writing_area_height(window.height);
+    let top_padding = space().height(height * (2.0 / 3.0));
+    let bottom_padding = space().height(height * (2.0 / 3.0));
+    let sheet = column![top_padding, container(page).center_x(Length::Fill), bottom_padding]
+        .spacing(0)
+        .width(Length::Fill);
+
+    scrollable(sheet)
+        .id(scrollable::Id::new(EDITOR_SCROLL_ID))
         .height(Length::Fill)
         .width(Length::Fill)
         .into()
@@ -75,6 +88,7 @@ fn editor_spans<'a>(
     app: &'a App,
     mode: ThemeMode,
     caret_visible: bool,
+    columns: usize,
 ) -> Vec<iced::widget::text::Span<'a, ()>> {
     let mut spans = Vec::new();
     let cursor = app.editor.cursor();
@@ -84,7 +98,7 @@ fn editor_spans<'a>(
     let extended = app.editor.cat_highlight().is_some() || app.editor.selection().is_some();
 
     for (region_index, region) in app.editor.regions().iter().enumerate() {
-        if let Some(separator) = separator_for_region(app, region_index) {
+        if let Some(separator) = separator_for_region(app, region_index, columns) {
             if region_index > 0 {
                 spans.push(span("\n"));
             }
@@ -169,7 +183,7 @@ fn editor_spans<'a>(
     spans
 }
 
-fn separator_for_region(app: &App, region_index: usize) -> Option<String> {
+fn separator_for_region(app: &App, region_index: usize, columns: usize) -> Option<String> {
     let region = app.editor.regions().get(region_index)?;
     let info = app.archive.document_info(region.document)?;
     let locked = app
@@ -187,9 +201,10 @@ fn separator_for_region(app: &App, region_index: usize) -> Option<String> {
             "── {marker}{} ──────────────────────────────",
             local_date_time(info.modified())
         )),
-        View::Work(_) if region_index > 0 || locked => Some(format!(
-            "── {marker}────────────────────────────────────────"
-        )),
+        View::Work(_) if region_index > 0 || locked => {
+            let prefix = if locked { "[LOCKED] " } else { "" };
+            Some(format!("{prefix}{}", "─".repeat(columns.saturating_sub(prefix.chars().count()))))
+        },
         _ => None,
     }
 }
