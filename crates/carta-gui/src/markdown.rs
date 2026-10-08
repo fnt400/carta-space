@@ -3,7 +3,6 @@
 use carta_core::DocumentId;
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Syntax {
@@ -85,18 +84,12 @@ pub struct Cache {
 }
 
 impl Cache {
-    /// Hashing the contents is linear but cheap. Parsing happens only when
-    /// the Document changes; idle redraws never repeat the Markdown parse.
-    pub fn ranges(&mut self, id: DocumentId, text: &str) -> &[Range] {
-        let mut hash = std::collections::hash_map::DefaultHasher::new();
-        text.hash(&mut hash);
-        let fingerprint = hash.finish();
-        let entry = self
-            .documents
-            .entry(id)
-            .or_insert_with(|| (fingerprint, parse(text)));
-        if entry.0 != fingerprint {
-            *entry = (fingerprint, parse(text));
+    /// Generations are incremented by the viewport layout only for changed
+    /// Documents. Normal navigation never hashes or reparses whole Documents.
+    pub fn ranges(&mut self, id: DocumentId, text: &str, generation: u64) -> &[Range] {
+        let entry = self.documents.entry(id).or_insert_with(|| (generation, parse(text)));
+        if entry.0 != generation {
+            *entry = (generation, parse(text));
         }
         &entry.1
     }
