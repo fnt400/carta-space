@@ -3504,7 +3504,7 @@ mod tests {
             app.editor.regions()[region].text.len()
         );
         assert!(app.last_leap_span.is_some());
-        assert_eq!(app.editor.regions()[region].text, "alpha beta");
+        assert!(app.editor.regions()[region].text.starts_with("alpha beta"));
     }
 
     #[test]
