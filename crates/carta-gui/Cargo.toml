@@ -9,6 +9,7 @@ publish = false
 [dependencies]
 carta-app = { path = "../carta-app" }
 carta-core = { path = "../carta-core" }
+chrono.workspace = true
 iced = { version = "=0.14.0", default-features = false, features = [
     "advanced",
     "wgpu",
