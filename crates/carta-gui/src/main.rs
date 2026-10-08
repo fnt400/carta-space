@@ -206,7 +206,11 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
     let mut clipboard = Task::none();
     let result = match message {
         Message::Raw(Event::Keyboard(event)) => {
+            let started = profile::enabled().then(Instant::now);
             let result = state.input.handle(app, event, columns);
+            if let Some(started) = started {
+                profile::record("input", started);
+            }
             clipboard = match state.input.take_clipboard_request() {
                 Some(ClipboardRequest::Read) => iced::clipboard::read().map(Message::PasteText),
                 Some(ClipboardRequest::Write(text)) => iced::clipboard::write(text),
