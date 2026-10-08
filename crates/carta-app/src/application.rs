@@ -2269,7 +2269,10 @@ impl App {
             || self.editor.is_dirty()
             || self.provisional.is_some()
             || !matches!(self.mode, AppMode::Editing)
-            || !matches!(self.view, View::CreationDate(_) | View::ModificationDate | View::Work(_))
+            || !matches!(
+                self.view,
+                View::CreationDate(_) | View::ModificationDate | View::Work(_)
+            )
             || !self.conflicts.is_empty()
             || self.archive.sync_remote()?.is_none()
         {
@@ -2309,7 +2312,9 @@ impl App {
                 }
             }
             SyncApply::Conflict => {
-                self.status = "Sync conflict · local and remote histories preserved; resolution required".into();
+                self.status =
+                    "Sync conflict · local and remote histories preserved; resolution required"
+                        .into();
                 self.scheduler.sync_attempted(Instant::now());
             }
             SyncApply::Stale => {

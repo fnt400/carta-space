@@ -52,11 +52,15 @@ pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
     };
 
     if remote.is_empty() {
-        return Err(Error::InvalidSyncRemote("Synchronization is not configured".into()));
+        return Err(Error::InvalidSyncRemote(
+            "Synchronization is not configured".into(),
+        ));
     }
-    let base_head = git_text(&source, "inspect background-sync base", &[
-        "rev-parse", "--verify", "HEAD",
-    ])?;
+    let base_head = git_text(
+        &source,
+        "inspect background-sync base",
+        &["rev-parse", "--verify", "HEAD"],
+    )?;
     if crate::history::is_dirty_at(&source)? {
         return Err(Error::SyncRequiresCleanArchive);
     }
@@ -65,7 +69,8 @@ pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
     // fast-forward is accepted by the Git server. Failure falls back to a
     // private merge snapshot; neither path modifies the live working tree.
     let remote_heads = crate::history::git_output(
-        &source, "inspect background sync remote heads",
+        &source,
+        "inspect background sync remote heads",
         &["ls-remote", "--heads", "carta-sync"],
     )?;
     let remote_heads = String::from_utf8_lossy(&remote_heads.stdout);
@@ -94,7 +99,12 @@ pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
         .output()
         .map_err(|error| Error::io(&source, error))?;
     if pushed.status.success() {
-        return Ok(simple_stage(source, remote, base_head, SyncOutcome::Published));
+        return Ok(simple_stage(
+            source,
+            remote,
+            base_head,
+            SyncOutcome::Published,
+        ));
     }
 
     // tempfile creates the staging directory with owner-only access (0700
@@ -119,9 +129,11 @@ pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
     }
     // A local edit could have happened during clone. A stale job cannot
     // ever be applied; reject it now if clone's HEAD differs.
-    let copied_head = git_text(&clone, "verify cloned base", &[
-        "rev-parse", "--verify", "HEAD",
-    ])?;
+    let copied_head = git_text(
+        &clone,
+        "verify cloned base",
+        &["rev-parse", "--verify", "HEAD"],
+    )?;
     if copied_head != base_head {
         return Err(Error::InvalidSyncRemote(
             "Archive changed while preparing background sync; retry later".into(),
@@ -131,9 +143,11 @@ pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
     let mut staged_archive = Archive::open(&clone)?;
     staged_archive.set_sync_remote(&remote)?;
     let outcome = staged_archive.sync()?.outcome();
-    let synced_head = git_text(&clone, "read synchronized snapshot", &[
-        "rev-parse", "--verify", "HEAD",
-    ])?;
+    let synced_head = git_text(
+        &clone,
+        "read synchronized snapshot",
+        &["rev-parse", "--verify", "HEAD"],
+    )?;
 
     Ok(StagedSync {
         data: Arc::new(Stage {
@@ -191,9 +205,12 @@ impl StagedSync {
         if archive.is_dirty()? {
             return Ok(SyncApply::Stale);
         }
-        if git_text(archive.root(), "check live sync base", &[
-            "rev-parse", "--verify", "HEAD",
-        ])? != stage.base_head {
+        if git_text(
+            archive.root(),
+            "check live sync base",
+            &["rev-parse", "--verify", "HEAD"],
+        )? != stage.base_head
+        {
             return Ok(SyncApply::Stale);
         }
         if stage.outcome == SyncOutcome::Conflict {
@@ -215,14 +232,24 @@ impl StagedSync {
         };
         let clone = clone_path.to_string_lossy();
         crate::history::git_output(
-            archive.root(), "import staged background sync result",
+            archive.root(),
+            "import staged background sync result",
             // The staging clone retains the local Archive's branch name, which
             // need not be "carta". Always import its pinned checked-out HEAD.
-            &["fetch", "--quiet", "--no-tags", "--", clone.as_ref(), "HEAD"],
+            &[
+                "fetch",
+                "--quiet",
+                "--no-tags",
+                "--",
+                clone.as_ref(),
+                "HEAD",
+            ],
         )?;
-        let fetched = git_text(archive.root(), "verify staged background sync result", &[
-            "rev-parse", "--verify", "FETCH_HEAD",
-        ])?;
+        let fetched = git_text(
+            archive.root(),
+            "verify staged background sync result",
+            &["rev-parse", "--verify", "FETCH_HEAD"],
+        )?;
         if fetched != stage.synced_head {
             return Err(Error::InvalidSyncRemote(
                 "Background sync fetched an unexpected commit".into(),
@@ -231,14 +258,17 @@ impl StagedSync {
         // Recheck after object transfer: a local checkpoint could have been
         // created since the initial test.
         if archive.is_dirty()?
-            || git_text(archive.root(), "recheck sync base", &[
-                "rev-parse", "--verify", "HEAD",
-            ])? != stage.base_head
+            || git_text(
+                archive.root(),
+                "recheck sync base",
+                &["rev-parse", "--verify", "HEAD"],
+            )? != stage.base_head
         {
             return Ok(SyncApply::Stale);
         }
         crate::history::git_output(
-            archive.root(), "install background sync checkpoint",
+            archive.root(),
+            "install background sync checkpoint",
             &["reset", "--hard", "--quiet", &stage.synced_head],
         )?;
         archive.refresh()?;
@@ -253,14 +283,22 @@ mod tests {
     use std::process::Command;
 
     fn git(path: &Path, args: &[&str]) {
-        assert!(Command::new("git").current_dir(path).args(args).status().unwrap().success());
+        assert!(Command::new("git")
+            .current_dir(path)
+            .args(args)
+            .status()
+            .unwrap()
+            .success());
     }
 
     #[test]
     fn stages_and_applies_remote_update_without_mutating_live_archive_in_worker() {
         let tmp = tempfile::tempdir().unwrap();
         let remote = tmp.path().join("remote.git");
-        git(tmp.path(), &["init", "--bare", "--quiet", remote.to_str().unwrap()]);
+        git(
+            tmp.path(),
+            &["init", "--bare", "--quiet", remote.to_str().unwrap()],
+        );
         let original_path = tmp.path().join("original");
         let mut original = Archive::create(&original_path).unwrap();
         let url = remote.to_str().unwrap();
@@ -278,7 +316,10 @@ mod tests {
         let old_head = git_text(&original_path, "test head", &["rev-parse", "HEAD"]).unwrap();
         let staged = stage_sync(original_path.clone()).unwrap();
         assert_eq!(staged.outcome(), SyncOutcome::UpdatedFromRemote);
-        assert_eq!(git_text(&original_path, "test head", &["rev-parse", "HEAD"]).unwrap(), old_head);
+        assert_eq!(
+            git_text(&original_path, "test head", &["rev-parse", "HEAD"]).unwrap(),
+            old_head
+        );
         assert_eq!(staged.apply(&mut original).unwrap(), SyncApply::Updated);
         assert!(original.document_info(one).is_some());
         assert!(original.documents().count() >= 2);
@@ -288,16 +329,24 @@ mod tests {
     fn private_worker_publishes_local_checkpoint_without_resetting_source() {
         let tmp = tempfile::tempdir().unwrap();
         let remote = tmp.path().join("remote.git");
-        git(tmp.path(), &["init", "--bare", "--quiet", remote.to_str().unwrap()]);
+        git(
+            tmp.path(),
+            &["init", "--bare", "--quiet", remote.to_str().unwrap()],
+        );
         let root = tmp.path().join("local");
         let mut archive = Archive::create(&root).unwrap();
         archive.set_sync_remote(remote.to_str().unwrap()).unwrap();
-        archive.create_document("written on the first computer\n").unwrap();
+        archive
+            .create_document("written on the first computer\n")
+            .unwrap();
         archive.checkpoint(CheckpointKind::Manual, None).unwrap();
         let head = git_text(&root, "head", &["rev-parse", "HEAD"]).unwrap();
         let job = stage_sync(root.clone()).unwrap();
         assert_eq!(job.outcome(), SyncOutcome::Published);
-        assert_eq!(git_text(&root, "head", &["rev-parse", "HEAD"]).unwrap(), head);
+        assert_eq!(
+            git_text(&root, "head", &["rev-parse", "HEAD"]).unwrap(),
+            head
+        );
         assert_eq!(job.apply(&mut archive).unwrap(), SyncApply::Unchanged);
         // The remote is bare: history::git_output assumes a worktree's
         // .git directory and is therefore intentionally not used here.
@@ -308,7 +357,10 @@ mod tests {
             .output()
             .unwrap();
         assert!(published.status.success());
-        let published = String::from_utf8(published.stdout).unwrap().trim().to_owned();
+        let published = String::from_utf8(published.stdout)
+            .unwrap()
+            .trim()
+            .to_owned();
         assert_eq!(head, published);
     }
 
@@ -316,7 +368,10 @@ mod tests {
     fn uncheckpointed_local_writing_is_never_overwritten_by_old_sync_result() {
         let tmp = tempfile::tempdir().unwrap();
         let remote = tmp.path().join("remote.git");
-        git(tmp.path(), &["init", "--bare", "--quiet", remote.to_str().unwrap()]);
+        git(
+            tmp.path(),
+            &["init", "--bare", "--quiet", remote.to_str().unwrap()],
+        );
         let root = tmp.path().join("local");
         let mut archive = Archive::create(&root).unwrap();
         archive.set_sync_remote(remote.to_str().unwrap()).unwrap();
@@ -326,14 +381,20 @@ mod tests {
         let staged = stage_sync(root.clone()).unwrap();
         archive.edit_document(doc, "writing in progress\n").unwrap();
         assert_eq!(staged.apply(&mut archive).unwrap(), SyncApply::Stale);
-        assert_eq!(archive.read_document(doc).unwrap().content(), "writing in progress\n");
+        assert_eq!(
+            archive.read_document(doc).unwrap().content(),
+            "writing in progress\n"
+        );
     }
 
     #[test]
     fn stale_snapshot_does_not_replace_new_local_checkpoint() {
         let tmp = tempfile::tempdir().unwrap();
         let remote = tmp.path().join("remote.git");
-        git(tmp.path(), &["init", "--bare", "--quiet", remote.to_str().unwrap()]);
+        git(
+            tmp.path(),
+            &["init", "--bare", "--quiet", remote.to_str().unwrap()],
+        );
         let local = tmp.path().join("local");
         let mut archive = Archive::create(&local).unwrap();
         archive.set_sync_remote(remote.to_str().unwrap()).unwrap();

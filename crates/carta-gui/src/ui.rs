@@ -91,7 +91,13 @@ fn editor_view<'a>(
         top_padding + viewport::VERTICAL_PADDING,
     );
     let spans = window_spans(
-        app, mode, columns, first, last, &layout, &mut state.markdown.borrow_mut(),
+        app,
+        mode,
+        columns,
+        first,
+        last,
+        &layout,
+        &mut state.markdown.borrow_mut(),
     );
     let total_rows = layout.total_rows();
     drop(layout);
@@ -104,7 +110,9 @@ fn editor_view<'a>(
 
     let page = container(text_view)
         .width(Length::Fill)
-        .height(Length::Fixed((last.saturating_sub(first).max(1) as f32) * line_height))
+        .height(Length::Fixed(
+            (last.saturating_sub(first).max(1) as f32) * line_height,
+        ))
         .max_width(EDITOR_MAX_WIDTH)
         .padding([0, viewport::HORIZONTAL_PADDING as u16]);
 
@@ -117,14 +125,11 @@ fn editor_view<'a>(
 
     let leading = top_padding + viewport::VERTICAL_PADDING + first as f32 * line_height;
     let trailing = total_rows.saturating_sub(last) as f32 * line_height
-        + viewport::VERTICAL_PADDING + top_padding;
-    let sheet = column![
-        space().height(leading),
-        area,
-        space().height(trailing)
-    ]
-    .spacing(0)
-    .width(Length::Fill);
+        + viewport::VERTICAL_PADDING
+        + top_padding;
+    let sheet = column![space().height(leading), area, space().height(trailing)]
+        .spacing(0)
+        .width(Length::Fill);
 
     scrollable(sheet)
         .id(Id::new(EDITOR_SCROLL_ID))
@@ -164,7 +169,10 @@ fn window_spans<'a>(
 ) -> Vec<iced::widget::text::Span<'a, ()>> {
     let mut spans = Vec::new();
     let cursor = app.editor.cursor();
-    let selection = app.editor.selection().or_else(|| app.cat_render_highlight());
+    let selection = app
+        .editor
+        .selection()
+        .or_else(|| app.cat_render_highlight());
     let extended = app.editor.cat_highlight().is_some() || app.editor.selection().is_some();
 
     for row in first..last {
@@ -178,24 +186,33 @@ fn window_spans<'a>(
                     spans.push(span(separator).font(IOSEVKA).color(secondary_text(mode)));
                 }
             }
-            Some(Row::Text { region, start, end, hard_break }) => {
+            Some(Row::Text {
+                region,
+                start,
+                end,
+                hard_break,
+            }) => {
                 let item = &app.editor.regions()[region];
                 let text = &item.text;
-                let syntax = syntax_cache.ranges(
-                    item.document, text, layout.generation(region),
-                );
+                let syntax = syntax_cache.ranges(item.document, text, layout.generation(region));
                 let selected = selection.and_then(|(a, b)| {
                     if region < a.region || region > b.region {
                         return None;
                     }
                     let first_byte = if region == a.region { a.byte } else { 0 };
-                    let last_byte = if region == b.region { b.byte } else { text.len() };
+                    let last_byte = if region == b.region {
+                        b.byte
+                    } else {
+                        text.len()
+                    };
                     (first_byte < last_byte).then_some((first_byte, last_byte))
                 });
                 let is_cursor_region = region == cursor.region;
                 let cursor_here = is_cursor_region && cursor.byte >= start && cursor.byte < end;
                 let caret_end = if cursor_here {
-                    text[cursor.byte..].chars().next()
+                    text[cursor.byte..]
+                        .chars()
+                        .next()
                         .map_or(cursor.byte, |ch| cursor.byte + ch.len_utf8())
                 } else {
                     cursor.byte
@@ -242,12 +259,13 @@ fn window_spans<'a>(
                     }
                     spans.push(styled);
                 }
-                if is_cursor_region && cursor.byte == end
-                    && (hard_break || end == text.len())
-                {
-                    spans.push(span(" ").font(IOSEVKA)
-                        .background(caret_color(mode))
-                        .color(caret_foreground(mode)));
+                if is_cursor_region && cursor.byte == end && (hard_break || end == text.len()) {
+                    spans.push(
+                        span(" ")
+                            .font(IOSEVKA)
+                            .background(caret_color(mode))
+                            .color(caret_foreground(mode)),
+                    );
                 }
             }
             None => {}

@@ -226,10 +226,15 @@ fn subscription(state: &Gui) -> Subscription<Message> {
 }
 
 fn scroll_to_caret(state: &mut Gui) -> Task<Message> {
-    let Some(app) = &state.app else { return Task::none(); };
+    let Some(app) = &state.app else {
+        return Task::none();
+    };
     let started = profile::enabled().then(Instant::now);
     let mut layout = state.layout.borrow_mut();
-    layout.sync(app, viewport::columns(state.window_size.width, state.font_size));
+    layout.sync(
+        app,
+        viewport::columns(state.window_size.width, state.font_size),
+    );
     let row = layout.caret_row(app);
     let offset = viewport::VERTICAL_PADDING + row as f32 * viewport::line_height(state.font_size);
     drop(layout);
@@ -239,7 +244,10 @@ fn scroll_to_caret(state: &mut Gui) -> Task<Message> {
     }
     operation::scroll_to(
         ui::EDITOR_SCROLL_ID,
-        AbsoluteOffset { x: None, y: Some(offset) },
+        AbsoluteOffset {
+            x: None,
+            y: Some(offset),
+        },
     )
 }
 
@@ -262,8 +270,7 @@ fn indexed_hit_test(
     let row = first.saturating_add((point.y.max(0.0) / line_height) as usize);
     let left = (window.width - window.width.min(viewport::PAGE_WIDTH)) / 2.0
         + viewport::HORIZONTAL_PADDING;
-    let col = ((point.x - left).max(0.0) / viewport::mono_advance(font_size))
-        .round() as usize;
+    let col = ((point.x - left).max(0.0) / viewport::mono_advance(font_size)).round() as usize;
     layout.hit_test(app, row, col)
 }
 
@@ -276,9 +283,7 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
     let idle = now.saturating_duration_since(state.last_user_input) >= QUIET && !state.pointer_down;
 
     let can_integrate = state.app.as_ref().is_some_and(|app| {
-        !app.editor.is_dirty()
-            && matches!(app.mode, AppMode::Editing)
-            && app.conflicts.is_empty()
+        !app.editor.is_dirty() && matches!(app.mode, AppMode::Editing) && app.conflicts.is_empty()
     });
     if idle && can_integrate {
         if let Some(staged) = state.sync_ready.take() {
@@ -387,7 +392,8 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                     state.next_sync_at = Instant::now() + Duration::from_secs(delay);
                     if let Some(app) = &mut state.app {
                         app.scheduler.sync_attempted(Instant::now());
-                        app.status = format!("Automatic sync unavailable; retry scheduled: {error}");
+                        app.status =
+                            format!("Automatic sync unavailable; retry scheduled: {error}");
                     }
                 }
             }
@@ -401,7 +407,9 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
         }
         Message::PointerMoved(point) => {
             state.pointer = Some(point);
-            if state.pointer_down { state.last_user_input = Instant::now(); }
+            if state.pointer_down {
+                state.last_user_input = Instant::now();
+            }
             if state.pointer_down {
                 if let Some(app) = &mut state.app {
                     if matches!(app.mode, AppMode::Editing)
@@ -411,9 +419,14 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                             View::CreationDate(_) | View::ModificationDate | View::Work(_)
                         )
                     {
-                        if let Some(cursor) =
-                            indexed_hit_test(app, &state.layout, state.scroll_y, point, state.window_size, state.font_size)
-                        {
+                        if let Some(cursor) = indexed_hit_test(
+                            app,
+                            &state.layout,
+                            state.scroll_y,
+                            point,
+                            state.window_size,
+                            state.font_size,
+                        ) {
                             if cursor != app.editor.cursor() {
                                 app.editor.set_cursor(cursor, true);
                             }
@@ -436,9 +449,14 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                         View::CreationDate(_) | View::ModificationDate | View::Work(_)
                     )
                 {
-                    if let Some(cursor) =
-                        indexed_hit_test(app, &state.layout, state.scroll_y, point, state.window_size, state.font_size)
-                    {
+                    if let Some(cursor) = indexed_hit_test(
+                        app,
+                        &state.layout,
+                        state.scroll_y,
+                        point,
+                        state.window_size,
+                        state.font_size,
+                    ) {
                         app.cat_navigation();
                         app.editor.set_cursor(cursor, false);
                         state.pointer_down = true;

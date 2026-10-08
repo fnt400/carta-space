@@ -17,8 +17,15 @@ struct DocumentRows {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Row {
     Gap,
-    Rule { region: usize },
-    Text { region: usize, start: usize, end: usize, hard_break: bool },
+    Rule {
+        region: usize,
+    },
+    Text {
+        region: usize,
+        start: usize,
+        end: usize,
+        hard_break: bool,
+    },
 }
 
 /// Cache lifetime matches the window, not the Archive. It can be discarded
@@ -136,7 +143,6 @@ impl Layout {
         self.serial
     }
 
-
     pub fn sync(&mut self, app: &App, columns: usize) {
         let regions = app.editor.regions();
         let ptr = regions.as_ptr() as usize;
@@ -155,7 +161,10 @@ impl Layout {
             self.docs.clear();
             self.indices.clear();
             for (i, region) in regions.iter().enumerate() {
-                let locked = app.archive.document_is_locked(region.document).unwrap_or(false);
+                let locked = app
+                    .archive
+                    .document_is_locked(region.document)
+                    .unwrap_or(false);
                 let prefix = prefix_rows(&app.view, i, locked);
                 let generation = self.next_generation();
                 self.docs.push(DocumentRows {
@@ -167,7 +176,8 @@ impl Layout {
                 });
                 self.indices.insert(region.document, i);
             }
-            self.totals.reset(self.docs.iter().map(|doc| doc.prefix + doc.starts.len()));
+            self.totals
+                .reset(self.docs.iter().map(|doc| doc.prefix + doc.starts.len()));
         } else {
             // Editing a Document invalidates its rows, not all other Documents.
             // Dirty IDs are supplied by the canonical editor. The current
@@ -210,10 +220,14 @@ impl Layout {
 
     pub fn caret_row(&self, app: &App) -> usize {
         let cursor = app.editor.cursor();
-        let Some(doc) = self.docs.get(cursor.region) else { return 0; };
+        let Some(doc) = self.docs.get(cursor.region) else {
+            return 0;
+        };
         let starts = &doc.starts;
         let byte = cursor.byte;
-        let visual_row = starts.partition_point(|&start| start <= byte).saturating_sub(1);
+        let visual_row = starts
+            .partition_point(|&start| start <= byte)
+            .saturating_sub(1);
         self.totals.prefix(cursor.region) + doc.prefix + visual_row
     }
 
@@ -241,7 +255,12 @@ impl Layout {
         let next = doc.starts.get(visual + 1).copied().unwrap_or(text.len());
         let hard_break = next > start && text.as_bytes()[next - 1] == b'\n';
         let end = if hard_break { next - 1 } else { next };
-        Some(Row::Text { region: index, start, end, hard_break })
+        Some(Row::Text {
+            region: index,
+            start,
+            end,
+            hard_break,
+        })
     }
 
     /// Byte offset in the visible row, rounded to an insertion cell.
@@ -254,7 +273,9 @@ impl Layout {
                 let (region, _) = self.totals.find(row.min(self.total_rows() - 1));
                 Some(Cursor { region, byte: 0 })
             }
-            Row::Text { region, start, end, .. } => {
+            Row::Text {
+                region, start, end, ..
+            } => {
                 let text = &app.editor.regions()[region].text;
                 let byte = text[start..end]
                     .char_indices()
@@ -266,13 +287,22 @@ impl Layout {
         }
     }
 
-    pub fn window(&self, offset: f32, height: f32, line_height: f32, top_pad: f32) -> (usize, usize) {
+    pub fn window(
+        &self,
+        offset: f32,
+        height: f32,
+        line_height: f32,
+        top_pad: f32,
+    ) -> (usize, usize) {
         let visible_top = ((offset - top_pad).max(0.0) / line_height).floor() as usize;
         let visible = (height / line_height).ceil() as usize + 2;
         let overscan = visible.max(16);
         let total = self.total_rows();
         let first = visible_top.saturating_sub(overscan).min(total);
-        let last = visible_top.saturating_add(visible).saturating_add(overscan).min(total);
+        let last = visible_top
+            .saturating_add(visible)
+            .saturating_add(overscan)
+            .min(total);
         (first, last.max(first))
     }
 }
@@ -314,10 +344,12 @@ mod tests {
         layout.totals.reset(std::iter::repeat_n(6, 20_000));
         assert_eq!(layout.total_rows(), 120_000);
         let (first, last) = layout.window(1_200_000.0, 720.0, 22.0, 480.0);
-        assert!(last - first < 120, "rendered rows cannot grow with Document count");
+        assert!(
+            last - first < 120,
+            "rendered rows cannot grow with Document count"
+        );
         assert!(first > 0 && last < layout.total_rows());
     }
-
 
     #[test]
     fn stable_window_size_is_independent_of_archive_length() {

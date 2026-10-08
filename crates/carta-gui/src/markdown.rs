@@ -95,23 +95,36 @@ fn resolve(ranges: Vec<Range>) -> Vec<Range> {
     let mut result: Vec<Range> = Vec::new();
     let mut index = 0;
     const PRIORITY: [Syntax; 6] = [
-        Syntax::Code, Syntax::Link, Syntax::Strong,
-        Syntax::Emphasis, Syntax::Heading, Syntax::Quote,
+        Syntax::Code,
+        Syntax::Link,
+        Syntax::Strong,
+        Syntax::Emphasis,
+        Syntax::Heading,
+        Syntax::Quote,
     ];
     while index < events.len() {
         let point = events[index].0;
         if last < point {
-            if let Some(syntax) = PRIORITY.into_iter()
+            if let Some(syntax) = PRIORITY
+                .into_iter()
                 .find(|syntax| active[*syntax as usize] > 0)
             {
                 if let Some(previous) = result.last_mut() {
                     if previous.end == last && previous.syntax == syntax {
                         previous.end = point;
                     } else {
-                        result.push(Range { start: last, end: point, syntax });
+                        result.push(Range {
+                            start: last,
+                            end: point,
+                            syntax,
+                        });
                     }
                 } else {
-                    result.push(Range { start: last, end: point, syntax });
+                    result.push(Range {
+                        start: last,
+                        end: point,
+                        syntax,
+                    });
                 }
             }
         }
@@ -132,7 +145,8 @@ fn resolve(ranges: Vec<Range>) -> Vec<Range> {
 /// `ranges` must be the non-overlapping result stored in `Cache`.
 pub fn style_at(ranges: &[Range], byte: usize) -> Option<Syntax> {
     let next = ranges.partition_point(|range| range.end <= byte);
-    ranges.get(next)
+    ranges
+        .get(next)
         .filter(|range| range.start <= byte)
         .map(|range| range.syntax)
 }
@@ -154,7 +168,10 @@ impl Cache {
                 self.documents.remove(&oldest);
             }
         }
-        let entry = self.documents.entry(id).or_insert_with(|| (generation, resolve(parse(text))));
+        let entry = self
+            .documents
+            .entry(id)
+            .or_insert_with(|| (generation, resolve(parse(text))));
         if entry.0 != generation {
             *entry = (generation, resolve(parse(text)));
         }
