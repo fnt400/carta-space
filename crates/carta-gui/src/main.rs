@@ -148,7 +148,8 @@ impl Gui {
                         (app, previous)
                     })
                     .map_err(|error| error.to_string())
-            });
+            })
+        };
 
         let (app, error, previous) = match result {
             Ok((app, previous)) => (Some(app), None, previous),
