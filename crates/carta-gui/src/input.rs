@@ -317,11 +317,11 @@ impl GuiInputState {
                 app.dispatch_action(Action::MoveCharacterForward, Instant::now());
                 return Ok(());
             }
-            Code::Home if !in_leap => {
+            Code::Home => {
                 app.dispatch_action(Action::DocumentStart, Instant::now());
                 return Ok(());
             }
-            Code::End if !in_leap => {
+            Code::End => {
                 app.dispatch_action(Action::DocumentEnd, Instant::now());
                 return Ok(());
             }
