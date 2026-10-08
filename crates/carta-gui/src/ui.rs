@@ -132,6 +132,7 @@ fn editor_spans<'a>(app: &'a App, mode: ThemeMode, caret_visible: bool) -> Vec<i
                             } else {
                                 caret
                             }
+                        },
                         };
                         if newline_caret {
                             vec![styled, span("\n").font(IOSEVKA)]
