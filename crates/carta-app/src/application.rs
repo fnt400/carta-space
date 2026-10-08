@@ -2309,7 +2309,7 @@ impl App {
                 }
             }
             SyncApply::Conflict => {
-                self.status = "Sync conflict · local and remote histories preserved; use Sync Now to resolve".into();
+                self.status = "Sync conflict · local and remote histories preserved; resolution required".into();
                 self.scheduler.sync_attempted(Instant::now());
             }
             SyncApply::Stale => {
