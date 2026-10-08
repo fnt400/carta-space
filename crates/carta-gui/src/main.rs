@@ -169,8 +169,18 @@ fn subscription(state: &Gui) -> Subscription<Message> {
     } else {
         Duration::from_secs(15)
     };
+    // A mouse drag can end outside the text sheet; release the selection
+    // state even if the sheet's mouse area does not receive the event.
+    let mouse_release = event::listen_raw(|event, _status, _window| {
+        matches!(
+            event,
+            Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left))
+        )
+        .then_some(Message::PointerReleased)
+    });
     Subscription::batch([
         keyboard,
+        mouse_release,
         iced::time::every(interval).map(Message::Tick),
         window::open_events().map(Message::WindowOpened),
         window::resize_events().map(|(_id, size)| Message::WindowSize(size)),
