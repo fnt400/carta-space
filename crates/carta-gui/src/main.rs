@@ -154,13 +154,9 @@ fn view(state: &Gui) -> Element<'_, Message> {
             .collect();
 
     let editor = scrollable(
-        container(
-            rich_text(spans)
-                .size(19)
-                .width(Length::Fill),
-        )
-        .padding(24)
-        .width(Length::Fill),
+        container(rich_text(spans).size(19).width(Length::Fill))
+            .padding(24)
+            .width(Length::Fill),
     )
     .height(Length::Fill)
     .width(Length::Fill);
