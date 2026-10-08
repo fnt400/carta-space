@@ -11,6 +11,8 @@ base64 = "0.22"
 carta-app = { path = "../carta-app" }
 carta-core = { path = "../carta-core" }
 chrono = { version = "0.4.42", default-features = false, features = ["clock", "std"] }
+pulldown-cmark = { version = "0.13.4", default-features = false }
+serde_json = { version = "1.0.145", features = ["arbitrary_precision"] }
 iced = { version = "=0.14.0", default-features = false, features = [
     "advanced",
     "linux-theme-detection",
