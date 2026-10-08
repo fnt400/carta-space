@@ -368,7 +368,11 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
         Ok(true) => {}
         Ok(false) => {
             state.next_sync_at = now + INTERVAL;
-            // No remote configured is an explicit opt-out, not a failed push.
+            // Missing remote configuration is a persistent, visible
+            // problem when a committed checkpoint is queued for upload.
+            if app.scheduler.is_sync_pending() {
+                state.sync_error = Some("Remote carta-sync non configurato".into());
+            }
             app.scheduler
                 .sync_finished(app.scheduler.sync_generation(), now);
             return Task::none();
@@ -417,6 +421,9 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                         if let Some(app) = &mut state.app {
                             app.scheduler
                                 .sync_finished(state.sync_started_generation, now);
+                            if stage.outcome() == SyncOutcome::Published {
+                                app.status = "Sync completata · commit pubblicati".into();
+                            }
                         }
                         state.next_sync_at = now + Duration::from_secs(180);
                     }
