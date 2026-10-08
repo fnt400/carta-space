@@ -1241,7 +1241,22 @@ impl App {
         Ok(())
     }
 
+    /// Full maintenance tick. The TUI preserves its established automatic
+    /// synchronization behavior.
     pub fn tick(&mut self, now: Instant) -> AppResult<bool> {
+        self.tick_with_sync(now, true)
+    }
+
+    /// Maintenance suitable for a GUI event loop: keep autosave, checkpoints
+    /// and status expiry, but never perform potentially blocking remote Git
+    /// operations on the UI thread. Remote sync remains available explicitly
+    /// via the shared command palette until an asynchronous implementation
+    /// can preserve archive/editor consistency.
+    pub fn tick_without_remote_sync(&mut self, now: Instant) -> AppResult<bool> {
+        self.tick_with_sync(now, false)
+    }
+
+    fn tick_with_sync(&mut self, now: Instant, auto_sync: bool) -> AppResult<bool> {
         if self.quit {
             return Ok(false);
         }
@@ -1256,7 +1271,8 @@ impl App {
             self.scheduler.checkpointed(now);
             redraw = true;
         }
-        if self.scheduler.sync_due(now)
+        if auto_sync
+            && self.scheduler.sync_due(now)
             && matches!(self.mode, AppMode::Editing)
             && matches!(
                 self.view,
