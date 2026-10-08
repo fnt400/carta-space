@@ -113,7 +113,7 @@ fn subscription(_state: &Gui) -> Subscription<Message> {
 
     Subscription::batch([
         keyboard,
-        iced::time::every(Duration::from_millis(83)).map(Message::Tick),
+        iced::time::every(Duration::from_millis(167)).map(Message::Tick),
         system::theme_changes().map(Message::SystemTheme),
     ])
 }
