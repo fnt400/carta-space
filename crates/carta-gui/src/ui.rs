@@ -343,7 +343,7 @@ fn with_caret(input: &str, cursor: usize) -> String {
         cursor -= 1;
     }
     let mut value = input.to_owned();
-    value.insert_str(cursor, "▏");
+    value.insert(cursor, '▏');
     value
 }
 
