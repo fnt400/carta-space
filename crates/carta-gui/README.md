@@ -17,6 +17,10 @@ During this first stage it is excluded from the main Rust 1.85 workspace because
 - show the shared command palette, prompts, confirmations, selectors and LEAP query;
 - support Left/Right/Up/Down editor navigation with a visual-width adapter, and center the caret near two-thirds of the available editor height;
 - support Ctrl-Right+C Cat Copy or clipboard paste, and automatically export newly extended Cat selections to the system clipboard;
+- color Markdown headings, emphasis, strong text, links, quotes and code **without hiding markup or modifying authored text**; a per-Document fingerprint cache avoids re-parsing unchanged text;
+- zoom the writing font using physical Right Ctrl + minus (smaller) or Right Ctrl + equals (larger), from 12 to 32 pixels in 2-pixel steps, adjusting the screen-space row geometry without changing document content;
+- position the caret by clicking, and select with left-button drag, sharing the canonical editor selection model rather than maintaining a second text buffer;
+- restore the previous View, document and UTF-8 cursor byte position from the same XDG session sidecar used by the TUI (saved when the application closes and during maintenance);
 - tick the shared scheduler only as needed: about once per second while dirty, every two seconds for a transient status, and every 15 seconds otherwise;
 - autosave dirty state when the shell exits.
 
@@ -25,6 +29,36 @@ This is not yet the finished editor surface. Pixel-exact soft wrapping, complete
 ### Cursor and font
 
 The editor paints the character at the logical caret without inserting fake Unicode squares into the authored text. Narrow (at-point highlight), wide (highlight behind the insertion point) and extended highlight behaviors follow the Cat semantics in the shared application model. The caret is permanently visible, without a blink timer. At end-of-line or end-of-document a stable blank cell is reserved for caret visibility; the text itself is never modified. Auto-follow scrolling uses a presentation-only visual-row estimate based on the fixed Iosevka advance and line height. It adds virtual blank space above and below the rendered text and does not modify the Archive. Exact positioning for tabs, East Asian wide characters, grapheme clusters and mixed font metrics awaits a renderer-measured layout.
+
+### GUI interactions and persistence
+
+The source remains Markdown; syntax color applies to the source text and
+delimiters. Selection and the Cat caret take precedence over syntax colors.
+Only the editor writing font is zoomed; modal/status typography remains fixed.
+Font zoom resets to 18 px on a new launch.
+
+A mouse press positions the caret; dragging a held left button extends a
+standard selection. This shares the same editor semantics as keyboard
+selection. Clicks on generated separators snap to the nearest document's
+beginning, without making separators editable. Pointer hit testing currently
+uses the approximate single-width Iosevka geometry used for soft-wrap
+navigation; tabs, wide Unicode graphemes, ligatures and mixed-width text may
+require more accurate renderer-level hit testing. Dragging beyond the
+viewport does not yet auto-scroll.
+
+The last View/Document/cursor is loaded and saved at
+`$XDG_DATA_HOME/carta/session-<archive-id>.json` (or
+`~/.local/share/carta/session-<archive-id>.json`). This is exactly the
+existing TUI sidecar format. The file is *outside* the Archive, never
+synchronized or included in portable exports. Save errors appear in the
+status line, and shutdown performs a final best-effort save. The kill switch
+does not persist state.
+
+**Performance**: Markdown parsing is cached per unchanged Document; source
+hashing and formatting the currently rendered View still happen when a
+render is requested. Verify in release mode with a large Archive, extended
+click-drag operations and at least fifteen minutes of writing, rather than
+using success of automated tests as proof of responsiveness.
 
 Iosevka Regular is bundled directly with the GUI and loaded at startup, so users do not need to install fonts or depend on the host's font resolution. The checked-in base64 asset is decoded in memory rather than installing anything system-wide (see `LICENSES/OFL-iosevka.txt`). The original TUI remains unchanged; its font is selected by the terminal emulator. To match both visually, select **Iosevka** in the terminal as well.
 
