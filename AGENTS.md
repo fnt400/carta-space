@@ -118,43 +118,51 @@ and memory usage are core product requirements, not optional polish.
 
 ## Development environment on NixOS
 
-The development host is NixOS.
+The development host is NixOS. Do **not** install or configure dependencies
+directly on the NixOS host unless explicitly asked to do so.
 
-Do **not** install or configure development dependencies directly into the NixOS host unless explicitly asked to do so.
+For the current v0.2 graphical development cycle the **preferred local
+environment is `carta-gui-dev`, based on `ubuntu:26.04`**, with Rust
+1.88 or newer (the GUI's minimum supported Rust version). This replaces the
+former Debian `carta-dev` default. The old box may still exist for v0.1.2
+TUI compatibility work, but is not a prerequisite for v0.2 verification.
 
-Use `distrobox` as the default development environment mechanism.
-
-Create and use a dedicated Debian container for Carta Space development. The preferred default is:
+Create or update the development box from the NixOS host with:
 
 ```bash
-distrobox create --name carta-dev --image debian:stable
-distrobox enter carta-dev
+scripts/setup-carta-distrobox.sh
+distrobox enter carta-gui-dev
 ```
 
-If the box already exists, reuse it.
+The setup script defaults to Ubuntu 26.04 and installs Cargo, Clippy, rustfmt,
+Git, Wayland development packages and the native build toolchain via APT.
+The repository remains in the user's normal home and is accessed through
+Distrobox's shared-home integration. Do not create redundant containers,
+remove working environments, or touch the user's development archives.
 
-Inside `carta-dev`, install and configure whatever development tools are needed for the task. This may include, as appropriate:
+**Execution-context rule:** These instructions describe the *user's local*
+development setup; an OpenCode agent running in an isolated environment may
+not have access to the user's Distrobox or its container runtime. Do not
+assume it does. Before verification, check `command -v cargo`,
+`rustc --version`, `cargo --version` and the presence of the required
+build dependencies. If already running inside `carta-gui-dev`, execute
+Cargo directly; do not nest another `distrobox enter`. If outside the box
+and `distrobox` is available, enter the existing `carta-gui-dev`. If
+Distrobox is unavailable but the execution environment has an adequate
+Rust toolchain and build dependencies, direct Cargo verification is acceptable
+**provided the report identifies the environment used**; it is not evidence
+of a successful test inside the user's box. If neither is possible, report
+**BLOCKED: environment unavailable** (not a code/test FAIL) and do not claim
+build or test results. Do not install host packages merely to work around
+a sandbox limitation.
 
-- Rust toolchain and Cargo;
-- build-essential and pkg-config;
-- Git;
-- curl, wget, jq, unzip, zip;
-- clang, lldb, gdb;
-- cmake and ninja-build;
-- libraries required by Rust crates;
-- terminal/testing utilities;
-- code quality tools such as rustfmt and clippy;
-- other temporary build or diagnostic dependencies.
+Use `scripts/verify-carta.sh` **within an adequate execution environment**
+to run the complete v0.2 workspace + GUI verification, including a release
+build, or run its commands explicitly when narrower testing is warranted.
+The script does not launch or manually evaluate the GUI.
 
-Prefer installing development tooling inside the Debian box rather than modifying the NixOS host.
-
-The repository itself may remain in the user's normal home directory and be accessed from inside Distrobox through its normal home-directory integration.
-
-Do not create additional containers unless there is a concrete need.
-
-Do not delete or rebuild the development box merely to solve a local dependency problem; first try to repair or extend the existing environment.
-
-When adding a new required system dependency, document it in the repository if it becomes part of the reproducible development setup.
+When adding new required system dependencies, document them in the
+reproducible development setup.
 
 ## Development practice
 
@@ -217,7 +225,18 @@ user/dogfooding -> ChatGPT implementation -> local pull -> OpenCode verification
 
 For current v0.2 work, the active development branch is `opencode/v0.2`. The final terminal snapshot is `release/v0.1.2-final`; do not develop new features there. Do not write implementation commits to `main` unless explicitly requested.
 
-If local verification requires a code change, OpenCode should report the failure rather than silently patching it unless the task explicitly authorizes edits.
+For routine v0.2 verification, OpenCode is authorized to make up to three
+small, unambiguous **mechanical** fixes, such as `cargo fmt`, trivial imports,
+syntactic mistakes or precise Clippy suggestions. Re-run the entire relevant
+verification suite after any change, and commit/push only the permitted diffs.
+Do not modify LEAP, rendering, scheduler, storage, synchronization, clipboard,
+the archive format, algorithmic behavior, dependencies or tests to make them
+pass. Those changes remain ChatGPT's responsibility.
+
+A missing tool or inaccessible sandbox/container is an **environment
+blocker**, not a source-code failure. Distinguish `PASS`, `FAIL` (a test
+actually failed) and `BLOCKED` (a test could not run). Never report `PASS`
+for unexecuted tests or for GUI responsiveness without real runtime profiling.
 
 
 ## Public repository privacy rule
