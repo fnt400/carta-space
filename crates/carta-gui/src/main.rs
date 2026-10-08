@@ -35,6 +35,8 @@ pub(crate) struct Gui {
     pub(crate) app: Option<App>,
     pub(crate) input: GuiInputState,
     pub(crate) error: Option<String>,
+    pub(crate) setup_path: Option<PathBuf>,
+    pub(crate) clone_url: String,
     pub(crate) theme_mode: ThemeMode,
     pub(crate) window_size: Size,
     pub(crate) font_size: f32,
@@ -70,6 +72,9 @@ pub(crate) enum Message {
     Scrolled(f32),
     SyncFinished(Result<StagedSync, String>),
     QuitSyncFinished(Result<SyncOutcome, String>),
+    CloneUrlChanged(String),
+    CreateDefaultArchive,
+    CloneDefaultArchive,
 }
 
 impl Gui {
@@ -94,7 +99,9 @@ impl Gui {
         let missing = || Self {
             app: None,
             input: GuiInputState::default(),
-            error: Some("Usage: carta-gui <archive-path>".into()),
+            error: Some("Unable to resolve the default archive path".into()),
+            setup_path: None,
+            clone_url: String::new(),
             theme_mode: ThemeMode::Dark,
             window_size: Size::new(1024.0, 768.0),
             font_size: viewport::FONT_SIZE,
@@ -114,8 +121,8 @@ impl Gui {
             sync_started_generation: 0,
             sync_error: None,
         };
-        let Some(path) = env::args_os()
-            .nth(1)
+        let explicit_archive = env::args_os().nth(1);
+        let Some(path) = explicit_archive.clone()
             .map(PathBuf::from)
             .or_else(|| session::default_archive_path().ok())
         else {
@@ -123,7 +130,11 @@ impl Gui {
         };
 
         let root = session::data_root().ok();
-        let result = Archive::open(&path)
+        let setup_path = (explicit_archive.is_none() && !path.exists()).then_some(path.clone());
+        let result = if setup_path.is_some() {
+            Err(String::new())
+        } else {
+            Archive::open(&path)
             .map_err(|error| error.to_string())
             .and_then(|archive| {
                 let previous = root.as_deref().and_then(|root| {
@@ -141,12 +152,15 @@ impl Gui {
 
         let (app, error, previous) = match result {
             Ok((app, previous)) => (Some(app), None, previous),
+            Err(_) if setup_path.is_some() => (None, None, None),
             Err(error) => (None, Some(error), None),
         };
         Self {
             app,
             input: GuiInputState::default(),
             error,
+            setup_path,
+            clone_url: String::new(),
             theme_mode: ThemeMode::Dark,
             window_size: Size::new(1024.0, 768.0),
             font_size: viewport::FONT_SIZE,
@@ -165,6 +179,50 @@ impl Gui {
             sync_failures: 0,
             sync_started_generation: 0,
             sync_error: None,
+        }
+    }
+
+    fn initialize_default_archive(&mut self, clone: bool) {
+        let Some(path) = self.setup_path.as_ref() else {
+            return;
+        };
+        // No implicit overwrite of an existing Archive or unrelated directory.
+        if path.exists() {
+            self.error = Some("The destination already exists; no files were changed".into());
+            return;
+        }
+        let archive = if clone {
+            let remote = self.clone_url.trim();
+            if remote.is_empty() {
+                self.error = Some("Specify the Git remote URL to clone".into());
+                return;
+            }
+            Archive::clone_sync_remote(remote, path)
+        } else {
+            Archive::create(path)
+        };
+        let archive = match archive {
+            Ok(archive) => archive,
+            Err(error) => {
+                self.error = Some(format!("Archive setup failed: {error}"));
+                return;
+            }
+        };
+        let previous = self.session_root.as_deref().and_then(|root| {
+            session::load(root, archive.metadata().archive_id())
+                .ok()
+                .flatten()
+        });
+        match App::open(archive, previous.as_ref(), Instant::now()) {
+            Ok(mut app) => {
+                app.enable_background_sync();
+                self.app = Some(app);
+                self.last_saved_session = previous;
+                self.error = None;
+                self.setup_path = None;
+                self.next_sync_at = Instant::now();
+            }
+            Err(error) => self.error = Some(format!("Archive open failed: {error}")),
         }
     }
 
@@ -448,6 +506,19 @@ fn normalize_clipboard(value: &str) -> String {
 
 fn update(state: &mut Gui, message: Message) -> Task<Message> {
     match message {
+        Message::CloneUrlChanged(url) => {
+            state.clone_url = url;
+            state.error = None;
+            return Task::none();
+        }
+        Message::CreateDefaultArchive => {
+            state.initialize_default_archive(false);
+            return service_tick(state, Instant::now());
+        }
+        Message::CloneDefaultArchive => {
+            state.initialize_default_archive(true);
+            return service_tick(state, Instant::now());
+        }
         Message::QuitSyncFinished(result) => {
             state.quit_sync_active = false;
             match result {
