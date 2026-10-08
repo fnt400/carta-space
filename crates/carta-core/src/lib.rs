@@ -1,4 +1,5 @@
 mod archive;
+mod background_sync;
 mod backlinks;
 mod conflict;
 mod content;
@@ -14,6 +15,7 @@ mod validation;
 mod work;
 
 pub use archive::Archive;
+pub use background_sync::{stage_sync, StagedSync, SyncApply};
 pub use conflict::{Conflict, ConflictChoice, DocumentConflict, WorkConflict};
 pub use content::{
     extract_markdown_links, link_at_byte_offset, CartaLinkTarget, LinkResolution, MarkdownLink,
