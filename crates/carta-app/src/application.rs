@@ -3714,6 +3714,25 @@ mod tests {
     }
 
     #[test]
+    fn outbound_sync_is_allowed_while_user_is_typing_or_document_is_provisional() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        app.archive.set_sync_remote("unused-local-remote").unwrap();
+        app.enable_background_sync();
+
+        assert!(app.provisional.is_some());
+        assert!(app.prepare_background_sync().unwrap());
+        assert!(app.editor.insert("unsaved typing"));
+        assert!(app.editor.is_dirty());
+        // Publishing an existing committed HEAD must never wait for the
+        // current Document to be saved, finalized or selected.
+        assert!(app.prepare_background_sync().unwrap());
+        assert!(app.editor.is_dirty());
+        assert!(app.provisional.is_some());
+    }
+
+    #[test]
     fn gui_maintenance_keeps_local_saves_without_attempting_remote_sync() {
         let temporary = tempfile::tempdir().unwrap();
         let archive = Archive::create(temporary.path().join("archive")).unwrap();
