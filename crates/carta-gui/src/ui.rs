@@ -49,7 +49,7 @@ fn build_view(state: &Gui) -> Element<'_, Message> {
 
     let editor = editor_view(state, app, state.theme_mode, state.window_size);
     let leap = leap_line(app);
-    let status = status_bar(app, state.theme_mode);
+    let status = status_bar(app, state.theme_mode, state.sync_error.as_deref());
 
     let mut base = column![editor].height(Length::Fill).spacing(0);
     if let Some(leap) = leap {
@@ -333,11 +333,22 @@ fn leap_line(app: &App) -> Option<Element<'_, Message>> {
     )
 }
 
-fn status_bar(app: &App, mode: ThemeMode) -> Element<'_, Message> {
+fn status_bar<'a>(
+    app: &App,
+    mode: ThemeMode,
+    sync_error: Option<&'a str>,
+) -> Element<'a, Message> {
     let status = app.status_bar();
     let right = text(status.right).font(IOSEVKA).size(STATUS_SIZE);
+    let left = if let Some(error) = sync_error {
+        // Keep the error persistent, independently of expiring App statuses.
+        let shortened: String = error.chars().take(140).collect();
+        format!("SYNC FALLITA · {shortened} · ritento automatico")
+    } else {
+        status.left
+    };
     let line = row![
-        text(status.left)
+        text(left)
             .font(IOSEVKA)
             .size(STATUS_SIZE)
             .width(Length::Fill),
@@ -350,8 +361,16 @@ fn status_bar(app: &App, mode: ThemeMode) -> Element<'_, Message> {
         .width(Length::Fill)
         .style(move |_| {
             iced::widget::container::Style::default()
-                .background(status_background(mode))
-                .color(status_foreground(mode))
+                .background(if sync_error.is_some() {
+                    sync_error_background(mode)
+                } else {
+                    status_background(mode)
+                })
+                .color(if sync_error.is_some() {
+                    color!(0xFFFFFF)
+                } else {
+                    status_foreground(mode)
+                })
         })
         .into()
 }
@@ -518,6 +537,13 @@ fn status_background(mode: ThemeMode) -> Color {
     match mode {
         ThemeMode::Light => color!(0xD0D0D0),
         ThemeMode::Dark | ThemeMode::None => color!(0x666666),
+    }
+}
+
+fn sync_error_background(mode: ThemeMode) -> Color {
+    match mode {
+        ThemeMode::Light => color!(0xB42318),
+        ThemeMode::Dark | ThemeMode::None => color!(0x991B1B),
     }
 }
 
