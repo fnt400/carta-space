@@ -49,6 +49,8 @@ pub struct CompositeEditor {
     redo: Vec<Snapshot>,
     dirty_documents: BTreeSet<DocumentId>,
     typing_run: Option<(DocumentId, usize)>,
+    /// Monotonic content mutation counter; cursor-only movement does not bump it.
+    content_revision: u64,
 }
 
 impl CompositeEditor {
@@ -63,6 +65,7 @@ impl CompositeEditor {
             redo: Vec::new(),
             dirty_documents: BTreeSet::new(),
             typing_run: None,
+            content_revision: 0,
         };
         editor.clamp_cursor();
         editor
@@ -73,6 +76,10 @@ impl CompositeEditor {
     }
     pub fn cursor(&self) -> Cursor {
         self.cursor
+    }
+    /// Allows frontends to retain derived layout while navigating unchanged text.
+    pub fn content_revision(&self) -> u64 {
+        self.content_revision
     }
     pub fn anchor(&self) -> Option<Cursor> {
         self.anchor
@@ -850,6 +857,7 @@ impl CompositeEditor {
 
     fn mark_document_dirty(&mut self, document: DocumentId) {
         self.dirty_documents.insert(document);
+        self.content_revision = self.content_revision.wrapping_add(1);
     }
 
     fn mark_current_dirty(&mut self) {
