@@ -154,23 +154,6 @@ impl Cache {
     }
 }
 
-pub fn syntax_at(ranges: &[Range], start: usize, end: usize) -> Option<Syntax> {
-    // Most specific syntax takes priority over a containing block.
-    const PRIORITY: [Syntax; 6] = [
-        Syntax::Code,
-        Syntax::Link,
-        Syntax::Strong,
-        Syntax::Emphasis,
-        Syntax::Heading,
-        Syntax::Quote,
-    ];
-    PRIORITY.into_iter().find(|kind| {
-        ranges
-            .iter()
-            .any(|range| range.syntax == *kind && range.start < end && start < range.end)
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -191,7 +174,7 @@ mod tests {
             assert!(ranges.iter().any(|r| r.syntax == kind), "missing {kind:?}");
         }
         let bold = source.find("**bold**").unwrap();
-        assert_eq!(syntax_at(&ranges, bold, bold + 1), Some(Syntax::Strong));
+        assert_eq!(style_at(&resolve(ranges), bold), Some(Syntax::Strong));
     }
 
     #[test]
@@ -211,6 +194,6 @@ mod tests {
         let text = "# a **strong** title\n";
         let r = parse(text);
         let n = text.find("strong").unwrap();
-        assert_eq!(syntax_at(&r, n, n + 1), Some(Syntax::Strong));
+        assert_eq!(style_at(&resolve(r), n), Some(Syntax::Strong));
     }
 }
