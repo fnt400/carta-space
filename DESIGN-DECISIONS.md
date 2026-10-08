@@ -559,3 +559,16 @@ IME event support remains part of the adapter contract even though no configured
 **Renderer:** The first prototype used WGPU, but a real Linux desktop run failed during Iced shader creation because the active GPU/driver did not expose the shader capability required by the WGPU quad shader. Carta's surface is predominantly text and simple geometry, so GPU-specific shader requirements are not justified for the baseline frontend. The canonical renderer is therefore Iced's supported `tiny-skia` software renderer. WGPU may be reconsidered later as an optional acceleration path, but Carta must not require it to start.
 
 **Why Iced:** It provides the best balance for Carta between implementation simplicity, runtime performance, modern desktop presentation, cross-platform support and the physical keyboard fidelity required by LEAP.
+
+
+---
+
+## DD-048 — GUI cursor states and bundled monospace font
+
+**Decision:** The v0.2 GUI renders the Cat insertion point without injecting two character-wide Unicode squares into document text. It uses the shared application's narrow, wide and extended Cat highlight semantics, and distinguishes the saved (~3 Hz) from the dirty (~1 Hz) blink rate described by the Canon Cat Reference Manual (1987, cursor/highlight section). An existing character at point acts as the caret's painted cell; only newline/end-of-document positions need a stable blank cell. This is an intermediate rich-text projection, not a claim of pixel-perfect replication of the original raster cursor.
+
+**Font:** Iosevka Regular is included with the graphical application under the SIL Open Font License 1.1; the GUI loads its bytes explicitly on startup rather than merely requesting a system font by family name. The font asset is text/base64 because this repository receives programmatic GitHub Contents API updates and the application decodes it in memory. The CLI and frozen TUI remain unaffected; a terminal emulator must independently select Iosevka to use identical typography.
+
+**Rationale:** The text must never shift because of a blinking insertion cursor. The desktop graphical font must not silently fall back to an arbitrary installed font. Do not couple cursor appearance to the archive format or the shared editor's semantic state beyond the already defined Cat cursor/highlight rules.
+
+**Reference:** Canon Cat Reference Manual, "The Cursor and the Highlight", pages 8–9, https://www.manualslib.com/manual/986126/Canon-Cat.html?page=8 .
