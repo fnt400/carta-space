@@ -3,4 +3,3 @@
 
 # The GUI is a standalone Cargo project, excluded from the root workspace.
 /crates/carta-gui/target/
-/crates/carta-gui/Cargo.lock
