@@ -3,6 +3,7 @@ use chrono::{DateTime, Local};
 use iced::theme::Mode as ThemeMode;
 use iced::widget::{column, container, rich_text, row, scrollable, space, span, stack, text, Id};
 use iced::{color, Color, Element, Font, Length};
+use std::time::Instant;
 
 use crate::presentation::SegmentKind;
 use crate::viewport;
@@ -16,6 +17,15 @@ const EDITOR_MAX_WIDTH: f32 = viewport::PAGE_WIDTH;
 pub(crate) const EDITOR_SCROLL_ID: &str = "carta-editor-scroll";
 
 pub(crate) fn view(state: &Gui) -> Element<'_, Message> {
+    let started = crate::profile::enabled().then(Instant::now);
+    let result = build_view(state);
+    if let Some(started) = started {
+        crate::profile::record("view", started);
+    }
+    result
+}
+
+fn build_view(state: &Gui) -> Element<'_, Message> {
     if let Some(error) = &state.error {
         return container(
             column![
