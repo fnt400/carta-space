@@ -156,7 +156,7 @@ of a successful test inside the user's box. If neither is possible, report
 build or test results. Do not install host packages merely to work around
 a sandbox limitation.
 
-Use `scripts/verify-carta.sh` **within an adequate execution environment**
+Use `bash scripts/verify-carta.sh` **within an adequate execution environment**
 to run the complete v0.2 workspace + GUI verification, including a release
 build, or run its commands explicitly when narrower testing is warranted.
 The script does not launch or manually evaluate the GUI.
