@@ -102,8 +102,9 @@ pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
     let private = tempfile::tempdir().map_err(|e| Error::io(&source, e))?;
     let clone = private.path().join("archive");
     let status = Command::new("git")
-        .args(["clone", "--quiet", "--no-hardlinks", "--single-branch",
-               "--branch", "carta", "--"])
+        // The *remote* branch is called carta. The local Archive branch
+        // may have a different name, so clone its actual checked-out HEAD.
+        .args(["clone", "--quiet", "--no-hardlinks", "--"])
         .arg(&source)
         .arg(&clone)
         .status()
@@ -296,9 +297,16 @@ mod tests {
         assert_eq!(job.outcome(), SyncOutcome::Published);
         assert_eq!(git_text(&root, "head", &["rev-parse", "HEAD"]).unwrap(), head);
         assert_eq!(job.apply(&mut archive).unwrap(), SyncApply::Unchanged);
-        let published = git_text(&remote, "remote published head", &[
-            "rev-parse", "refs/heads/carta",
-        ]).unwrap();
+        // The remote is bare: history::git_output assumes a worktree's
+        // .git directory and is therefore intentionally not used here.
+        let published = Command::new("git")
+            .arg("--git-dir")
+            .arg(&remote)
+            .args(["rev-parse", "refs/heads/carta"])
+            .output()
+            .unwrap();
+        assert!(published.status.success());
+        let published = String::from_utf8(published.stdout).unwrap().trim().to_owned();
         assert_eq!(head, published);
     }
 
