@@ -54,11 +54,11 @@ synchronized or included in portable exports. Save errors appear in the
 status line, and shutdown performs a final best-effort save. The kill switch
 does not persist state.
 
-**Performance**: Markdown parsing is cached per unchanged Document; source
-hashing and formatting the currently rendered View still happen when a
-render is requested. Verify in release mode with a large Archive, extended
-click-drag operations and at least fifteen minutes of writing, rather than
-using success of automated tests as proof of responsiveness.
+**Performance**: The virtual View renderer indexes visual rows and
+reuses Markdown syntax across cursor-only interactions. Verify in release
+mode with a large Archive, extended click-drag operations and at least
+fifteen minutes of writing, rather than treating automated tests as proof
+of sustained responsiveness.
 
 Iosevka Regular is bundled directly with the GUI and loaded at startup, so users do not need to install fonts or depend on the host's font resolution. The checked-in base64 asset is decoded in memory rather than installing anything system-wide (see `LICENSES/OFL-iosevka.txt`). The original TUI remains unchanged; its font is selected by the terminal emulator. To match both visually, select **Iosevka** in the terminal as well.
 
@@ -74,21 +74,49 @@ cargo run --release --manifest-path crates/carta-gui/Cargo.toml -- /path/to/arch
 
 Rust 1.88 or newer is required.
 
-### Background maintenance and the UI thread
+### Automatic background Git synchronization
 
-**Temporary v0.2 restriction:** the graphical frontend keeps automatic
-local autosaves and 10-minute Git checkpoints but suspends **automatic
-remote** Git/SSH sync. Network Git processes were being launched
-synchronously by the application maintenance tick (nominally at 180 seconds),
-which can freeze the event loop. The ordinary TUI retains its existing
-automatic synchronization behavior. GUI users can still request explicit sync
-through the command palette, but that command may itself temporarily block.
-An asynchronous sync worker with well-defined archive/edit consistency is
-needed before automatic remote synchronization can return to the GUI.
+Carta's archive synchronization is separate from the frontend. The GUI now
+uses the shared `carta-core` two-phase background-sync service instead of
+invoking network Git/SSH commands from its Iced update loop:
 
-The idle GUI timer is activity-adaptive (15 seconds when idle, two seconds
-when displaying a transient status, one second while edits are awaiting
-autosave), instead of issuing an unconditional 2-second update.
+1. Once the local editor is clean, checkpoint unsynchronized local files.
+   This prepares a stable local Git commit.
+2. A Tokio **blocking worker** creates a private, temporary Git snapshot
+   (owner-only permissions), performs Git fetch/merge/push on that snapshot
+   and returns its resulting commit. The worker never resets, fetches into
+   or modifies the live Archive.
+3. The GUI keeps accepting keyboard, LEAP and mouse events while the worker
+   is active. After a quiet window, the frontend checks that the live editor
+   and working tree are clean, the configured remote has not changed and the
+   local Git HEAD still equals the snapshot's base.
+4. Only then does it import the staged commit **locally** and refresh the
+   document projection. If the base has changed or there is unsaved writing,
+   the result is rejected and retried from a fresh checkpoint.
+5. Automatic sync starts at launch, after local checkpoints and at least
+   every three minutes in normal editing views. Network failures trigger
+   bounded exponential backoff without losing the local archive. Explicit
+   `Sync Now` and remote setup queue the same background mechanism.
+
+The reference TUI still retains its original synchronous `App::tick`
+implementation for compatibility; the shared staging service is available
+to other frontends independently of Iced.
+
+**Safety**: The staging worker never touches the active Archive tree. An
+automatic conflict never silently discards either Git history. Unresolved
+merge conflicts are reported for explicit resolution rather than
+force-pushing one side. Staging data is private, temporary and removed after
+the result has been processed.
+
+**Limitations**: Network transfer and remote Git commands run entirely
+off-thread. The short local checkpoint phase and, when remote files changed,
+the final local import/reset plus Archive reload still run during a quiet
+period on the application thread. Those operations are deliberately
+separated from networking, but are not yet guaranteed to be zero-latency
+with an enormous Archive. The first private snapshot also copies the
+tracked working files and may generate disk I/O. Measure these separately;
+do not claim that this implementation makes *all* disk work asynchronous.
+
 
 ### Virtual View renderer — sustained responsiveness
 
