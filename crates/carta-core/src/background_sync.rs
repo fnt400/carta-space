@@ -384,7 +384,10 @@ mod tests {
 
         let tmp = tempfile::tempdir().unwrap();
         let remote = tmp.path().join("remote.git");
-        git(tmp.path(), &["init", "--bare", "--quiet", remote.to_str().unwrap()]);
+        git(
+            tmp.path(),
+            &["init", "--bare", "--quiet", remote.to_str().unwrap()],
+        );
         let root = tmp.path().join("local");
         let archive = Archive::create(&root).unwrap();
         archive.set_sync_remote(remote.to_str().unwrap()).unwrap();
@@ -404,11 +407,21 @@ mod tests {
         let changed_head = git_text(&root, "changed head", &["rev-parse", "HEAD"]).unwrap();
         assert_ne!(changed_head, original_head);
         let error = stage_sync(root.clone()).unwrap_err();
-        assert!(matches!(error, Error::SyncArchiveMismatch { .. }), "{error:?}");
-        let published = Command::new("git").arg("--git-dir").arg(&remote)
-            .args(["rev-parse", "refs/heads/carta"]).output().unwrap();
+        assert!(
+            matches!(error, Error::SyncArchiveMismatch { .. }),
+            "{error:?}"
+        );
+        let published = Command::new("git")
+            .arg("--git-dir")
+            .arg(&remote)
+            .args(["rev-parse", "refs/heads/carta"])
+            .output()
+            .unwrap();
         assert!(published.status.success());
-        assert_eq!(String::from_utf8(published.stdout).unwrap().trim(), original_head);
+        assert_eq!(
+            String::from_utf8(published.stdout).unwrap().trim(),
+            original_head
+        );
     }
 
     #[test]
@@ -477,7 +490,10 @@ mod tests {
     fn concurrent_edits_to_different_documents_merge_without_overwriting_local_work() {
         let tmp = tempfile::tempdir().unwrap();
         let remote = tmp.path().join("remote.git");
-        git(tmp.path(), &["init", "--bare", "--quiet", remote.to_str().unwrap()]);
+        git(
+            tmp.path(),
+            &["init", "--bare", "--quiet", remote.to_str().unwrap()],
+        );
         let root = tmp.path().join("fermi");
         let mut a = Archive::create(&root).unwrap();
         a.set_sync_remote(remote.to_str().unwrap()).unwrap();
@@ -500,14 +516,20 @@ mod tests {
         assert_eq!(a.read_document(first).unwrap().content(), local_before);
         assert_eq!(staged.apply(&mut a).unwrap(), SyncApply::Updated);
         assert_eq!(a.read_document(first).unwrap().content(), "A from Fermi\n");
-        assert_eq!(a.read_document(second).unwrap().content(), "B from Tanaka\n");
+        assert_eq!(
+            a.read_document(second).unwrap().content(),
+            "B from Tanaka\n"
+        );
     }
 
     #[test]
     fn concurrent_changes_to_same_document_are_never_silently_overwritten() {
         let tmp = tempfile::tempdir().unwrap();
         let remote = tmp.path().join("remote.git");
-        git(tmp.path(), &["init", "--bare", "--quiet", remote.to_str().unwrap()]);
+        git(
+            tmp.path(),
+            &["init", "--bare", "--quiet", remote.to_str().unwrap()],
+        );
         let root = tmp.path().join("fermi");
         let mut a = Archive::create(&root).unwrap();
         a.set_sync_remote(remote.to_str().unwrap()).unwrap();
@@ -527,7 +549,10 @@ mod tests {
         let staged = stage_sync(root.clone()).unwrap();
         assert_eq!(staged.outcome(), SyncOutcome::Conflict);
         assert_eq!(staged.apply(&mut a).unwrap(), SyncApply::Conflict);
-        assert_eq!(git_text(&root, "after conflict", &["rev-parse", "HEAD"]).unwrap(), local_head);
+        assert_eq!(
+            git_text(&root, "after conflict", &["rev-parse", "HEAD"]).unwrap(),
+            local_head
+        );
         assert_eq!(a.read_document(doc).unwrap().content(), "Fermi\n");
         assert_eq!(b.read_document(doc).unwrap().content(), "Tanaka\n");
     }
