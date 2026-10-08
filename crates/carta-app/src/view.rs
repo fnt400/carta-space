@@ -124,7 +124,10 @@ mod tests {
         let first_generation = scheduler.sync_generation();
         scheduler.sync_pending(); // Another checkpoint while Git was working.
         scheduler.sync_finished(first_generation, start + Duration::from_secs(1));
-        assert!(scheduler.is_sync_pending(), "second commit must still be pushed");
+        assert!(
+            scheduler.is_sync_pending(),
+            "second commit must still be pushed"
+        );
         let second_generation = scheduler.sync_generation();
         scheduler.sync_finished(second_generation, start + Duration::from_secs(2));
         assert!(!scheduler.is_sync_pending());

@@ -287,8 +287,7 @@ fn indexed_hit_test(
 fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
     const QUIET: Duration = Duration::from_secs(2);
     const INTERVAL: Duration = Duration::from_secs(180);
-    let idle = now.saturating_duration_since(state.last_user_input) >= QUIET
-        && !state.pointer_down;
+    let idle = now.saturating_duration_since(state.last_user_input) >= QUIET && !state.pointer_down;
 
     if state.sync_ready.is_some() {
         let current_generation = state
@@ -331,9 +330,8 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
                         state.next_sync_at = now + INTERVAL;
                     }
                     Ok(SyncApply::Conflict) => {
-                        state.sync_error = Some(
-                            "Conflitto Git: modifiche simultanee da risolvere".into()
-                        );
+                        state.sync_error =
+                            Some("Conflitto Git: modifiche simultanee da risolvere".into());
                         state.next_sync_at = now + INTERVAL;
                     }
                     Ok(SyncApply::Stale) => {
@@ -367,7 +365,8 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
         Ok(false) => {
             state.next_sync_at = now + INTERVAL;
             // No remote configured is an explicit opt-out, not a failed push.
-            app.scheduler.sync_finished(app.scheduler.sync_generation(), now);
+            app.scheduler
+                .sync_finished(app.scheduler.sync_generation(), now);
             return Task::none();
         }
         Err(error) => {
@@ -412,16 +411,17 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                         state.sync_error = None;
                         state.sync_failures = 0;
                         if let Some(app) = &mut state.app {
-                            app.scheduler.sync_finished(state.sync_started_generation, now);
+                            app.scheduler
+                                .sync_finished(state.sync_started_generation, now);
                         }
                         state.next_sync_at = now + Duration::from_secs(180);
                     }
                     SyncOutcome::Conflict => {
-                        state.sync_error = Some(
-                            "Conflitto Git: modifiche concorrenti sul server".into()
-                        );
+                        state.sync_error =
+                            Some("Conflitto Git: modifiche concorrenti sul server".into());
                         if let Some(app) = &mut state.app {
-                            app.scheduler.sync_finished(state.sync_started_generation, now);
+                            app.scheduler
+                                .sync_finished(state.sync_started_generation, now);
                         }
                         state.next_sync_at = now + Duration::from_secs(180);
                     }

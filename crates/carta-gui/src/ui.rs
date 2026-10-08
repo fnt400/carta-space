@@ -333,11 +333,7 @@ fn leap_line(app: &App) -> Option<Element<'_, Message>> {
     )
 }
 
-fn status_bar<'a>(
-    app: &App,
-    mode: ThemeMode,
-    sync_error: Option<&'a str>,
-) -> Element<'a, Message> {
+fn status_bar<'a>(app: &App, mode: ThemeMode, sync_error: Option<&'a str>) -> Element<'a, Message> {
     let failed = sync_error.is_some();
     let status = app.status_bar();
     let right = text(status.right).font(IOSEVKA).size(STATUS_SIZE);
