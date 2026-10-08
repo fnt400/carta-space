@@ -181,16 +181,10 @@ fn view(state: &Gui) -> Element<'_, Message> {
         text(&app.status).size(12)
     };
 
-    let body = column![
-        header,
-        context,
-        editor,
-        mode_panel(app),
-        status,
-    ]
-    .spacing(10)
-    .padding([14, 18])
-    .height(Length::Fill);
+    let body = column![header, context, editor, mode_panel(app), status,]
+        .spacing(10)
+        .padding([14, 18])
+        .height(Length::Fill);
 
     container(body)
         .width(Length::Fill)

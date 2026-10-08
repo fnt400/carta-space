@@ -348,8 +348,5 @@ impl GuiInputState {
 }
 
 fn is_neutral_modifier(code: Code) -> bool {
-    matches!(
-        code,
-        Code::ShiftLeft | Code::ShiftRight | Code::AltRight
-    )
+    matches!(code, Code::ShiftLeft | Code::ShiftRight | Code::AltRight)
 }
