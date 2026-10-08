@@ -378,6 +378,40 @@ mod tests {
     }
 
     #[test]
+    fn fast_path_rejects_different_archive_id_even_with_shared_git_history() {
+        use crate::{ArchiveId, Timestamp};
+        use std::fs::File;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let remote = tmp.path().join("remote.git");
+        git(tmp.path(), &["init", "--bare", "--quiet", remote.to_str().unwrap()]);
+        let root = tmp.path().join("local");
+        let archive = Archive::create(&root).unwrap();
+        archive.set_sync_remote(remote.to_str().unwrap()).unwrap();
+        archive.sync_remote().unwrap().unwrap();
+        let original_head = git_text(&root, "original head", &["rev-parse", "HEAD"]).unwrap();
+        let initial = stage_sync(root.clone()).unwrap();
+        assert_eq!(initial.outcome(), SyncOutcome::Published);
+
+        // Simulate a local metadata identity change committed on top of the
+        // published history. The old fast-path push would accept and publish
+        // this unrelated Archive ID because Git ancestry alone matched.
+        let replacement = ArchiveMetadata::new(ArchiveId::new_v7(), Timestamp::now_local());
+        replacement
+            .write_to(File::create(root.join("carta.json")).unwrap())
+            .unwrap();
+        archive.checkpoint(CheckpointKind::Manual, None).unwrap();
+        let changed_head = git_text(&root, "changed head", &["rev-parse", "HEAD"]).unwrap();
+        assert_ne!(changed_head, original_head);
+        let error = stage_sync(root.clone()).unwrap_err();
+        assert!(matches!(error, Error::SyncArchiveMismatch { .. }), "{error:?}");
+        let published = Command::new("git").arg("--git-dir").arg(&remote)
+            .args(["rev-parse", "refs/heads/carta"]).output().unwrap();
+        assert!(published.status.success());
+        assert_eq!(String::from_utf8(published.stdout).unwrap().trim(), original_head);
+    }
+
+    #[test]
     fn private_worker_publishes_local_checkpoint_without_resetting_source() {
         let tmp = tempfile::tempdir().unwrap();
         let remote = tmp.path().join("remote.git");
