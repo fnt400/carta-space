@@ -335,6 +335,10 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
                         state.next_sync_at = now + INTERVAL;
                     }
                     Ok(SyncApply::Stale) => {
+                        // The editor/Archive changed after staging: retry
+                        // without replacing any live data, but avoid an
+                        // immediate worker loop while those changes settle.
+                        state.sync_failures = state.sync_failures.max(1);
                         state.next_sync_at = now + Duration::from_secs(5);
                     }
                     Err(error) => {
