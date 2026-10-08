@@ -13,6 +13,7 @@ struct DocumentRows {
     prefix: usize,
     locked: bool,
     generation: u64,
+    content_version: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -118,6 +119,7 @@ impl Layout {
                     prefix,
                     locked,
                     generation,
+                    content_version: app.editor.document_revision(region.document),
                 });
                 self.indices.insert(region.document, i);
             }
@@ -130,9 +132,14 @@ impl Layout {
             let changed_ids = dirty.into_iter().chain(current);
             for id in changed_ids {
                 if let Some(&index) = self.indices.get(&id) {
+                    let version = app.editor.document_revision(id);
+                    if self.docs[index].content_version == version {
+                        continue;
+                    }
                     let generation = self.next_generation();
                     self.docs[index].starts = row_starts(&regions[index].text, columns);
                     self.docs[index].generation = generation;
+                    self.docs[index].content_version = version;
                 }
             }
         }
