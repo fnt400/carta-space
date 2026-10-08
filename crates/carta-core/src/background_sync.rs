@@ -221,6 +221,44 @@ mod tests {
     }
 
     #[test]
+    fn private_worker_publishes_local_checkpoint_without_resetting_source() {
+        let tmp = tempfile::tempdir().unwrap();
+        let remote = tmp.path().join("remote.git");
+        git(tmp.path(), &["init", "--bare", "--quiet", remote.to_str().unwrap()]);
+        let root = tmp.path().join("local");
+        let mut archive = Archive::create(&root).unwrap();
+        archive.set_sync_remote(remote.to_str().unwrap()).unwrap();
+        archive.create_document("written on the first computer\n").unwrap();
+        archive.checkpoint(CheckpointKind::Manual, None).unwrap();
+        let head = git_text(&root, "head", &["rev-parse", "HEAD"]).unwrap();
+        let job = stage_sync(root.clone()).unwrap();
+        assert_eq!(job.outcome(), SyncOutcome::Published);
+        assert_eq!(git_text(&root, "head", &["rev-parse", "HEAD"]).unwrap(), head);
+        assert_eq!(job.apply(&mut archive).unwrap(), SyncApply::Unchanged);
+        let published = git_text(&remote, "remote published head", &[
+            "rev-parse", "refs/heads/carta",
+        ]).unwrap();
+        assert_eq!(head, published);
+    }
+
+    #[test]
+    fn uncheckpointed_local_writing_is_never_overwritten_by_old_sync_result() {
+        let tmp = tempfile::tempdir().unwrap();
+        let remote = tmp.path().join("remote.git");
+        git(tmp.path(), &["init", "--bare", "--quiet", remote.to_str().unwrap()]);
+        let root = tmp.path().join("local");
+        let mut archive = Archive::create(&root).unwrap();
+        archive.set_sync_remote(remote.to_str().unwrap()).unwrap();
+        let doc = archive.create_document("old\n").unwrap();
+        archive.checkpoint(CheckpointKind::Manual, None).unwrap();
+        archive.sync().unwrap();
+        let staged = stage_sync(root.clone()).unwrap();
+        archive.edit_document(doc, "writing in progress\n").unwrap();
+        assert_eq!(staged.apply(&mut archive).unwrap(), SyncApply::Stale);
+        assert_eq!(archive.read_document(doc).unwrap().content(), "writing in progress\n");
+    }
+
+    #[test]
     fn stale_snapshot_does_not_replace_new_local_checkpoint() {
         let tmp = tempfile::tempdir().unwrap();
         let remote = tmp.path().join("remote.git");
