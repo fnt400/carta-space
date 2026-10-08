@@ -1,0 +1,28 @@
+name: One-time audit rustfmt
+on:
+  push:
+    branches: [opencode/v0.2]
+    paths: [".github/workflows/audit-format-once.yml"]
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    if: github.repository == 'fnt400/carta-space'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Format reviewed Rust source
+        run: |
+          set -eu
+          cargo fmt --all
+          cargo fmt --manifest-path crates/carta-gui/Cargo.toml
+          git add crates/carta-core/src/background_sync.rs
+          if git diff --cached --quiet; then
+            echo 'Already formatted'
+            exit 0
+          fi
+          git -c user.name=github-actions -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -m 'Format audit safety checks and concurrent Git sync tests'
+          git push origin HEAD:opencode/v0.2
