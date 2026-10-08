@@ -186,12 +186,14 @@ fn separator_for_region(app: &App, region_index: usize, columns: usize) -> Optio
             "── {marker}{} ──────────────────────────────",
             local_date_time(info.modified())
         )),
-        View::Work(_) if region_index > 0 || locked => {
-            let prefix = if locked { "[LOCKED] " } else { "" };
-            Some(format!("{prefix}{}", "─".repeat(columns.saturating_sub(prefix.chars().count()))))
-        },
+        View::Work(_) if region_index > 0 || locked => Some(work_rule(columns, locked)),
         _ => None,
     }
+}
+
+fn work_rule(columns: usize, locked: bool) -> String {
+    let prefix = if locked { "[LOCKED] " } else { "" };
+    format!("{prefix}{}", "─".repeat(columns.saturating_sub(prefix.chars().count())))
 }
 
 fn local_date_time(timestamp: carta_core::Timestamp) -> String {
@@ -431,6 +433,14 @@ fn modal_foreground(mode: ThemeMode) -> Color {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn work_rule_is_continuous_at_each_window_width() {
+        assert_eq!(work_rule(40, false), "─".repeat(40));
+        assert_eq!(work_rule(80, true).chars().count(), 80);
+        assert!(work_rule(80, true).starts_with("[LOCKED] "));
+        assert!(!work_rule(40, false).contains('\\n'));
+    }
 
     #[test]
     fn prompt_caret_is_utf8_safe() {
