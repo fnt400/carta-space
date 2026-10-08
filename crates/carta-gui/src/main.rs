@@ -326,6 +326,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                     .clamp(viewport::MIN_FONT_SIZE, viewport::MAX_FONT_SIZE);
                 zoomed = next != state.font_size;
                 state.font_size = next;
+                app.status = format!("Writing font: {next:.0} px");
             }
             if let Some(started) = started {
                 profile::record("input", started);
