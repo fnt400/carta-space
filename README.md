@@ -286,14 +286,20 @@ The current Rust workspace contains `carta-format`, `carta-core`, `carta-app`, `
 
 The enhanced-keyboard-reporting experiment remains separate under `experiments/keyboard-events` as a diagnostic for terminal compatibility.
 
-Development commands run in the Debian Distrobox described in `AGENTS.md`. The container requires Rust, Cargo, rustfmt, Clippy, and Git. From the repository root, validate the workspace with:
+Development of v0.2 (including the experimental GUI) uses the Ubuntu 26.04
+Distrobox `carta-gui-dev` described in `AGENTS.md`, with Rust >= 1.88.
+From the repository root on the NixOS host, run:
 
 ```bash
-distrobox enter carta-dev
-cargo fmt --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace
+distrobox enter carta-gui-dev
+bash scripts/verify-carta.sh
 ```
+
+The verification script checks the normal Rust workspace and the standalone GUI
+crate, including the optimized GUI release build. It does **not** establish
+runtime smoothness: sustained GUI responsiveness must be tested manually with a
+representative Archive. The old Debian `carta-dev` is retained only for
+legacy v0.1.2 TUI compatibility as needed.
 
 The v0.1 interaction contract now fixes startup/resume behavior, LEAP semantics, the contextual dmenu-like command palette, editing and clipboard behavior, Creation Date/Modification Date/Work/Search Views, Work operations, links/backlinks, History, Trash/Wipe, import/export, autosave/checkpoints, Git synchronization, recovery, and structural atomicity. Implementation work should follow `INTERACTION-CONTRACT.md` rather than inventing missing UI semantics.
 
