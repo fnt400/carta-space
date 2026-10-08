@@ -119,22 +119,13 @@ fn prefix_rows(view: &View, index: usize, locked: bool) -> usize {
 }
 
 fn row_starts(text: &str, width: usize) -> Vec<usize> {
-    let mut starts = vec![0];
-    let mut col = 0;
-    let width = width.max(1);
-    for (byte, ch) in text.char_indices() {
-        if ch == '\n' {
-            starts.push(byte + 1);
-            col = 0;
-        } else {
-            if col >= width {
-                starts.push(byte);
-                col = 0;
-            }
-            col += 1;
-        }
-    }
-    starts
+    // Use the editor's canonical word-wrap boundaries so cursor navigation,
+    // pointer hit-testing and displayed rows agree. This is derived layout;
+    // no newlines are inserted into authored text.
+    carta_app::editor::visual_ranges(text, width)
+        .into_iter()
+        .map(|(start, _)| start)
+        .collect()
 }
 
 impl Layout {
