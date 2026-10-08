@@ -8,7 +8,7 @@ mod viewport;
 
 use base64::Engine as _;
 use carta_app::{App, AppMode, Session, View};
-use carta_core::Archive;
+use carta_core::{stage_sync, Archive, StagedSync, SyncApply};
 use iced::event::{self, Status};
 use iced::theme::Mode as ThemeMode;
 use iced::widget::operation::{self, AbsoluteOffset};
@@ -45,6 +45,11 @@ pub(crate) struct Gui {
     last_saved_session: Option<Session>,
     pointer: Option<Point>,
     pointer_down: bool,
+    sync_active: bool,
+    sync_ready: Option<StagedSync>,
+    next_sync_at: Instant,
+    last_user_input: Instant,
+    sync_failures: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -60,6 +65,7 @@ pub(crate) enum Message {
     PointerPressed,
     PointerReleased,
     Scrolled(f32),
+    SyncFinished(Result<StagedSync, String>),
 }
 
 impl Gui {
@@ -68,11 +74,14 @@ impl Gui {
         let font_bytes = base64::engine::general_purpose::STANDARD
             .decode(include_str!("../assets/iosevka-regular.ttf.b64").trim())
             .expect("bundled Iosevka font must be valid base64");
+        let mut gui = Self::load();
+        let sync = service_tick(&mut gui, Instant::now());
         (
-            Self::load(),
+            gui,
             Task::batch([
                 system::theme().map(Message::SystemTheme),
                 iced::font::load(font_bytes).map(|result| Message::FontLoaded(result.is_ok())),
+                sync,
             ]),
         )
     }
@@ -92,6 +101,11 @@ impl Gui {
             last_saved_session: None,
             pointer: None,
             pointer_down: false,
+            sync_active: false,
+            sync_ready: None,
+            next_sync_at: Instant::now(),
+            last_user_input: Instant::now(),
+            sync_failures: 0,
         };
         let Some(path) = env::args_os()
             .nth(1)
@@ -111,7 +125,10 @@ impl Gui {
                         .flatten()
                 });
                 App::open(archive, previous.as_ref(), Instant::now())
-                    .map(|app| (app, previous))
+                    .map(|mut app| {
+                        app.enable_background_sync();
+                        (app, previous)
+                    })
                     .map_err(|error| error.to_string())
             });
 
@@ -133,6 +150,11 @@ impl Gui {
             last_saved_session: previous,
             pointer: None,
             pointer_down: false,
+            sync_active: false,
+            sync_ready: None,
+            next_sync_at: Instant::now(),
+            last_user_input: Instant::now(),
+            sync_failures: 0,
         }
     }
 
@@ -245,12 +267,116 @@ fn indexed_hit_test(
     layout.hit_test(app, row, col)
 }
 
+/// Two-phase sync orchestration. Network Git is confined to a private
+/// copy on a Tokio blocking worker. The GUI integrates local results only
+/// after a quiet period, with source HEAD/dirty-state validation.
+fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
+    const QUIET: Duration = Duration::from_secs(2);
+    const INTERVAL: Duration = Duration::from_secs(180);
+    let idle = now.saturating_duration_since(state.last_user_input) >= QUIET && !state.pointer_down;
+
+    if idle {
+        if let Some(staged) = state.sync_ready.take() {
+            let result = if let Some(app) = state.app.as_mut() {
+                app.apply_background_sync(&staged)
+            } else {
+                return Task::none();
+            };
+            match result {
+                Ok(SyncApply::Updated) => {
+                    // Recreate only disposable rendering indices after a
+                    // remote update replaced the underlying Document data.
+                    *state.layout.borrow_mut() = layout::Layout::default();
+                    *state.markdown.borrow_mut() = markdown::Cache::default();
+                    state.next_sync_at = now + INTERVAL;
+                    return scroll_to_caret(state);
+                }
+                Ok(SyncApply::Unchanged | SyncApply::Conflict) => {
+                    state.next_sync_at = now + INTERVAL;
+                }
+                Ok(SyncApply::Stale) => {
+                    // Local writing/checkpoint progressed since worker start.
+                    // Resnapshot after a short quiet window, never overwrite.
+                    state.next_sync_at = now + Duration::from_secs(5);
+                    return Task::none();
+                }
+                Err(error) => {
+                    if let Some(app) = &mut state.app {
+                        app.status = format!("Sync integration unavailable: {error}");
+                        app.scheduler.sync_attempted(now);
+                    }
+                    state.next_sync_at = now + Duration::from_secs(30);
+                    return Task::none();
+                }
+            }
+        }
+    }
+
+    if state.sync_active || state.sync_ready.is_some() || !idle {
+        return Task::none();
+    }
+    let Some(app) = &mut state.app else {
+        return Task::none();
+    };
+    if now < state.next_sync_at && !app.scheduler.sync_due(now) {
+        return Task::none();
+    }
+
+    // For this phase only local operations are permitted. In particular,
+    // checkpoint before launching a worker so it sees an immutable commit.
+    match app.prepare_background_sync() {
+        Ok(true) => {}
+        Ok(false) => {
+            state.next_sync_at = now + Duration::from_secs(15);
+            return Task::none();
+        }
+        Err(error) => {
+            app.status = format!("Sync preparation unavailable: {error}");
+            state.next_sync_at = now + Duration::from_secs(30);
+            return Task::none();
+        }
+    }
+
+    let root = app.archive.root().to_path_buf();
+    state.sync_active = true;
+    state.next_sync_at = now + INTERVAL;
+    Task::perform(
+        async move {
+            match tokio::task::spawn_blocking(move || stage_sync(root)).await {
+                Ok(Ok(stage)) => Ok(stage),
+                Ok(Err(error)) => Err(error.to_string()),
+                Err(error) => Err(format!("Background sync worker failed: {error}")),
+            }
+        },
+        Message::SyncFinished,
+    )
+}
+
 fn normalize_clipboard(value: &str) -> String {
     value.replace("\r\n", "\n").replace('\r', "\n")
 }
 
 fn update(state: &mut Gui, message: Message) -> Task<Message> {
     match message {
+        Message::SyncFinished(result) => {
+            state.sync_active = false;
+            match result {
+                Ok(stage) => {
+                    state.sync_failures = 0;
+                    state.sync_ready = Some(stage);
+                }
+                Err(error) => {
+                    state.sync_failures = state.sync_failures.saturating_add(1);
+                    let delay = 30_u64.saturating_mul(1_u64 << state.sync_failures.min(4));
+                    state.next_sync_at = Instant::now() + Duration::from_secs(delay);
+                    if let Some(app) = &mut state.app {
+                        app.scheduler.sync_attempted(Instant::now());
+                        app.status = format!("Automatic sync unavailable; retry scheduled: {error}");
+                    }
+                }
+            }
+            return service_tick(state, Instant::now());
+        }
         Message::Scrolled(offset) => {
             // Native wheel and scrollbar position remains the source of truth.
             // Only the bounded visible-row window is recomputed.
@@ -259,6 +385,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
         }
         Message::PointerMoved(point) => {
             state.pointer = Some(point);
+            if state.pointer_down { state.last_user_input = Instant::now(); }
             if state.pointer_down {
                 if let Some(app) = &mut state.app {
                     if matches!(app.mode, AppMode::Editing)
@@ -281,6 +408,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
             return Task::none();
         }
         Message::PointerPressed => {
+            state.last_user_input = Instant::now();
             let Some(point) = state.pointer else {
                 return Task::none();
             };
@@ -305,6 +433,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
         }
         Message::PointerReleased => {
             state.pointer_down = false;
+            state.last_user_input = Instant::now();
             return Task::none();
         }
         Message::Tick(now) => {
@@ -322,7 +451,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                     app.status = format!("Session save: {error}");
                 }
             }
-            return Task::none();
+            return service_tick(state, now);
         }
         Message::SystemTheme(mode) => {
             state.theme_mode = mode;
@@ -368,6 +497,9 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
         return Task::none();
     };
     let keyboard_event = matches!(message, Message::Raw(Event::Keyboard(_)));
+    if keyboard_event {
+        state.last_user_input = Instant::now();
+    }
     let before_cursor = app.editor.cursor();
     let before_region_count = app.editor.regions().len();
     let before_view = std::mem::discriminant(&app.view);
@@ -407,10 +539,13 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                 || std::mem::discriminant(&app.view) != before_view));
     if app.quit {
         iced::exit()
-    } else if follow_caret {
-        Task::batch([clipboard, scroll_to_caret(state)])
     } else {
-        clipboard
+        let auto_sync = service_tick(state, Instant::now());
+        if follow_caret {
+            Task::batch([clipboard, scroll_to_caret(state), auto_sync])
+        } else {
+            Task::batch([clipboard, auto_sync])
+        }
     }
 }
 
