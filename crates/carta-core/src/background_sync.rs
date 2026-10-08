@@ -63,9 +63,9 @@ pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
         "inspect background-sync base",
         &["rev-parse", "--verify", "HEAD"],
     )?;
-    if crate::history::is_dirty_at(&source)? {
-        return Err(Error::SyncRequiresCleanArchive);
-    }
+    // Only immutable committed data may be published. The writer can keep
+    // editing the live worktree while the worker pushes this pinned HEAD.
+    // Importing remote changes is independently guarded by StagedSync::apply.
     // Most sync cycles need no clone. Inspect the remote only on this
     // worker, and publish the *pinned commit* (never a moving HEAD) when a
     // fast-forward is accepted by the Git server. Failure falls back to a
