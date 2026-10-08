@@ -1,6 +1,6 @@
 use carta_core::DocumentId;
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use unicode_width::UnicodeWidthChar;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -51,6 +51,7 @@ pub struct CompositeEditor {
     typing_run: Option<(DocumentId, usize)>,
     /// Monotonic content mutation counter; cursor-only movement does not bump it.
     content_revision: u64,
+    document_revisions: BTreeMap<DocumentId, u64>,
 }
 
 impl CompositeEditor {
@@ -66,6 +67,7 @@ impl CompositeEditor {
             dirty_documents: BTreeSet::new(),
             typing_run: None,
             content_revision: 0,
+            document_revisions: BTreeMap::new(),
         };
         editor.clamp_cursor();
         editor
@@ -80,6 +82,9 @@ impl CompositeEditor {
     /// Allows frontends to retain derived layout while navigating unchanged text.
     pub fn content_revision(&self) -> u64 {
         self.content_revision
+    }
+    pub fn document_revision(&self, document: DocumentId) -> u64 {
+        self.document_revisions.get(&document).copied().unwrap_or(0)
     }
     pub fn anchor(&self) -> Option<Cursor> {
         self.anchor
@@ -858,6 +863,7 @@ impl CompositeEditor {
     fn mark_document_dirty(&mut self, document: DocumentId) {
         self.dirty_documents.insert(document);
         self.content_revision = self.content_revision.wrapping_add(1);
+        *self.document_revisions.entry(document).or_default() = self.content_revision;
     }
 
     fn mark_current_dirty(&mut self) {
