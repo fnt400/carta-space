@@ -111,3 +111,34 @@ impl Scheduler {
         self.sync_pending = false;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn commit_made_during_push_remains_queued_after_earlier_push_succeeds() {
+        let start = Instant::now();
+        let mut scheduler = Scheduler::new(start);
+        scheduler.sync_pending();
+        let first_generation = scheduler.sync_generation();
+        scheduler.sync_pending(); // Another checkpoint while Git was working.
+        scheduler.sync_finished(first_generation, start + Duration::from_secs(1));
+        assert!(scheduler.is_sync_pending(), "second commit must still be pushed");
+        let second_generation = scheduler.sync_generation();
+        scheduler.sync_finished(second_generation, start + Duration::from_secs(2));
+        assert!(!scheduler.is_sync_pending());
+    }
+
+    #[test]
+    fn failed_push_can_retry_without_acknowledging_pending_checkpoint() {
+        let start = Instant::now();
+        let mut scheduler = Scheduler::new(start);
+        scheduler.sync_pending();
+        let generation = scheduler.sync_generation();
+        // A failed worker does NOT call sync_finished.
+        assert!(scheduler.is_sync_pending());
+        scheduler.sync_finished(generation, start + Duration::from_secs(3));
+        assert!(!scheduler.is_sync_pending());
+    }
+}
