@@ -213,18 +213,19 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::normalize_clipboard;
-    #[test]
-    fn pasted_line_endings_are_normalized() {
-        assert_eq!(normalize_clipboard("a\r\nb\rc\n"), "a\nb\nc\n");
-    }
-}
-
 fn theme(state: &Gui) -> Theme {
     match state.theme_mode {
         ThemeMode::Light => Theme::Light,
         ThemeMode::Dark | ThemeMode::None => Theme::Dark,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_clipboard;
+
+    #[test]
+    fn pasted_line_endings_are_normalized() {
+        assert_eq!(normalize_clipboard("a\r\nb\rc\n"), "a\nb\nc\n");
     }
 }
