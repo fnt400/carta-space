@@ -1,14 +1,16 @@
 mod input;
 mod presentation;
 mod ui;
+mod viewport;
 
 use base64::Engine as _;
 use carta_app::App;
 use carta_core::Archive;
 use iced::event::{self, Status};
 use iced::theme::Mode as ThemeMode;
-use iced::{system, window, Event, Font, Settings, Subscription, Task, Theme};
-use input::GuiInputState;
+use iced::{system, window, Event, Font, Settings, Size, Subscription, Task, Theme};
+use iced::widget::operation::{self, AbsoluteOffset};
+use input::{ClipboardRequest, GuiInputState};
 use std::env;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -30,8 +32,8 @@ pub(crate) struct Gui {
     pub(crate) input: GuiInputState,
     pub(crate) error: Option<String>,
     pub(crate) theme_mode: ThemeMode,
-    pub(crate) blink_origin: Instant,
     pub(crate) caret_visible: bool,
+    pub(crate) window_size: Size,
 }
 
 #[derive(Debug, Clone)]
@@ -40,6 +42,9 @@ pub(crate) enum Message {
     Tick(Instant),
     SystemTheme(ThemeMode),
     FontLoaded(bool),
+    WindowOpened(window::Id),
+    WindowSize(Size),
+    PasteText(Option<String>),
 }
 
 impl Gui {
@@ -64,8 +69,8 @@ impl Gui {
                 input: GuiInputState::default(),
                 error: Some("Usage: carta-gui <archive-path>".into()),
                 theme_mode: ThemeMode::Dark,
-                blink_origin: Instant::now(),
                 caret_visible: true,
+                window_size: Size::new(1024.0, 768.0),
             };
         };
 
@@ -79,16 +84,16 @@ impl Gui {
                 input: GuiInputState::default(),
                 error: None,
                 theme_mode: ThemeMode::Dark,
-                blink_origin: Instant::now(),
                 caret_visible: true,
+                window_size: Size::new(1024.0, 768.0),
             },
             Err(error) => Self {
                 app: None,
                 input: GuiInputState::default(),
                 error: Some(error),
                 theme_mode: ThemeMode::Dark,
-                blink_origin: Instant::now(),
                 caret_visible: true,
+                window_size: Size::new(1024.0, 768.0),
             },
         }
     }
@@ -113,57 +118,111 @@ fn subscription(_state: &Gui) -> Subscription<Message> {
 
     Subscription::batch([
         keyboard,
-        iced::time::every(Duration::from_millis(167)).map(Message::Tick),
+        // No animation loop: only maintain autosave/status on a low-frequency timer.
+        iced::time::every(Duration::from_secs(2)).map(Message::Tick),
+        window::open_events().map(Message::WindowOpened),
+        window::resize_events().map(|(_id, size)| Message::WindowSize(size)),
         system::theme_changes().map(Message::SystemTheme),
     ])
 }
 
-fn update(state: &mut Gui, message: Message) -> Task<Message> {
-    if let Message::SystemTheme(mode) = message {
-        state.theme_mode = mode;
+fn scroll_to_caret(state: &Gui) -> Task<Message> {
+    let Some(app) = &state.app else {
         return Task::none();
-    }
-    if let Message::FontLoaded(success) = message {
-        if !success {
+    };
+    let offset = viewport::scroll_offset(
+        app,
+        state.window_size.width,
+        state.window_size.height,
+    );
+    operation::scroll_to(
+        ui::EDITOR_SCROLL_ID,
+        AbsoluteOffset { x: None, y: Some(offset) },
+    )
+}
+
+fn normalize_clipboard(value: &str) -> String {
+    value.replace("\r\n", "\n").replace('\r', "\n")
+}
+
+fn update(state: &mut Gui, message: Message) -> Task<Message> {
+    match message {
+        Message::SystemTheme(mode) => {
+            state.theme_mode = mode;
+            return Task::none();
+        }
+        Message::FontLoaded(false) => {
             if let Some(app) = &mut state.app {
                 app.status = "Bundled Iosevka font could not be loaded".into();
             }
+            return Task::none();
         }
-        return Task::none();
+        Message::FontLoaded(true) => return scroll_to_caret(state),
+        Message::WindowOpened(id) => {
+            return window::size(id).map(Message::WindowSize);
+        }
+        Message::WindowSize(size) => {
+            state.window_size = size;
+            return scroll_to_caret(state);
+        }
+        Message::PasteText(value) => {
+            if let Some(app) = &mut state.app {
+                if matches!(app.mode, carta_app::AppMode::Editing) {
+                    if let Some(value) = value {
+                        let value = normalize_clipboard(&value);
+                        if !value.is_empty() {
+                            app.dispatch_action(
+                                carta_app::Action::InsertText(value),
+                                Instant::now(),
+                            );
+                            return scroll_to_caret(state);
+                        }
+                    }
+                    app.status = "No text available in system clipboard".into();
+                }
+            }
+            return Task::none();
+        }
+        _ => {}
     }
 
+    let columns = viewport::columns(state.window_size.width);
     let Some(app) = &mut state.app else {
         return Task::none();
     };
-
+    let keyboard_event = matches!(message, Message::Raw(Event::Keyboard(_)));
+    let mut clipboard = Task::none();
     let result = match message {
         Message::Raw(Event::Keyboard(event)) => {
-            state.blink_origin = Instant::now();
-            state.caret_visible = true;
-            state.input.handle(app, event)
+            let result = state.input.handle(app, event, columns);
+            clipboard = match state.input.take_clipboard_request() {
+                Some(ClipboardRequest::Read) => iced::clipboard::read().map(Message::PasteText),
+                Some(ClipboardRequest::Write(text)) => iced::clipboard::write(text),
+                None => Task::none(),
+            };
+            result
         }
-        Message::Tick(now) => {
-            // Canon Cat: about 3 Hz when saved, about 1 Hz when dirty.
-            let half_period_ms = if app.editor.is_dirty() { 500 } else { 167 };
-            state.caret_visible = (now
-                .saturating_duration_since(state.blink_origin)
-                .as_millis()
-                / half_period_ms)
-                % 2
-                == 0;
-            app.tick(now).map(|_| ())
-        }
-        Message::Raw(_) | Message::SystemTheme(_) | Message::FontLoaded(_) => Ok(()),
+        Message::Tick(now) => app.tick(now).map(|_| ()),
+        _ => Ok(()),
     };
-
     if let Err(error) = result {
         app.status = format!("Error: {error}");
     }
-
     if app.quit {
         iced::exit()
+    } else if keyboard_event {
+        Task::batch([clipboard, scroll_to_caret(state)])
     } else {
-        Task::none()
+        clipboard
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_clipboard;
+    #[test]
+    fn pasted_line_endings_are_normalized() {
+        assert_eq!(normalize_clipboard("a\r\nb\rc\n"), "a\nb\nc\n");
     }
 }
 
