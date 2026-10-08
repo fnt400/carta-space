@@ -92,9 +92,9 @@ the live Archive **only when the editor has been idle and is clean**, with
 HEAD, remote-configuration and worktree checks. If the local base advanced
 during the worker, Carta discards the stale staged result and retries.
 
-A failed push/pull or an unresolved merge conflict makes the **entire GUI
-status bar red**, with a persistent error message (independent of expiring
-editor status messages). Failed transfers remain queued, retry
+A failed push/pull, an unresolved merge conflict, or a commit waiting
+without a configured remote makes the **entire GUI status bar red**, with a
+persistent error message (independent of expiring editor status messages). Failed transfers remain queued, retry
 automatically with bounded backoff, and clear the red warning only after
 successful synchronization. Periodic checks every three minutes also
 detect commits made outside Carta. Explicit `Sync Now` uses the same worker.
