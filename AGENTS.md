@@ -95,6 +95,27 @@ The working rule is:
 
 > Complexity must be earned by a demonstrated problem.
 
+## Responsiveness is a release blocker
+
+**Carta must remain fast throughout long writing sessions, not merely at startup.**
+Latency, smooth cursor movement, immediate LEAP response and minimal idle CPU
+and memory usage are core product requirements, not optional polish.
+
+- Never perform remote Git/SSH, substantial checkpoint work, or other
+  unbounded blocking operations in the GUI event loop.
+- Avoid unnecessary periodic re-layout/re-rendering and rescanning whole
+  Documents for operations that can use derived, disposable state.
+- Prefer eliminating useless work over micro-optimizations or opaque caches.
+- Evaluate graphical responsiveness using an optimized **release** build;
+  debug-mode software rendering is not representative.
+- Include extended (at least ten-minute) tests with realistic multi-Document
+  archives and repeated input, including idle CPU, typing, LEAP, scrolling,
+  clipboard, and memory behavior. Automated compilation is necessary but not
+  proof of fluidity.
+- If a GUI feature cannot yet run without blocking or loss of consistency,
+  document the restriction explicitly rather than silently compromising
+  responsiveness or archival safety.
+
 ## Development environment on NixOS
 
 The development host is NixOS.
