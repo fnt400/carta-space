@@ -227,7 +227,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                 profile::record("maintenance", started);
             }
             result
-        },
+        }
         _ => Ok(()),
     };
     if let Err(error) = result {
