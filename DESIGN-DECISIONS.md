@@ -600,3 +600,19 @@ IME event support remains part of the adapter contract even though no configured
 **Trade-off:** Automatic remote sync is temporarily unavailable in the GUI. This must be disclosed to users and must be reinstated only with safe asynchronous execution, archive/editor consistency and reliable error reporting. The remaining local checkpoint path can still block the GUI and needs measurement. Do not solve responsiveness problems by making unsaved authored text less durable or running overlapping archive mutations on background threads.
 
 **Diagnostic strategy:** Optional `CARTA_GUI_PROFILE=1` prints content-free average/worst time for view construction, row-based scroll calculations and maintenance. It does not measure downstream glyph shaping or software rasterization. Profile the release build and verify CPU, RSS and event latency over time before introducing heavier caching or renderer changes.
+
+---
+
+## DD-051 — GUI Markdown colors, zoom, mouse editing and shared session state (2026-10-08)
+
+**Scope:** The graphical v0.2 frontend can style Markdown source code, adjust the writing font, position/select through the mouse and restore the previous cursor location. The reference v0.1.2 terminal behavior and Archive format remain untouched.
+
+**Markdown:** Reuse the same `pulldown-cmark` source-range strategy already used by the TUI. Only presentation ink changes; Markdown delimiters are never hidden, replaced or rewritten. The foreground palette recognizes headings, emphasis, strong text, links/images, quotes and inline/fenced code. A per-Document hash/cache prevents reparsing unchanged documents; the cache is disposable and is never persisted. Caret and conventional/Cat selection colors take precedence.
+
+**Zoom:** Physical RightCtrl+Minus and RightCtrl+Equal apply 2 px decrements/increments over a constrained 12–32 px writing font; navigation columns, line heights and scroll offsets use the same size. Modal/status font sizes are separate. The zoom value is currently transient, not part of the Archive or shared session format.
+
+**Mouse:** Iced's mouse area reports local pointer coordinates over the centered writing sheet, including scrolling translation. Those are mapped to UTF-8 byte offsets using the existing GUI single-width font/wrap approximation, then passed to `CompositeEditor::set_cursor` with conventional selection anchored by a held left button. Generated separator rows are protected from direct editing. The mapping is necessarily approximate for tabs, East Asian wide characters, grapheme clusters and renderer-specific wrapping; proper glyph-position hit testing should replace it when justified. Do not create a second independent selection/text buffer.
+
+**Session:** On startup the GUI reads `session-<archive-id>.json` from the same `$XDG_DATA_HOME/carta` root and in the same `carta-app::Session` schema already used by the TUI. It saves on maintenance and shutdown, independently of the Archive and Git. The emergency kill-switch deliberately suppresses persistence. No new canonical metadata or synchronization responsibilities are introduced.
+
+**Performance invariant:** Keep styling presentation-only and cache parsed source ranges, avoid additional polling loops or font-reflow animations, and verify launch-to-long-session latency in a release build. More exact hit testing or renderer changes must not regress sustained input responsiveness.
