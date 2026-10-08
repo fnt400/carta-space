@@ -539,7 +539,7 @@ The desktop GUI will provide the second implementation needed to determine which
 
 ## DD-047 — Iced is the canonical v0.2 desktop GUI toolkit
 
-**Decision:** Carta Space v0.2 uses Iced 0.14 for the canonical desktop GUI, with Winit-backed native window/input events and WGPU as the initial renderer.
+**Decision:** Carta Space v0.2 uses Iced 0.14 for the canonical desktop GUI, with Winit-backed native window/input events and `tiny-skia` as the initial renderer.
 
 The decision follows a dedicated isolated probe rather than API assumptions. The probe builds on Linux, macOS and Windows, and the target Linux/Wayland keyboard test confirmed all required behaviors:
 
@@ -555,5 +555,7 @@ IME event support remains part of the adapter contract even though no configured
 **Architecture:** Iced is a frontend only. The canonical editor, LEAP semantics, Cat selection, View/AppMode state and application behavior remain in `carta-app`. The GUI translates native Iced/Winit events into shared `Action` and `ModeAction` values and renders shared state. It must not introduce a second editor model.
 
 **MSRV:** Iced 0.14 requires Rust 1.88 or newer. During the initial shell/prototype stage, `carta-gui` remains isolated from the main Rust 1.85 workspace so the existing v0.1 compatibility targets are not raised prematurely. Integrating `carta-gui` into the main workspace and raising the v0.2 MSRV will be a separate deliberate step once the graphical shell is stable.
+
+**Renderer:** The first prototype used WGPU, but a real Linux desktop run failed during Iced shader creation because the active GPU/driver did not expose the shader capability required by the WGPU quad shader. Carta's surface is predominantly text and simple geometry, so GPU-specific shader requirements are not justified for the baseline frontend. The canonical renderer is therefore Iced's supported `tiny-skia` software renderer. WGPU may be reconsidered later as an optional acceleration path, but Carta must not require it to start.
 
 **Why Iced:** It provides the best balance for Carta between implementation simplicity, runtime performance, modern desktop presentation, cross-platform support and the physical keyboard fidelity required by LEAP.
