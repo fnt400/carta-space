@@ -1,4 +1,4 @@
-use carta_app::{Action, App, AppMode, ModeAction, View};
+use carta_app::{Action, App, AppMode, Command, ModeAction, View};
 use carta_core::LeapDirection;
 use iced::keyboard::key::{Code, Physical};
 use iced::keyboard::Event as KeyboardEvent;
@@ -8,6 +8,44 @@ use std::time::Instant;
 struct PendingLeap {
     code: Code,
     direction: LeapDirection,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RightControlIntent {
+    Kill,
+    NewDocument,
+    Bold,
+    Italic,
+    OpenWork,
+    Link,
+    MonthlyCreationDate,
+    Undo,
+    Redo,
+    CopyOrPaste,
+    PreviousDocument,
+    NextDocument,
+    DocumentStart,
+    DocumentEnd,
+}
+
+fn right_control_intent(code: Code) -> Option<RightControlIntent> {
+    match code {
+        Code::KeyG => Some(RightControlIntent::Kill),
+        Code::KeyN => Some(RightControlIntent::NewDocument),
+        Code::KeyB => Some(RightControlIntent::Bold),
+        Code::KeyI => Some(RightControlIntent::Italic),
+        Code::KeyW => Some(RightControlIntent::OpenWork),
+        Code::KeyL => Some(RightControlIntent::Link),
+        Code::KeyM => Some(RightControlIntent::MonthlyCreationDate),
+        Code::KeyZ => Some(RightControlIntent::Undo),
+        Code::KeyR => Some(RightControlIntent::Redo),
+        Code::KeyC => Some(RightControlIntent::CopyOrPaste),
+        Code::PageUp => Some(RightControlIntent::PreviousDocument),
+        Code::PageDown => Some(RightControlIntent::NextDocument),
+        Code::Home => Some(RightControlIntent::DocumentStart),
+        Code::End => Some(RightControlIntent::DocumentEnd),
+        _ => None,
+    }
 }
 
 #[derive(Debug, Default)]
@@ -151,6 +189,10 @@ impl GuiInputState {
         code: Code,
         text: Option<&str>,
     ) -> carta_app::AppResult {
+        if self.right_control_held && self.handle_right_control_chord(app, code)? {
+            return Ok(());
+        }
+
         if self.handle_mode_key(app, code, text)? {
             return Ok(());
         }
@@ -262,6 +304,77 @@ impl GuiInputState {
         Ok(())
     }
 
+    fn handle_right_control_chord(
+        &mut self,
+        app: &mut App,
+        code: Code,
+    ) -> carta_app::AppResult<bool> {
+        let Some(intent) = right_control_intent(code) else {
+            return Ok(false);
+        };
+
+        self.pending_leap = None;
+
+        let editing = matches!(app.mode, AppMode::Editing);
+        let editable_view = matches!(
+            app.view,
+            View::CreationDate(_) | View::ModificationDate | View::Work(_)
+        );
+        let editable = editing && editable_view && !app.collapsed;
+
+        match intent {
+            RightControlIntent::Kill => {
+                self.active_leap = None;
+                app.trigger_kill_switch();
+            }
+            RightControlIntent::NewDocument if editing && editable_view => {
+                app.execute(Command::NewDocument)?;
+            }
+            RightControlIntent::Bold if editable => {
+                if app.insert_markdown_pair("**") {
+                    app.edited(Instant::now());
+                    app.status.clear();
+                }
+            }
+            RightControlIntent::Italic if editable => {
+                if app.insert_markdown_pair("*") {
+                    app.edited(Instant::now());
+                    app.status.clear();
+                }
+            }
+            RightControlIntent::OpenWork if editing => app.execute(Command::OpenWork)?,
+            RightControlIntent::Link if editing => app.activate_link_shortcut()?,
+            RightControlIntent::MonthlyCreationDate if editing => {
+                app.execute(Command::OpenCreationDateView)?;
+            }
+            RightControlIntent::Undo if editable => app.execute(Command::Undo)?,
+            RightControlIntent::Redo if editable => app.execute(Command::Redo)?,
+            RightControlIntent::CopyOrPaste if editable => {
+                if app.editor.cat_highlight().is_some() {
+                    app.copy_cat_highlight();
+                } else {
+                    app.status =
+                        "System clipboard paste is not yet available in carta-gui".into();
+                }
+            }
+            RightControlIntent::PreviousDocument if editing && editable_view => {
+                app.dispatch_action(Action::PreviousDocument, Instant::now());
+            }
+            RightControlIntent::NextDocument if editing && editable_view => {
+                app.dispatch_action(Action::NextDocument, Instant::now());
+            }
+            RightControlIntent::DocumentStart if editing && editable_view => {
+                app.dispatch_action(Action::DocumentStart, Instant::now());
+            }
+            RightControlIntent::DocumentEnd if editing && editable_view => {
+                app.dispatch_action(Action::DocumentEnd, Instant::now());
+            }
+            _ => {}
+        }
+
+        Ok(true)
+    }
+
     fn handle_mode_key(
         &mut self,
         app: &mut App,
@@ -349,4 +462,36 @@ impl GuiInputState {
 
 fn is_neutral_modifier(code: Code) -> bool {
     matches!(code, Code::ShiftLeft | Code::ShiftRight | Code::AltRight)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn right_control_chords_match_the_interaction_contract() {
+        let expected = [
+            (Code::KeyG, RightControlIntent::Kill),
+            (Code::KeyN, RightControlIntent::NewDocument),
+            (Code::KeyB, RightControlIntent::Bold),
+            (Code::KeyI, RightControlIntent::Italic),
+            (Code::KeyW, RightControlIntent::OpenWork),
+            (Code::KeyL, RightControlIntent::Link),
+            (Code::KeyM, RightControlIntent::MonthlyCreationDate),
+            (Code::KeyZ, RightControlIntent::Undo),
+            (Code::KeyR, RightControlIntent::Redo),
+            (Code::KeyC, RightControlIntent::CopyOrPaste),
+            (Code::PageUp, RightControlIntent::PreviousDocument),
+            (Code::PageDown, RightControlIntent::NextDocument),
+            (Code::Home, RightControlIntent::DocumentStart),
+            (Code::End, RightControlIntent::DocumentEnd),
+        ];
+
+        for (code, intent) in expected {
+            assert_eq!(right_control_intent(code), Some(intent));
+        }
+        assert_eq!(right_control_intent(Code::KeyA), None);
+        assert_eq!(right_control_intent(Code::AltRight), None);
+    }
 }
