@@ -23,8 +23,8 @@ struct Stage {
     base_head: String,
     synced_head: String,
     outcome: SyncOutcome,
-    _private_directory: TempDir,
-    clone: PathBuf,
+    _private_directory: Option<TempDir>,
+    clone: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,6 +60,43 @@ pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
     if crate::history::is_dirty_at(&source)? {
         return Err(Error::SyncRequiresCleanArchive);
     }
+    // Most sync cycles need no clone. Inspect the remote only on this
+    // worker, and publish the *pinned commit* (never a moving HEAD) when a
+    // fast-forward is accepted by the Git server. Failure falls back to a
+    // private merge snapshot; neither path modifies the live working tree.
+    let remote_heads = crate::history::git_output(
+        &source, "inspect background sync remote heads",
+        &["ls-remote", "--heads", "carta-sync"],
+    )?;
+    let remote_heads = String::from_utf8_lossy(&remote_heads.stdout);
+    let mut any_remote = false;
+    let mut remote_head: Option<&str> = None;
+    for line in remote_heads.lines() {
+        any_remote = true;
+        let mut fields = line.split_whitespace();
+        let hash = fields.next().unwrap_or_default();
+        if fields.next() == Some("refs/heads/carta") {
+            remote_head = Some(hash);
+        }
+    }
+    if any_remote && remote_head.is_none() {
+        return Err(Error::SyncRemoteNotEmpty);
+    }
+    if remote_head == Some(base_head.as_str()) {
+        return Ok(simple_stage(source, remote, base_head, SyncOutcome::Synced));
+    }
+    // Git's non-force push rejects stale remote heads and concurrently
+    // advanced branches. Retrying through the merge path is then safe.
+    let refspec = format!("{base_head}:refs/heads/carta");
+    let pushed = Command::new("git")
+        .current_dir(&source)
+        .args(["push", "--quiet", "carta-sync", &refspec])
+        .output()
+        .map_err(|error| Error::io(&source, error))?;
+    if pushed.status.success() {
+        return Ok(simple_stage(source, remote, base_head, SyncOutcome::Published));
+    }
+
     // tempfile creates the staging directory with owner-only access (0700
     // on Unix), and cleans it automatically when no response retains it.
     let private = tempfile::tempdir().map_err(|e| Error::io(&source, e))?;
@@ -104,10 +141,29 @@ pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
             base_head,
             synced_head,
             outcome,
-            _private_directory: private,
-            clone,
+            _private_directory: Some(private),
+            clone: Some(clone),
         }),
     })
+}
+
+fn simple_stage(
+    source: PathBuf,
+    remote: String,
+    base_head: String,
+    outcome: SyncOutcome,
+) -> StagedSync {
+    StagedSync {
+        data: Arc::new(Stage {
+            source,
+            remote,
+            synced_head: base_head.clone(),
+            base_head,
+            outcome,
+            _private_directory: None,
+            clone: None,
+        }),
+    }
 }
 
 fn git_text(root: &Path, operation: &'static str, args: &[&str]) -> Result<String, Error> {
@@ -151,7 +207,12 @@ impl StagedSync {
         // Transfer objects from the private snapshot without any remote SSH
         // operations. The staged HEAD must be the exact object produced by
         // the worker; never use a potentially moving remote branch ref.
-        let clone = stage.clone.to_string_lossy();
+        let Some(clone_path) = stage.clone.as_ref() else {
+            return Err(Error::InvalidSyncRemote(
+                "Background synchronization has no staged repository to import".into(),
+            ));
+        };
+        let clone = clone_path.to_string_lossy();
         crate::history::git_output(
             archive.root(), "import staged background sync result",
             &["fetch", "--quiet", "--no-tags", "--", clone.as_ref(), "refs/heads/carta"],
