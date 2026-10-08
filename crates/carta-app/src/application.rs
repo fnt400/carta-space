@@ -218,6 +218,7 @@ pub struct App {
     pending_wipe: Option<carta_core::WipePlan>,
     work_positions: BTreeMap<WorkId, Position>,
     work_mru: Vec<WorkId>,
+    background_sync_enabled: bool,
 }
 
 impl App {
@@ -316,6 +317,7 @@ impl App {
             pending_wipe: None,
             work_positions: session.map_or_else(BTreeMap::new, |s| s.work_positions.clone()),
             work_mru: session.map_or_else(Vec::new, |s| s.work_mru.clone()),
+            background_sync_enabled: false,
         })
     }
 
@@ -830,7 +832,7 @@ impl App {
             }
             Package => self.prompt("Package .cat path", PromptAction::Package),
             CreateCheckpoint => self.prompt("Checkpoint note (optional)", PromptAction::Checkpoint),
-            SyncNow => self.sync_now(true)?,
+            SyncNow => self.request_sync()?,
             SyncSettings => self.open_sync_settings()?,
             InsertDateTime => {
                 let timestamp = Local::now().format("%Y-%m-%d %H:%M").to_string();
@@ -974,7 +976,7 @@ impl App {
                     self.status = "Synchronization disabled".into();
                 } else {
                     self.archive.set_sync_remote(remote)?;
-                    self.sync_now(true)?;
+                    self.request_sync()?;
                 }
             }
             PromptAction::ConfirmRestoreDocument => {
@@ -2236,6 +2238,26 @@ impl App {
             PromptAction::SyncRemote,
         );
         Ok(())
+    }
+
+    /// UI backends use a worker for remote operations; the reference TUI
+    /// retains its historical synchronous mode until it adopts the worker.
+    pub fn enable_background_sync(&mut self) {
+        self.background_sync_enabled = true;
+    }
+
+    fn request_sync(&mut self) -> AppResult {
+        if self.background_sync_enabled {
+            if self.archive.sync_remote()?.is_none() {
+                self.status = "Synchronization is not configured".into();
+                return Ok(());
+            }
+            self.scheduler.sync_pending();
+            self.status = "Synchronization queued".into();
+            Ok(())
+        } else {
+            self.sync_now(true)
+        }
     }
 
     /// The frontend schedules the network part on a dedicated worker, but
