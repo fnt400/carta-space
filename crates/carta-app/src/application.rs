@@ -3623,6 +3623,26 @@ mod tests {
     }
 
     #[test]
+    fn gui_maintenance_keeps_local_saves_without_attempting_remote_sync() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let now = Instant::now();
+        let mut app = App::open(archive, None, now).unwrap();
+        app.archive.set_sync_remote("unused-local-remote").unwrap();
+        assert!(app.editor.insert("local text"));
+        app.edited(now);
+        app.scheduler.sync_pending();
+        assert!(app.editor.is_dirty());
+
+        app.tick_without_remote_sync(now + Duration::from_secs(2))
+            .unwrap();
+
+        assert!(!app.editor.is_dirty(), "GUI must still autosave locally");
+        assert!(app.scheduler.is_sync_pending(), "GUI must defer remote I/O");
+        assert!(!app.status.starts_with("Sync unavailable:"));
+    }
+
+    #[test]
     fn tick_after_quit_does_not_run_scheduled_work() {
         let temporary = tempfile::tempdir().unwrap();
         let archive = Archive::create(temporary.path().join("archive")).unwrap();
