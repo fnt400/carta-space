@@ -82,10 +82,12 @@ invoking network Git/SSH commands from its Iced update loop:
 
 1. Once the local editor is clean, checkpoint unsynchronized local files.
    This prepares a stable local Git commit.
-2. A Tokio **blocking worker** creates a private, temporary Git snapshot
-   (owner-only permissions), performs Git fetch/merge/push on that snapshot
-   and returns its resulting commit. The worker never resets, fetches into
-   or modifies the live Archive.
+2. A Tokio **blocking worker** checks the remote. If it already matches,
+   no further work is necessary. If the server accepts a fast-forward push
+   of the pinned local checkpoint, it publishes without creating a clone.
+   Only when the remote must be integrated does it create a temporary
+   owner-only private snapshot and perform Git fetch/merge/push there.
+   The worker never resets or modifies the active Archive's working tree.
 3. The GUI keeps accepting keyboard, LEAP and mouse events while the worker
    is active. After a quiet window, the frontend checks that the live editor
    and working tree are clean, the configured remote has not changed and the
@@ -113,8 +115,9 @@ off-thread. The short local checkpoint phase and, when remote files changed,
 the final local import/reset plus Archive reload still run during a quiet
 period on the application thread. Those operations are deliberately
 separated from networking, but are not yet guaranteed to be zero-latency
-with an enormous Archive. The first private snapshot also copies the
-tracked working files and may generate disk I/O. Measure these separately;
+with an enormous Archive. When the remote and local histories diverge, the private snapshot copies
+the tracked working files and may generate disk I/O; ordinary already-synced
+cycles and fast-forward uploads avoid this cost. Measure these separately;
 do not claim that this implementation makes *all* disk work asynchronous.
 
 
