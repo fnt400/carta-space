@@ -33,7 +33,9 @@ fn build_view(state: &Gui) -> Element<'_, Message> {
     if let Some(path) = &state.setup_path {
         let mut content = column![
             text("Carta Space").font(IOSEVKA).size(24),
-            text("Nessun archivio nella posizione standard").font(IOSEVKA).size(16),
+            text("Nessun archivio nella posizione standard")
+                .font(IOSEVKA)
+                .size(16),
             text(path.display().to_string()).font(IOSEVKA).size(14),
             button("Crea nuovo archivio").on_press(Message::CreateDefaultArchive),
             text("Oppure clona un archivio Git esistente:").font(IOSEVKA),
