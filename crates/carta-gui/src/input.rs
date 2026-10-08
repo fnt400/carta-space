@@ -318,10 +318,20 @@ impl GuiInputState {
                 return Ok(());
             }
             Code::Home => {
+                // A held physical LEAP must not erase the structural jump
+                // when its key is eventually released.
+                if in_leap {
+                    app.end_leap();
+                }
                 app.dispatch_action(Action::DocumentStart, Instant::now());
                 return Ok(());
             }
             Code::End => {
+                // A held physical LEAP must not erase the structural jump
+                // when its key is eventually released.
+                if in_leap {
+                    app.end_leap();
+                }
                 app.dispatch_action(Action::DocumentEnd, Instant::now());
                 return Ok(());
             }
