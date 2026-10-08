@@ -572,3 +572,17 @@ IME event support remains part of the adapter contract even though no configured
 **Rationale:** The text must never shift because of a blinking insertion cursor. The desktop graphical font must not silently fall back to an arbitrary installed font. Do not couple cursor appearance to the archive format or the shared editor's semantic state beyond the already defined Cat cursor/highlight rules.
 
 **Reference:** Canon Cat Reference Manual, "The Cursor and the Highlight", pages 8–9, https://www.manualslib.com/manual/986126/Canon-Cat.html?page=8 .
+
+---
+
+## DD-049 — GUI editing viewport and nonblinking cursor
+
+**Decision (supersedes the GUI blink cadence in DD-048):** The v0.2 desktop caret is always visible. The graphical shell no longer animates cursor blinking or redraws the full text surface at ~6 Hz while idle. It runs the application maintenance tick at a low frequency for autosave, status expiry and synchronization; keyboard, clipboard and window events drive interactive updates.
+
+**Input:** Backward LEAP takes characters from the keyboard event's layout-aware modified logical key when native text is suppressed by Left Control. This preserves non-US layouts and Shift rather than reconstructing characters from physical key positions. Up/Down navigation uses the shared editor's visual movement method with a GUI-local column estimate. Right Control+C and Cat highlight clipboard export are executed through the Iced platform clipboard tasks, not by adding host API calls to `carta-app`.
+
+**Viewport:** The scrolling writing surface includes synthetic vertical padding so the caret can remain around two-thirds of the visible height even at the beginning/end of a Document. The GUI translates editor byte offsets to approximate visual rows, accounting for generated separators and soft wrapping; it updates scroll position on keyboard input and resize. These presentation-only values do not change Markdown content or archive format. Exact visual metrics for tabs, multi-cell glyphs, variable shaping and mixed scripts remain an explicit limitation of the provisional rich-text renderer.
+
+**Work View:** Generated Work separators now extend to the editor's current monospace column width rather than a fixed 40-character line. They remain UI only and must never be included in Clipboard operations or saved content.
+
+**Validation:** Static/CI checks can verify keyboard fallbacks, cursor row projection and clipboard-text normalization, but precise position, modifier fidelity, resource use and host clipboard integration must be manually checked in the target graphical session. Preserve the frozen v0.1.2 terminal interaction semantics.
