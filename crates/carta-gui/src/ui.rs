@@ -7,6 +7,7 @@ use iced::widget::{
 use iced::{color, Color, Element, Font, Length};
 use std::time::Instant;
 
+use crate::layout::{Layout, Row};
 use crate::markdown::{self, Syntax};
 use crate::viewport;
 use crate::{Gui, Message};
@@ -75,45 +76,65 @@ fn editor_view<'a>(
     window: iced::Size,
 ) -> Element<'a, Message> {
     let columns = viewport::columns(window.width, state.font_size);
-    let spans = editor_spans(app, mode, columns, &mut state.markdown.borrow_mut());
+    let line_height = viewport::line_height(state.font_size);
+    let height = viewport::writing_area_height(window.height);
+    let top_padding = height * (2.0 / 3.0);
+
+    // Index all Document rows once, then lay out and shape only a bounded
+    // window. Neither keystrokes nor cursor navigation rebuild the View text.
+    let mut layout = state.layout.borrow_mut();
+    layout.sync(app, columns);
+    let (first, last) = layout.window(
+        state.scroll_y,
+        height,
+        line_height,
+        top_padding + viewport::VERTICAL_PADDING,
+    );
+    let spans = window_spans(
+        app, mode, columns, first, last, &layout, &mut state.markdown.borrow_mut(),
+    );
+    let total_rows = layout.total_rows();
+    drop(layout);
+
     let text_view = rich_text(spans)
         .font(IOSEVKA)
         .size(state.font_size)
-        .line_height(iced::Pixels(viewport::line_height(state.font_size)))
+        .line_height(iced::Pixels(line_height))
         .width(Length::Fill);
 
     let page = container(text_view)
         .width(Length::Fill)
+        .height(Length::Fixed((last.saturating_sub(first).max(1) as f32) * line_height))
         .max_width(EDITOR_MAX_WIDTH)
-        .padding([
-            viewport::VERTICAL_PADDING as u16,
-            viewport::HORIZONTAL_PADDING as u16,
-        ]);
+        .padding([0, viewport::HORIZONTAL_PADDING as u16]);
 
-    // The mouse area has the same page-row origin used by the hit tester.
-    // It does not include the virtual padding at the top of the scroll sheet.
+    // The pointer is relative to the visible window (not the entire Archive).
     let area = mouse_area(container(page).center_x(Length::Fill))
         .on_move(Message::PointerMoved)
         .on_press(Message::PointerPressed)
         .on_release(Message::PointerReleased)
         .interaction(iced::mouse::Interaction::Text);
 
-    let height = viewport::writing_area_height(window.height);
-    let top_padding = space().height(height * (2.0 / 3.0));
-    let bottom_padding = space().height(height * (2.0 / 3.0));
-    let sheet = column![top_padding, area, bottom_padding]
-        .spacing(0)
-        .width(Length::Fill);
+    let leading = top_padding + viewport::VERTICAL_PADDING + first as f32 * line_height;
+    let trailing = total_rows.saturating_sub(last) as f32 * line_height
+        + viewport::VERTICAL_PADDING + top_padding;
+    let sheet = column![
+        space().height(leading),
+        area,
+        space().height(trailing)
+    ]
+    .spacing(0)
+    .width(Length::Fill);
 
     scrollable(sheet)
         .id(Id::new(EDITOR_SCROLL_ID))
+        .on_scroll(|viewport| Message::Scrolled(viewport.absolute_offset().y))
         .height(Length::Fill)
         .width(Length::Fill)
         .into()
 }
 
 fn syntax_color(mode: ThemeMode, syntax: Syntax) -> Color {
-    // Source Markdown remains visible: only ink color changes, never metrics.
     match (mode, syntax) {
         (ThemeMode::Light, Syntax::Heading) => color!(0x7940AC),
         (ThemeMode::Light, Syntax::Strong) => color!(0xA04A23),
@@ -130,117 +151,108 @@ fn syntax_color(mode: ThemeMode, syntax: Syntax) -> Color {
     }
 }
 
-fn editor_spans<'a>(
+/// Build a bounded set of spans. All strings refer to unchanged source
+/// slices. Generated lines are presentation-only.
+fn window_spans<'a>(
     app: &'a App,
     mode: ThemeMode,
     columns: usize,
-    cache: &mut markdown::Cache,
+    first: usize,
+    last: usize,
+    layout: &Layout,
+    syntax_cache: &mut markdown::Cache,
 ) -> Vec<iced::widget::text::Span<'a, ()>> {
     let mut spans = Vec::new();
     let cursor = app.editor.cursor();
-    // Explicit Cat/conventional selection must outrank the implicit at-point
-    // Cat highlight; otherwise mouse dragging would remain visually hidden.
-    let selection = app
-        .editor
-        .selection()
-        .or_else(|| app.cat_render_highlight());
+    let selection = app.editor.selection().or_else(|| app.cat_render_highlight());
     let extended = app.editor.cat_highlight().is_some() || app.editor.selection().is_some();
 
-    for (index, region) in app.editor.regions().iter().enumerate() {
-        if let Some(separator) = separator_for_region(app, index, columns) {
-            if index > 0 {
-                spans.push(span("\n"));
-            }
-            spans.push(span(separator).font(IOSEVKA).color(secondary_text(mode)));
-            spans.push(span("\n\n"));
-        } else if index > 0 {
-            spans.push(span("\n\n"));
+    for row in first..last {
+        if row > first {
+            spans.push(span("\n").font(IOSEVKA));
         }
+        match layout.row(app, row) {
+            Some(Row::Gap) => {}
+            Some(Row::Rule { region }) => {
+                if let Some(separator) = separator_for_region(app, region, columns) {
+                    spans.push(span(separator).font(IOSEVKA).color(secondary_text(mode)));
+                }
+            }
+            Some(Row::Text { region, start, end, hard_break }) => {
+                let item = &app.editor.regions()[region];
+                let text = &item.text;
+                let syntax = syntax_cache.ranges(
+                    item.document, text, layout.generation(region),
+                );
+                let selected = selection.and_then(|(a, b)| {
+                    if region < a.region || region > b.region {
+                        return None;
+                    }
+                    let first_byte = if region == a.region { a.byte } else { 0 };
+                    let last_byte = if region == b.region { b.byte } else { text.len() };
+                    (first_byte < last_byte).then_some((first_byte, last_byte))
+                });
+                let is_cursor_region = region == cursor.region;
+                let cursor_here = is_cursor_region && cursor.byte >= start && cursor.byte < end;
+                let caret_end = if cursor_here {
+                    text[cursor.byte..].chars().next()
+                        .map_or(cursor.byte, |ch| cursor.byte + ch.len_utf8())
+                } else {
+                    cursor.byte
+                };
 
-        let value = region.text.as_str();
-        let styles = cache.ranges(region.document, value);
-        let selected = selection.and_then(|(start, end)| {
-            if index < start.region || index > end.region {
-                return None;
-            }
-            let first = if index == start.region { start.byte } else { 0 };
-            let last = if index == end.region {
-                end.byte
-            } else {
-                value.len()
-            };
-            (first < last).then_some((first, last))
-        });
-        let caret = (index == cursor.region).then_some(cursor.byte);
-        let caret_end = caret.map(|byte| {
-            value[byte..]
-                .chars()
-                .next()
-                .map_or(byte, |ch| byte + ch.len_utf8())
-        });
+                let mut boundaries = vec![start, end];
+                if cursor_here {
+                    boundaries.extend([cursor.byte, caret_end]);
+                }
+                if let Some((a, b)) = selected {
+                    boundaries.extend([a.clamp(start, end), b.clamp(start, end)]);
+                }
+                for range in syntax.iter().filter(|range|
+                    range.start < end && start < range.end
+                ) {
+                    boundaries.push(range.start.clamp(start, end));
+                    boundaries.push(range.end.clamp(start, end));
+                }
+                boundaries.sort_unstable();
+                boundaries.dedup();
 
-        let mut boundaries = vec![0, value.len()];
-        if let Some(byte) = caret {
-            boundaries.push(byte);
-        }
-        if let Some(byte) = caret_end {
-            boundaries.push(byte);
-        }
-        if let Some((start, end)) = selected {
-            boundaries.extend([start, end]);
-        }
-        for range in styles {
-            boundaries.extend([range.start, range.end]);
-        }
-        boundaries.sort_unstable();
-        boundaries.dedup();
-
-        for pair in boundaries.windows(2) {
-            let (start, end) = (pair[0], pair[1]);
-            if end <= start {
-                continue;
+                for pair in boundaries.windows(2) {
+                    let (a, b) = (pair[0], pair[1]);
+                    if a == b {
+                        continue;
+                    }
+                    let mut styled = span(&text[a..b]).font(IOSEVKA);
+                    if cursor_here && a == cursor.byte {
+                        styled = styled
+                            .background(caret_color(mode))
+                            .color(caret_foreground(mode));
+                    } else if selected.is_some_and(|(from, to)| from < b && a < to) {
+                        styled = styled
+                            .background(if extended {
+                                selection_background(mode)
+                            } else {
+                                cat_highlight_background(mode)
+                            })
+                            .color(selection_foreground(mode));
+                    } else if let Some(syntax) = markdown::syntax_at(syntax, a, b) {
+                        styled = styled.color(syntax_color(mode, syntax));
+                    }
+                    spans.push(styled);
+                }
+                if is_cursor_region && cursor.byte == end
+                    && (hard_break || end == text.len())
+                {
+                    spans.push(span(" ").font(IOSEVKA)
+                        .background(caret_color(mode))
+                        .color(caret_foreground(mode)));
+                }
             }
-            let fragment = &value[start..end];
-            let is_caret = caret == Some(start);
-            let newline_caret = is_caret && fragment == "\n";
-            let display = if newline_caret { " " } else { fragment };
-            let mut styled = span(display).font(IOSEVKA);
-            if is_caret {
-                styled = styled
-                    .background(caret_color(mode))
-                    .color(caret_foreground(mode));
-            } else if selected.is_some_and(|(first, last)| first < end && start < last) {
-                styled = styled
-                    .background(if extended {
-                        selection_background(mode)
-                    } else {
-                        cat_highlight_background(mode)
-                    })
-                    .color(selection_foreground(mode));
-            } else if let Some(syntax) = markdown::syntax_at(styles, start, end) {
-                styled = styled.color(syntax_color(mode, syntax));
-            }
-            spans.push(styled);
-            if newline_caret {
-                spans.push(span("\n").font(IOSEVKA));
-            }
-        }
-        if caret == Some(value.len()) {
-            spans.push(
-                span(" ")
-                    .font(IOSEVKA)
-                    .background(caret_color(mode))
-                    .color(caret_foreground(mode)),
-            );
+            None => {}
         }
     }
     if spans.is_empty() {
-        spans.push(
-            span(" ")
-                .font(IOSEVKA)
-                .background(caret_color(mode))
-                .color(caret_foreground(mode)),
-        );
+        spans.push(span(" ").font(IOSEVKA));
     }
     spans
 }
