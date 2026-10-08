@@ -474,6 +474,65 @@ mod tests {
     }
 
     #[test]
+    fn concurrent_edits_to_different_documents_merge_without_overwriting_local_work() {
+        let tmp = tempfile::tempdir().unwrap();
+        let remote = tmp.path().join("remote.git");
+        git(tmp.path(), &["init", "--bare", "--quiet", remote.to_str().unwrap()]);
+        let root = tmp.path().join("fermi");
+        let mut a = Archive::create(&root).unwrap();
+        a.set_sync_remote(remote.to_str().unwrap()).unwrap();
+        let first = a.create_document("A before\n").unwrap();
+        let second = a.create_document("B before\n").unwrap();
+        a.checkpoint(CheckpointKind::Manual, None).unwrap();
+        a.sync().unwrap();
+
+        let peer = tmp.path().join("tanaka");
+        let mut b = Archive::clone_sync_remote(remote.to_str().unwrap(), &peer).unwrap();
+        a.edit_document(first, "A from Fermi\n").unwrap();
+        a.checkpoint(CheckpointKind::Manual, None).unwrap();
+        b.edit_document(second, "B from Tanaka\n").unwrap();
+        b.checkpoint(CheckpointKind::Manual, None).unwrap();
+        b.sync().unwrap();
+
+        let local_before = a.read_document(first).unwrap().content().to_owned();
+        let staged = stage_sync(root.clone()).unwrap();
+        assert_eq!(staged.outcome(), SyncOutcome::Merged);
+        assert_eq!(a.read_document(first).unwrap().content(), local_before);
+        assert_eq!(staged.apply(&mut a).unwrap(), SyncApply::Updated);
+        assert_eq!(a.read_document(first).unwrap().content(), "A from Fermi\n");
+        assert_eq!(a.read_document(second).unwrap().content(), "B from Tanaka\n");
+    }
+
+    #[test]
+    fn concurrent_changes_to_same_document_are_never_silently_overwritten() {
+        let tmp = tempfile::tempdir().unwrap();
+        let remote = tmp.path().join("remote.git");
+        git(tmp.path(), &["init", "--bare", "--quiet", remote.to_str().unwrap()]);
+        let root = tmp.path().join("fermi");
+        let mut a = Archive::create(&root).unwrap();
+        a.set_sync_remote(remote.to_str().unwrap()).unwrap();
+        let doc = a.create_document("shared\n").unwrap();
+        a.checkpoint(CheckpointKind::Manual, None).unwrap();
+        a.sync().unwrap();
+
+        let peer = tmp.path().join("tanaka");
+        let mut b = Archive::clone_sync_remote(remote.to_str().unwrap(), &peer).unwrap();
+        a.edit_document(doc, "Fermi\n").unwrap();
+        a.checkpoint(CheckpointKind::Manual, None).unwrap();
+        b.edit_document(doc, "Tanaka\n").unwrap();
+        b.checkpoint(CheckpointKind::Manual, None).unwrap();
+        b.sync().unwrap();
+
+        let local_head = git_text(&root, "before conflict", &["rev-parse", "HEAD"]).unwrap();
+        let staged = stage_sync(root.clone()).unwrap();
+        assert_eq!(staged.outcome(), SyncOutcome::Conflict);
+        assert_eq!(staged.apply(&mut a).unwrap(), SyncApply::Conflict);
+        assert_eq!(git_text(&root, "after conflict", &["rev-parse", "HEAD"]).unwrap(), local_head);
+        assert_eq!(a.read_document(doc).unwrap().content(), "Fermi\n");
+        assert_eq!(b.read_document(doc).unwrap().content(), "Tanaka\n");
+    }
+
+    #[test]
     fn stale_snapshot_does_not_replace_new_local_checkpoint() {
         let tmp = tempfile::tempdir().unwrap();
         let remote = tmp.path().join("remote.git");
