@@ -30,6 +30,7 @@ struct Profile {
     since: Instant,
     view: Counts,
     scroll: Counts,
+    input: Counts,
     maintenance: Counts,
 }
 impl Profile {
@@ -38,6 +39,7 @@ impl Profile {
             since: Instant::now(),
             view: Counts::default(),
             scroll: Counts::default(),
+            input: Counts::default(),
             maintenance: Counts::default(),
         }
     }
@@ -67,12 +69,14 @@ pub fn record(which: &str, started: Instant) {
     match which {
         "view" => profile.view.add(elapsed),
         "scroll" => profile.scroll.add(elapsed),
+        "input" => profile.input.add(elapsed),
         "maintenance" => profile.maintenance.add(elapsed),
         _ => return,
     }
     if profile.since.elapsed() >= Duration::from_secs(15) {
         eprintln!(
-            "carta-gui profile: view {} avg {:.2} ms max {:.2} ms; scroll {} avg {:.2} ms max {:.2} ms; maintenance {} avg {:.2} ms max {:.2} ms",
+            "carta-gui profile: input {} avg {:.2} ms max {:.2} ms; view {} avg {:.2} ms max {:.2} ms; scroll {} avg {:.2} ms max {:.2} ms; maintenance {} avg {:.2} ms max {:.2} ms",
+            profile.input.count, profile.input.average_ms(), profile.input.worst_ms(),
             profile.view.count, profile.view.average_ms(), profile.view.worst_ms(),
             profile.scroll.count, profile.scroll.average_ms(), profile.scroll.worst_ms(),
             profile.maintenance.count, profile.maintenance.average_ms(), profile.maintenance.worst_ms(),
