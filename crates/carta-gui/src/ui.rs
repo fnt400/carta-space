@@ -10,6 +10,7 @@ use crate::viewport;
 use crate::{Gui, Message};
 
 const IOSEVKA: Font = Font::with_name("Iosevka");
+const EDITOR_SIZE: f32 = viewport::FONT_SIZE; // Modal palette typography.
 const STATUS_SIZE: f32 = 14.0;
 const EDITOR_MAX_WIDTH: f32 = viewport::PAGE_WIDTH;
 
