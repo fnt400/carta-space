@@ -31,7 +31,7 @@ pub(crate) fn view(state: &Gui) -> Element<'_, Message> {
         return container(text("Carta Space").font(IOSEVKA)).into();
     };
 
-    let editor = editor_view(app, state.theme_mode);
+    let editor = editor_view(app, state.theme_mode, state.caret_visible);
     let leap = leap_line(app);
     let status = status_bar(app, state.theme_mode);
 
@@ -53,8 +53,8 @@ pub(crate) fn view(state: &Gui) -> Element<'_, Message> {
     }
 }
 
-fn editor_view(app: &App, mode: ThemeMode) -> Element<'_, Message> {
-    let spans = editor_spans(app, mode);
+fn editor_view(app: &App, mode: ThemeMode, caret_visible: bool) -> Element<'_, Message> {
+    let spans = editor_spans(app, mode, caret_visible);
     let text_view = rich_text(spans)
         .font(IOSEVKA)
         .size(EDITOR_SIZE)
@@ -71,12 +71,13 @@ fn editor_view(app: &App, mode: ThemeMode) -> Element<'_, Message> {
         .into()
 }
 
-fn editor_spans<'a>(app: &'a App, mode: ThemeMode) -> Vec<iced::widget::text::Span<'a, ()>> {
+fn editor_spans<'a>(app: &'a App, mode: ThemeMode, caret_visible: bool) -> Vec<iced::widget::text::Span<'a, ()>> {
     let mut spans = Vec::new();
     let cursor = app.editor.cursor();
     let selection = app
         .cat_render_highlight()
         .or_else(|| app.editor.selection());
+    let extended = app.editor.cat_highlight().is_some() || app.editor.selection().is_some();
 
     for (region_index, region) in app.editor.regions().iter().enumerate() {
         if let Some(separator) = separator_for_region(app, region_index) {
@@ -98,13 +99,45 @@ fn editor_spans<'a>(app: &'a App, mode: ThemeMode) -> Vec<iced::widget::text::Sp
             spans.extend(
                 crate::presentation::segments(&region.text, cursor.byte, selected)
                     .into_iter()
-                    .map(|segment| match segment.kind {
+                    .flat_map(|segment| {
+                        let newline_caret = segment.kind == SegmentKind::Caret
+                            && segment.content == "\\n";
+                        let styled = match segment.kind {
                         SegmentKind::Text => span(segment.content).font(IOSEVKA),
                         SegmentKind::Selection => span(segment.content)
                             .font(IOSEVKA)
-                            .background(selection_background(mode))
+                            .background(if extended {
+                                selection_background(mode)
+                            } else {
+                                cat_highlight_background(mode)
+                            })
                             .color(selection_foreground(mode)),
-                        SegmentKind::Caret => span("□□").font(IOSEVKA).color(caret_color(mode)),
+                        SegmentKind::Caret => {
+                            // A newline has no printable cell, so give its caret
+                            // a stable one-cell placeholder before the LF.
+                            let content = if segment.content.is_empty() || segment.content == "\\n" {
+                                " "
+                            } else {
+                                segment.content
+                            };
+                            let caret = span(content).font(IOSEVKA);
+                            if caret_visible {
+                                caret.background(caret_color(mode))
+                                    .color(caret_foreground(mode))
+                            } else if extended && selected.is_some_and(|(start, end)| {
+                                cursor.byte >= start && cursor.byte < end
+                            }) {
+                                caret.background(selection_background(mode))
+                                    .color(selection_foreground(mode))
+                            } else {
+                                caret
+                            }
+                        };
+                        if newline_caret {
+                            vec![styled, span("\\n").font(IOSEVKA)]
+                        } else {
+                            vec![styled]
+                        }
                     }),
             );
         } else {
@@ -113,7 +146,12 @@ fn editor_spans<'a>(app: &'a App, mode: ThemeMode) -> Vec<iced::widget::text::Sp
     }
 
     if spans.is_empty() {
-        spans.push(span("□□").font(IOSEVKA).color(caret_color(mode)));
+        let caret = span(" ").font(IOSEVKA);
+        spans.push(if caret_visible {
+            caret.background(caret_color(mode)).color(caret_foreground(mode))
+        } else {
+            caret
+        });
     }
 
     spans
@@ -304,7 +342,7 @@ fn with_caret(input: &str, cursor: usize) -> String {
         cursor -= 1;
     }
     let mut value = input.to_owned();
-    value.insert_str(cursor, "□□");
+    value.insert_str(cursor, "▏");
     value
 }
 
@@ -319,6 +357,20 @@ fn caret_color(mode: ThemeMode) -> Color {
     match mode {
         ThemeMode::Light => color!(0x333333),
         ThemeMode::Dark | ThemeMode::None => color!(0xE0E0E0),
+    }
+}
+
+fn caret_foreground(mode: ThemeMode) -> Color {
+    match mode {
+        ThemeMode::Light => color!(0xFFFFFF),
+        ThemeMode::Dark | ThemeMode::None => color!(0x111111),
+    }
+}
+
+fn cat_highlight_background(mode: ThemeMode) -> Color {
+    match mode {
+        ThemeMode::Light => color!(0x666666),
+        ThemeMode::Dark | ThemeMode::None => color!(0x555555),
     }
 }
 
@@ -370,8 +422,8 @@ mod tests {
 
     #[test]
     fn prompt_caret_is_utf8_safe() {
-        assert_eq!(with_caret("caffè", 4), "caff□□è");
-        assert_eq!(with_caret("é", 1), "□□é");
-        assert_eq!(with_caret("é", 2), "é□□");
+        assert_eq!(with_caret("caffè", 4), "caff▏è");
+        assert_eq!(with_caret("é", 1), "▏é");
+        assert_eq!(with_caret("é", 2), "é▏");
     }
 }
