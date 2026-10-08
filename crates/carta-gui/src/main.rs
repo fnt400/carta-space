@@ -75,6 +75,7 @@ pub(crate) enum Message {
     CloneUrlChanged(String),
     CreateDefaultArchive,
     CloneDefaultArchive,
+    CloneFinished(Result<(), String>),
 }
 
 impl Gui {
@@ -183,32 +184,7 @@ impl Gui {
         }
     }
 
-    fn initialize_default_archive(&mut self, clone: bool) {
-        let Some(path) = self.setup_path.as_ref() else {
-            return;
-        };
-        // No implicit overwrite of an existing Archive or unrelated directory.
-        if path.exists() {
-            self.error = Some("The destination already exists; no files were changed".into());
-            return;
-        }
-        let archive = if clone {
-            let remote = self.clone_url.trim();
-            if remote.is_empty() {
-                self.error = Some("Specify the Git remote URL to clone".into());
-                return;
-            }
-            Archive::clone_sync_remote(remote, path)
-        } else {
-            Archive::create(path)
-        };
-        let archive = match archive {
-            Ok(archive) => archive,
-            Err(error) => {
-                self.error = Some(format!("Archive setup failed: {error}"));
-                return;
-            }
-        };
+    fn install_archive(&mut self, archive: Archive) {
         let previous = self.session_root.as_deref().and_then(|root| {
             session::load(root, archive.metadata().archive_id())
                 .ok()
@@ -224,6 +200,20 @@ impl Gui {
                 self.next_sync_at = Instant::now();
             }
             Err(error) => self.error = Some(format!("Archive open failed: {error}")),
+        }
+    }
+
+    fn create_default_archive(&mut self) {
+        let Some(path) = self.setup_path.as_ref() else {
+            return;
+        };
+        if path.exists() {
+            self.error = Some("The destination already exists; no files were changed".into());
+            return;
+        }
+        match Archive::create(path) {
+            Ok(archive) => self.install_archive(archive),
+            Err(error) => self.error = Some(format!("Archive setup failed: {error}")),
         }
     }
 
@@ -513,11 +503,50 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
             return Task::none();
         }
         Message::CreateDefaultArchive => {
-            state.initialize_default_archive(false);
+            state.create_default_archive();
             return service_tick(state, Instant::now());
         }
         Message::CloneDefaultArchive => {
-            state.initialize_default_archive(true);
+            let Some(path) = state.setup_path.clone() else {
+                return Task::none();
+            };
+            let remote = state.clone_url.trim().to_owned();
+            if remote.is_empty() {
+                state.error = Some("Specify the Git remote URL to clone".into());
+                return Task::none();
+            }
+            if path.exists() {
+                state.error = Some("The destination already exists; no files were changed".into());
+                return Task::none();
+            }
+            state.error = Some("Cloning Git archive…".into());
+            return Task::perform(
+                async move {
+                    match tokio::task::spawn_blocking(move || {
+                        Archive::clone_sync_remote(&remote, &path).map(|_| ())
+                    })
+                    .await
+                    {
+                        Ok(Ok(())) => Ok(()),
+                        Ok(Err(error)) => Err(error.to_string()),
+                        Err(error) => Err(format!("Clone worker failed: {error}")),
+                    }
+                },
+                Message::CloneFinished,
+            );
+        }
+        Message::CloneFinished(result) => {
+            match result {
+                Ok(()) => {
+                    if let Some(path) = state.setup_path.as_ref() {
+                        match Archive::open(path) {
+                            Ok(archive) => state.install_archive(archive),
+                            Err(error) => state.error = Some(format!("Archive open failed: {error}")),
+                        }
+                    }
+                }
+                Err(error) => state.error = Some(format!("Git clone failed: {error}")),
+            }
             return service_tick(state, Instant::now());
         }
         Message::QuitSyncFinished(result) => {
