@@ -38,12 +38,18 @@ pub enum SyncApply {
 /// A network job can run in spawn_blocking or a dedicated std::thread.
 /// It takes a path, not an Archive reference, and NEVER writes into that path.
 pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
-    let remote = crate::sync::optional_git_text(
-        &source,
-        "read sync remote for background job",
-        &["config", "--get", "remote.carta-sync.url"],
-    )?
-    .unwrap_or_default();
+    // Read only Git config: opening a second Archive instance would run
+    // recovery procedures on the active editor's live working tree.
+    let config = Command::new("git")
+        .current_dir(&source)
+        .args(["config", "--get", "remote.carta-sync.url"])
+        .output()
+        .map_err(|error| Error::io(&source, error))?;
+    let remote = if config.status.success() {
+        String::from_utf8_lossy(&config.stdout).trim().to_owned()
+    } else {
+        String::new()
+    };
 
     if remote.is_empty() {
         return Err(Error::InvalidSyncRemote("Synchronization is not configured".into()));
@@ -211,7 +217,7 @@ mod tests {
         assert_eq!(git_text(&original_path, "test head", &["rev-parse", "HEAD"]).unwrap(), old_head);
         assert_eq!(staged.apply(&mut original).unwrap(), SyncApply::Updated);
         assert!(original.document_info(one).is_some());
-        assert!(original.all_documents().len() >= 2);
+        assert!(original.documents().count() >= 2);
     }
 
     #[test]
