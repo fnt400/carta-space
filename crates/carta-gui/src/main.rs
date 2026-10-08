@@ -200,6 +200,9 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
         return Task::none();
     };
     let keyboard_event = matches!(message, Message::Raw(Event::Keyboard(_)));
+    let before_cursor = app.editor.cursor();
+    let before_region_count = app.editor.regions().len();
+    let before_view = std::mem::discriminant(&app.view);
     let mut clipboard = Task::none();
     let result = match message {
         Message::Raw(Event::Keyboard(event)) => {
@@ -226,9 +229,13 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
     if let Err(error) = result {
         app.status = format!("Error: {error}");
     }
+    let follow_caret = keyboard_event
+        && (app.editor.cursor() != before_cursor
+            || app.editor.regions().len() != before_region_count
+            || std::mem::discriminant(&app.view) != before_view);
     if app.quit {
         iced::exit()
-    } else if keyboard_event {
+    } else if follow_caret {
         Task::batch([clipboard, scroll_to_caret(state)])
     } else {
         clipboard
