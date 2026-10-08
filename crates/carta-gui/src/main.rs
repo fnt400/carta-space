@@ -136,20 +136,20 @@ impl Gui {
             Err(String::new())
         } else {
             Archive::open(&path)
-            .map_err(|error| error.to_string())
-            .and_then(|archive| {
+                .map_err(|error| error.to_string())
+                .and_then(|archive| {
                 let previous = root.as_deref().and_then(|root| {
                     session::load(root, archive.metadata().archive_id())
                         .ok()
                         .flatten()
                 });
-                App::open(archive, previous.as_ref(), Instant::now())
-                    .map(|mut app| {
-                        app.enable_background_sync();
-                        (app, previous)
-                    })
-                    .map_err(|error| error.to_string())
-            })
+                    App::open(archive, previous.as_ref(), Instant::now())
+                        .map(|mut app| {
+                            app.enable_background_sync();
+                            (app, previous)
+                        })
+                        .map_err(|error| error.to_string())
+                })
         };
 
         let (app, error, previous) = match result {
@@ -211,7 +211,14 @@ impl Gui {
             self.error = Some("The destination already exists; no files were changed".into());
             return;
         }
-        match Archive::create(path) {
+        // $XDG_DATA_HOME/carta may not exist on a first installation.
+        let result = path
+            .parent()
+            .map(std::fs::create_dir_all)
+            .transpose()
+            .map_err(|error| error.to_string())
+            .and_then(|()| Archive::create(path).map_err(|error| error.to_string()));
+        match result {
             Ok(archive) => self.install_archive(archive),
             Err(error) => self.error = Some(format!("Archive setup failed: {error}")),
         }
@@ -523,7 +530,13 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
             return Task::perform(
                 async move {
                     match tokio::task::spawn_blocking(move || {
-                        Archive::clone_sync_remote(&remote, &path).map(|_| ())
+                        if let Some(parent) = path.parent() {
+                            std::fs::create_dir_all(parent)
+                                .map_err(|error| error.to_string())?;
+                        }
+                        Archive::clone_sync_remote(&remote, &path)
+                            .map(|_| ())
+                            .map_err(|error| error.to_string())
                     })
                     .await
                     {
@@ -541,7 +554,9 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                     if let Some(path) = state.setup_path.as_ref() {
                         match Archive::open(path) {
                             Ok(archive) => state.install_archive(archive),
-                            Err(error) => state.error = Some(format!("Archive open failed: {error}")),
+                            Err(error) => {
+                                state.error = Some(format!("Archive open failed: {error}"));
+                            }
                         }
                     }
                 }
@@ -564,7 +579,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                 app.quit = false;
                 app.status = "Quit annullato: sincronizzazione non riuscita".into();
             }
-            Task::none()
+            return Task::none();
         }
         Message::SyncFinished(result) => {
             state.sync_active = false;
