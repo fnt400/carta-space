@@ -121,6 +121,51 @@ The Nix package builds Carta natively and supplies its Git and Typst runtime dep
 
 On first launch, `carta` opens the default XDG archive location and offers to create an empty Archive or import an existing Git Archive when none exists.
 
+#### Experimental graphical v0.2 branch
+
+On `opencode/v0.2`, the flake builds the GUI by default. From the
+repository checkout:
+
+```bash
+nix build
+./result/bin/carta-gui
+```
+
+The GUI uses the existing Archive under
+`${XDG_DATA_HOME:-$HOME/.local/share}/carta/archive when launched without
+arguments; to use another Archive, provide its path explicitly:
+
+```bash
+./result/bin/carta-gui /path/to/archive
+```
+
+The other programs remain available:
+
+```bash
+nix build .#carta-space  # TUI + CLI
+nix run .#carta          # TUI
+nix run .#carta-cli      # CLI
+```
+
+To **install** the graphical application and its XDG `.desktop` launcher into
+your Nix user profile, run:
+
+```bash
+nix profile install .#carta-gui
+```
+
+The launcher appears as **Carta Space** in desktop application menus where
+Nix profile desktop entries are indexed. Building with `nix build` alone
+only creates the `result` symlink; it does not register a launcher. The
+initial GUI still requires an existing Archive, which can be created with
+the reference TUI or CLI. It uses the bundled Iosevka font and a generic
+text-editor icon in the desktop menu.
+
+The GUI is a separate Cargo project with its own committed
+`crates/carta-gui/Cargo.lock` to make Nix dependency resolution reproducible.
+Its Rust minimum version is 1.88. The terminal workspace and v0.1.x
+compatibility build remain separate.
+
 The helper programs under `scripts/` are development and maintenance tools. They are not part of the normal installation or startup path.
 
 ## Reference implementation architecture
