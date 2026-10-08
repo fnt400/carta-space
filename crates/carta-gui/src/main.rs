@@ -156,7 +156,6 @@ fn view(state: &Gui) -> Element<'_, Message> {
     let editor = scrollable(
         container(
             rich_text(spans)
-                .on_link_click(iced::never)
                 .size(19)
                 .width(Length::Fill),
         )
