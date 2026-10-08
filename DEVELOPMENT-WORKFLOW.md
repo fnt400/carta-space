@@ -34,21 +34,36 @@ ChatGPT is normally responsible for:
 
 ChatGPT must keep changes scoped and must not silently change archive-format or accepted interaction semantics merely to simplify implementation.
 
-### OpenCode — local verification agent
+### OpenCode — local verification and small mechanical corrections
 
-Routine formatter, Clippy, workspace test and build checks run automatically in GitHub Actions on every push to `opencode/v0.2`.
+OpenCode is used to verify ChatGPT's published commit in an appropriate
+local Rust environment. Prefer **Luna Low** for routine checks. GitHub Actions
+also run automated quality gates, but a passing CI result does not establish
+GUI responsiveness.
 
-OpenCode is reserved for operations that require the real local environment or direct hardware interaction:
+The current v0.2 local environment is **`carta-gui-dev` (Ubuntu 26.04,
+Rust >= 1.88)**, not the former Debian `carta-dev`. OpenCode may run
+inside that Distrobox or invoke it when available. In an isolated agent
+execution environment that lacks Distrobox, an equivalent complete native
+Rust toolchain is acceptable for code checks; clearly identify that environment
+and never imply it is the user's NixOS/Distrobox. If a valid execution
+environment cannot be reached, report **BLOCKED** rather than **FAIL**.
 
-- reproducing runtime failures that CI cannot reproduce;
-- exercising the affected frontend;
-- physical-keyboard event probes;
-- terminal compatibility checks for the frozen TUI when relevant;
-- GUI window/input/rendering checks when relevant;
-- filesystem/Git/Distrobox-dependent checks;
-- reporting exact logs, backtraces, commands, and outcomes.
+Default verification: `bash scripts/verify-carta.sh`, including the
+separate GUI debug and release builds. OpenCode may automatically fix
+formatting, trivial Clippy lints, imports and syntax errors with an unambiguous
+local fix, up to three small attempts, followed by complete re-verification.
 
-Unless a task explicitly authorizes edits, OpenCode must not modify repository files. If verification exposes a defect, it reports the defect and stops; the fix returns to ChatGPT.
+OpenCode must not autonomously change program behavior or tests: LEAP, input,
+rendering, scrolling, persistence, synchronization, architecture and
+dependencies return to ChatGPT. It must not alter frozen TUI behavior.
+Publish focused mechanical commits only after reviewing the diff for private
+data. For a genuine unresolved test failure, push a sanitized
+`bugfixes/opencode-report-<HEAD_TESTATO>.md` and return **FAIL**.
+
+An environmental inability to execute is reported as **BLOCKED**, with the
+specific unavailable tool/container and the commands not run. Do not
+commit an environment-only failure report unless explicitly requested.
 
 ## Default loop
 
@@ -86,12 +101,15 @@ When a requested change affects the archive format, canonical metadata, identity
 
 A normal OpenCode verification prompt should:
 
-1. state the repository root being verified;
-2. state the active branch and expected commit;
-3. explicitly say **do not modify files** unless formatting-only changes are authorized;
-4. list the exact commands and runtime checks;
-5. ask for raw failure output when something fails;
-6. stop after reporting results.
+1. state the repository, branch `opencode/v0.2`, and **exact expected HEAD**;
+2. inspect the working tree, then `git pull --ff-only origin opencode/v0.2`;
+3. identify the **actual execution environment** and Rust/toolchain version;
+4. run `bash scripts/verify-carta.sh` from an adequate environment;
+5. authorize only the small mechanical fixes described above;
+6. distinguish **PASS** (all checks run), **FAIL** (tests/lints actually failed)
+   and **BLOCKED** (environment prevents running them);
+7. return the tested HEAD, any new commit, and a sanitized failure report for
+   genuine code failures.
 
 The Carta crates live inside this workspace; verification should not assume separate sibling repositories for them.
 
@@ -105,7 +123,13 @@ cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --locked
 ```
 
-Do not ask the user to relay these routine checks through OpenCode. Passing automated tests does not replace real runtime verification for physical keyboard input, terminal/GUI rendering, export, recovery, or other environment-dependent behavior.
+Local workspace and standalone GUI checks are additionally available
+through `bash scripts/verify-carta.sh`. Run this in the actual local
+`carta-gui-dev` when possible, since remote agent sandboxes may not have the
+same container runtime or libraries. Passing automated tests does not replace
+real runtime verification for physical keyboard input, GUI rendering,
+sustained responsiveness, export, recovery or other environment-dependent
+behavior.
 
 ## Git discipline
 
