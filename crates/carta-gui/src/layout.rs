@@ -195,23 +195,24 @@ impl Layout {
     pub fn hit_test(&self, app: &App, row: usize, column: usize) -> Option<Cursor> {
         let candidate = self.row(app, row.min(self.total_rows.saturating_sub(1)))?;
         match candidate {
-            Row::Rule { region } | Row::Text { region, .. } if matches!(candidate, Row::Rule { .. }) => {
-                Some(Cursor { region, byte: 0 })
-            }
+            Row::Rule { region } => Some(Cursor { region, byte: 0 }),
             Row::Gap => {
-                // A separator/gap belongs to the nearest following Document.
+                // A generated rule or gap cannot be edited.
                 let region = self.docs.partition_point(|doc| doc.content_start <= row);
-                Some(Cursor { region: region.min(self.docs.len().saturating_sub(1)), byte: 0 })
+                Some(Cursor {
+                    region: region.min(self.docs.len().saturating_sub(1)),
+                    byte: 0,
+                })
             }
             Row::Text { region, start, end, .. } => {
                 let text = &app.editor.regions()[region].text;
-                let byte = text[start..end].char_indices()
+                let byte = text[start..end]
+                    .char_indices()
                     .nth(column)
                     .map(|(byte, _)| start + byte)
                     .unwrap_or(end);
                 Some(Cursor { region, byte })
             }
-            Row::Rule { region } => Some(Cursor { region, byte: 0 }),
         }
     }
 
