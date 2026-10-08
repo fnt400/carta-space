@@ -15,6 +15,7 @@ pub struct GuiInputState {
     pending_leap: Option<PendingLeap>,
     active_leap: Option<PendingLeap>,
     suppressed_leap_releases: u8,
+    right_control_held: bool,
 }
 
 impl GuiInputState {
@@ -29,6 +30,11 @@ impl GuiInputState {
                 let Physical::Code(code) = physical_key else {
                     return Ok(());
                 };
+
+                if !repeat && code == Code::ControlRight {
+                    self.handle_right_control_press(app);
+                    return Ok(());
+                }
 
                 if !repeat && self.handle_leap_press(app, code) {
                     return Ok(());
@@ -45,11 +51,33 @@ impl GuiInputState {
                 let Physical::Code(code) = physical_key else {
                     return Ok(());
                 };
+                if code == Code::ControlRight {
+                    self.right_control_held = false;
+                    return Ok(());
+                }
                 self.handle_release(app, code);
             }
             KeyboardEvent::ModifiersChanged(_) => {}
         }
         Ok(())
+    }
+
+    fn handle_right_control_press(&mut self, app: &mut App) {
+        self.right_control_held = true;
+
+        if let Some(active) = self.active_leap {
+            if matches!(app.mode, AppMode::Leap { palette: false, .. }) {
+                app.leap_again_active();
+            } else {
+                app.leap_again_preserving_anchor(active.direction);
+            }
+            return;
+        }
+
+        if let Some(pending) = self.pending_leap.take() {
+            self.active_leap = Some(pending);
+            app.leap_again(pending.direction);
+        }
     }
 
     fn handle_leap_press(&mut self, app: &mut App, code: Code) -> bool {
@@ -61,6 +89,13 @@ impl GuiInputState {
         let Some(direction) = direction else {
             return false;
         };
+
+        if self.right_control_held && self.active_leap.is_none() {
+            self.pending_leap = None;
+            self.suppressed_leap_releases = self.suppressed_leap_releases.saturating_add(1);
+            app.leap_again(direction);
+            return true;
+        }
 
         if self.active_leap.is_some() {
             return true;
@@ -315,6 +350,6 @@ impl GuiInputState {
 fn is_neutral_modifier(code: Code) -> bool {
     matches!(
         code,
-        Code::ShiftLeft | Code::ShiftRight | Code::ControlRight | Code::AltRight
+        Code::ShiftLeft | Code::ShiftRight | Code::AltRight
     )
 }

@@ -11,13 +11,14 @@ During this first stage it is excluded from the main Rust 1.85 workspace because
 - open an existing Carta Archive supplied explicitly on the command line;
 - render the current document, caret and Cat selection from `carta-app`;
 - translate physical Left Ctrl / Left Alt into the shared LEAP behavior;
+- support Right Ctrl / Leap Again with the same semantics as the TUI;
 - pass LEAP query text and basic editing keys through `carta_app::Action`;
 - preserve Right Alt/AltGr as ordinary text input;
 - show the shared command palette, prompts, confirmations, selectors and LEAP query;
 - tick the shared scheduler while idle for autosave/checkpoints/sync;
 - autosave dirty state when the shell exits.
 
-This is not yet the finished editor surface. Visual vertical navigation, full multi-document view projection, clipboard integration, pointer-based editing and final styling remain subsequent GUI work.
+This is not yet the finished editor surface. Visual vertical navigation, full multi-document view projection, clipboard integration and pointer-based editing remain subsequent GUI work. The current styling intentionally follows a restrained writing-first desktop shell rather than the earlier diagnostic/demo layout.
 
 ## Run
 

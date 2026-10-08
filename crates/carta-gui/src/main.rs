@@ -4,8 +4,8 @@ mod presentation;
 use carta_app::{App, AppMode};
 use carta_core::Archive;
 use iced::event::{self, Status};
-use iced::widget::{column, container, rich_text, scrollable, span, text};
-use iced::{color, window, Element, Event, Length, Subscription, Task};
+use iced::widget::{column, container, rich_text, row, scrollable, span, text};
+use iced::{color, window, Element, Event, Length, Subscription, Task, Theme};
 use input::GuiInputState;
 use presentation::SegmentKind;
 use std::env;
@@ -15,6 +15,7 @@ use std::time::{Duration, Instant};
 fn main() -> iced::Result {
     iced::application(Gui::load, update, view)
         .title("Carta Space")
+        .theme(|_| Theme::Light)
         .subscription(subscription)
         .run()
 }
@@ -149,32 +150,46 @@ fn view(state: &Gui) -> Element<'_, Message> {
                 SegmentKind::Selection => span(segment.content)
                     .background(color!(0xBFD5F2))
                     .color(color!(0x182C45)),
-                SegmentKind::Caret => span("│").color(color!(0xA94730)),
+                SegmentKind::Caret => span("■■").color(color!(0xB54835)),
             })
             .collect();
 
     let editor = scrollable(
         container(rich_text(spans).size(19).width(Length::Fill))
-            .padding(24)
-            .width(Length::Fill),
+            .padding([34, 42])
+            .width(Length::Fill)
+            .style(iced::widget::container::rounded_box),
     )
     .height(Length::Fill)
     .width(Length::Fill);
 
     let save_state = if app.editor.is_dirty() {
-        " · Unsaved"
+        "Unsaved"
     } else {
-        ""
+        "Saved"
     };
+    let header = row![
+        text("Carta").size(18),
+        text(format!("{mode} · {save_state}")).size(12),
+    ]
+    .spacing(18);
+
+    let context = text(archive).size(11);
+    let status = if app.status.is_empty() {
+        text("Esc · Commands     Left Ctrl / Left Alt · LEAP     Right Ctrl · Again").size(12)
+    } else {
+        text(&app.status).size(12)
+    };
+
     let body = column![
-        text("Carta Space").size(28),
-        text(format!("{archive} · {mode}{save_state}")).size(13),
+        header,
+        context,
         editor,
         mode_panel(app),
-        text(&app.status).size(13),
+        status,
     ]
-    .spacing(8)
-    .padding(16)
+    .spacing(10)
+    .padding([14, 18])
     .height(Length::Fill);
 
     container(body)
@@ -185,9 +200,7 @@ fn view(state: &Gui) -> Element<'_, Message> {
 
 fn mode_panel(app: &App) -> Element<'_, Message> {
     match &app.mode {
-        AppMode::Editing => text("Esc · Commands    Left Ctrl / Left Alt · LEAP")
-            .size(13)
-            .into(),
+        AppMode::Editing => text("").size(1).into(),
         AppMode::Palette { query, selected } => {
             let commands = app.palette_commands(query);
             let mut panel = column![text(format!("Commands  › {query}")).size(18)].spacing(4);
@@ -203,7 +216,11 @@ fn mode_panel(app: &App) -> Element<'_, Message> {
                 let marker = if index == *selected { "▶" } else { " " };
                 panel = panel.push(text(format!("{marker} {}", command.label())).size(15));
             }
-            container(panel).padding(12).width(Length::Fill).into()
+            container(panel)
+                .padding(14)
+                .width(Length::Fill)
+                .style(iced::widget::container::rounded_box)
+                .into()
         }
         AppMode::Prompt {
             title,
@@ -217,7 +234,11 @@ fn mode_panel(app: &App) -> Element<'_, Message> {
                 panel = panel.push(text(detail).size(14));
             }
             panel = panel.push(text(format!("› {}", with_caret(input, *cursor))).size(16));
-            container(panel).padding(12).width(Length::Fill).into()
+            container(panel)
+                .padding(14)
+                .width(Length::Fill)
+                .style(iced::widget::container::rounded_box)
+                .into()
         }
         AppMode::Confirm { title, details, .. } => {
             let mut panel = column![text(title).size(18)].spacing(5);
@@ -225,7 +246,11 @@ fn mode_panel(app: &App) -> Element<'_, Message> {
                 panel = panel.push(text(detail).size(14));
             }
             panel = panel.push(text("Y · Confirm      N / Esc · Cancel").size(14));
-            container(panel).padding(12).width(Length::Fill).into()
+            container(panel)
+                .padding(14)
+                .width(Length::Fill)
+                .style(iced::widget::container::rounded_box)
+                .into()
         }
         AppMode::Selector {
             title,
@@ -251,15 +276,21 @@ fn mode_panel(app: &App) -> Element<'_, Message> {
                 let marker = if index == *selected { "▶" } else { " " };
                 panel = panel.push(text(format!("{marker} {}", choice.label)).size(15));
             }
-            container(panel).padding(12).width(Length::Fill).into()
+            container(panel)
+                .padding(14)
+                .width(Length::Fill)
+                .style(iced::widget::container::rounded_box)
+                .into()
         }
         AppMode::Leap { session, .. } => {
             let direction = match session.direction() {
                 carta_core::LeapDirection::Forward => "Forward",
                 carta_core::LeapDirection::Backward => "Backward",
             };
-            text(format!("LEAP {direction}  › {}", session.query()))
-                .size(17)
+            container(text(format!("LEAP {direction}  › {}", session.query())).size(16))
+                .padding(12)
+                .width(Length::Fill)
+                .style(iced::widget::container::rounded_box)
                 .into()
         }
     }
