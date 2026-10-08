@@ -74,62 +74,43 @@ cargo run --release --manifest-path crates/carta-gui/Cargo.toml -- /path/to/arch
 
 Rust 1.88 or newer is required.
 
-### Automatic background Git synchronization
+### Automatic push after every commit (non-blocking)
 
-Carta's archive synchronization is separate from the frontend. The GUI now
-uses the shared `carta-core` two-phase background-sync service instead of
-invoking network Git/SSH commands from its Iced update loop:
+Git synchronization belongs to the Archive, not the graphical renderer.
+**Every Carta checkpoint queues an outbound push immediately.** The GUI
+starts its blocking Tokio worker even during uninterrupted writing, while
+a prompt is open, or while the current Document is an empty provisional
+draft. Only the already committed Git HEAD is published; unsaved content
+is neither uploaded nor overwritten. If another checkpoint happens while
+a push is in flight, the newer generation remains pending and is published
+by the next worker rather than being incorrectly acknowledged.
 
-1. Once the local editor is clean, checkpoint unsynchronized local files.
-   This prepares a stable local Git commit.
-2. A Tokio **blocking worker** checks the remote. If it already matches,
-   no further work is necessary. If the server accepts a fast-forward push
-   of the pinned local checkpoint, it publishes without creating a clone.
-   Only when the remote must be integrated does it create a temporary
-   owner-only private snapshot and perform Git fetch/merge/push there.
-   The worker never resets or modifies the active Archive's working tree.
-3. The GUI keeps accepting keyboard, LEAP and mouse events while the worker
-   is active. After a quiet window, the frontend checks that the live editor
-   and working tree are clean, the configured remote has not changed and the
-   local Git HEAD still equals the snapshot's base.
-4. Only then does it import the staged commit **locally** and refresh the
-   document projection. If the base has changed or there is unsaved writing,
-   the result is rejected and retried from a fresh checkpoint.
-5. Automatic sync starts at launch, after local checkpoints and at least
-   every three minutes in normal editing views. Network failures trigger
-   bounded exponential backoff without losing the local archive. Explicit
-   `Sync Now` and remote setup queue the same background mechanism.
+The worker checks the remote; already-synced and fast-forward pushes require
+no private clone. When the remote has changed, an owner-private temporary
+clone performs the Git fetch/merge/push. Incoming changes are applied to
+the live Archive **only when the editor has been idle and is clean**, with
+HEAD, remote-configuration and worktree checks. If the local base advanced
+during the worker, Carta discards the stale staged result and retries.
 
-The reference TUI still retains its original synchronous `App::tick`
-implementation for compatibility; the shared staging service is available
-to other frontends independently of Iced.
+A failed push/pull or an unresolved merge conflict makes the **entire GUI
+status bar red**, with a persistent error message (independent of expiring
+editor status messages). Failed transfers remain queued, retry
+automatically with bounded backoff, and clear the red warning only after
+successful synchronization. Periodic checks every three minutes also
+detect commits made outside Carta. Explicit `Sync Now` uses the same worker.
 
-**Safety**: The staging worker never touches the active Archive tree. An
-automatic conflict never silently discards either Git history. Unresolved
-merge conflicts are reported for explicit resolution rather than
-force-pushing one side. Staging data is private, temporary and removed after
-the result has been processed.
+The reference TUI retains its previous automatic synchronization scheduler;
+there is no new Iced dependency in the shared Archive model.
 
-**Limitations**: Network transfer and remote Git commands run entirely
-off-thread. The short local checkpoint phase and, when remote files changed,
-the final local import/reset plus Archive reload still run during a quiet
-period on the application thread. Those operations are deliberately
-separated from networking, but are not yet guaranteed to be zero-latency
-with an enormous Archive. When the remote and local histories diverge, the private snapshot copies
-the tracked working files and may generate disk I/O; ordinary already-synced
-cycles and fast-forward uploads avoid this cost. Measure these separately;
-do not claim that this implementation makes *all* disk work asynchronous.
-
-**Known outstanding behavior (audit):** When the active view contains a
-new empty, provisional Document, the Archive has an intentionally
-uncommitted draft. Automatic pull and push are therefore deferred until
-that Document becomes persistent; this may prevent initial synchronization
-on a newly opened or empty month. This must be resolved without committing
-empty drafts to the remote or discarding text. When both machines edit the
-same Document and Git cannot merge, both histories are preserved but the
-GUI does not yet provide a native three-way Git merge conflict resolver.
-These two cases require explicit release acceptance; a passing CI suite
-does not imply the full automatic-sync experience is complete.
+**Known limits:** Network operations run off-thread; local checkpoints
+and application of remote changes still perform short synchronous disk/Git
+operations during a quiet period and have not been proven imperceptible on
+enormous Archives. Incoming changes cannot currently be applied while an
+empty provisional Document is open, so pull can wait for that draft to be
+finalized. Automatic three-way conflict resolution is not implemented:
+both histories are preserved and the status bar stays red until the
+conflict is resolved. These are distinct from the now-unblocked outbound
+push of previously committed snapshots.
 
 
 ### Virtual View renderer — sustained responsiveness
