@@ -433,6 +433,7 @@ dependencies = [
  "iced",
  "pulldown-cmark",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]
