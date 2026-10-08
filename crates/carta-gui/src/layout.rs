@@ -8,8 +8,6 @@ use std::collections::HashMap;
 #[derive(Debug)]
 struct DocumentRows {
     starts: Vec<usize>, // byte start of each soft/hard wrapped visual row
-    start: usize,       // absolute first row, including generated separator
-    content_start: usize,
     prefix: usize,
     locked: bool,
     generation: u64,
@@ -34,8 +32,65 @@ pub struct Layout {
     view_kind: u8,
     docs: Vec<DocumentRows>,
     indices: HashMap<DocumentId, usize>,
-    total_rows: usize,
+    totals: RowTotals,
     serial: u64,
+}
+
+/// Fenwick tree of Document block heights. Prefix lookups, row-to-Document
+/// searches and single-Document height changes take O(log Documents). Every
+/// block includes generated separators and at least one visual text row.
+#[derive(Default)]
+struct RowTotals {
+    tree: Vec<i64>,
+}
+
+impl RowTotals {
+    fn reset(&mut self, lengths: impl IntoIterator<Item = usize>) {
+        let lengths: Vec<_> = lengths.into_iter().collect();
+        self.tree = vec![0; lengths.len() + 1];
+        for (i, length) in lengths.into_iter().enumerate() {
+            self.add(i, length as i64);
+        }
+    }
+
+    fn add(&mut self, index: usize, delta: i64) {
+        let mut i = index + 1;
+        while i < self.tree.len() {
+            self.tree[i] += delta;
+            i += i & (!i + 1);
+        }
+    }
+
+    fn prefix(&self, count: usize) -> usize {
+        let mut i = count;
+        let mut sum = 0_i64;
+        while i > 0 {
+            sum += self.tree[i];
+            i &= i - 1;
+        }
+        sum as usize
+    }
+
+    fn total(&self) -> usize {
+        self.prefix(self.tree.len().saturating_sub(1))
+    }
+
+    /// Locate a 0-based row, returning (Document index, local block row).
+    /// Caller ensures row < total.
+    fn find(&self, row: usize) -> (usize, usize) {
+        let mut index = 0;
+        let mut count = 0_i64;
+        let mut step = self.tree.len().next_power_of_two() / 2;
+        while step > 0 {
+            let next = index + step;
+            if next < self.tree.len() && count + self.tree[next] <= row as i64 {
+                index = next;
+                count += self.tree[next];
+            }
+            step /= 2;
+        }
+        (index, row - count as usize)
+    }
 }
 
 fn view_kind(view: &View) -> u8 {
@@ -81,15 +136,6 @@ impl Layout {
         self.serial
     }
 
-    fn recalculate_starts(&mut self) {
-        let mut current = 0;
-        for doc in &mut self.docs {
-            doc.start = current;
-            doc.content_start = current + doc.prefix;
-            current = doc.content_start + doc.starts.len();
-        }
-        self.total_rows = current;
-    }
 
     pub fn sync(&mut self, app: &App, columns: usize) {
         let regions = app.editor.regions();
@@ -114,8 +160,6 @@ impl Layout {
                 let generation = self.next_generation();
                 self.docs.push(DocumentRows {
                     starts: row_starts(&region.text, columns),
-                    start: 0,
-                    content_start: 0,
                     prefix,
                     locked,
                     generation,
@@ -123,6 +167,7 @@ impl Layout {
                 });
                 self.indices.insert(region.document, i);
             }
+            self.totals.reset(self.docs.iter().map(|doc| doc.prefix + doc.starts.len()));
         } else {
             // Editing a Document invalidates its rows, not all other Documents.
             // Dirty IDs are supplied by the canonical editor. The current
@@ -137,9 +182,13 @@ impl Layout {
                         continue;
                     }
                     let generation = self.next_generation();
-                    self.docs[index].starts = row_starts(&regions[index].text, columns);
+                    let new_rows = row_starts(&regions[index].text, columns);
+                    let previous = self.docs[index].starts.len() as i64;
+                    let updated = new_rows.len() as i64;
+                    self.docs[index].starts = new_rows;
                     self.docs[index].generation = generation;
                     self.docs[index].content_version = version;
+                    self.totals.add(index, updated - previous);
                 }
             }
         }
@@ -149,11 +198,10 @@ impl Layout {
         self.editor_revision = revision;
         self.columns = columns;
         self.view_kind = kind;
-        self.recalculate_starts();
     }
 
     pub fn total_rows(&self) -> usize {
-        self.total_rows
+        self.totals.total()
     }
 
     pub fn generation(&self, region: usize) -> u64 {
@@ -166,16 +214,16 @@ impl Layout {
         let starts = &doc.starts;
         let byte = cursor.byte;
         let visual_row = starts.partition_point(|&start| start <= byte).saturating_sub(1);
-        doc.content_start + visual_row
+        self.totals.prefix(cursor.region) + doc.prefix + visual_row
     }
 
     pub fn row(&self, app: &App, row: usize) -> Option<Row> {
-        if row >= self.total_rows { return None; }
-        // Binary search by a Document's first row, independent of View size.
-        let index = self.docs.partition_point(|doc| doc.start <= row).saturating_sub(1);
+        if row >= self.total_rows() {
+            return None;
+        }
+        let (index, local) = self.totals.find(row);
         let doc = &self.docs[index];
-        if row < doc.content_start {
-            let local = row - doc.start;
+        if local < doc.prefix {
             let separator = match &app.view {
                 View::CreationDate(_) | View::ModificationDate => true,
                 View::Work(_) => index > 0 || doc.locked,
@@ -187,7 +235,7 @@ impl Layout {
             return Some(Row::Gap);
         }
 
-        let visual = row - doc.content_start;
+        let visual = local - doc.prefix;
         let start = doc.starts[visual];
         let text = &app.editor.regions()[index].text;
         let next = doc.starts.get(visual + 1).copied().unwrap_or(text.len());
@@ -198,16 +246,13 @@ impl Layout {
 
     /// Byte offset in the visible row, rounded to an insertion cell.
     pub fn hit_test(&self, app: &App, row: usize, column: usize) -> Option<Cursor> {
-        let candidate = self.row(app, row.min(self.total_rows.saturating_sub(1)))?;
+        let candidate = self.row(app, row.min(self.total_rows().saturating_sub(1)))?;
         match candidate {
             Row::Rule { region } => Some(Cursor { region, byte: 0 }),
             Row::Gap => {
                 // A generated rule or gap cannot be edited.
-                let region = self.docs.partition_point(|doc| doc.content_start <= row);
-                Some(Cursor {
-                    region: region.min(self.docs.len().saturating_sub(1)),
-                    byte: 0,
-                })
+                let (region, _) = self.totals.find(row.min(self.total_rows() - 1));
+                Some(Cursor { region, byte: 0 })
             }
             Row::Text { region, start, end, .. } => {
                 let text = &app.editor.regions()[region].text;
@@ -225,8 +270,9 @@ impl Layout {
         let visible_top = ((offset - top_pad).max(0.0) / line_height).floor() as usize;
         let visible = (height / line_height).ceil() as usize + 2;
         let overscan = visible.max(16);
-        let first = visible_top.saturating_sub(overscan).min(self.total_rows);
-        let last = visible_top.saturating_add(visible).saturating_add(overscan).min(self.total_rows);
+        let total = self.total_rows();
+        let first = visible_top.saturating_sub(overscan).min(total);
+        let last = visible_top.saturating_add(visible).saturating_add(overscan).min(total);
         (first, last.max(first))
     }
 }
@@ -245,33 +291,40 @@ mod tests {
     }
 
     #[test]
-    fn indexing_many_documents_does_not_increase_visible_render_work() {
-        let mut layout = Layout::default();
-        for _ in 0..20_000 {
-            layout.docs.push(DocumentRows {
-                starts: vec![0, 12, 24],
-                start: 0,
-                content_start: 0,
-                prefix: 3,
-                locked: false,
-                generation: 1,
-                content_version: 0,
-            });
-        }
-        layout.recalculate_starts();
-        assert_eq!(layout.total_rows(), 120_000);
-        let (first, last) = layout.window(1_200_000.0, 720.0, 22.0, 480.0);
-        assert!(last - first < 120, "the rendered row count cannot scale with Document count");
-        assert!(first > 0 && last < layout.total_rows());
-        // Rebuilding the virtual total uses only the cached number of rows,
-        // not the source text itself.
+    fn updating_one_document_does_not_scan_or_reposition_other_documents() {
+        let mut totals = RowTotals::default();
+        totals.reset([5, 10, 20, 3, 11]);
+        assert_eq!(totals.total(), 49);
+        assert_eq!(totals.prefix(3), 35);
+        assert_eq!(totals.find(0), (0, 0));
+        assert_eq!(totals.find(14), (1, 9));
+        assert_eq!(totals.find(15), (2, 0));
+        totals.add(1, -6); // Document 1 got six visual rows shorter.
+        assert_eq!(totals.total(), 43);
+        assert_eq!(totals.prefix(3), 29);
+        assert_eq!(totals.find(9), (2, 0));
+        totals.add(2, 9);
+        assert_eq!(totals.total(), 52);
+        assert_eq!(totals.find(51), (4, 10));
     }
 
     #[test]
+    fn indexing_many_documents_does_not_increase_visible_render_work() {
+        let mut layout = Layout::default();
+        layout.totals.reset(std::iter::repeat_n(6, 20_000));
+        assert_eq!(layout.total_rows(), 120_000);
+        let (first, last) = layout.window(1_200_000.0, 720.0, 22.0, 480.0);
+        assert!(last - first < 120, "rendered rows cannot grow with Document count");
+        assert!(first > 0 && last < layout.total_rows());
+    }
+
+
+    #[test]
     fn stable_window_size_is_independent_of_archive_length() {
-        let layout = Layout { total_rows: 1_000_000, ..Layout::default() };
+        let mut layout = Layout::default();
+        layout.totals.reset([1_000_000]);
         let (first, last) = layout.window(640_000.0, 800.0, 22.0, 500.0);
         assert!(last - first <= 130, "must shape only bounded visible rows");
-        assert!(first > 0 && last < layout.total_rows);
+        assert!(first > 0 && last < layout.total_rows());
     }
 }
