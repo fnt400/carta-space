@@ -17,7 +17,7 @@ During this first stage it is excluded from the main Rust 1.85 workspace because
 - show the shared command palette, prompts, confirmations, selectors and LEAP query;
 - support Left/Right/Up/Down editor navigation with a visual-width adapter, and center the caret near two-thirds of the available editor height;
 - support Ctrl-Right+C Cat Copy or clipboard paste, and automatically export newly extended Cat selections to the system clipboard;
-- tick the shared scheduler at 2-second intervals instead of repainting the window at animation frame rates;
+- tick the shared scheduler only as needed: about once per second while dirty, every two seconds for a transient status, and every 15 seconds otherwise;
 - autosave dirty state when the shell exits.
 
 This is not yet the finished editor surface. Pixel-exact soft wrapping, complete non-editable View projections and pointer-based editing remain subsequent GUI work. The current shell deliberately mirrors the proven TUI presentation: a centered monospace writing surface, generated document separators, transient modal overlays, and a persistent status bar.
@@ -28,13 +28,54 @@ The editor paints the character at the logical caret without inserting fake Unic
 
 Iosevka Regular is bundled directly with the GUI and loaded at startup, so users do not need to install fonts or depend on the host's font resolution. The checked-in base64 asset is decoded in memory rather than installing anything system-wide (see `LICENSES/OFL-iosevka.txt`). The original TUI remains unchanged; its font is selected by the terminal emulator. To match both visually, select **Iosevka** in the terminal as well.
 
-## Run
+## Run and performance checks
+
+For evaluating responsiveness, always test the optimized release build. The
+debug build has unoptimized software rasterization (`tiny-skia`) and is not a
+representative performance benchmark.
 
 ```sh
-cargo run --manifest-path crates/carta-gui/Cargo.toml -- /path/to/archive
+cargo run --release --manifest-path crates/carta-gui/Cargo.toml -- /path/to/archive
 ```
 
 Rust 1.88 or newer is required.
+
+### Background maintenance and the UI thread
+
+**Temporary v0.2 restriction:** the graphical frontend keeps automatic
+local autosaves and 10-minute Git checkpoints but suspends **automatic
+remote** Git/SSH sync. Network Git processes were being launched
+synchronously by the application maintenance tick (nominally at 180 seconds),
+which can freeze the event loop. The ordinary TUI retains its existing
+automatic synchronization behavior. GUI users can still request explicit sync
+through the command palette, but that command may itself temporarily block.
+An asynchronous sync worker with well-defined archive/edit consistency is
+needed before automatic remote synchronization can return to the GUI.
+
+The idle GUI timer is activity-adaptive (15 seconds when idle, two seconds
+when displaying a transient status, one second while edits are awaiting
+autosave), instead of issuing an unconditional 2-second update.
+
+### Opt-in profiling
+
+To distinguish application handling from text reconstruction, run:
+
+```sh
+CARTA_GUI_PROFILE=1 cargo run --release --manifest-path crates/carta-gui/Cargo.toml -- /path/to/archive
+```
+
+Every 15 seconds of reported activity, the GUI prints anonymized timing
+counts, average and worst times (milliseconds) for `view` widget construction,
+`scroll` row calculations and `maintenance` handling. It never prints archive
+text, names, paths, search queries or keys. There is no profiling overhead
+unless the environment flag is enabled.
+
+A fast `view` timer does **not** establish a fast render: layout, shaping and
+`tiny-skia` rasterization happen downstream. A system profiler (e.g.
+`perf`) and an actual long-lived GUI session are required to identify a
+remaining compositor/rasterization bottleneck. Compare idle/typing behavior
+near startup and after at least ten minutes on the same test Archive.
+
 
 ## Focused manual checks
 
