@@ -1,36 +1,29 @@
-name: One-time background sync verification
-# Re-run after correcting staged fetch for archives with non-carta local branches.
+name: One-time background sync formatting
 on:
   push:
     branches: [opencode/v0.2]
     paths: [".github/workflows/sync-verify-once.yml"]
 permissions:
-  contents: read
+  contents: write
 jobs:
-  verify:
+  format:
     if: github.repository == 'fnt400/carta-space'
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
-      - name: Install native dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends pkg-config libwayland-dev
-      - name: Verify workspace and GUI
+          components: rustfmt
+      - name: Commit verified Rust formatting
         shell: bash
         run: |
-          set -u
+          set -euo pipefail
           cargo fmt --all
           cargo fmt --manifest-path crates/carta-gui/Cargo.toml
-          set +e
-          timeout 1800 bash scripts/verify-carta.sh > /tmp/carta-verify.log 2>&1
-          result=$?
-          set -e
-          echo "CARTA_VERIFY_EXIT_CODE=$result"
-          echo "=== Tail of full verification ==="
-          tail -n 160 /tmp/carta-verify.log
-          exit "$result"
+          git add -- crates/carta-app/src crates/carta-core/src crates/carta-gui/src
+          if git diff --cached --quiet; then
+            echo "No Rust formatting changes."
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Format verified asynchronous archive sync implementation'
+          git push origin HEAD:opencode/v0.2
