@@ -558,6 +558,42 @@ mod tests {
     }
 
     #[test]
+    fn uncommitted_writing_does_not_hold_back_an_earlier_committed_push() {
+        let tmp = tempfile::tempdir().unwrap();
+        let remote = tmp.path().join("remote.git");
+        git(tmp.path(), &["init", "--bare", "--quiet", remote.to_str().unwrap()]);
+        let root = tmp.path().join("working");
+        let mut archive = Archive::create(&root).unwrap();
+        archive.set_sync_remote(remote.to_str().unwrap()).unwrap();
+        let document = archive.create_document("committed text\n").unwrap();
+        archive.checkpoint(CheckpointKind::Manual, None).unwrap();
+        let checkpoint_head =
+            git_text(&root, "committed head", &["rev-parse", "HEAD"]).unwrap();
+
+        // A later edit remains uncommitted while the asynchronous worker runs.
+        archive.edit_document(document, "new uncommitted text\n").unwrap();
+        assert!(archive.is_dirty().unwrap());
+        let job = stage_sync(root.clone()).unwrap();
+        assert_eq!(job.outcome(), SyncOutcome::Published);
+        assert_eq!(job.apply(&mut archive).unwrap(), SyncApply::Stale);
+        assert_eq!(
+            archive.read_document(document).unwrap().content(),
+            "new uncommitted text\n"
+        );
+        let published = Command::new("git")
+            .arg("--git-dir")
+            .arg(&remote)
+            .args(["rev-parse", "refs/heads/carta"])
+            .output()
+            .unwrap();
+        assert!(published.status.success());
+        assert_eq!(
+            String::from_utf8(published.stdout).unwrap().trim(),
+            checkpoint_head
+        );
+    }
+
+    #[test]
     fn stale_snapshot_does_not_replace_new_local_checkpoint() {
         let tmp = tempfile::tempdir().unwrap();
         let remote = tmp.path().join("remote.git");
