@@ -1,16 +1,15 @@
 use carta_app::{App, AppMode, View};
 use chrono::{DateTime, Local};
 use iced::theme::Mode as ThemeMode;
-use iced::widget::{column, container, rich_text, row, scrollable, space, span, stack, text, Id};
+use iced::widget::{column, container, mouse_area, rich_text, row, scrollable, space, span, stack, text, Id};
 use iced::{color, Color, Element, Font, Length};
 use std::time::Instant;
 
-use crate::presentation::SegmentKind;
+use crate::markdown::{self, Syntax};
 use crate::viewport;
 use crate::{Gui, Message};
 
 const IOSEVKA: Font = Font::with_name("Iosevka");
-const EDITOR_SIZE: f32 = viewport::FONT_SIZE;
 const STATUS_SIZE: f32 = 14.0;
 const EDITOR_MAX_WIDTH: f32 = viewport::PAGE_WIDTH;
 
@@ -44,7 +43,7 @@ fn build_view(state: &Gui) -> Element<'_, Message> {
         return container(text("Carta Space").font(IOSEVKA)).into();
     };
 
-    let editor = editor_view(app, state.theme_mode, state.window_size);
+    let editor = editor_view(state, app, state.theme_mode, state.window_size);
     let leap = leap_line(app);
     let status = status_bar(app, state.theme_mode);
 
@@ -66,13 +65,14 @@ fn build_view(state: &Gui) -> Element<'_, Message> {
     }
 }
 
-fn editor_view(app: &App, mode: ThemeMode, window: iced::Size) -> Element<'_, Message> {
-    let columns = viewport::columns(window.width);
-    let spans = editor_spans(app, mode, columns);
+
+fn editor_view(state: &Gui, app: &App, mode: ThemeMode, window: iced::Size) -> Element<'_, Message> {
+    let columns = viewport::columns(window.width, state.font_size);
+    let spans = editor_spans(app, mode, columns, &mut state.markdown.borrow_mut());
     let text_view = rich_text(spans)
         .font(IOSEVKA)
-        .size(EDITOR_SIZE)
-        .line_height(iced::Pixels(viewport::LINE_HEIGHT))
+        .size(state.font_size)
+        .line_height(iced::Pixels(viewport::line_height(state.font_size)))
         .width(Length::Fill);
 
     let page = container(text_view)
@@ -83,16 +83,20 @@ fn editor_view(app: &App, mode: ThemeMode, window: iced::Size) -> Element<'_, Me
             viewport::HORIZONTAL_PADDING as u16,
         ]);
 
+    // The mouse area has the same page-row origin used by the hit tester.
+    // It does not include the virtual padding at the top of the scroll sheet.
+    let area = mouse_area(container(page).center_x(Length::Fill))
+        .on_move(Message::PointerMoved)
+        .on_press(Message::PointerPressed)
+        .on_release(Message::PointerReleased)
+        .interaction(iced::mouse::Interaction::Text);
+
     let height = viewport::writing_area_height(window.height);
     let top_padding = space().height(height * (2.0 / 3.0));
     let bottom_padding = space().height(height * (2.0 / 3.0));
-    let sheet = column![
-        top_padding,
-        container(page).center_x(Length::Fill),
-        bottom_padding
-    ]
-    .spacing(0)
-    .width(Length::Fill);
+    let sheet = column![top_padding, area, bottom_padding]
+        .spacing(0)
+        .width(Length::Fill);
 
     scrollable(sheet)
         .id(Id::new(EDITOR_SCROLL_ID))
@@ -101,87 +105,98 @@ fn editor_view(app: &App, mode: ThemeMode, window: iced::Size) -> Element<'_, Me
         .into()
 }
 
+fn syntax_color(mode: ThemeMode, syntax: Syntax) -> Color {
+    // Source Markdown remains visible: only ink color changes, never metrics.
+    match (mode, syntax) {
+        (ThemeMode::Light, Syntax::Heading) => color!(0x7940AC),
+        (ThemeMode::Light, Syntax::Strong) => color!(0xA04A23),
+        (ThemeMode::Light, Syntax::Emphasis) => color!(0x276783),
+        (ThemeMode::Light, Syntax::Link) => color!(0x175BBD),
+        (ThemeMode::Light, Syntax::Code) => color!(0x317542),
+        (ThemeMode::Light, Syntax::Quote) => color!(0x67807B),
+        (_, Syntax::Heading) => color!(0xC5A1FB),
+        (_, Syntax::Strong) => color!(0xFFD098),
+        (_, Syntax::Emphasis) => color!(0x95D8E7),
+        (_, Syntax::Link) => color!(0x8DBAFF),
+        (_, Syntax::Code) => color!(0xA5E5B0),
+        (_, Syntax::Quote) => color!(0x95AAA7),
+    }
+}
+
 fn editor_spans<'a>(
     app: &'a App,
     mode: ThemeMode,
     columns: usize,
+    cache: &mut markdown::Cache,
 ) -> Vec<iced::widget::text::Span<'a, ()>> {
     let mut spans = Vec::new();
     let cursor = app.editor.cursor();
-    let selection = app
-        .cat_render_highlight()
-        .or_else(|| app.editor.selection());
+    let selection = app.cat_render_highlight().or_else(|| app.editor.selection());
     let extended = app.editor.cat_highlight().is_some() || app.editor.selection().is_some();
 
-    for (region_index, region) in app.editor.regions().iter().enumerate() {
-        if let Some(separator) = separator_for_region(app, region_index, columns) {
-            if region_index > 0 {
-                spans.push(span("\n"));
-            }
+    for (index, region) in app.editor.regions().iter().enumerate() {
+        if let Some(separator) = separator_for_region(app, index, columns) {
+            if index > 0 { spans.push(span("\n")); }
             spans.push(span(separator).font(IOSEVKA).color(secondary_text(mode)));
             spans.push(span("\n\n"));
-        } else if region_index > 0 {
+        } else if index > 0 {
             spans.push(span("\n\n"));
         }
 
-        if region_index == cursor.region {
-            let selected = selection.and_then(|(start, end)| {
-                (start.region == region_index && end.region == region_index)
-                    .then_some((start.byte, end.byte))
-            });
+        let value = region.text.as_str();
+        let styles = cache.ranges(region.document, value);
+        let selected = selection.and_then(|(start, end)| {
+            if index < start.region || index > end.region { return None; }
+            let first = if index == start.region { start.byte } else { 0 };
+            let last = if index == end.region { end.byte } else { value.len() };
+            (first < last).then_some((first, last))
+        });
+        let caret = (index == cursor.region).then_some(cursor.byte);
+        let caret_end = caret.map(|byte| {
+            value[byte..].chars().next().map_or(byte, |ch| byte + ch.len_utf8())
+        });
 
-            spans.extend(
-                crate::presentation::segments(&region.text, cursor.byte, selected)
-                    .into_iter()
-                    .flat_map(|segment| {
-                        let newline_caret =
-                            segment.kind == SegmentKind::Caret && segment.content == "\n";
-                        let styled = match segment.kind {
-                            SegmentKind::Text => span(segment.content).font(IOSEVKA),
-                            SegmentKind::Selection => span(segment.content)
-                                .font(IOSEVKA)
-                                .background(if extended {
-                                    selection_background(mode)
-                                } else {
-                                    cat_highlight_background(mode)
-                                })
-                                .color(selection_foreground(mode)),
-                            SegmentKind::Caret => {
-                                // A newline has no printable cell, so give its caret
-                                // a stable one-cell placeholder before the LF.
-                                let content =
-                                    if segment.content.is_empty() || segment.content == "\n" {
-                                        " "
-                                    } else {
-                                        segment.content
-                                    };
-                                let caret = span(content).font(IOSEVKA);
-                                caret
-                                    .background(caret_color(mode))
-                                    .color(caret_foreground(mode))
-                            }
-                        };
-                        if newline_caret {
-                            vec![styled, span("\n").font(IOSEVKA)]
-                        } else {
-                            vec![styled]
-                        }
-                    }),
+        let mut boundaries = vec![0, value.len()];
+        if let Some(byte) = caret { boundaries.push(byte); }
+        if let Some(byte) = caret_end { boundaries.push(byte); }
+        if let Some((start, end)) = selected { boundaries.extend([start, end]); }
+        for range in styles {
+            boundaries.extend([range.start, range.end]);
+        }
+        boundaries.sort_unstable();
+        boundaries.dedup();
+
+        for pair in boundaries.windows(2) {
+            let (start, end) = (pair[0], pair[1]);
+            if end <= start { continue; }
+            let fragment = &value[start..end];
+            let is_caret = caret == Some(start);
+            let newline_caret = is_caret && fragment == "\n";
+            let display = if newline_caret { " " } else { fragment };
+            let mut styled = span(display).font(IOSEVKA);
+            if is_caret {
+                styled = styled.background(caret_color(mode)).color(caret_foreground(mode));
+            } else if selected.is_some_and(|(first, last)| first < end && start < last) {
+                styled = styled
+                    .background(if extended { selection_background(mode) } else { cat_highlight_background(mode) })
+                    .color(selection_foreground(mode));
+            } else if let Some(syntax) = markdown::syntax_at(styles, start, end) {
+                styled = styled.color(syntax_color(mode, syntax));
+            }
+            spans.push(styled);
+            if newline_caret { spans.push(span("\n").font(IOSEVKA)); }
+        }
+        if caret == Some(value.len()) {
+            spans.push(
+                span(" ").font(IOSEVKA)
+                    .background(caret_color(mode))
+                    .color(caret_foreground(mode)),
             );
-        } else {
-            spans.push(span(region.text.as_str()).font(IOSEVKA));
         }
     }
-
     if spans.is_empty() {
-        let caret = span(" ").font(IOSEVKA);
-        spans.push(
-            caret
-                .background(caret_color(mode))
-                .color(caret_foreground(mode)),
-        );
+        spans.push(span(" ").font(IOSEVKA).background(caret_color(mode)).color(caret_foreground(mode)));
     }
-
     spans
 }
 
