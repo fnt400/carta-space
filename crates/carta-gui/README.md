@@ -17,7 +17,7 @@ During this first stage it is excluded from the main Rust 1.85 workspace because
 - show the shared command palette, prompts, confirmations, selectors and LEAP query;
 - support Left/Right/Up/Down editor navigation with a visual-width adapter, and center the caret near two-thirds of the available editor height;
 - support Ctrl-Right+C Cat Copy or clipboard paste, and automatically export newly extended Cat selections to the system clipboard;
-- color Markdown headings, emphasis, strong text, links, quotes and code **without hiding markup or modifying authored text**; a per-Document fingerprint cache avoids re-parsing unchanged text;
+- color Markdown headings, emphasis, strong text, links, quotes and code **without hiding markup or modifying authored text**; a versioned syntax cache avoids parsing unchanged Documents;
 - zoom the writing font using physical Right Ctrl + minus (smaller) or Right Ctrl + equals (larger), from 12 to 32 pixels in 2-pixel steps, adjusting the screen-space row geometry without changing document content;
 - position the caret by clicking, and select with left-button drag, sharing the canonical editor selection model rather than maintaining a second text buffer;
 - restore the previous View, document and UTF-8 cursor byte position from the same XDG session sidecar used by the TUI (saved when the application closes and during maintenance);
@@ -89,6 +89,44 @@ needed before automatic remote synchronization can return to the GUI.
 The idle GUI timer is activity-adaptive (15 seconds when idle, two seconds
 when displaying a transient status, one second while edits are awaiting
 autosave), instead of issuing an unconditional 2-second update.
+
+### Virtual View renderer — sustained responsiveness
+
+The GUI no longer builds one giant `rich_text` widget containing every
+Document in the current View. That approach made text shaping, styling, and
+software rasterization proportional to the **entire View**, so a View with
+many Documents became progressively unusable.
+
+The GUI now builds a disposable, font-size-dependent index of visual rows
+and generated Document separators. Iced receives only the rows in/near the
+visible viewport (about three screens including overscan). The rest of the
+Archive is represented by empty virtual spacer heights to preserve native
+scrollbar and mouse-wheel behavior. Source text is still held canonically in
+`carta-app` and is never duplicated to make a View.
+
+The row index is initially built once for a newly loaded View or after
+changing font size. Cursor-only navigation reuses it. A text mutation updates
+the affected Document's rows, not every Document in the View. A Fenwick
+prefix-sum index locates global rows and updates Document block heights in
+O(log N) for N Documents. Undo/redo also invalidate the affected Document's
+projection. Markdown syntax is compiled into non-overlapping, indexed ranges
+once per changed Document and never rescanned on routine navigation; the
+disposable syntax cache is capped at 128 Documents.
+
+This removes the all-Document reconstruction/shaping/rasterization path
+that caused the View-size-dependent slowdown. It does **not** remove the
+initial cost of loading the Archive and building the row index, nor does
+it make editing one extremely large individual Document fully incremental.
+Those are separate, measurable scaling cases and should not be confused
+with redraw behavior.
+
+**Regression acceptance:** Build with `--release`, compare typing latency,
+LEAP, native wheel scrolling, scrollbar dragging, mouse selection and zoom
+for a small View and a large View with thousands of synthetic Documents.
+Exercise the application for at least 30 minutes, including Undo/Redo,
+switching Views, changing font size, reaching the beginning/end, and cursor
+restore after restart. Measure CPU/RSS and the optional profile timing.
+No automated test can certify the physical GUI experience.
 
 ### Opt-in profiling
 
