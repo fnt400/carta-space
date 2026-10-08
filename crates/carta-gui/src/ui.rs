@@ -67,7 +67,7 @@ fn build_view(state: &Gui) -> Element<'_, Message> {
 }
 
 
-fn editor_view(state: &Gui, app: &App, mode: ThemeMode, window: iced::Size) -> Element<'_, Message> {
+fn editor_view<'a>(state: &Gui, app: &'a App, mode: ThemeMode, window: iced::Size) -> Element<'a, Message> {
     let columns = viewport::columns(window.width, state.font_size);
     let spans = editor_spans(app, mode, columns, &mut state.markdown.borrow_mut());
     let text_view = rich_text(spans)
