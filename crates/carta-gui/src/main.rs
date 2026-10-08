@@ -29,6 +29,8 @@ pub(crate) struct Gui {
     pub(crate) input: GuiInputState,
     pub(crate) error: Option<String>,
     pub(crate) theme_mode: ThemeMode,
+    pub(crate) blink_origin: Instant,
+    pub(crate) caret_visible: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -50,6 +52,8 @@ impl Gui {
                 input: GuiInputState::default(),
                 error: Some("Usage: carta-gui <archive-path>".into()),
                 theme_mode: ThemeMode::Dark,
+                blink_origin: Instant::now(),
+                caret_visible: true,
             };
         };
 
@@ -63,12 +67,16 @@ impl Gui {
                 input: GuiInputState::default(),
                 error: None,
                 theme_mode: ThemeMode::Dark,
+                blink_origin: Instant::now(),
+                caret_visible: true,
             },
             Err(error) => Self {
                 app: None,
                 input: GuiInputState::default(),
                 error: Some(error),
                 theme_mode: ThemeMode::Dark,
+                blink_origin: Instant::now(),
+                caret_visible: true,
             },
         }
     }
@@ -93,7 +101,7 @@ fn subscription(_state: &Gui) -> Subscription<Message> {
 
     Subscription::batch([
         keyboard,
-        iced::time::every(Duration::from_millis(250)).map(Message::Tick),
+        iced::time::every(Duration::from_millis(83)).map(Message::Tick),
         system::theme_changes().map(Message::SystemTheme),
     ])
 }
@@ -109,8 +117,19 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
     };
 
     let result = match message {
-        Message::Raw(Event::Keyboard(event)) => state.input.handle(app, event),
-        Message::Tick(now) => app.tick(now).map(|_| ()),
+        Message::Raw(Event::Keyboard(event)) => {
+            state.blink_origin = Instant::now();
+            state.caret_visible = true;
+            state.input.handle(app, event)
+        }
+        Message::Tick(now) => {
+            // Canon Cat: about 3 Hz when saved, about 1 Hz when dirty.
+            let half_period_ms = if app.editor.is_dirty() { 500 } else { 167 };
+            state.caret_visible =
+                (now.saturating_duration_since(state.blink_origin).as_millis()
+                    / half_period_ms) % 2 == 0;
+            app.tick(now).map(|_| ())
+        },
         Message::Raw(_) | Message::SystemTheme(_) => Ok(()),
     };
 
