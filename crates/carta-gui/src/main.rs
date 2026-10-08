@@ -1,5 +1,6 @@
 mod input;
 mod presentation;
+mod profile;
 mod ui;
 mod viewport;
 
@@ -107,15 +108,24 @@ impl Drop for Gui {
     }
 }
 
-fn subscription(_state: &Gui) -> Subscription<Message> {
+fn subscription(state: &Gui) -> Subscription<Message> {
     let keyboard = event::listen_raw(|event, _status: Status, _window: window::Id| {
         matches!(event, Event::Keyboard(_)).then_some(Message::Raw(event))
     });
 
+    // Avoid periodic reconstruction of the entire rich-text view while idle.
+    // Dirty buffers are saved promptly; transient statuses still expire; an
+    // otherwise idle window needs only infrequent local maintenance.
+    let interval = if state.app.as_ref().is_some_and(|app| app.editor.is_dirty()) {
+        Duration::from_secs(1)
+    } else if state.app.as_ref().is_some_and(|app| !app.status.is_empty()) {
+        Duration::from_secs(2)
+    } else {
+        Duration::from_secs(15)
+    };
     Subscription::batch([
         keyboard,
-        // No animation loop: only maintain autosave/status on a low-frequency timer.
-        iced::time::every(Duration::from_secs(2)).map(Message::Tick),
+        iced::time::every(interval).map(Message::Tick),
         window::open_events().map(Message::WindowOpened),
         window::resize_events().map(|(_id, size)| Message::WindowSize(size)),
         system::theme_changes().map(Message::SystemTheme),
@@ -126,7 +136,11 @@ fn scroll_to_caret(state: &Gui) -> Task<Message> {
     let Some(app) = &state.app else {
         return Task::none();
     };
+    let started = profile::enabled().then(Instant::now);
     let offset = viewport::scroll_offset(app, state.window_size.width, state.window_size.height);
+    if let Some(started) = started {
+        profile::record("scroll", started);
+    }
     operation::scroll_to(
         ui::EDITOR_SCROLL_ID,
         AbsoluteOffset {
@@ -197,7 +211,16 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
             };
             result
         }
-        Message::Tick(now) => app.tick(now).map(|_| ()),
+        Message::Tick(now) => {
+            let started = profile::enabled().then(Instant::now);
+            // Remote Git/SSH can block for an unbounded time; it is not safe
+            // to run automatic network synchronization inside the UI loop.
+            let result = app.tick_without_remote_sync(now).map(|_| ());
+            if let Some(started) = started {
+                profile::record("maintenance", started);
+            }
+            result
+        },
         _ => Ok(()),
     };
     if let Err(error) = result {
