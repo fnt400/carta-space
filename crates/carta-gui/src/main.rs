@@ -32,7 +32,6 @@ pub(crate) struct Gui {
     pub(crate) input: GuiInputState,
     pub(crate) error: Option<String>,
     pub(crate) theme_mode: ThemeMode,
-    pub(crate) caret_visible: bool,
     pub(crate) window_size: Size,
 }
 
@@ -69,7 +68,6 @@ impl Gui {
                 input: GuiInputState::default(),
                 error: Some("Usage: carta-gui <archive-path>".into()),
                 theme_mode: ThemeMode::Dark,
-                caret_visible: true,
                 window_size: Size::new(1024.0, 768.0),
             };
         };
@@ -84,7 +82,6 @@ impl Gui {
                 input: GuiInputState::default(),
                 error: None,
                 theme_mode: ThemeMode::Dark,
-                caret_visible: true,
                 window_size: Size::new(1024.0, 768.0),
             },
             Err(error) => Self {
@@ -92,7 +89,6 @@ impl Gui {
                 input: GuiInputState::default(),
                 error: Some(error),
                 theme_mode: ThemeMode::Dark,
-                caret_visible: true,
                 window_size: Size::new(1024.0, 768.0),
             },
         }
