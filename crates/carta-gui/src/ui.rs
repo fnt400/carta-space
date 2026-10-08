@@ -1,7 +1,7 @@
 use carta_app::{App, AppMode, View};
 use chrono::{DateTime, Local};
 use iced::theme::Mode as ThemeMode;
-use iced::widget::{column, container, rich_text, row, scrollable, space, span, stack, text};
+use iced::widget::{column, container, rich_text, row, scrollable, space, span, stack, text, Id};
 use iced::{color, Color, Element, Font, Length};
 
 use crate::presentation::SegmentKind;
@@ -78,7 +78,7 @@ fn editor_view(app: &App, mode: ThemeMode, window: iced::Size) -> Element<'_, Me
         .width(Length::Fill);
 
     scrollable(sheet)
-        .id(scrollable::Id::new(EDITOR_SCROLL_ID))
+        .id(Id::new(EDITOR_SCROLL_ID))
         .height(Length::Fill)
         .width(Length::Fill)
         .into()
@@ -439,7 +439,7 @@ mod tests {
         assert_eq!(work_rule(40, false), "─".repeat(40));
         assert_eq!(work_rule(80, true).chars().count(), 80);
         assert!(work_rule(80, true).starts_with("[LOCKED] "));
-        assert!(!work_rule(40, false).contains('\\n'));
+        assert!(!work_rule(40, false).contains('\n'));
     }
 
     #[test]
