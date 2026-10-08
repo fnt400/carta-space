@@ -3,14 +3,14 @@ set -euo pipefail
 
 # Prepara la Distrobox di sviluppo di Carta Space.
 # Carta non viene installata nel container: il repository resta nel normale
-# $HOME condiviso da Distrobox e viene avviato con scripts/carta-tui.sh.
+# $HOME condiviso da Distrobox. La GUI si avvia con cargo dal repository.
 #
 # Variabili opzionali:
-#   CARTA_DISTROBOX_NAME   nome del container (default: carta-dev)
-#   CARTA_DISTROBOX_IMAGE  immagine Distrobox (default: debian:stable)
+#   CARTA_DISTROBOX_NAME   nome del container (default: carta-gui-dev)
+#   CARTA_DISTROBOX_IMAGE  immagine Distrobox (default: ubuntu:26.04)
 
-BOX_NAME="${CARTA_DISTROBOX_NAME:-carta-dev}"
-BOX_IMAGE="${CARTA_DISTROBOX_IMAGE:-debian:stable}"
+BOX_NAME="${CARTA_DISTROBOX_NAME:-carta-gui-dev}"
+BOX_IMAGE="${CARTA_DISTROBOX_IMAGE:-ubuntu:26.04}"
 
 host_timezone() {
     if [[ -n "${TZ:-}" ]]; then
@@ -92,10 +92,10 @@ sudo apt-get install -y --no-install-recommends \
     rustfmt \
     tzdata
 
-# Carta richiede Rust >= 1.85.
+# Il frontend GUI v0.2 richiede Rust >= 1.88.
 rust_version=$(rustc --version | awk '{print $2}')
-if ! dpkg --compare-versions "$rust_version" ge 1.85; then
-    printf 'setup-carta-distrobox: Rust %s è troppo vecchio; serve >= 1.85\n' \
+if ! dpkg --compare-versions "$rust_version" ge 1.88; then
+    printf 'setup-carta-distrobox: Rust %s è troppo vecchio; serve >= 1.88\n' \
         "$rust_version" >&2
     exit 1
 fi
@@ -133,9 +133,9 @@ cat <<EOF
 Distrobox pronta: $BOX_NAME
 
 Carta Space non è stata installata nel container.
-Dal repository puoi avviare la TUI con:
+Dal repository puoi verificare il workspace e la GUI con:
 
-  scripts/carta-tui.sh
+  scripts/verify-carta.sh
 
 Per entrare manualmente nell'ambiente:
 
