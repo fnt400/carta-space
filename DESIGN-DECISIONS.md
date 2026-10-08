@@ -586,3 +586,17 @@ IME event support remains part of the adapter contract even though no configured
 **Work View:** Generated Work separators now extend to the editor's current monospace column width rather than a fixed 40-character line. They remain UI only and must never be included in Clipboard operations or saved content.
 
 **Validation:** Static/CI checks can verify keyboard fallbacks, cursor row projection and clipboard-text normalization, but precise position, modifier fidelity, resource use and host clipboard integration must be manually checked in the target graphical session. Preserve the frozen v0.1.2 terminal interaction semantics.
+
+---
+
+## DD-050 — Sustained responsiveness and GUI maintenance isolation (2026-10-08)
+
+**Product invariant:** Carta is a continuously responsive writing environment. Low and stable input latency, fluid LEAP/navigation and negligible idle work remain release-blocking acceptance criteria even after long sessions on modest hardware. A successful compile/test is not proof of responsiveness; compare release-mode behavior at startup and after at least ten minutes on a realistic Archive.
+
+**Observed concern:** The provisional GUI becomes sluggish after minutes. The code contained two plausible contributors, not yet demonstrated as the sole cause: an unconditional two-second GUI event tick and an automatic Git/SSH sync attempt at 180 seconds executed synchronously inside `App::tick` on the GUI thread. Each tick could reconstruct the entire rich-text widget. Software rasterization in an unoptimized debug build can compound the cost. A measurement on the affected machine is still required.
+
+**Interim mitigation:** The GUI now uses a local-only maintenance tick, which continues automatic document autosaves and local Git checkpoints but skips automatic remote Git/SSH synchronization. Manual sync remains available and is still synchronous; the reference TUI retains its unchanged scheduler. The GUI maintenance subscription runs approximately every 15 seconds when idle, every two seconds while a transient status is shown and every second while unsaved edits are pending. Keyboard events without changes to the cursor, region count or view no longer issue a redundant scroll operation.
+
+**Trade-off:** Automatic remote sync is temporarily unavailable in the GUI. This must be disclosed to users and must be reinstated only with safe asynchronous execution, archive/editor consistency and reliable error reporting. The remaining local checkpoint path can still block the GUI and needs measurement. Do not solve responsiveness problems by making unsaved authored text less durable or running overlapping archive mutations on background threads.
+
+**Diagnostic strategy:** Optional `CARTA_GUI_PROFILE=1` prints content-free average/worst time for view construction, row-based scroll calculations and maintenance. It does not measure downstream glyph shaping or software rasterization. Profile the release build and verify CPU, RSS and event latency over time before introducing heavier caching or renderer changes.
