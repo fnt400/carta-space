@@ -208,9 +208,11 @@ fn window_spans<'a>(
                 if let Some((a, b)) = selected {
                     boundaries.extend([a.clamp(start, end), b.clamp(start, end)]);
                 }
-                for range in syntax.iter().filter(|range|
-                    range.start < end && start < range.end
-                ) {
+                let first_style = syntax.partition_point(|range| range.end <= start);
+                for range in syntax[first_style..]
+                    .iter()
+                    .take_while(|range| range.start < end)
+                {
                     boundaries.push(range.start.clamp(start, end));
                     boundaries.push(range.end.clamp(start, end));
                 }
@@ -235,7 +237,7 @@ fn window_spans<'a>(
                                 cat_highlight_background(mode)
                             })
                             .color(selection_foreground(mode));
-                    } else if let Some(syntax) = markdown::syntax_at(syntax, a, b) {
+                    } else if let Some(syntax) = markdown::style_at(syntax, a) {
                         styled = styled.color(syntax_color(mode, syntax));
                     }
                     spans.push(styled);
