@@ -39,6 +39,7 @@ pub struct Scheduler {
     checkpoint_after: Duration,
     sync_after: Duration,
     sync_pending: bool,
+    sync_generation: u64,
 }
 
 impl Scheduler {
@@ -51,6 +52,7 @@ impl Scheduler {
             checkpoint_after: Duration::from_secs(600),
             sync_after: Duration::from_secs(180),
             sync_pending: false,
+            sync_generation: 0,
         }
     }
 
@@ -83,6 +85,21 @@ impl Scheduler {
 
     pub fn sync_pending(&mut self) {
         self.sync_pending = true;
+        self.sync_generation = self.sync_generation.wrapping_add(1);
+    }
+
+    /// Tracks commits queued while an earlier background transfer is running.
+    pub fn sync_generation(&self) -> u64 {
+        self.sync_generation
+    }
+
+    /// A successful push may acknowledge only the commits known when it
+    /// started; a later commit must remain queued for its own push.
+    pub fn sync_finished(&mut self, started_generation: u64, now: Instant) {
+        self.last_sync = now;
+        if self.sync_generation == started_generation {
+            self.sync_pending = false;
+        }
     }
 
     pub fn is_sync_pending(&self) -> bool {
