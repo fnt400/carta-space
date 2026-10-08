@@ -1,4 +1,5 @@
 name: One-time background sync verification
+# Re-run after correcting local branch and bare-repository assumptions.
 on:
   push:
     branches: [opencode/v0.2]
