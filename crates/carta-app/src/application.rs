@@ -5,7 +5,8 @@ use crate::session::{Position, SavedView, Session};
 use crate::Action;
 use carta_core::{
     Archive, CartaLinkTarget, CheckpointKind, Conflict, ConflictChoice, DocumentId, LeapDirection,
-    LeapPosition, LeapRuntime, LeapSession, SyncOutcome, Volume, WorkId, WorkRestoreOptions,
+    LeapPosition, LeapRuntime, LeapSession, StagedSync, SyncApply, SyncOutcome, Volume, WorkId,
+    WorkRestoreOptions,
 };
 use carta_publish::{export_pdf, Publication};
 use chrono::{Datelike, Local};
@@ -2235,6 +2236,67 @@ impl App {
             PromptAction::SyncRemote,
         );
         Ok(())
+    }
+
+    /// The frontend schedules the network part on a dedicated worker, but
+    /// local autosave and checkpoint creation remain owned by the App.
+    /// Never snapshot an in-memory dirty editor, a provisional Document, or
+    /// an unresolved-conflict Archive.
+    pub fn prepare_background_sync(&mut self) -> AppResult<bool> {
+        if self.quit
+            || self.editor.is_dirty()
+            || self.provisional.is_some()
+            || !matches!(self.mode, AppMode::Editing)
+            || !matches!(self.view, View::CreationDate(_) | View::ModificationDate | View::Work(_))
+            || !self.conflicts.is_empty()
+            || self.archive.sync_remote()?.is_none()
+        {
+            return Ok(false);
+        }
+        if self.archive.is_dirty()? {
+            self.checkpoint(CheckpointKind::Automatic, Some("Prepared background sync"))?;
+        }
+        Ok(true)
+    }
+
+    /// Apply a pre-fetched, fully network-synchronized snapshot only when it
+    /// is safe to replace the on-disk committed Archive. Called when the GUI
+    /// has been idle; the worker never gets mutable access to this App.
+    pub fn apply_background_sync(&mut self, staged: &StagedSync) -> AppResult<SyncApply> {
+        if self.editor.is_dirty()
+            || self.provisional.is_some()
+            || !matches!(self.mode, AppMode::Editing)
+            || !self.conflicts.is_empty()
+        {
+            return Ok(SyncApply::Stale);
+        }
+
+        let document = self.editor.current_document();
+        let byte = self.editor.cursor().byte;
+        let result = staged.apply(&mut self.archive)?;
+        match result {
+            SyncApply::Updated => {
+                self.reload_after_sync(document, byte)?;
+                self.status = "Synced · remote changes applied".into();
+                self.scheduler.sync_attempted(Instant::now());
+            }
+            SyncApply::Unchanged => {
+                self.scheduler.sync_attempted(Instant::now());
+                if staged.outcome() == SyncOutcome::Published {
+                    self.status = "Synced · local changes uploaded".into();
+                }
+            }
+            SyncApply::Conflict => {
+                self.status = "Sync conflict · local and remote histories preserved; use Sync Now to resolve".into();
+                self.scheduler.sync_attempted(Instant::now());
+            }
+            SyncApply::Stale => {
+                // The local Archive changed during network I/O: never reset
+                // the active editor and retry from a fresh local checkpoint.
+                self.scheduler.sync_pending();
+            }
+        }
+        Ok(result)
     }
 
     fn sync_now(&mut self, include_current: bool) -> AppResult {
