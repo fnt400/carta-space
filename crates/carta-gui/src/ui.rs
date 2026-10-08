@@ -132,7 +132,9 @@ fn editor_spans<'a>(
 ) -> Vec<iced::widget::text::Span<'a, ()>> {
     let mut spans = Vec::new();
     let cursor = app.editor.cursor();
-    let selection = app.cat_render_highlight().or_else(|| app.editor.selection());
+    // Explicit Cat/conventional selection must outrank the implicit at-point
+    // Cat highlight; otherwise mouse dragging would remain visually hidden.
+    let selection = app.editor.selection().or_else(|| app.cat_render_highlight());
     let extended = app.editor.cat_highlight().is_some() || app.editor.selection().is_some();
 
     for (index, region) in app.editor.regions().iter().enumerate() {
