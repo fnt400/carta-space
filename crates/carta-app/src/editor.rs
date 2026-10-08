@@ -798,14 +798,18 @@ impl CompositeEditor {
             self.undo.push(current);
         }
         for state in snapshot.documents {
-            if let Some(region) = self
+            let restored = if let Some(region) = self
                 .regions
                 .iter_mut()
                 .find(|region| region.document == state.document)
             {
                 region.text = state.text;
+                true
+            } else {
+                false
+            };
+            if restored {
                 // Undo/redo replaces a Document without calling changed().
-                // Frontend row and syntax projections must be invalidated too.
                 self.mark_document_dirty(state.document);
             }
         }
