@@ -55,5 +55,8 @@ jobs:
       - name: Clippy GUI
         run: cargo +stable clippy --manifest-path crates/carta-gui/Cargo.toml --all-targets -- -D warnings
 
+      - name: Test GUI
+        run: cargo +stable test --manifest-path crates/carta-gui/Cargo.toml --locked
+
       - name: Build GUI
         run: cargo +stable build --manifest-path crates/carta-gui/Cargo.toml
