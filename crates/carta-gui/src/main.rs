@@ -544,6 +544,10 @@ fn request_quit(state: &mut Gui) -> Task<Message> {
     } else {
         return finish_quit(state);
     }
+    // A close request must end transient input and mouse drag immediately,
+    // even while the final network worker is still publishing.
+    state.input.cancel_leap();
+    state.pointer_down = false;
     if let Err(error) = state.save_session() {
         return quit_failed(state, format!("Salvataggio sessione fallito: {error}"));
     }
