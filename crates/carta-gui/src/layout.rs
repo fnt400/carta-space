@@ -177,12 +177,11 @@ impl Layout {
                 });
                 self.indices.insert(region.document, i);
             }
-            self.totals
-                .reset(
-                    self.docs
-                        .iter()
-                        .map(|doc| doc.prefix + displayed_rows(doc.starts.len(), app.collapsed)),
-                );
+            self.totals.reset(
+                self.docs
+                    .iter()
+                    .map(|doc| doc.prefix + displayed_rows(doc.starts.len(), app.collapsed)),
+            );
         } else {
             // Editing a Document invalidates its rows, not all other Documents.
             // Dirty IDs are supplied by the canonical editor. The current
@@ -198,7 +197,8 @@ impl Layout {
                     }
                     let generation = self.next_generation();
                     let new_rows = row_starts(&regions[index].text, columns);
-                    let previous = displayed_rows(self.docs[index].starts.len(), app.collapsed) as i64;
+                    let previous =
+                        displayed_rows(self.docs[index].starts.len(), app.collapsed) as i64;
                     let updated = displayed_rows(new_rows.len(), app.collapsed) as i64;
                     self.docs[index].starts = new_rows;
                     self.docs[index].generation = generation;
