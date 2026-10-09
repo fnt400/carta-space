@@ -1126,6 +1126,11 @@ mod tests {
         gui.install_archive(archive);
         gui.last_user_input = now - Duration::from_secs(3);
         assert!(gui.error.is_none(), "{:?}", gui.error);
+        assert!(
+            gui.sync_error.is_none(),
+            "origin adoption failed: {:?}",
+            gui.sync_error
+        );
         assert_eq!(
             gui.app
                 .as_ref()
