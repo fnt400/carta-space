@@ -228,6 +228,14 @@ impl StagedSync {
             return Ok(SyncApply::Conflict);
         }
         if stage.synced_head == stage.base_head {
+            // URL-based pushes do not advance Git's local remote-tracking ref.
+            // Otherwise "git status" falsely reports unpublished commits even
+            // after the remote acknowledged the exact checkpoint.
+            if matches!(stage.outcome, SyncOutcome::Synced | SyncOutcome::Published)
+                && stage.effective_urls.1.contains(&stage.effective_urls.0)
+            {
+                crate::sync::record_confirmed_publication(archive.root(), &stage.base_head)?;
+            }
             return Ok(SyncApply::Unchanged);
         }
 

@@ -101,6 +101,20 @@ automatically with bounded backoff, and clear the red warning only after
 successful synchronization. Periodic checks every three minutes also
 detect commits made outside Carta. Explicit `Sync Now` uses the same worker.
 
+**Safe Quit (GUI v0.2):** Window Close and the Quit command save and checkpoint
+locally, then keep the window open while the final Git HEAD is published and
+verified asynchronously. If another push is already in flight, Carta finishes
+that worker and explicitly starts a fresh publication for the final checkpoint.
+An error, conflict, or unverifiable result displays a persistent warning with
+**Retry push**, **Continue editing**, and **Exit without push (risk)** choices.
+No normal configured-remote Quit may silently leave an unpushed final commit.
+Only an explicitly confirmed offline exit or emergency/system termination
+bypasses that safeguard. Explicit local-only Archives exit without network
+access. After confirmed publication, Carta advances the local
+`refs/remotes/carta-sync/carta` tracking ref when the fetch endpoint was a
+confirmed push destination: `git status` must not falsely report a missing
+push merely because the tracking ref was stale.
+
 The reference TUI retains its previous automatic synchronization scheduler;
 there is no new Iced dependency in the shared Archive model.
 

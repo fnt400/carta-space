@@ -209,6 +209,35 @@ impl SyncEndpoints {
     }
 }
 
+/// The synchronous metadata reflection of an already acknowledged push.
+/// URL-based Git push does not update refs/remotes/carta-sync/carta. Keeping
+/// that ref stale makes "git status" claim the Archive is still ahead.
+/// Never rewind a ref which another process may have advanced; use CAS.
+pub(crate) fn record_confirmed_publication(root: &Path, head: &str) -> Result<(), Error> {
+    let current = optional_git_text(
+        root,
+        "inspect sync tracking ref",
+        &["rev-parse", "--verify", "--quiet", SYNC_TRACKING_REF],
+    )?;
+    if current.as_deref() == Some(head) {
+        return Ok(());
+    }
+    if let Some(old) = current.as_deref() {
+        if !is_ancestor(root, old, head)? {
+            return Err(Error::InvalidSyncRemote(
+                "Remote tracking ref changed unexpectedly; sync must be verified again".into(),
+            ));
+        }
+    }
+    let previous = current.unwrap_or_else(|| "0000000000000000000000000000000000000000".into());
+    crate::history::git_output(
+        root,
+        "reflect confirmed sync publication",
+        &["update-ref", SYNC_TRACKING_REF, head, &previous],
+    )?;
+    Ok(())
+}
+
 pub(crate) fn resolved_sync_urls(root: &Path) -> Result<(String, Vec<String>), Error> {
     let resolve = |args: &[&str]| -> Result<Vec<String>, Error> {
         let urls = required_git_text(root, "resolve sync URLs", args)?;

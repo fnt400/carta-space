@@ -11,7 +11,7 @@ use std::time::Instant;
 use crate::layout::{Layout, Row};
 use crate::markdown::{self, Syntax};
 use crate::viewport;
-use crate::{Gui, Message};
+use crate::{Gui, Message, QuitState};
 
 const IOSEVKA: Font = Font::with_name("Iosevka");
 const EDITOR_SIZE: f32 = viewport::FONT_SIZE; // Modal palette typography.
@@ -87,7 +87,9 @@ fn build_view(state: &Gui) -> Element<'_, Message> {
         .height(Length::Fill)
         .into();
 
-    if let Some(overlay) = modal_overlay(app, state.theme_mode) {
+    if let Some(overlay) = quit_overlay(state) {
+        stack![base, overlay].into()
+    } else if let Some(overlay) = modal_overlay(app, state.theme_mode) {
         stack![base, overlay].into()
     } else {
         base
@@ -477,6 +479,51 @@ fn modal_overlay(app: &App, mode: ThemeMode) -> Option<Element<'_, Message>> {
         }
     };
 
+    Some(container(panel).center(Length::Fill).into())
+}
+
+/// A closing window is not proof of remote publication. This warning
+/// remains visible until the final checkpoint is acknowledged or the user
+/// explicitly chooses an offline exit.
+fn quit_overlay(state: &Gui) -> Option<Element<'_, Message>> {
+    let content = match &state.quit_state {
+        QuitState::Idle => return None,
+        QuitState::WaitingForCurrentSync | QuitState::Publishing => column![
+            text("Pubblicazione finale in corso…")
+                .font(IOSEVKA)
+                .size(EDITOR_SIZE),
+            text("Carta sta verificando che l'ultimo checkpoint sia sul server Git.")
+                .font(IOSEVKA)
+                .size(STATUS_SIZE),
+            text("Non chiudere il processo. Se la rete non risponde, puoi continuare a lavorare.")
+                .font(IOSEVKA)
+                .size(STATUS_SIZE),
+            row![
+                button("Continua a lavorare").on_press(Message::QuitCancel),
+                button("Esci senza push (rischio)").on_press(Message::QuitWithoutSync),
+            ]
+            .spacing(12)
+        ]
+        .spacing(12),
+        QuitState::Failed(error) => column![
+            text("ATTENZIONE: PUSH FINALE NON COMPLETATO")
+                .font(IOSEVKA)
+                .size(EDITOR_SIZE)
+                .color(color!(0xFF7777)),
+            text("Il lavoro è stato salvato localmente, ma NON è garantito sul server Git.")
+                .font(IOSEVKA)
+                .size(STATUS_SIZE),
+            text(error).font(IOSEVKA).size(STATUS_SIZE),
+            row![
+                button("Riprova push").on_press(Message::QuitRetry),
+                button("Continua a lavorare").on_press(Message::QuitCancel),
+                button("Esci senza push (rischio)").on_press(Message::QuitWithoutSync),
+            ]
+            .spacing(12)
+        ]
+        .spacing(12),
+    };
+    let panel = modal_box(content, state.theme_mode);
     Some(container(panel).center(Length::Fill).into())
 }
 

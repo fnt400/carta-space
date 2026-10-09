@@ -35,6 +35,14 @@ fn main() -> iced::Result {
         .run()
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum QuitState {
+    Idle,
+    WaitingForCurrentSync,
+    Publishing,
+    Failed(String),
+}
+
 pub(crate) struct Gui {
     pub(crate) app: Option<App>,
     pub(crate) input: GuiInputState,
@@ -58,6 +66,8 @@ pub(crate) struct Gui {
     last_user_input: Instant,
     sync_failures: u32,
     sync_started_generation: u64,
+    pub(crate) quit_state: QuitState,
+    quit_retries: u8,
     pub(crate) sync_error: Option<String>,
 }
 
@@ -76,6 +86,9 @@ pub(crate) enum Message {
     Scrolled(f32),
     SyncFinished(Result<StagedSync, String>),
     QuitRequested,
+    QuitRetry,
+    QuitCancel,
+    QuitWithoutSync,
     CloneUrlChanged(String),
     CreateDefaultArchive,
     CloneDefaultArchive,
@@ -124,6 +137,8 @@ impl Gui {
             last_user_input: Instant::now(),
             sync_failures: 0,
             sync_started_generation: 0,
+            quit_state: QuitState::Idle,
+            quit_retries: 0,
             sync_error: None,
         };
         let explicit_archive = env::args_os().nth(1);
@@ -194,6 +209,8 @@ impl Gui {
             last_user_input: Instant::now(),
             sync_failures: u32::from(sync_error.is_some()),
             sync_started_generation: 0,
+            quit_state: QuitState::Idle,
+            quit_retries: 0,
             sync_error,
         }
     }
@@ -369,8 +386,11 @@ fn indexed_hit_test(
 /// typing or the current Document is provisional. Only the *integration* of
 /// remote changes may wait for a safe moment.
 fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
+    if state.quit_state != QuitState::Idle {
+        return Task::none();
+    }
     if state.app.as_ref().is_some_and(|app| app.quit) {
-        return finish_quit(state);
+        return request_quit(state);
     }
     const QUIET: Duration = Duration::from_secs(2);
     const INTERVAL: Duration = Duration::from_secs(180);
@@ -496,7 +516,74 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
     )
 }
 
-/// Shared Quit has already saved and checkpointed locally. Never wait for SSH.
+/// Normal Quit closes only after publishing the final checkpoint or after
+/// explicit acknowledgement that publication has not succeeded.
+fn request_quit(state: &mut Gui) -> Task<Message> {
+    // The explicit emergency kill switch is not a normal Quit and must
+    // remain immediately available when the user requests it.
+    if state.app.as_ref().is_some_and(|app| app.kill_switch_triggered()) {
+        return finish_quit(state);
+    }
+    if state.quit_state != QuitState::Idle {
+        return Task::none();
+    }
+    if let Some(app) = state.app.as_mut() {
+        if !app.quit {
+            if matches!(app.mode, AppMode::Leap { .. }) {
+                app.cancel_mode();
+            }
+            if let Err(error) = app.execute(Command::Quit) {
+                app.status = format!("Quit: {error}");
+                return Task::none();
+            }
+        }
+    } else {
+        return finish_quit(state);
+    }
+    if let Err(error) = state.save_session() {
+        return quit_failed(state, format!("Salvataggio sessione fallito: {error}"));
+    }
+    // An earlier staged snapshot does not include the final Quit checkpoint.
+    state.sync_ready = None;
+    state.quit_retries = 0;
+    start_quit_publication(state)
+}
+
+fn quit_failed(state: &mut Gui, error: String) -> Task<Message> {
+    state.sync_error = Some(error.clone());
+    state.quit_state = QuitState::Failed(error);
+    Task::none()
+}
+
+fn start_quit_publication(state: &mut Gui) -> Task<Message> {
+    if state.sync_active {
+        state.quit_state = QuitState::WaitingForCurrentSync;
+        return Task::none();
+    }
+    let Some(app) = state.app.as_mut() else {
+        return finish_quit(state);
+    };
+    // An earlier setup error cannot be interpreted as successful publication.
+    if let Err(error) = app.archive.enable_origin_sync_remote() {
+        return quit_failed(state, format!("Configurazione Git fallita: {error}"));
+    }
+    match app.archive.sync_remote() {
+        Ok(None) => return finish_quit(state), // Explicit local-only mode.
+        Err(error) => return quit_failed(state, format!("Controllo remoto fallito: {error}")),
+        Ok(Some(_)) => {}
+    }
+    // App::finish_quit already saved and checkpointed the last text.
+    // prepare_background_sync() deliberately skips jobs after app.quit.
+    let root = app.archive.root().to_path_buf();
+    state.sync_started_generation = app.scheduler.sync_generation();
+    state.sync_active = true;
+    state.quit_state = QuitState::Publishing;
+    Task::perform(
+        detached_job(move || stage_sync(root).map_err(|error| error.to_string())),
+        Message::SyncFinished,
+    )
+}
+
 fn finish_quit(state: &mut Gui) -> Task<Message> {
     state.input.cancel_leap();
     state.pointer_down = false;
@@ -534,19 +621,31 @@ fn normalize_clipboard(value: &str) -> String {
 
 fn update(state: &mut Gui, message: Message) -> Task<Message> {
     match message {
-        Message::QuitRequested => {
-            if let Some(app) = state.app.as_mut() {
-                if !app.quit {
-                    if matches!(app.mode, AppMode::Leap { .. }) {
-                        app.cancel_mode();
-                    }
-                    if let Err(error) = app.execute(Command::Quit) {
-                        app.status = format!("Quit: {error}");
-                        return Task::none();
-                    }
-                }
+        Message::QuitRequested => return request_quit(state),
+        Message::QuitRetry => {
+            if matches!(&state.quit_state, QuitState::Failed(_)) {
+                state.quit_retries = 0;
+                return start_quit_publication(state);
             }
-            return finish_quit(state);
+            return Task::none();
+        }
+        Message::QuitCancel => {
+            if state.quit_state != QuitState::Idle {
+                state.quit_state = QuitState::Idle;
+                if let Some(app) = state.app.as_mut() {
+                    app.quit = false;
+                    app.status = "Uscita annullata · commit locali conservati".into();
+                }
+                return service_tick(state, Instant::now());
+            }
+            return Task::none();
+        }
+        Message::QuitWithoutSync => {
+            if state.quit_state != QuitState::Idle {
+                // Explicit acknowledgement is required for offline exit.
+                return finish_quit(state);
+            }
+            return Task::none();
         }
         Message::CloneUrlChanged(url) => {
             state.clone_url = url;
@@ -610,8 +709,46 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
         Message::SyncFinished(result) => {
             state.sync_active = false;
             let now = Instant::now();
-            if state.app.as_ref().is_some_and(|app| app.quit) {
-                return finish_quit(state);
+            if state.quit_state == QuitState::WaitingForCurrentSync {
+                // The old worker may have published only the pre-Quit HEAD.
+                // Always run a fresh worker after its completion.
+                return start_quit_publication(state);
+            }
+            if state.quit_state == QuitState::Publishing {
+                let stage = match result {
+                    Ok(stage) => stage,
+                    Err(error) => return quit_failed(state, format!("Push finale fallito: {error}")),
+                };
+                let Some(app) = state.app.as_mut() else {
+                    return quit_failed(state, "Archivio chiuso durante il push".into());
+                };
+                let outcome = stage.outcome();
+                // Validates the exact local HEAD, archive cleanliness, and
+                // pinned remote configuration before acknowledging this result.
+                let applied = app.apply_background_sync(&stage);
+                return match applied {
+                    Ok(SyncApply::Unchanged)
+                        if matches!(outcome, SyncOutcome::Synced | SyncOutcome::Published) =>
+                    {
+                        state.sync_error = None;
+                        finish_quit(state)
+                    }
+                    Ok(SyncApply::Updated) | Ok(SyncApply::Stale) | Ok(SyncApply::Unchanged) => {
+                        // Recheck the current HEAD after a merge or stale stage,
+                        // not the obsolete one published by an older worker.
+                        state.quit_retries += 1;
+                        if state.quit_retries >= 3 {
+                            quit_failed(state, "Push finale non verificato dopo 3 tentativi".into())
+                        } else {
+                            start_quit_publication(state)
+                        }
+                    }
+                    Ok(SyncApply::Conflict) => quit_failed(
+                        state,
+                        "Conflitto Git durante il push finale: risoluzione necessaria".into(),
+                    ),
+                    Err(error) => quit_failed(state, format!("Verifica push finale: {error}")),
+                };
             }
             let result = result.and_then(|stage| {
                 let Some(app) = state.app.as_ref() else {
@@ -732,6 +869,9 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
             return Task::none();
         }
         Message::Tick(now) => {
+            if state.quit_state != QuitState::Idle {
+                return Task::none();
+            }
             if let Some(app) = &mut state.app {
                 let started = profile::enabled().then(Instant::now);
                 if let Err(error) = app.tick_without_remote_sync(now) {
@@ -787,6 +927,10 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
         _ => {}
     }
 
+    if state.quit_state != QuitState::Idle {
+        // Freeze editor input while publishing or showing the failure warning.
+        return Task::none();
+    }
     let columns = viewport::columns(state.window_size.width, state.font_size);
     let Some(app) = &mut state.app else {
         return Task::none();
@@ -837,7 +981,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                 || app.collapsed != before_collapsed
                 || std::mem::discriminant(&app.mode) != before_mode));
     if app.quit {
-        finish_quit(state)
+        request_quit(state)
     } else {
         let auto_sync = service_tick(state, Instant::now());
         if follow_caret {
@@ -952,6 +1096,8 @@ mod tests {
             last_user_input: now,
             sync_failures: 0,
             sync_started_generation: 0,
+            quit_state: QuitState::Idle,
+            quit_retries: 0,
             sync_error: None,
         };
         gui.install_archive(archive);
@@ -1029,40 +1175,36 @@ mod tests {
     }
 
     #[test]
-    fn window_close_checkpoints_final_text_without_remote_publication() {
+    fn window_close_publishes_the_final_checkpoint_and_updates_git_status() {
         let (mut gui, temporary) = fixture();
         let app = gui.app.as_mut().unwrap();
         let path = app.archive.root().to_path_buf();
         let before = git(&path, &["rev-parse", "HEAD"]);
         assert!(app.editor.insert("synthetic final text"));
-        let document = app.editor.current_document().unwrap();
         assert!(update(&mut gui, Message::QuitRequested).units() > 0);
         assert!(gui.app.as_ref().unwrap().quit);
-        assert!(!gui.sync_active);
+        assert_eq!(gui.quit_state, QuitState::Publishing);
+        assert!(gui.sync_active);
         assert_ne!(git(&path, &["rev-parse", "HEAD"]), before);
         assert!(!gui.app.as_ref().unwrap().archive.is_dirty().unwrap());
-        assert!(!gui.app.as_ref().unwrap().editor.is_dirty());
-        assert!(gui
-            .app
-            .as_ref()
-            .unwrap()
-            .archive
-            .read_document(document)
-            .unwrap()
-            .content()
-            .contains("synthetic final text"));
-        assert_ne!(
-            git(
-                &temporary.0.join("remote.git"),
-                &["rev-parse", "refs/heads/carta"]
-            ),
-            git(&path, &["rev-parse", "HEAD"])
+        let final_stage = stage_sync(path.clone()).unwrap();
+        assert_eq!(final_stage.outcome(), SyncOutcome::Published);
+        assert!(update(&mut gui, Message::SyncFinished(Ok(final_stage))).units() > 0);
+        assert_published(&gui, &temporary);
+        assert_eq!(
+            git(&path, &["rev-parse", "refs/remotes/carta-sync/carta"]),
+            git(&path, &["rev-parse", "HEAD"]),
+            "tracking ref must reflect the confirmed push"
         );
-        assert!(gui.last_saved_session.is_some());
+        assert_eq!(
+            git(&path, &["rev-list", "--count", "carta-sync/carta..HEAD"]),
+            "0",
+            "git status must not report a stale unpushed commit"
+        );
     }
 
     #[test]
-    fn unavailable_remote_does_not_cancel_quit() {
+    fn unavailable_remote_blocks_quit_until_user_acknowledges_failure() {
         let (mut gui, temporary) = fixture();
         let app = gui.app.as_mut().unwrap();
         let path = app.archive.root().to_path_buf();
@@ -1071,9 +1213,15 @@ mod tests {
             .set_sync_remote(temporary.0.join("missing.git").to_str().unwrap())
             .unwrap();
         assert!(update(&mut gui, Message::QuitRequested).units() > 0);
+        assert_eq!(gui.quit_state, QuitState::Publishing);
+        let err = stage_sync(path.clone()).unwrap_err().to_string();
+        assert_eq!(update(&mut gui, Message::SyncFinished(Err(err))).units(), 0);
+        assert!(matches!(gui.quit_state, QuitState::Failed(_)));
         assert!(gui.app.as_ref().unwrap().quit);
-        assert!(gui.app.as_ref().unwrap().scheduler.is_sync_pending());
         assert!(!Archive::open(path).unwrap().is_dirty().unwrap());
+        assert_eq!(update(&mut gui, Message::QuitRequested).units(), 0);
+        // Only a distinct, explicit user action can now permit an offline exit.
+        assert!(update(&mut gui, Message::QuitWithoutSync).units() > 0);
     }
 
     #[test]
@@ -1116,32 +1264,55 @@ mod tests {
     }
 
     #[test]
-    fn quit_during_sync_checkpoints_and_exits_immediately() {
+    fn quit_during_prior_push_republishes_the_final_checkpoint() {
         let (mut gui, temporary) = fixture();
         let path = gui.app.as_ref().unwrap().archive.root().to_path_buf();
         assert!(service_tick(&mut gui, Instant::now()).units() > 0);
-        let older = stage_sync(path.clone()).unwrap();
-        assert!(gui
-            .app
-            .as_mut()
-            .unwrap()
-            .editor
-            .insert("synthetic newer text"));
-        assert!(update(&mut gui, Message::QuitRequested).units() > 0);
-        assert!(gui.app.as_ref().unwrap().quit);
+        let old_stage = stage_sync(path.clone()).unwrap();
+        assert!(gui.app.as_mut().unwrap().editor.insert("newer text at Quit"));
+        assert_eq!(update(&mut gui, Message::QuitRequested).units(), 0);
+        assert_eq!(gui.quit_state, QuitState::WaitingForCurrentSync);
         assert!(gui.sync_active);
-        assert!(service_tick(&mut gui, Instant::now()).units() > 0);
-        assert!(update(&mut gui, Message::SyncFinished(Ok(older))).units() > 0);
-        assert!(!gui.sync_active);
-        assert!(gui.app.as_ref().unwrap().scheduler.is_sync_pending());
-        assert!(!gui.app.as_ref().unwrap().editor.is_dirty());
-        assert_ne!(
-            git(
-                &temporary.0.join("remote.git"),
-                &["rev-parse", "refs/heads/carta"]
-            ),
+        // Finishing the older worker MUST schedule a new network operation.
+        assert!(update(&mut gui, Message::SyncFinished(Ok(old_stage))).units() > 0);
+        assert_eq!(gui.quit_state, QuitState::Publishing);
+        let last_stage = stage_sync(path.clone()).unwrap();
+        assert_eq!(last_stage.outcome(), SyncOutcome::Published);
+        assert!(update(&mut gui, Message::SyncFinished(Ok(last_stage))).units() > 0);
+        assert_published(&gui, &temporary);
+        assert_eq!(
+            git(&path, &["rev-parse", "refs/remotes/carta-sync/carta"]),
             git(&path, &["rev-parse", "HEAD"])
         );
+    }
+
+    #[test]
+    fn failed_quit_can_retry_after_remote_is_repaired() {
+        let (mut gui, temporary) = fixture();
+        let path = gui.app.as_ref().unwrap().archive.root().to_path_buf();
+        gui.app.as_mut().unwrap().editor.insert("last line");
+        gui.app
+            .as_ref()
+            .unwrap()
+            .archive
+            .set_sync_remote(temporary.0.join("absent.git").to_str().unwrap())
+            .unwrap();
+        assert!(update(&mut gui, Message::QuitRequested).units() > 0);
+        let err = stage_sync(path.clone()).unwrap_err().to_string();
+        assert_eq!(update(&mut gui, Message::SyncFinished(Err(err))).units(), 0);
+        assert!(matches!(gui.quit_state, QuitState::Failed(_)));
+
+        gui.app
+            .as_ref()
+            .unwrap()
+            .archive
+            .set_sync_remote(temporary.0.join("remote.git").to_str().unwrap())
+            .unwrap();
+        assert!(update(&mut gui, Message::QuitRetry).units() > 0);
+        assert_eq!(gui.quit_state, QuitState::Publishing);
+        let staged = stage_sync(path).unwrap();
+        assert!(update(&mut gui, Message::SyncFinished(Ok(staged))).units() > 0);
+        assert_published(&gui, &temporary);
     }
 
     #[test]

@@ -907,9 +907,9 @@ When a remote is configured, Carta SHOULD attempt synchronization:
 - soon after a new checkpoint;
 - periodically while the Archive is open, editable, and clean;
 - on explicit `Sync Now`;
-- during normal Quit on a best-effort basis.
+- during normal Quit, including the final Quit checkpoint, before confirming closure.
 
-A synchronization, network, authentication, or remote error MUST NOT prevent further local editing, local checkpoints, or normal Quit.
+A synchronization, network, authentication, or remote error MUST NOT prevent further local editing or local checkpoints. The GUI MUST NOT silently complete normal Quit with unpublished commits. The user may explicitly override a failed or stalled publication after reading an unmistakable warning; this does not imply a successful push.
 
 **Accepted v0.2 desktop override:** when no dedicated `carta-sync` remote is
 configured, the GUI enables synchronization from an existing local branch
@@ -926,13 +926,23 @@ and retry with backoff without preventing writing or local checkpoints.
 Optional synchronization setup errors MUST NOT prevent opening the Archive.
 Disabled or unconfigured Archives remain normal local-only Archives.
 
-Both the desktop window-close request and the Quit command MUST autosave and
-create the final local checkpoint, then exit without waiting for Git/SSH.
-Publication is automatic while the Archive is open and resumes at the next
-startup, including checkpoints left unpublished by Quit or a network failure.
-Closing the window is not a guarantee that the remote has received the final
-checkpoint. Emergency termination and the frozen v0.1 TUI retain their existing
-semantics.
+Both the desktop window-close request and the Quit command MUST autosave,
+create the final local checkpoint, and start a dedicated final Git
+synchronization without blocking the GUI event loop. Closing MUST wait for
+positive acknowledgement that the *final* live checkpoint has been published
+to every configured publication destination. A worker already running when
+Quit begins may have uploaded an older HEAD: let it finish, then publish and
+verify the final checkpoint separately. If the worker reports a failure,
+configuration change, conflict, or an unverifiable result, the window MUST
+stay open with a blocking, persistent warning and explicit Retry, Continue
+Editing, and Exit Without Publication choices. During this prompt all
+canonical local data remain intact. In explicitly local-only mode, no remote
+publication is required. A successful URL-based publication MUST also
+reconcile Git's local remote-tracking ref when the fetch destination was
+among the successfully updated push destinations; a stale tracking ref alone
+does not prove an unpublished commit. Network hangs may be escaped only
+through an explicit, warned offline-exit choice. Emergency termination and
+the frozen v0.1 TUI retain their existing semantics.
 
 `Sync Now` first autosaves and checkpoints current local changes when necessary.
 
