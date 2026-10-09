@@ -702,7 +702,9 @@ fn update_sync_config(
                 .arg(&staged_path)
                 .args(args)
                 .output()
-                .map_err(|error| Error::InvalidSyncRemote(format!("run Git config staging command: {error}")))?;
+                .map_err(|error| {
+                    Error::InvalidSyncRemote(format!("run Git config staging command: {error}"))
+                })?;
             if !output.status.success()
                 && !(args.first() == Some(&"--unset-all") && output.status.code() == Some(5))
             {
@@ -764,7 +766,9 @@ fn update_sync_config(
                     .arg(&staged_path)
                     .args(["--includes", "--null", "--get-all", key])
                     .output()
-                    .map_err(|error| Error::InvalidSyncRemote(format!("verify Git staging command: {error}")))?;
+                    .map_err(|error| {
+                        Error::InvalidSyncRemote(format!("verify Git staging command: {error}"))
+                    })?;
                 if !output.status.success()
                     && !(output.status.code() == Some(1) && output.stdout.is_empty())
                 {
@@ -786,10 +790,14 @@ fn update_sync_config(
                 .map_err(|error| Error::io(&config_path, error))?
                 .permissions(),
         )
-        .map_err(|error| Error::InvalidSyncRemote(format!("set staging Git permissions: {error}")))?;
+        .map_err(|error| {
+            Error::InvalidSyncRemote(format!("set staging Git permissions: {error}"))
+        })?;
         fs::File::open(&staged_path)
             .and_then(|file| file.sync_all())
-            .map_err(|error| Error::InvalidSyncRemote(format!("fsync staging Git config: {error}")))?;
+            .map_err(|error| {
+                Error::InvalidSyncRemote(format!("fsync staging Git config: {error}"))
+            })?;
         unchanged()?;
         staged
             .persist(&config_path)
