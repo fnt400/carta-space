@@ -1181,7 +1181,7 @@ mod tests {
         assert!(gui.sync_active);
         assert_eq!(git(&path, &["rev-parse", "HEAD"]), head);
         assert_eq!(service_tick(&mut gui, Instant::now()).units(), 0);
-        let staged = stage_sync(path).unwrap();
+        let staged = stage_sync(path.clone()).unwrap();
         assert_eq!(staged.outcome(), SyncOutcome::Published);
         assert_published(&gui, &temporary);
         assert_eq!(
