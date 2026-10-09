@@ -772,8 +772,21 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
             match result {
                 Ok(stage) => match stage.outcome() {
                     SyncOutcome::Synced | SyncOutcome::Published => {
-                        // Publication changes no live files. Acknowledge only
-                        // this generation without waiting for editing to stop.
+                        // The remote acknowledged the pinned snapshot. Update
+                        // Git's tracking ref too, without requiring a clean
+                        // in-memory editor or changing authored content.
+                        let reflected = state
+                            .app
+                            .as_ref()
+                            .map(|app| stage.reflect_confirmed_publication(&app.archive))
+                            .transpose();
+                        if let Err(error) = reflected {
+                            state.sync_error = Some(format!("Sync tracking: {error}"));
+                            sync_backoff(state, now);
+                            return service_tick(state, now);
+                        }
+                        // Acknowledge only this generation; newer commits stay
+                        // queued for the next publication.
                         if let Some(app) = state.app.as_mut() {
                             app.scheduler
                                 .sync_finished(state.sync_started_generation, now);
@@ -1178,6 +1191,11 @@ mod tests {
         assert!(!gui.sync_active);
         assert!(gui.sync_error.is_none());
         assert!(!gui.app.as_ref().unwrap().scheduler.is_sync_pending());
+        assert_eq!(
+            git(&path, &["rev-parse", "refs/remotes/carta-sync/carta"]),
+            git(&path, &["rev-parse", "HEAD"]),
+            "regular automatic push must also update Git tracking metadata"
+        );
     }
 
     #[test]

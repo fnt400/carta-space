@@ -206,6 +206,28 @@ impl StagedSync {
             && resolved_sync_urls(archive.root())? == stage.effective_urls)
     }
 
+    /// Acknowledged URL-based pushes must also refresh Git's local tracking
+    /// ref, or 'git status' can falsely report unpublished commits. This
+    /// metadata-only operation is safe even while the editor is dirty:
+    /// it never changes authored text or HEAD and it never runs on the
+    /// network worker. A newer HEAD is deliberately not acknowledged.
+    pub fn reflect_confirmed_publication(&self, archive: &Archive) -> Result<bool, Error> {
+        let stage = &self.data;
+        if !matches!(stage.outcome, SyncOutcome::Synced | SyncOutcome::Published)
+            || !stage.effective_urls.1.contains(&stage.effective_urls.0)
+            || !self.configuration_matches(archive)?
+            || git_text(
+                archive.root(),
+                "verify acknowledged tracking base",
+                &["rev-parse", "--verify", "HEAD"],
+            )? != stage.base_head
+        {
+            return Ok(false);
+        }
+        crate::sync::record_confirmed_publication(archive.root(), &stage.base_head)?;
+        Ok(true)
+    }
+
     /// No networking. The caller MUST also check the live editor's dirty
     /// state immediately before calling. Local Git operations and Archive
     /// refresh still occur synchronously; schedule integration when idle.
@@ -231,11 +253,7 @@ impl StagedSync {
             // URL-based pushes do not advance Git's local remote-tracking ref.
             // Otherwise "git status" falsely reports unpublished commits even
             // after the remote acknowledged the exact checkpoint.
-            if matches!(stage.outcome, SyncOutcome::Synced | SyncOutcome::Published)
-                && stage.effective_urls.1.contains(&stage.effective_urls.0)
-            {
-                crate::sync::record_confirmed_publication(archive.root(), &stage.base_head)?;
-            }
+            self.reflect_confirmed_publication(archive)?;
             return Ok(SyncApply::Unchanged);
         }
 
