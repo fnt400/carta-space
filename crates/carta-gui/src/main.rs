@@ -521,7 +521,11 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
 fn request_quit(state: &mut Gui) -> Task<Message> {
     // The explicit emergency kill switch is not a normal Quit and must
     // remain immediately available when the user requests it.
-    if state.app.as_ref().is_some_and(|app| app.kill_switch_triggered()) {
+    if state
+        .app
+        .as_ref()
+        .is_some_and(|app| app.kill_switch_triggered())
+    {
         return finish_quit(state);
     }
     if state.quit_state != QuitState::Idle {
@@ -717,7 +721,9 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
             if state.quit_state == QuitState::Publishing {
                 let stage = match result {
                     Ok(stage) => stage,
-                    Err(error) => return quit_failed(state, format!("Push finale fallito: {error}")),
+                    Err(error) => {
+                        return quit_failed(state, format!("Push finale fallito: {error}"))
+                    }
                 };
                 let Some(app) = state.app.as_mut() else {
                     return quit_failed(state, "Archivio chiuso durante il push".into());
@@ -1269,7 +1275,12 @@ mod tests {
         let path = gui.app.as_ref().unwrap().archive.root().to_path_buf();
         assert!(service_tick(&mut gui, Instant::now()).units() > 0);
         let old_stage = stage_sync(path.clone()).unwrap();
-        assert!(gui.app.as_mut().unwrap().editor.insert("newer text at Quit"));
+        assert!(gui
+            .app
+            .as_mut()
+            .unwrap()
+            .editor
+            .insert("newer text at Quit"));
         assert_eq!(update(&mut gui, Message::QuitRequested).units(), 0);
         assert_eq!(gui.quit_state, QuitState::WaitingForCurrentSync);
         assert!(gui.sync_active);
