@@ -686,16 +686,21 @@ fn update_sync_config(
             Ok(())
         };
         unchanged()?;
+        // Git config --file must reopen the staging path in a child process.
+        // Keep only a TempPath (no open Windows handle) while constructing it.
+        // TempPath still removes an uncommitted staging file on failure.
         let staged = tempfile::NamedTempFile::new_in(root.join(".git"))
-            .map_err(|error| Error::io(&config_path, error))?;
-        fs::write(staged.path(), &snapshot.0).map_err(|error| Error::io(staged.path(), error))?;
+            .map_err(|error| Error::io(&config_path, error))?
+            .into_temp_path();
+        let staged_path = staged.to_path_buf();
+        fs::write(&staged_path, &snapshot.0).map_err(|error| Error::io(&staged_path, error))?;
         for args in commands {
             let output = crate::history::git_command(root)
                 .args(["config", "--file"])
-                .arg(staged.path())
+                .arg(&staged_path)
                 .args(args)
                 .output()
-                .map_err(|error| Error::io(staged.path(), error))?;
+                .map_err(|error| Error::io(&staged_path, error))?;
             if !output.status.success()
                 && !(args.first() == Some(&"--unset-all") && output.status.code() == Some(5))
             {
@@ -754,10 +759,10 @@ fn update_sync_config(
                 }
                 let output = crate::history::git_command(root)
                     .args(["config", "--file"])
-                    .arg(staged.path())
+                    .arg(&staged_path)
                     .args(["--includes", "--null", "--get-all", key])
                     .output()
-                    .map_err(|error| Error::io(staged.path(), error))?;
+                    .map_err(|error| Error::io(&staged_path, error))?;
                 if !output.status.success()
                     && !(output.status.code() == Some(1) && output.stdout.is_empty())
                 {
@@ -774,15 +779,15 @@ fn update_sync_config(
             }
         }
         fs::set_permissions(
-            staged.path(),
+            &staged_path,
             fs::metadata(&config_path)
                 .map_err(|error| Error::io(&config_path, error))?
                 .permissions(),
         )
-        .map_err(|error| Error::io(staged.path(), error))?;
-        fs::File::open(staged.path())
+        .map_err(|error| Error::io(&staged_path, error))?;
+        fs::File::open(&staged_path)
             .and_then(|file| file.sync_all())
-            .map_err(|error| Error::io(staged.path(), error))?;
+            .map_err(|error| Error::io(&staged_path, error))?;
         unchanged()?;
         staged
             .persist(&config_path)
