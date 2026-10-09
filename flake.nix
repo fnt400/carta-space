@@ -81,6 +81,7 @@
             cargoLock.lockFile = ./crates/carta-gui/Cargo.lock;
 
             nativeBuildInputs = with pkgs; [
+              git
               copyDesktopItems
               makeWrapper
               pkg-config
