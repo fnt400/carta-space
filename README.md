@@ -166,6 +166,33 @@ The GUI is a separate Cargo project with its own committed
 Its Rust minimum version is 1.88. The terminal workspace and v0.1.x
 compatibility build remain separate.
 
+The GUI automatically synchronizes an Archive with its dedicated `carta-sync`
+remote, or adopts an existing `origin/carta` upstream when no dedicated remote
+is configured. Archives without either remain local-only. `Sync Settings`
+can configure or explicitly disable synchronization; disabling persists across
+restarts. Carta does not encrypt synchronization: anyone who can read the remote
+can read the authored text, metadata and retained Git history.
+
+Committed checkpoints are published automatically in the background, including
+already-unpublished checkpoints found at startup. Pulls are staged privately
+and integrated only when the editor is safely idle and the Archive has not
+changed. All fetch/push destinations are validated against the Archive identity;
+jobs pin their destinations even if Git configuration changes during transfer.
+
+Setup, network and conflict errors appear as nonblocking status warnings.
+Writing and local checkpoints continue; failed transfers remain queued and
+retry with backoff. Both palette Quit and closing the desktop window save and
+checkpoint locally, then exit without waiting for Git/SSH. The final checkpoint
+may therefore remain local until the next startup. Git/SSH operations currently
+have no enforced completion deadline, but do not hold the GUI open on Quit.
+Publication to multiple destinations is not atomic; successful earlier pushes
+are retained and remaining destinations are retried safely without force-push.
+
+After adopting origin, Carta uses the dedicated `carta-sync` tracking refs.
+`git status` may still compare against an outdated `origin/carta`; fetching
+origin refreshes that comparison. Publication tests verify the remote branch's
+actual commit, not just a local tracking ref.
+
 The helper programs under `scripts/` are development and maintenance tools. They are not part of the normal installation or startup path.
 
 ## Reference implementation architecture

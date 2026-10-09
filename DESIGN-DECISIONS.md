@@ -646,3 +646,47 @@ IME event support remains part of the adapter contract even though no configured
 **Remaining performance limit:** The *network* portion is fully asynchronous and common cycles avoid copying the Archive. Checkpoint preparation and short, network-free final integration still run on the active application thread after a two-second quiet period, and can take noticeable time on extremely large Archives. This is not a claim of absolute zero-latency I/O. Track these costs separately and do not regress editing responsiveness; if necessary, move final import/integration to a coordinated storage actor rather than allowing concurrent writes to the live Archive.
 
 **Safety tests:** Exercise initial publish, no-op, remote-only update, stale local HEAD, uncheckpointed local edits, delayed network failure and divergent changes using synthetic Archives. Long-lived physical GUI testing remains required.
+
+---
+
+## DD-054 — Existing upstream and nonblocking desktop synchronization
+
+**Decision:** The v0.2 GUI explicitly adopts an existing `origin/carta` upstream
+when no dedicated `carta-sync` remote exists. Adoption copies the ordered origin
+URLs and configured push URLs into device-local synchronization configuration,
+without network access, altering authored data or enabling unrelated remotes. An
+explicit disable flag prevents adoption on later opens. The dedicated remote
+retains precedence. This behavior was approved with the warning that Carta
+does not encrypt remote text, metadata or retained history.
+
+**Safety:** Device-local remote changes use a locked atomic configuration
+transaction, so failed setup cannot silently replace the publication destination.
+Each worker resolves and pins effective fetch/push endpoints, including Git URL
+rewrites and relative local paths. A private transport snapshots authentication
+settings without retaining routing rewrites. Validate every nonempty destination
+against the committed Archive identity before any push. Known-object cycles
+avoid cloning the Archive; unknown objects and incoming/divergent histories use
+the private staging path. No worker writes the live worktree or publishes a
+moving HEAD. Partial multi-destination publication is safely retryable, not an
+atomic distributed transaction.
+
+**Warnings:** Synchronization setup, transport and conflict errors are non-modal
+status warnings. They never prevent opening, writing or local checkpoints.
+Unpublished checkpoints remain queued with bounded retry backoff. Outbound-only
+success is acknowledged while writing; only incoming integration waits for a
+quiet, clean editor and the existing configuration/HEAD guards.
+
+**Quit:** Disable the toolkit's automatic window-close exit and route window
+close through shared Quit autosave/checkpoint. After local durability succeeds,
+exit without waiting for the network. Startup automatically retries unpublished
+history, including the final checkpoint. A closed window is not a promise of
+remote publication. Network jobs use detached threads with async result channels
+so toolkit runtime shutdown does not join a blocked Git/SSH worker.
+
+**Scope:** The requested nonblocking warning behavior replaces the earlier
+local proposal to keep Quit open until final remote publication. It does not
+change the Archive format, frozen TUI interaction or emergency termination.
+Git network work never runs in Drop or the event loop. This change introduces
+no network deadline or child-process cancellation policy: a stalled transfer
+can delay further sync attempts, but not writing or Quit. Runtime responsiveness
+and physical window/keyboard testing remain separate from synthetic tests.

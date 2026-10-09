@@ -69,6 +69,12 @@ pub struct GuiInputState {
 }
 
 impl GuiInputState {
+    pub fn cancel_leap(&mut self) {
+        self.pending_leap = None;
+        self.active_leap = None;
+        self.suppressed_leap_releases = 0;
+    }
+
     pub fn take_clipboard_request(&mut self) -> Option<ClipboardRequest> {
         self.clipboard_request.take()
     }

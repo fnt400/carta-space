@@ -911,6 +911,29 @@ When a remote is configured, Carta SHOULD attempt synchronization:
 
 A synchronization, network, authentication, or remote error MUST NOT prevent further local editing, local checkpoints, or normal Quit.
 
+**Accepted v0.2 desktop override:** when no dedicated `carta-sync` remote is
+configured, the GUI enables synchronization from an existing local branch
+upstream explicitly configured as `origin/carta`. The existing Git remote is
+treated as the user's publication destination; a dedicated `carta-sync` remote
+always takes precedence. Explicitly disabling synchronization persists as
+device-local configuration and prevents automatic re-enabling. Carta adds no
+encryption: remote readers can access authored text, metadata and all retained
+history. Archives without that upstream remain local-only.
+
+Automatic desktop push/pull runs outside the GUI event loop. Failures and
+conflicts produce non-modal status warnings, retain unpublished checkpoints,
+and retry with backoff without preventing writing or local checkpoints.
+Optional synchronization setup errors MUST NOT prevent opening the Archive.
+Disabled or unconfigured Archives remain normal local-only Archives.
+
+Both the desktop window-close request and the Quit command MUST autosave and
+create the final local checkpoint, then exit without waiting for Git/SSH.
+Publication is automatic while the Archive is open and resumes at the next
+startup, including checkpoints left unpublished by Quit or a network failure.
+Closing the window is not a guarantee that the remote has received the final
+checkpoint. Emergency termination and the frozen v0.1 TUI retain their existing
+semantics.
+
 `Sync Now` first autosaves and checkpoints current local changes when necessary.
 
 ### 16.3 Integration
@@ -926,6 +949,14 @@ Normal synchronization is:
 Normal synchronization MUST NOT use rebase or force-push.
 
 An empty remote may be initialized from the local Archive. A non-empty remote that is not already a synchronization remote for the same Archive MUST NOT be silently overwritten or adopted.
+
+The desktop service validates the fetch destination and every publication
+destination before publishing. Resolved endpoints are pinned for each job;
+changing configuration must not redirect an in-flight push. Incoming changes
+may be integrated only when the editor and Archive are clean, configuration
+still matches, and local HEAD still equals the staged base. Publication to
+multiple destinations is not atomic: a partial network failure retains the
+checkpoint for safe non-force retry.
 
 ### 16.4 Synchronization conflicts
 

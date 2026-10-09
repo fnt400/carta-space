@@ -1,13 +1,12 @@
 //! Off-thread, frontend-neutral remote synchronization.
 //!
-//! Network Git commands operate ONLY on an isolated, private clone of an
-//! immutable local checkpoint. The live Archive is never changed by a worker.
+//! Network Git commands operate ONLY in an isolated, private transport or
+//! clone of an immutable checkpoint. The live Archive is never changed by a worker.
 //! The frontend may integrate the result only when its in-memory editor is
 //! clean, the live working tree is clean and its HEAD still matches the base.
 //! Never use this as a generic concurrent git-sync of the live worktree.
+use crate::sync::{configured_sync_remote, optional_git_text, resolved_sync_urls, SyncEndpoints};
 use crate::{Archive, Error, SyncOutcome};
-use carta_format::ArchiveMetadata;
-use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
@@ -22,6 +21,8 @@ pub struct StagedSync {
 struct Stage {
     source: PathBuf,
     remote: String,
+    push_urls: Option<String>,
+    effective_urls: (String, Vec<String>),
     base_head: String,
     synced_head: String,
     outcome: SyncOutcome,
@@ -40,95 +41,64 @@ pub enum SyncApply {
 /// A network job can run in spawn_blocking or a dedicated std::thread.
 /// It takes a path, not an Archive reference, and NEVER writes into that path.
 pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
-    // Read only Git config: opening a second Archive instance would run
-    // recovery procedures on the active editor's live working tree.
-    let config = Command::new("git")
-        .current_dir(&source)
-        .args(["config", "--get", "remote.carta-sync.url"])
-        .output()
-        .map_err(|error| Error::io(&source, error))?;
-    let remote = if config.status.success() {
-        String::from_utf8_lossy(&config.stdout).trim().to_owned()
-    } else {
-        String::new()
-    };
-
-    if remote.is_empty() {
-        return Err(Error::InvalidSyncRemote(
-            "Synchronization is not configured".into(),
-        ));
-    }
+    // Read config only: opening another Archive would run live recovery.
+    let remote = configured_sync_remote(&source)?.ok_or_else(|| {
+        Error::InvalidSyncRemote("Synchronization is disabled or not configured".into())
+    })?;
+    let push_urls = optional_git_text(
+        &source,
+        "read background sync push URLs",
+        &["config", "--get-all", "remote.carta-sync.pushurl"],
+    )?;
     let base_head = git_text(
         &source,
         "inspect background-sync base",
         &["rev-parse", "--verify", "HEAD"],
     )?;
+    let endpoints = SyncEndpoints::resolve(&source)?;
     // Only immutable committed data may be published. The writer can keep
     // editing the live worktree while the worker pushes this pinned HEAD.
     // Importing remote changes is independently guarded by StagedSync::apply.
     // Most sync cycles need no clone. Inspect the remote only on this
     // worker, and publish the *pinned commit* (never a moving HEAD) when a
-    // fast-forward is accepted by the Git server. Failure falls back to a
-    // private merge snapshot; neither path modifies the live working tree.
-    let remote_heads = crate::history::git_output(
-        &source,
-        "inspect background sync remote heads",
-        &["ls-remote", "--heads", "carta-sync"],
-    )?;
-    let remote_heads = String::from_utf8_lossy(&remote_heads.stdout);
-    let mut any_remote = false;
-    let mut remote_head: Option<&str> = None;
-    for line in remote_heads.lines() {
-        any_remote = true;
-        let mut fields = line.split_whitespace();
-        let hash = fields.next().unwrap_or_default();
-        if fields.next() == Some("refs/heads/carta") {
-            remote_head = Some(hash);
-        }
-    }
-    if any_remote && remote_head.is_none() {
-        return Err(Error::SyncRemoteNotEmpty);
-    }
-    if remote_head == Some(base_head.as_str()) {
-        return Ok(simple_stage(source, remote, base_head, SyncOutcome::Synced));
+    // fast-forward is accepted by the Git server. Unknown objects or incoming
+    // history require a private merge snapshot; neither path changes the live tree.
+    let remote_head = endpoints.head(&source, &endpoints.fetch)?;
+    let known = endpoints.validate(&source, &base_head, false)?;
+    if known
+        && remote_head.as_deref() == Some(base_head.as_str())
+        && endpoints.pushes == [endpoints.fetch.clone()]
+    {
+        return Ok(simple_stage(
+            source,
+            remote,
+            push_urls,
+            (endpoints.fetch.clone(), endpoints.pushes.clone()),
+            base_head,
+            SyncOutcome::Synced,
+        ));
     }
     // The ordinary Archive::sync path validates Archive IDs before a
     // nonempty-remote push. The fast path must preserve that invariant.
     // When the remote commit is unknown locally, do not push optimistically:
     // use the isolated clone and the existing validated merge path instead.
-    let can_fast_push = match remote_head {
-        Some(remote_commit) => {
-            let object = format!("{remote_commit}^{{commit}}");
-            let present = Command::new("git")
-                .current_dir(&source)
-                .args(["cat-file", "-e", &object])
-                .status()
-                .map_err(|error| Error::io(&source, error))?
-                .success();
-            if present {
-                validate_committed_archive_ids(&source, &base_head, remote_commit)?;
-            }
-            present
-        }
-        None => true, // Truly empty remote; no existing Archive to replace.
-    };
+    let can_fast_push = known
+        && match remote_head.as_deref() {
+            Some(head) => crate::sync::is_ancestor(&source, head, &base_head)?,
+            None => true,
+        };
     if can_fast_push {
-        // Git's non-force push rejects stale remote heads and concurrently
-        // advanced branches. Retrying through the merge path is then safe.
-        let refspec = format!("{base_head}:refs/heads/carta");
-        let pushed = Command::new("git")
-            .current_dir(&source)
-            .args(["push", "--quiet", "carta-sync", &refspec])
-            .output()
-            .map_err(|error| Error::io(&source, error))?;
-        if pushed.status.success() {
-            return Ok(simple_stage(
-                source,
-                remote,
-                base_head,
-                SyncOutcome::Published,
-            ));
-        }
+        // Rejected or partial pushes stay pending at the caller. A later job
+        // can fetch/merge a concurrently advanced branch and retry non-force.
+        endpoints.publish(&source, &base_head)?;
+        return Ok(simple_stage(
+            source,
+            remote,
+            push_urls,
+            (endpoints.fetch.clone(), endpoints.pushes.clone()),
+            base_head,
+            SyncOutcome::Published,
+        ));
     }
 
     // tempfile creates the staging directory with owner-only access (0700
@@ -165,8 +135,7 @@ pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
     }
 
     let mut staged_archive = Archive::open(&clone)?;
-    staged_archive.set_sync_remote(&remote)?;
-    let outcome = staged_archive.sync()?.outcome();
+    let outcome = staged_archive.sync_with_endpoints(&endpoints)?.outcome();
     let synced_head = git_text(
         &clone,
         "read synchronized snapshot",
@@ -177,6 +146,8 @@ pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
         data: Arc::new(Stage {
             source,
             remote,
+            push_urls,
+            effective_urls: (endpoints.fetch.clone(), endpoints.pushes.clone()),
             base_head,
             synced_head,
             outcome,
@@ -186,37 +157,11 @@ pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
     })
 }
 
-/// Validate the immutable source and remote Git objects before a fast push.
-/// This function never reads mutable working files or changes Git refs.
-fn validate_committed_archive_ids(
-    source: &Path,
-    local_head: &str,
-    remote_head: &str,
-) -> Result<(), Error> {
-    let read = |commit: &str| -> Result<ArchiveMetadata, Error> {
-        let object = format!("{commit}:carta.json");
-        let output = crate::history::git_output(
-            source,
-            "read committed Archive identity",
-            &["show", &object],
-        )?;
-        ArchiveMetadata::read_from(Cursor::new(output.stdout))
-            .map_err(|error| Error::InvalidSyncRemote(error.to_string()))
-    };
-    let local = read(local_head)?.archive_id();
-    let remote = read(remote_head)?.archive_id();
-    if local != remote {
-        return Err(Error::SyncArchiveMismatch {
-            local: local.to_string(),
-            remote: remote.to_string(),
-        });
-    }
-    Ok(())
-}
-
 fn simple_stage(
     source: PathBuf,
     remote: String,
+    push_urls: Option<String>,
+    effective_urls: (String, Vec<String>),
     base_head: String,
     outcome: SyncOutcome,
 ) -> StagedSync {
@@ -224,6 +169,8 @@ fn simple_stage(
         data: Arc::new(Stage {
             source,
             remote,
+            push_urls,
+            effective_urls,
             synced_head: base_head.clone(),
             base_head,
             outcome,
@@ -243,18 +190,28 @@ impl StagedSync {
         self.data.outcome
     }
 
+    /// Check only the publication configuration, without networking or checks
+    /// of editor state, working files or HEAD. An outbound snapshot may be
+    /// acknowledged while newer writing continues; this does not authorize
+    /// installing incoming changes, which still requires `apply`'s guards.
+    pub fn configuration_matches(&self, archive: &Archive) -> Result<bool, Error> {
+        let stage = &self.data;
+        Ok(archive.root() == stage.source
+            && archive.sync_remote()?.as_deref() == Some(stage.remote.as_str())
+            && optional_git_text(
+                archive.root(),
+                "check live sync push URLs",
+                &["config", "--get-all", "remote.carta-sync.pushurl"],
+            )? == stage.push_urls
+            && resolved_sync_urls(archive.root())? == stage.effective_urls)
+    }
+
     /// No networking. The caller MUST also check the live editor's dirty
     /// state immediately before calling. Local Git operations and Archive
     /// refresh still occur synchronously; schedule integration when idle.
     pub fn apply(&self, archive: &mut Archive) -> Result<SyncApply, Error> {
         let stage = &self.data;
-        if archive.root() != stage.source {
-            return Ok(SyncApply::Stale);
-        }
-        if archive.sync_remote()?.as_deref() != Some(stage.remote.as_str()) {
-            return Ok(SyncApply::Stale);
-        }
-        if archive.is_dirty()? {
+        if !self.configuration_matches(archive)? || archive.is_dirty()? {
             return Ok(SyncApply::Stale);
         }
         if git_text(
@@ -310,6 +267,7 @@ impl StagedSync {
         // Recheck after object transfer: a local checkpoint could have been
         // created since the initial test.
         if archive.is_dirty()?
+            || !self.configuration_matches(archive)?
             || git_text(
                 archive.root(),
                 "recheck sync base",
@@ -332,6 +290,7 @@ impl StagedSync {
 mod tests {
     use super::*;
     use crate::{CheckpointKind, SyncOutcome};
+    use carta_format::ArchiveMetadata;
     use std::process::Command;
 
     fn git(path: &Path, args: &[&str]) {
@@ -341,6 +300,594 @@ mod tests {
             .status()
             .unwrap()
             .success());
+    }
+
+    fn adopted_archive(parent: &Path, push_urls: &[&Path]) -> (Archive, PathBuf) {
+        let remote = parent.join("fetch.git");
+        git(
+            parent,
+            &["init", "--bare", "--quiet", remote.to_str().unwrap()],
+        );
+        let root = parent.join("local");
+        let archive = Archive::create(&root).unwrap();
+        git(
+            &root,
+            &["remote", "add", "origin", remote.to_str().unwrap()],
+        );
+        git(
+            &root,
+            &["push", "--quiet", "origin", "HEAD:refs/heads/carta"],
+        );
+        let branch = git_text(&root, "test branch", &["branch", "--show-current"]).unwrap();
+        git(
+            &root,
+            &["config", &format!("branch.{branch}.remote"), "origin"],
+        );
+        git(
+            &root,
+            &[
+                "config",
+                &format!("branch.{branch}.merge"),
+                "refs/heads/carta",
+            ],
+        );
+        for url in push_urls {
+            git(
+                &root,
+                &[
+                    "config",
+                    "--add",
+                    "remote.origin.pushurl",
+                    url.to_str().unwrap(),
+                ],
+            );
+        }
+        assert!(archive.enable_origin_sync_remote().unwrap());
+        (archive, remote)
+    }
+
+    fn bare_head(remote: &Path) -> String {
+        let output = Command::new("git")
+            .current_dir(remote)
+            .args(["rev-parse", "refs/heads/carta"])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap().trim().to_owned()
+    }
+
+    #[test]
+    fn disabling_sync_invalidates_stage_even_when_raw_routing_remains() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (mut archive, fetch) = adopted_archive(tmp.path(), &[]);
+        let staged = stage_sync(archive.root().to_path_buf()).unwrap();
+        assert!(staged.configuration_matches(&archive).unwrap());
+        git(archive.root(), &["config", "carta.sync-disabled", "true"]);
+        assert_eq!(
+            git_text(
+                archive.root(),
+                "test raw URL is unchanged",
+                &["config", "--get", "remote.carta-sync.url"]
+            )
+            .unwrap(),
+            fetch.to_str().unwrap()
+        );
+        assert_eq!(archive.sync_remote().unwrap(), None);
+        assert_eq!(archive.sync().unwrap().outcome(), SyncOutcome::Disabled);
+        assert!(stage_sync(archive.root().to_path_buf()).is_err());
+        assert!(!staged.configuration_matches(&archive).unwrap());
+        assert_eq!(staged.apply(&mut archive).unwrap(), SyncApply::Stale);
+        git(archive.root(), &["config", "carta.sync-disabled", "false"]);
+        assert!(staged.configuration_matches(&archive).unwrap());
+    }
+
+    #[test]
+    fn configuration_matching_ignores_newer_checkpoints_and_dirty_writing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (mut archive, fetch) = adopted_archive(tmp.path(), &[]);
+        let staged = stage_sync(archive.root().to_path_buf()).unwrap();
+        assert!(staged.configuration_matches(&archive).unwrap());
+        let document = archive
+            .create_document("synthetic newer checkpoint")
+            .unwrap();
+        archive.checkpoint(CheckpointKind::Manual, None).unwrap();
+        assert!(staged.configuration_matches(&archive).unwrap());
+        assert_eq!(staged.apply(&mut archive).unwrap(), SyncApply::Stale);
+        archive
+            .edit_document(document, "synthetic unsaved writing")
+            .unwrap();
+        assert!(archive.is_dirty().unwrap());
+        assert!(staged.configuration_matches(&archive).unwrap());
+        assert_eq!(staged.apply(&mut archive).unwrap(), SyncApply::Stale);
+
+        git(
+            archive.root(),
+            &[
+                "config",
+                "remote.carta-sync.pushurl",
+                fetch.to_str().unwrap(),
+            ],
+        );
+        assert!(!staged.configuration_matches(&archive).unwrap());
+        git(
+            archive.root(),
+            &["config", "--unset", "remote.carta-sync.pushurl"],
+        );
+        assert!(staged.configuration_matches(&archive).unwrap());
+        git(
+            archive.root(),
+            &["config", "remote.carta-sync.url", "../fetch.git"],
+        );
+        assert!(!staged.configuration_matches(&archive).unwrap());
+        git(
+            archive.root(),
+            &["config", "remote.carta-sync.url", fetch.to_str().unwrap()],
+        );
+        let rewrite = format!(
+            "url.{}.insteadOf",
+            tmp.path().join("rerouted.git").display()
+        );
+        git(
+            archive.root(),
+            &["config", &rewrite, fetch.to_str().unwrap()],
+        );
+        assert!(!staged.configuration_matches(&archive).unwrap());
+        git(archive.root(), &["config", "--unset", &rewrite]);
+        assert!(staged.configuration_matches(&archive).unwrap());
+        let other = Archive::create(tmp.path().join("other")).unwrap();
+        assert!(!staged.configuration_matches(&other).unwrap());
+        archive.clear_sync_remote().unwrap();
+        assert!(!staged.configuration_matches(&archive).unwrap());
+    }
+
+    #[test]
+    fn matching_fetch_head_still_publishes_to_all_adopted_push_urls() {
+        let tmp = tempfile::tempdir().unwrap();
+        let push = tmp.path().join("push.git");
+        let other_push = tmp.path().join("other-push.git");
+        for destination in [&push, &other_push] {
+            git(
+                tmp.path(),
+                &["init", "--bare", "--quiet", destination.to_str().unwrap()],
+            );
+        }
+        let (mut archive, fetch) = adopted_archive(tmp.path(), &[&push, &other_push]);
+        git(
+            archive.root(),
+            &["push", "--quiet", "carta-sync", "HEAD:refs/heads/carta"],
+        );
+        let old_head = bare_head(&push);
+        archive.create_document("synthetic new checkpoint").unwrap();
+        archive.checkpoint(CheckpointKind::Manual, None).unwrap();
+        git(
+            archive.root(),
+            &[
+                "push",
+                "--quiet",
+                fetch.to_str().unwrap(),
+                "HEAD:refs/heads/carta",
+            ],
+        );
+        let head = bare_head(&fetch);
+        assert_ne!(head, old_head);
+        let staged = stage_sync(archive.root().to_path_buf()).unwrap();
+        assert_eq!(staged.outcome(), SyncOutcome::Published);
+        for destination in [&push, &other_push] {
+            assert_eq!(bare_head(destination), head);
+        }
+        assert_eq!(staged.apply(&mut archive).unwrap(), SyncApply::Unchanged);
+
+        // Changes to the list, its order, or its presence invalidate the job.
+        for urls in [vec![&push], vec![&other_push, &push], vec![]] {
+            git(
+                archive.root(),
+                &["config", "--unset-all", "remote.carta-sync.pushurl"],
+            );
+            for url in &urls {
+                git(
+                    archive.root(),
+                    &[
+                        "config",
+                        "--add",
+                        "remote.carta-sync.pushurl",
+                        url.to_str().unwrap(),
+                    ],
+                );
+            }
+            assert_eq!(staged.apply(&mut archive).unwrap(), SyncApply::Stale);
+        }
+    }
+
+    #[test]
+    fn missing_adopted_push_destination_never_publishes_to_fetch_or_reports_success() {
+        for ahead in [false, true] {
+            let tmp = tempfile::tempdir().unwrap();
+            let missing = tmp.path().join("missing.git");
+            let (mut archive, fetch) = adopted_archive(tmp.path(), &[&missing]);
+            let fetch_head = bare_head(&fetch);
+            if ahead {
+                archive
+                    .create_document("synthetic unpublished checkpoint")
+                    .unwrap();
+                archive.checkpoint(CheckpointKind::Manual, None).unwrap();
+            }
+            let local_head =
+                git_text(archive.root(), "test local head", &["rev-parse", "HEAD"]).unwrap();
+            assert!(stage_sync(archive.root().to_path_buf()).is_err());
+            assert_eq!(bare_head(&fetch), fetch_head);
+            assert_eq!(
+                git_text(
+                    archive.root(),
+                    "test unchanged local head",
+                    &["rev-parse", "HEAD"]
+                )
+                .unwrap(),
+                local_head
+            );
+        }
+    }
+
+    #[test]
+    fn private_fallback_publishes_incoming_and_divergent_results_to_adopted_push_url() {
+        for divergent in [false, true] {
+            let tmp = tempfile::tempdir().unwrap();
+            let push = tmp.path().join("push.git");
+            git(
+                tmp.path(),
+                &["init", "--bare", "--quiet", push.to_str().unwrap()],
+            );
+            let (mut archive, fetch) = adopted_archive(tmp.path(), &[&push]);
+            // Resolve local URLs in the live Archive, not the private clone.
+            git(
+                archive.root(),
+                &["config", "remote.carta-sync.url", "../fetch.git"],
+            );
+            git(
+                archive.root(),
+                &["config", "remote.carta-sync.pushurl", "../push.git"],
+            );
+            let mut peer =
+                Archive::clone_sync_remote(fetch.to_str().unwrap(), tmp.path().join("peer"))
+                    .unwrap();
+            peer.create_document("synthetic incoming checkpoint")
+                .unwrap();
+            peer.checkpoint(CheckpointKind::Manual, None).unwrap();
+            peer.sync().unwrap();
+            let fetch_head = bare_head(&fetch);
+            if divergent {
+                archive
+                    .create_document("synthetic local checkpoint")
+                    .unwrap();
+                archive.checkpoint(CheckpointKind::Manual, None).unwrap();
+            }
+            let local_head =
+                git_text(archive.root(), "test local head", &["rev-parse", "HEAD"]).unwrap();
+            let staged = stage_sync(archive.root().to_path_buf()).unwrap();
+            assert!(staged.data.clone.is_some());
+            assert_eq!(
+                staged.outcome(),
+                if divergent {
+                    SyncOutcome::Merged
+                } else {
+                    SyncOutcome::UpdatedFromRemote
+                }
+            );
+            assert_eq!(bare_head(&push), staged.data.synced_head);
+            assert_eq!(bare_head(&fetch), fetch_head);
+            assert_eq!(
+                git_text(
+                    archive.root(),
+                    "test worker preserves local head",
+                    &["rev-parse", "HEAD"]
+                )
+                .unwrap(),
+                local_head
+            );
+            // A changed destination also blocks integration of incoming data.
+            git(
+                archive.root(),
+                &[
+                    "config",
+                    "remote.carta-sync.pushurl",
+                    "synthetic-changed-destination",
+                ],
+            );
+            assert_eq!(staged.apply(&mut archive).unwrap(), SyncApply::Stale);
+            git(
+                archive.root(),
+                &["config", "remote.carta-sync.pushurl", "../push.git"],
+            );
+            assert_eq!(staged.apply(&mut archive).unwrap(), SyncApply::Updated);
+        }
+    }
+
+    #[test]
+    fn validates_all_destinations_before_any_publication() {
+        for foreground in [false, true] {
+            for other_archive in [false, true] {
+                for known in [false, true] {
+                    let tmp = tempfile::tempdir().unwrap();
+                    let empty = tmp.path().join("empty.git");
+                    let invalid = tmp.path().join("invalid.git");
+                    for destination in [&empty, &invalid] {
+                        git(
+                            tmp.path(),
+                            &["init", "--bare", "--quiet", destination.to_str().unwrap()],
+                        );
+                    }
+                    let (mut archive, fetch) = adopted_archive(tmp.path(), &[&empty, &invalid]);
+                    let foreign = Archive::create(tmp.path().join("foreign")).unwrap();
+                    git(
+                        foreign.root(),
+                        &[
+                            "push",
+                            "--quiet",
+                            invalid.to_str().unwrap(),
+                            if other_archive {
+                                "HEAD:refs/heads/carta"
+                            } else {
+                                "HEAD:refs/heads/main"
+                            },
+                        ],
+                    );
+                    if known {
+                        git(
+                            archive.root(),
+                            &[
+                                "fetch",
+                                "--quiet",
+                                invalid.to_str().unwrap(),
+                                if other_archive {
+                                    "refs/heads/carta"
+                                } else {
+                                    "refs/heads/main"
+                                },
+                            ],
+                        );
+                    }
+                    let head = git_text(archive.root(), "test checkpoint", &["rev-parse", "HEAD"])
+                        .unwrap();
+                    let config = std::fs::read(archive.root().join(".git/config")).unwrap();
+                    let refs = git_text(archive.root(), "test refs", &["show-ref"]).unwrap();
+                    let error = if foreground {
+                        archive.sync().unwrap_err()
+                    } else {
+                        stage_sync(archive.root().to_path_buf()).unwrap_err()
+                    };
+                    assert!(
+                        if other_archive {
+                            matches!(error, Error::SyncArchiveMismatch { .. })
+                        } else {
+                            matches!(error, Error::SyncRemoteNotEmpty)
+                        },
+                        "{error:?}"
+                    );
+                    assert_eq!(bare_head(&fetch), head);
+                    let output = Command::new("git")
+                        .current_dir(&empty)
+                        .args(["show-ref"])
+                        .output()
+                        .unwrap();
+                    assert!(
+                        output.stdout.is_empty(),
+                        "earlier valid destination was published"
+                    );
+                    assert_eq!(
+                        git_text(archive.root(), "test checkpoint", &["rev-parse", "HEAD"])
+                            .unwrap(),
+                        head
+                    );
+                    assert_eq!(
+                        std::fs::read(archive.root().join(".git/config")).unwrap(),
+                        config
+                    );
+                    if !foreground {
+                        assert_eq!(
+                            git_text(archive.root(), "test refs", &["show-ref"]).unwrap(),
+                            refs
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn default_push_urls_honor_push_instead_of_and_multiple_fetch_urls() {
+        let tmp = tempfile::tempdir().unwrap();
+        let push = tmp.path().join("push.git");
+        let other = tmp.path().join("other.git");
+        for destination in [&push, &other] {
+            git(
+                tmp.path(),
+                &["init", "--bare", "--quiet", destination.to_str().unwrap()],
+            );
+        }
+        let (mut archive, fetch) = adopted_archive(tmp.path(), &[]);
+        git(
+            archive.root(),
+            &["config", "remote.carta-sync.url", "synthetic-fetch"],
+        );
+        git(
+            archive.root(),
+            &["config", "--add", "remote.carta-sync.url", "../other.git"],
+        );
+        git(
+            archive.root(),
+            &["config", "url.../fetch.git.insteadOf", "synthetic-fetch"],
+        );
+        git(
+            archive.root(),
+            &["config", "url.../push.git.pushInsteadOf", "synthetic-fetch"],
+        );
+        let endpoints = SyncEndpoints::resolve(archive.root()).unwrap();
+        assert_eq!(
+            endpoints.fetch,
+            archive.root().join("../fetch.git").to_string_lossy()
+        );
+        assert_eq!(
+            endpoints.pushes,
+            vec![archive.root().join("../push.git").to_string_lossy()]
+        );
+        let staged = stage_sync(archive.root().to_path_buf()).unwrap();
+        assert!(staged.data.clone.is_none());
+        assert_eq!(bare_head(&push), bare_head(&fetch));
+        // Git synthesizes a pushurl for pushInsteadOf. Without that rule,
+        // its default publication list includes every configured fetch URL.
+        git(
+            archive.root(),
+            &["config", "--unset", "url.../push.git.pushInsteadOf"],
+        );
+        assert_eq!(staged.apply(&mut archive).unwrap(), SyncApply::Stale);
+        let endpoints = SyncEndpoints::resolve(archive.root()).unwrap();
+        assert_eq!(
+            endpoints.pushes,
+            vec![
+                archive.root().join("../fetch.git").to_string_lossy(),
+                archive.root().join("../other.git").to_string_lossy()
+            ]
+        );
+        let staged = stage_sync(archive.root().to_path_buf()).unwrap();
+        assert!(staged.data.clone.is_none());
+        assert_eq!(bare_head(&other), bare_head(&fetch));
+        git(
+            archive.root(),
+            &[
+                "config",
+                "--replace-all",
+                "remote.carta-sync.url",
+                "../fetch.git",
+            ],
+        );
+        assert_eq!(staged.apply(&mut archive).unwrap(), SyncApply::Stale);
+    }
+
+    #[test]
+    fn rejected_later_push_stays_pending_and_retries_without_force() {
+        let tmp = tempfile::tempdir().unwrap();
+        let push = tmp.path().join("push.git");
+        let advanced = tmp.path().join("advanced.git");
+        for destination in [&push, &advanced] {
+            git(
+                tmp.path(),
+                &["init", "--bare", "--quiet", destination.to_str().unwrap()],
+            );
+        }
+        let (mut archive, fetch) = adopted_archive(tmp.path(), &[&push, &advanced]);
+        let mut peer =
+            Archive::clone_sync_remote(fetch.to_str().unwrap(), tmp.path().join("peer")).unwrap();
+        peer.create_document("synthetic independent remote checkpoint")
+            .unwrap();
+        peer.checkpoint(CheckpointKind::Manual, None).unwrap();
+        git(
+            peer.root(),
+            &[
+                "push",
+                "--quiet",
+                advanced.to_str().unwrap(),
+                "HEAD:refs/heads/carta",
+            ],
+        );
+        let remote_head = bare_head(&advanced);
+        let local_head =
+            git_text(archive.root(), "test checkpoint", &["rev-parse", "HEAD"]).unwrap();
+        // Unknown destination metadata is fetched only in the private fallback.
+        assert!(stage_sync(archive.root().to_path_buf()).is_err());
+        assert_eq!(bare_head(&push), local_head);
+        assert_eq!(bare_head(&advanced), remote_head);
+        assert_eq!(
+            git_text(archive.root(), "test checkpoint", &["rev-parse", "HEAD"]).unwrap(),
+            local_head
+        );
+        peer.sync().unwrap();
+        let staged = stage_sync(archive.root().to_path_buf()).unwrap();
+        assert_eq!(staged.outcome(), SyncOutcome::UpdatedFromRemote);
+        assert_eq!(bare_head(&push), remote_head);
+        assert_eq!(bare_head(&advanced), remote_head);
+        assert_eq!(staged.apply(&mut archive).unwrap(), SyncApply::Updated);
+    }
+
+    #[test]
+    fn resolved_rewrites_are_pinned_and_changes_make_stage_stale() {
+        let tmp = tempfile::tempdir().unwrap();
+        let push = tmp.path().join("push.git");
+        let rerouted = tmp.path().join("rerouted.git");
+        for destination in [&push, &rerouted] {
+            git(
+                tmp.path(),
+                &["init", "--bare", "--quiet", destination.to_str().unwrap()],
+            );
+        }
+        let (mut archive, _) = adopted_archive(tmp.path(), &[]);
+        git(
+            archive.root(),
+            &["config", "remote.carta-sync.url", "synthetic-fetch"],
+        );
+        git(
+            archive.root(),
+            &["config", "remote.carta-sync.pushurl", "synthetic-push"],
+        );
+        git(
+            archive.root(),
+            &["config", "url.../fetch.git.insteadOf", "synthetic-fetch"],
+        );
+        git(
+            archive.root(),
+            &["config", "url.../push.git.insteadOf", "synthetic-push"],
+        );
+        let endpoints = SyncEndpoints::resolve(archive.root()).unwrap();
+        let head = git_text(archive.root(), "test checkpoint", &["rev-parse", "HEAD"]).unwrap();
+        assert!(endpoints.validate(archive.root(), &head, false).unwrap());
+        let staged = stage_sync(archive.root().to_path_buf()).unwrap();
+        assert!(staged.data.clone.is_none());
+        git(
+            archive.root(),
+            &["config", "url.../push.git.insteadOf", "unused-prefix"],
+        );
+        git(
+            archive.root(),
+            &["config", "url.../rerouted.git.insteadOf", "synthetic-push"],
+        );
+        archive
+            .create_document("synthetic pinned publication")
+            .unwrap();
+        let absolute_rewrite = format!("url.{}.insteadOf", rerouted.display());
+        git(
+            archive.root(),
+            &["config", &absolute_rewrite, &endpoints.pushes[0]],
+        );
+        archive.checkpoint(CheckpointKind::Manual, None).unwrap();
+        let new_head = git_text(archive.root(), "test checkpoint", &["rev-parse", "HEAD"]).unwrap();
+        endpoints.publish(archive.root(), &new_head).unwrap();
+        assert_eq!(bare_head(&push), new_head);
+        assert!(Command::new("git")
+            .current_dir(&rerouted)
+            .args(["show-ref"])
+            .output()
+            .unwrap()
+            .stdout
+            .is_empty());
+        assert_eq!(staged.apply(&mut archive).unwrap(), SyncApply::Stale);
+        // Check effective routing independently of the raw config guards.
+        git(archive.root(), &["config", "--unset", &absolute_rewrite]);
+        git(
+            archive.root(),
+            &["config", "url.../push.git.insteadOf", "synthetic-push"],
+        );
+        git(
+            archive.root(),
+            &["config", "--unset", "url.../rerouted.git.insteadOf"],
+        );
+        let staged = stage_sync(archive.root().to_path_buf()).unwrap();
+        git(
+            archive.root(),
+            &["config", "url.../push.git.insteadOf", "unused-prefix"],
+        );
+        git(
+            archive.root(),
+            &["config", "url.../rerouted.git.insteadOf", "synthetic-push"],
+        );
+        assert_eq!(staged.apply(&mut archive).unwrap(), SyncApply::Stale);
     }
 
     #[test]

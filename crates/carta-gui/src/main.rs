@@ -7,7 +7,7 @@ mod ui;
 mod viewport;
 
 use base64::Engine as _;
-use carta_app::{App, AppMode, Session, View};
+use carta_app::{App, AppMode, Command, Session, View};
 use carta_core::{stage_sync, Archive, StagedSync, SyncApply, SyncOutcome};
 use iced::event::{self, Status};
 use iced::theme::Mode as ThemeMode;
@@ -28,6 +28,10 @@ fn main() -> iced::Result {
             ..Settings::default()
         })
         .subscription(subscription)
+        .window(window::Settings {
+            exit_on_close_request: false,
+            ..window::Settings::default()
+        })
         .run()
 }
 
@@ -48,7 +52,7 @@ pub(crate) struct Gui {
     pointer: Option<Point>,
     pointer_down: bool,
     sync_active: bool,
-    quit_sync_active: bool,
+    clone_active: bool,
     sync_ready: Option<StagedSync>,
     next_sync_at: Instant,
     last_user_input: Instant,
@@ -71,7 +75,7 @@ pub(crate) enum Message {
     PointerReleased,
     Scrolled(f32),
     SyncFinished(Result<StagedSync, String>),
-    QuitSyncFinished(Result<SyncOutcome, String>),
+    QuitRequested,
     CloneUrlChanged(String),
     CreateDefaultArchive,
     CloneDefaultArchive,
@@ -114,7 +118,7 @@ impl Gui {
             pointer: None,
             pointer_down: false,
             sync_active: false,
-            quit_sync_active: false,
+            clone_active: false,
             sync_ready: None,
             next_sync_at: Instant::now(),
             last_user_input: Instant::now(),
@@ -133,12 +137,16 @@ impl Gui {
 
         let root = session::data_root().ok();
         let setup_path = (explicit_archive.is_none() && !path.exists()).then_some(path.clone());
+        let mut sync_error = None;
         let result = if setup_path.is_some() {
             Err(String::new())
         } else {
             Archive::open(&path)
                 .map_err(|error| error.to_string())
                 .and_then(|archive| {
+                    if let Err(error) = archive.enable_origin_sync_remote() {
+                        sync_error = Some(format!("Sync setup: {error}"));
+                    }
                     let previous = root.as_deref().and_then(|root| {
                         session::load(root, archive.metadata().archive_id())
                             .ok()
@@ -175,17 +183,26 @@ impl Gui {
             pointer: None,
             pointer_down: false,
             sync_active: false,
-            quit_sync_active: false,
+            clone_active: false,
             sync_ready: None,
-            next_sync_at: Instant::now(),
+            next_sync_at: Instant::now()
+                + if sync_error.is_some() {
+                    Duration::from_secs(30)
+                } else {
+                    Duration::ZERO
+                },
             last_user_input: Instant::now(),
-            sync_failures: 0,
+            sync_failures: u32::from(sync_error.is_some()),
             sync_started_generation: 0,
-            sync_error: None,
+            sync_error,
         }
     }
 
     fn install_archive(&mut self, archive: Archive) {
+        if let Err(error) = archive.enable_origin_sync_remote() {
+            self.sync_error = Some(format!("Sync setup: {error}"));
+            self.sync_failures = 1;
+        }
         let previous = self.session_root.as_deref().and_then(|root| {
             session::load(root, archive.metadata().archive_id())
                 .ok()
@@ -198,7 +215,12 @@ impl Gui {
                 self.last_saved_session = previous;
                 self.error = None;
                 self.setup_path = None;
-                self.next_sync_at = Instant::now();
+                self.next_sync_at = Instant::now()
+                    + if self.sync_failures > 0 {
+                        Duration::from_secs(30)
+                    } else {
+                        Duration::ZERO
+                    };
             }
             Err(error) => self.error = Some(format!("Archive open failed: {error}")),
         }
@@ -287,6 +309,7 @@ fn subscription(state: &Gui) -> Subscription<Message> {
         mouse_release,
         iced::time::every(interval).map(Message::Tick),
         window::open_events().map(Message::WindowOpened),
+        window::close_requests().map(|_| Message::QuitRequested),
         window::resize_events().map(|(_id, size)| Message::WindowSize(size)),
         system::theme_changes().map(Message::SystemTheme),
     ])
@@ -346,6 +369,9 @@ fn indexed_hit_test(
 /// typing or the current Document is provisional. Only the *integration* of
 /// remote changes may wait for a safe moment.
 fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
+    if state.app.as_ref().is_some_and(|app| app.quit) {
+        return finish_quit(state);
+    }
     const QUIET: Duration = Duration::from_secs(2);
     const INTERVAL: Duration = Duration::from_secs(180);
     let idle = now.saturating_duration_since(state.last_user_input) >= QUIET && !state.pointer_down;
@@ -362,7 +388,8 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
         // merge using the new committed base.
         if current_generation != state.sync_started_generation {
             state.sync_ready = None;
-            state.next_sync_at = now;
+            state.sync_failures = state.sync_failures.max(1);
+            state.next_sync_at = now + Duration::from_secs(5);
         } else {
             let can_integrate = state.app.as_ref().is_some_and(|app| {
                 !app.editor.is_dirty()
@@ -372,7 +399,16 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
             if idle && can_integrate {
                 let staged = state.sync_ready.take().expect("checked above");
                 let result = if let Some(app) = state.app.as_mut() {
-                    app.apply_background_sync(&staged)
+                    staged
+                        .configuration_matches(&app.archive)
+                        .map_err(|error| -> Box<dyn std::error::Error> { Box::new(error) })
+                        .and_then(|matches| {
+                            if matches {
+                                app.apply_background_sync(&staged)
+                            } else {
+                                Ok(SyncApply::Stale)
+                            }
+                        })
                 } else {
                     return Task::none();
                 };
@@ -393,6 +429,7 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
                     Ok(SyncApply::Conflict) => {
                         state.sync_error =
                             Some("Conflitto Git: modifiche simultanee da risolvere".into());
+                        state.sync_failures = state.sync_failures.max(1);
                         state.next_sync_at = now + INTERVAL;
                     }
                     Ok(SyncApply::Stale) => {
@@ -400,12 +437,13 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
                         // without replacing any live data, but avoid an
                         // immediate worker loop while those changes settle.
                         state.sync_failures = state.sync_failures.max(1);
+                        state.sync_error =
+                            Some("Sync: archive or configuration changed; retry queued".into());
                         state.next_sync_at = now + Duration::from_secs(5);
                     }
                     Err(error) => {
                         state.sync_error = Some(format!("Sync: {error}"));
-                        state.sync_failures = state.sync_failures.saturating_add(1);
-                        state.next_sync_at = now + Duration::from_secs(30);
+                        sync_backoff(state, now);
                     }
                 }
             }
@@ -423,25 +461,27 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
         return Task::none();
     }
 
+    // Adoption is local-only and optional. Failure never closes the editor.
+    if let Err(error) = app.archive.enable_origin_sync_remote() {
+        state.sync_error = Some(format!("Sync setup: {error}"));
+        sync_backoff(state, now);
+        return Task::none();
+    }
+
     // Before starting an outbound transfer we may checkpoint a fully saved,
     // non-provisional buffer. Otherwise publish only already committed data.
     match app.prepare_background_sync() {
         Ok(true) => {}
         Ok(false) => {
             state.next_sync_at = now + INTERVAL;
-            // Missing remote configuration is a persistent, visible
-            // problem when a committed checkpoint is queued for upload.
-            if app.scheduler.is_sync_pending() {
-                state.sync_error = Some("Remote carta-sync non configurato".into());
-            }
-            app.scheduler
-                .sync_finished(app.scheduler.sync_generation(), now);
+            // Keep the checkpoint queued without probing missing configuration
+            // again on every keystroke.
+            state.sync_failures = state.sync_failures.max(1);
             return Task::none();
         }
         Err(error) => {
             state.sync_error = Some(format!("Sync: {error}"));
-            state.sync_failures = state.sync_failures.saturating_add(1);
-            state.next_sync_at = now + Duration::from_secs(30);
+            sync_backoff(state, now);
             return Task::none();
         }
     }
@@ -451,52 +491,41 @@ fn service_tick(state: &mut Gui, now: Instant) -> Task<Message> {
     state.sync_active = true;
     state.next_sync_at = now + INTERVAL;
     Task::perform(
-        async move {
-            match tokio::task::spawn_blocking(move || stage_sync(root)).await {
-                Ok(Ok(stage)) => Ok(stage),
-                Ok(Err(error)) => Err(error.to_string()),
-                Err(error) => Err(format!("Background sync worker failed: {error}")),
-            }
-        },
+        detached_job(move || stage_sync(root).map_err(|error| error.to_string())),
         Message::SyncFinished,
     )
 }
 
-/// Finish Quit only after the final committed HEAD has been offered to the
-/// configured remote. A failed transfer keeps the window open with a visible
-/// error; quitting never silently abandons an unpublished checkpoint.
-fn finish_remote_quit(state: &mut Gui) -> Task<Message> {
-    if state.quit_sync_active || state.sync_active {
-        return Task::none();
+/// Shared Quit has already saved and checkpointed locally. Never wait for SSH.
+fn finish_quit(state: &mut Gui) -> Task<Message> {
+    state.input.cancel_leap();
+    state.pointer_down = false;
+    if let Err(error) = state.save_session() {
+        eprintln!("carta-gui: final session save failed: {error}");
     }
-    let Some(app) = state.app.as_ref() else {
-        return iced::exit();
-    };
-    let remote = match app.archive.sync_remote() {
-        Ok(remote) => remote,
-        Err(error) => {
-            if let Some(app) = state.app.as_mut() {
-                app.quit = false;
-            }
-            state.sync_error = Some(format!("Quit sync: {error}"));
-            return Task::none();
-        }
-    };
-    if remote.is_none() {
-        return iced::exit();
-    }
-    let root = app.archive.root().to_path_buf();
-    state.quit_sync_active = true;
-    Task::perform(
-        async move {
-            match tokio::task::spawn_blocking(move || stage_sync(root)).await {
-                Ok(Ok(stage)) => Ok(stage.outcome()),
-                Ok(Err(error)) => Err(error.to_string()),
-                Err(error) => Err(format!("Quit sync worker failed: {error}")),
-            }
-        },
-        Message::QuitSyncFinished,
-    )
+    iced::exit()
+}
+
+fn sync_backoff(state: &mut Gui, now: Instant) {
+    state.sync_failures = state.sync_failures.saturating_add(1);
+    state.next_sync_at = now + Duration::from_secs(30 * (1_u64 << state.sync_failures.min(4)));
+}
+
+// Dropping the async receiver does not join the network thread. In particular,
+// Tokio shutdown cannot wait indefinitely for a Git/SSH or clone operation.
+async fn detached_job<T: Send + 'static>(
+    job: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    let (sender, receiver) = iced::futures::channel::oneshot::channel();
+    std::thread::Builder::new()
+        .name("carta-network".into())
+        .spawn(move || {
+            let _ = sender.send(job());
+        })
+        .map_err(|error| format!("Network worker failed: {error}"))?;
+    receiver
+        .await
+        .map_err(|_| "Network worker stopped without a result".to_owned())?
 }
 
 fn normalize_clipboard(value: &str) -> String {
@@ -505,16 +534,36 @@ fn normalize_clipboard(value: &str) -> String {
 
 fn update(state: &mut Gui, message: Message) -> Task<Message> {
     match message {
+        Message::QuitRequested => {
+            if let Some(app) = state.app.as_mut() {
+                if !app.quit {
+                    if matches!(app.mode, AppMode::Leap { .. }) {
+                        app.cancel_mode();
+                    }
+                    if let Err(error) = app.execute(Command::Quit) {
+                        app.status = format!("Quit: {error}");
+                        return Task::none();
+                    }
+                }
+            }
+            return finish_quit(state);
+        }
         Message::CloneUrlChanged(url) => {
             state.clone_url = url;
             state.error = None;
             return Task::none();
         }
         Message::CreateDefaultArchive => {
+            if state.clone_active {
+                return Task::none();
+            }
             state.create_default_archive();
             return service_tick(state, Instant::now());
         }
         Message::CloneDefaultArchive => {
+            if state.clone_active {
+                return Task::none();
+            }
             let Some(path) = state.setup_path.clone() else {
                 return Task::none();
             };
@@ -528,27 +577,21 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                 return Task::none();
             }
             state.error = Some("Cloning Git archive…".into());
+            state.clone_active = true;
             return Task::perform(
-                async move {
-                    match tokio::task::spawn_blocking(move || {
-                        if let Some(parent) = path.parent() {
-                            std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
-                        }
-                        Archive::clone_sync_remote(&remote, &path)
-                            .map(|_| ())
-                            .map_err(|error| error.to_string())
-                    })
-                    .await
-                    {
-                        Ok(Ok(())) => Ok(()),
-                        Ok(Err(error)) => Err(error.to_string()),
-                        Err(error) => Err(format!("Clone worker failed: {error}")),
+                detached_job(move || {
+                    if let Some(parent) = path.parent() {
+                        std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
                     }
-                },
+                    Archive::clone_sync_remote(&remote, &path)
+                        .map(|_| ())
+                        .map_err(|error| error.to_string())
+                }),
                 Message::CloneFinished,
             );
         }
         Message::CloneFinished(result) => {
+            state.clone_active = false;
             match result {
                 Ok(()) => {
                     if let Some(path) = state.setup_path.as_ref() {
@@ -564,50 +607,42 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
             }
             return service_tick(state, Instant::now());
         }
-        Message::QuitSyncFinished(result) => {
-            state.quit_sync_active = false;
-            match result {
-                Ok(SyncOutcome::Conflict) => {
-                    state.sync_error = Some("Quit: conflitto Git remoto".into());
-                }
-                Err(error) => {
-                    state.sync_error = Some(format!("Quit: push Git fallito: {error}"));
-                }
-                Ok(_) => return iced::exit(),
-            }
-            if let Some(app) = state.app.as_mut() {
-                app.quit = false;
-                app.status = "Quit annullato: sincronizzazione non riuscita".into();
-            }
-            return Task::none();
-        }
         Message::SyncFinished(result) => {
             state.sync_active = false;
             let now = Instant::now();
+            if state.app.as_ref().is_some_and(|app| app.quit) {
+                return finish_quit(state);
+            }
+            let result = result.and_then(|stage| {
+                let Some(app) = state.app.as_ref() else {
+                    return Err("Sync archive is no longer open".into());
+                };
+                if stage
+                    .configuration_matches(&app.archive)
+                    .map_err(|error| error.to_string())?
+                {
+                    Ok(stage)
+                } else {
+                    Err("Sync configuration changed; retry queued".into())
+                }
+            });
             match result {
                 Ok(stage) => match stage.outcome() {
-                    // No live files need changing. Mark the published/synced
-                    // committed snapshot successful immediately, even while
-                    // typing, and keep subsequent commits queued.
                     SyncOutcome::Synced | SyncOutcome::Published => {
-                        state.sync_error = None;
-                        state.sync_failures = 0;
-                        if let Some(app) = &mut state.app {
+                        // Publication changes no live files. Acknowledge only
+                        // this generation without waiting for editing to stop.
+                        if let Some(app) = state.app.as_mut() {
                             app.scheduler
                                 .sync_finished(state.sync_started_generation, now);
-                            if stage.outcome() == SyncOutcome::Published {
-                                app.status = "Sync completata · commit pubblicati".into();
-                            }
                         }
+                        state.sync_error = None;
+                        state.sync_failures = 0;
                         state.next_sync_at = now + Duration::from_secs(180);
                     }
                     SyncOutcome::Conflict => {
                         state.sync_error =
                             Some("Conflitto Git: modifiche concorrenti sul server".into());
-                        if let Some(app) = &mut state.app {
-                            app.scheduler
-                                .sync_finished(state.sync_started_generation, now);
-                        }
+                        state.sync_failures = state.sync_failures.max(1);
                         state.next_sync_at = now + Duration::from_secs(180);
                     }
                     _ => {
@@ -618,15 +653,10 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                 },
                 Err(error) => {
                     state.sync_error = Some(format!("Push/pull Git fallito: {error}"));
-                    state.sync_failures = state.sync_failures.saturating_add(1);
-                    let delay = 30_u64.saturating_mul(1_u64 << state.sync_failures.min(4));
-                    state.next_sync_at = now + Duration::from_secs(delay);
+                    sync_backoff(state, now);
                     // Crucially, do not acknowledge sync_pending after failure.
                     // It must remain queued through all retry attempts.
                 }
-            }
-            if state.app.as_ref().is_some_and(|app| app.quit) {
-                return finish_remote_quit(state);
             }
             return service_tick(state, now);
         }
@@ -807,7 +837,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                 || app.collapsed != before_collapsed
                 || std::mem::discriminant(&app.mode) != before_mode));
     if app.quit {
-        finish_remote_quit(state)
+        finish_quit(state)
     } else {
         let auto_sync = service_tick(state, Instant::now());
         if follow_caret {
@@ -827,7 +857,783 @@ fn theme(state: &Gui) -> Theme {
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_clipboard;
+    use super::*;
+    use carta_core::CheckpointKind;
+    use std::path::Path;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    struct TemporaryArchive(PathBuf);
+
+    impl TemporaryArchive {
+        fn new() -> Self {
+            static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+            let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+            let path = env::temp_dir().join(format!(
+                "carta-gui-regression-{}-{}-{}",
+                std::process::id(),
+                stamp.as_nanos(),
+                NEXT_ID.fetch_add(1, Ordering::Relaxed)
+            ));
+            std::fs::create_dir(&path).unwrap();
+            Self(path)
+        }
+    }
+
+    impl Drop for TemporaryArchive {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn git(path: &Path, args: &[&str]) -> String {
+        let output = std::process::Command::new("git")
+            .current_dir(path)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {args:?}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8(output.stdout).unwrap().trim().to_owned()
+    }
+
+    fn fixture() -> (Gui, TemporaryArchive) {
+        let temporary = TemporaryArchive::new();
+        let remote = temporary.0.join("remote.git");
+        git(
+            &temporary.0,
+            &["init", "--bare", "--quiet", remote.to_str().unwrap()],
+        );
+        let path = temporary.0.join("archive");
+        let mut archive = Archive::create(&path).unwrap();
+        git(&path, &["branch", "-M", "carta"]);
+        git(
+            &path,
+            &["remote", "add", "origin", remote.to_str().unwrap()],
+        );
+        git(&path, &["config", "branch.carta.remote", "origin"]);
+        git(&path, &["config", "branch.carta.merge", "refs/heads/carta"]);
+        git(
+            &path,
+            &["push", "--quiet", "origin", "HEAD:refs/heads/carta"],
+        );
+        archive
+            .create_document("synthetic existing checkpoint")
+            .unwrap();
+        archive
+            .checkpoint(CheckpointKind::Structural, Some("synthetic checkpoint"))
+            .unwrap();
+        assert!(!archive.is_dirty().unwrap());
+        assert!(archive.sync_remote().unwrap().is_none());
+        let now = Instant::now();
+        let mut gui = Gui {
+            app: None,
+            input: GuiInputState::default(),
+            error: None,
+            setup_path: None,
+            clone_url: String::new(),
+            theme_mode: ThemeMode::Dark,
+            window_size: Size::new(1024.0, 768.0),
+            font_size: viewport::FONT_SIZE,
+            markdown: RefCell::new(markdown::Cache::default()),
+            layout: RefCell::new(layout::Layout::default()),
+            scroll_y: 0.0,
+            session_root: Some(temporary.0.join("sessions")),
+            last_saved_session: None,
+            pointer: None,
+            pointer_down: false,
+            sync_active: false,
+            clone_active: false,
+            sync_ready: None,
+            next_sync_at: now,
+            last_user_input: now,
+            sync_failures: 0,
+            sync_started_generation: 0,
+            sync_error: None,
+        };
+        gui.install_archive(archive);
+        gui.last_user_input = now - Duration::from_secs(3);
+        assert!(gui.error.is_none(), "{:?}", gui.error);
+        assert_eq!(
+            gui.app
+                .as_ref()
+                .unwrap()
+                .archive
+                .sync_remote()
+                .unwrap()
+                .as_deref(),
+            remote.to_str()
+        );
+        (gui, temporary)
+    }
+
+    fn assert_published(gui: &Gui, temporary: &TemporaryArchive) {
+        let app = gui.app.as_ref().unwrap();
+        assert_eq!(
+            git(
+                &temporary.0.join("remote.git"),
+                &["rev-parse", "refs/heads/carta"]
+            ),
+            git(app.archive.root(), &["rev-parse", "HEAD"])
+        );
+        assert!(!app.archive.is_dirty().unwrap());
+        assert!(!app.editor.is_dirty());
+    }
+
+    fn incoming_stage(gui: &Gui, temporary: &TemporaryArchive) -> StagedSync {
+        let path = gui.app.as_ref().unwrap().archive.root().to_path_buf();
+        stage_sync(path.clone()).unwrap();
+        let mut peer = Archive::clone_sync_remote(
+            temporary.0.join("remote.git").to_str().unwrap(),
+            temporary.0.join("peer"),
+        )
+        .unwrap();
+        peer.create_document("synthetic incoming document").unwrap();
+        peer.checkpoint(CheckpointKind::Structural, None).unwrap();
+        peer.sync().unwrap();
+        let staged = stage_sync(path).unwrap();
+        assert_eq!(staged.outcome(), SyncOutcome::UpdatedFromRemote);
+        staged
+    }
+
+    #[test]
+    fn automatic_sync_publishes_clean_existing_unpushed_checkpoint() {
+        let (mut gui, temporary) = fixture();
+        let path = gui.app.as_ref().unwrap().archive.root().to_path_buf();
+        let head = git(&path, &["rev-parse", "HEAD"]);
+        assert_ne!(
+            git(
+                &temporary.0.join("remote.git"),
+                &["rev-parse", "refs/heads/carta"]
+            ),
+            head
+        );
+        assert!(!gui.app.as_ref().unwrap().editor.is_dirty());
+        assert!(service_tick(&mut gui, Instant::now()).units() > 0);
+        assert!(gui.sync_active);
+        assert_eq!(git(&path, &["rev-parse", "HEAD"]), head);
+        assert_eq!(service_tick(&mut gui, Instant::now()).units(), 0);
+        let staged = stage_sync(path).unwrap();
+        assert_eq!(staged.outcome(), SyncOutcome::Published);
+        assert_published(&gui, &temporary);
+        assert_eq!(
+            update(&mut gui, Message::SyncFinished(Ok(staged))).units(),
+            0
+        );
+        assert!(!gui.sync_active);
+        assert!(gui.sync_error.is_none());
+        assert!(!gui.app.as_ref().unwrap().scheduler.is_sync_pending());
+    }
+
+    #[test]
+    fn window_close_checkpoints_final_text_without_remote_publication() {
+        let (mut gui, temporary) = fixture();
+        let app = gui.app.as_mut().unwrap();
+        let path = app.archive.root().to_path_buf();
+        let before = git(&path, &["rev-parse", "HEAD"]);
+        assert!(app.editor.insert("synthetic final text"));
+        let document = app.editor.current_document().unwrap();
+        assert!(update(&mut gui, Message::QuitRequested).units() > 0);
+        assert!(gui.app.as_ref().unwrap().quit);
+        assert!(!gui.sync_active);
+        assert_ne!(git(&path, &["rev-parse", "HEAD"]), before);
+        assert!(!gui.app.as_ref().unwrap().archive.is_dirty().unwrap());
+        assert!(!gui.app.as_ref().unwrap().editor.is_dirty());
+        assert!(gui
+            .app
+            .as_ref()
+            .unwrap()
+            .archive
+            .read_document(document)
+            .unwrap()
+            .content()
+            .contains("synthetic final text"));
+        assert_ne!(
+            git(
+                &temporary.0.join("remote.git"),
+                &["rev-parse", "refs/heads/carta"]
+            ),
+            git(&path, &["rev-parse", "HEAD"])
+        );
+        assert!(gui.last_saved_session.is_some());
+    }
+
+    #[test]
+    fn unavailable_remote_does_not_cancel_quit() {
+        let (mut gui, temporary) = fixture();
+        let app = gui.app.as_mut().unwrap();
+        let path = app.archive.root().to_path_buf();
+        assert!(app.editor.insert("synthetic pending final text"));
+        app.archive
+            .set_sync_remote(temporary.0.join("missing.git").to_str().unwrap())
+            .unwrap();
+        assert!(update(&mut gui, Message::QuitRequested).units() > 0);
+        assert!(gui.app.as_ref().unwrap().quit);
+        assert!(gui.app.as_ref().unwrap().scheduler.is_sync_pending());
+        assert!(!Archive::open(path).unwrap().is_dirty().unwrap());
+    }
+
+    #[test]
+    fn failed_background_push_retains_pending_and_retries_after_backoff() {
+        let (mut gui, temporary) = fixture();
+        gui.app.as_mut().unwrap().scheduler.sync_pending();
+        let path = gui.app.as_ref().unwrap().archive.root().to_path_buf();
+        gui.app
+            .as_ref()
+            .unwrap()
+            .archive
+            .set_sync_remote(temporary.0.join("missing.git").to_str().unwrap())
+            .unwrap();
+        assert!(service_tick(&mut gui, Instant::now()).units() > 0);
+        let error = stage_sync(path.clone()).unwrap_err().to_string();
+        assert_eq!(
+            update(&mut gui, Message::SyncFinished(Err(error))).units(),
+            0
+        );
+        assert!(!gui.sync_active);
+        assert!(gui.sync_error.is_some());
+        assert!(gui.app.as_ref().unwrap().scheduler.is_sync_pending());
+        assert_eq!(service_tick(&mut gui, Instant::now()).units(), 0);
+        gui.app
+            .as_ref()
+            .unwrap()
+            .archive
+            .set_sync_remote(temporary.0.join("remote.git").to_str().unwrap())
+            .unwrap();
+        let retry_at = gui.next_sync_at;
+        assert!(service_tick(&mut gui, retry_at).units() > 0);
+        let staged = stage_sync(path).unwrap();
+        assert_eq!(
+            update(&mut gui, Message::SyncFinished(Ok(staged))).units(),
+            0
+        );
+        assert!(!gui.app.as_ref().unwrap().scheduler.is_sync_pending());
+        assert!(gui.sync_error.is_none());
+        assert_published(&gui, &temporary);
+    }
+
+    #[test]
+    fn quit_during_sync_checkpoints_and_exits_immediately() {
+        let (mut gui, temporary) = fixture();
+        let path = gui.app.as_ref().unwrap().archive.root().to_path_buf();
+        assert!(service_tick(&mut gui, Instant::now()).units() > 0);
+        let older = stage_sync(path.clone()).unwrap();
+        assert!(gui
+            .app
+            .as_mut()
+            .unwrap()
+            .editor
+            .insert("synthetic newer text"));
+        assert!(update(&mut gui, Message::QuitRequested).units() > 0);
+        assert!(gui.app.as_ref().unwrap().quit);
+        assert!(gui.sync_active);
+        assert!(service_tick(&mut gui, Instant::now()).units() > 0);
+        assert!(update(&mut gui, Message::SyncFinished(Ok(older))).units() > 0);
+        assert!(!gui.sync_active);
+        assert!(gui.app.as_ref().unwrap().scheduler.is_sync_pending());
+        assert!(!gui.app.as_ref().unwrap().editor.is_dirty());
+        assert_ne!(
+            git(
+                &temporary.0.join("remote.git"),
+                &["rev-parse", "refs/heads/carta"]
+            ),
+            git(&path, &["rev-parse", "HEAD"])
+        );
+    }
+
+    #[test]
+    fn pending_checkpoint_without_remote_is_not_acknowledged() {
+        let (mut gui, _temporary) = fixture();
+        let app = gui.app.as_mut().unwrap();
+        app.archive.clear_sync_remote().unwrap();
+        app.scheduler.sync_pending();
+        let generation = app.scheduler.sync_generation();
+        assert_eq!(service_tick(&mut gui, Instant::now()).units(), 0);
+        assert!(!gui.sync_active);
+        assert!(gui.sync_error.is_none());
+        let app = gui.app.as_ref().unwrap();
+        assert!(app.scheduler.is_sync_pending());
+        assert_eq!(app.scheduler.sync_generation(), generation);
+    }
+
+    #[test]
+    fn background_sync_rejects_stale_archive_or_waits_for_dirty_editor() {
+        for dirty_editor in [false, true] {
+            let (mut gui, temporary) = fixture();
+            assert!(gui
+                .app
+                .as_mut()
+                .unwrap()
+                .editor
+                .insert("synthetic final text"));
+            gui.app.as_mut().unwrap().autosave().unwrap();
+            assert!(service_tick(&mut gui, Instant::now()).units() > 0);
+            let path = gui.app.as_ref().unwrap().archive.root().to_path_buf();
+            let staged = incoming_stage(&gui, &temporary);
+            let app = gui.app.as_mut().unwrap();
+            // Simulate an out-of-band change after the worker pinned its HEAD.
+            if dirty_editor {
+                assert!(app.editor.insert("synthetic unexpected edit"));
+            } else {
+                app.archive
+                    .create_document("synthetic concurrent change")
+                    .unwrap();
+                app.archive
+                    .checkpoint(
+                        CheckpointKind::Structural,
+                        Some("synthetic concurrent checkpoint"),
+                    )
+                    .unwrap();
+            }
+            let head = git(&path, &["rev-parse", "HEAD"]);
+            let revision = app.editor.content_revision();
+            assert_eq!(
+                update(&mut gui, Message::SyncFinished(Ok(staged))).units(),
+                0
+            );
+            assert!(!gui.sync_active);
+            let app = gui.app.as_ref().unwrap();
+            assert!(!app.quit);
+            assert_eq!(app.editor.is_dirty(), dirty_editor);
+            assert_eq!(app.editor.content_revision(), revision);
+            assert_eq!(git(&path, &["rev-parse", "HEAD"]), head);
+            assert_eq!(service_tick(&mut gui, Instant::now()).units(), 0);
+        }
+    }
+
+    #[test]
+    fn background_worker_does_not_freeze_paste_or_local_autosave() {
+        let (mut gui, _temporary) = fixture();
+        assert!(gui
+            .app
+            .as_mut()
+            .unwrap()
+            .editor
+            .insert("synthetic final text"));
+        assert!(service_tick(&mut gui, Instant::now()).units() > 0);
+        let revision = gui.app.as_ref().unwrap().editor.content_revision();
+        let _ = update(
+            &mut gui,
+            Message::PasteText(Some("editable during sync".into())),
+        );
+        assert!(gui.app.as_ref().unwrap().editor.content_revision() > revision);
+        let _ = update(
+            &mut gui,
+            Message::Tick(Instant::now() + Duration::from_secs(600)),
+        );
+        let app = gui.app.as_ref().unwrap();
+        assert!(!app.editor.is_dirty());
+        assert!(!app.quit);
+        assert!(gui.sync_active);
+        assert!(gui.last_saved_session.is_some());
+    }
+
+    #[test]
+    fn window_close_cancels_leap_and_mouse_drag_and_saves_session() {
+        use iced::keyboard::{key::Code, key::Physical, Key, Location, Modifiers};
+        let press = |code| {
+            Message::Raw(Event::Keyboard(iced::keyboard::Event::KeyPressed {
+                key: Key::Character("a".into()),
+                modified_key: Key::Character("a".into()),
+                physical_key: Physical::Code(code),
+                location: Location::Standard,
+                modifiers: Modifiers::empty(),
+                text: Some("a".into()),
+                repeat: false,
+            }))
+        };
+        for active in [false, true] {
+            let (mut gui, _temporary) = fixture();
+            let _ = update(&mut gui, press(Code::ControlLeft));
+            if active {
+                let _ = update(&mut gui, press(Code::KeyA));
+                assert!(matches!(
+                    gui.app.as_ref().unwrap().mode,
+                    AppMode::Leap { .. }
+                ));
+            }
+            gui.pointer_down = true;
+            let _ = update(&mut gui, Message::QuitRequested);
+            assert!(!gui.pointer_down);
+            let app = gui.app.as_ref().unwrap();
+            assert!(matches!(app.mode, AppMode::Editing));
+            assert!(app.quit);
+            assert!(gui.last_saved_session.is_some());
+        }
+    }
+
+    #[test]
+    fn emergency_quit_during_background_sync_skips_checkpoint_and_session() {
+        use iced::keyboard::{key::Code, key::Physical, Key, Location, Modifiers};
+        let (mut gui, _temporary) = fixture();
+        assert!(service_tick(&mut gui, Instant::now()).units() > 0);
+        assert!(gui
+            .app
+            .as_mut()
+            .unwrap()
+            .editor
+            .insert("unsaved emergency text"));
+        let head = git(
+            gui.app.as_ref().unwrap().archive.root(),
+            &["rev-parse", "HEAD"],
+        );
+        for code in [Code::KeyG, Code::ControlRight, Code::KeyG] {
+            let event = iced::keyboard::Event::KeyPressed {
+                key: Key::Character("g".into()),
+                modified_key: Key::Character("g".into()),
+                physical_key: Physical::Code(code),
+                location: Location::Standard,
+                modifiers: Modifiers::empty(),
+                text: Some("g".into()),
+                repeat: false,
+            };
+            let task = update(&mut gui, Message::Raw(Event::Keyboard(event)));
+            if gui.app.as_ref().unwrap().kill_switch_triggered() {
+                assert!(task.units() > 0);
+            }
+        }
+        assert!(gui.app.as_ref().unwrap().kill_switch_triggered());
+        assert_eq!(
+            git(
+                gui.app.as_ref().unwrap().archive.root(),
+                &["rev-parse", "HEAD"]
+            ),
+            head
+        );
+        assert!(gui.app.as_ref().unwrap().editor.is_dirty());
+        assert!(gui.last_saved_session.is_none());
+    }
+
+    #[test]
+    fn archive_without_any_remote_is_normal_local_only() {
+        let (mut gui, _temporary) = fixture();
+        let app = gui.app.as_mut().unwrap();
+        let path = app.archive.root().to_path_buf();
+        app.archive.clear_sync_remote().unwrap();
+        git(&path, &["config", "--unset", "carta.sync-disabled"]);
+        git(&path, &["remote", "remove", "origin"]);
+        app.scheduler.sync_pending();
+        assert_eq!(service_tick(&mut gui, Instant::now()).units(), 0);
+        assert!(gui.sync_error.is_none());
+        assert!(gui.app.as_ref().unwrap().scheduler.is_sync_pending());
+        let _ = update(
+            &mut gui,
+            Message::PasteText(Some("local-only writing".into())),
+        );
+        assert!(gui.app.as_ref().unwrap().editor.is_dirty());
+    }
+
+    #[test]
+    fn deferred_incoming_update_rechecks_configuration_before_application() {
+        let (mut gui, temporary) = fixture();
+        gui.app.as_mut().unwrap().scheduler.sync_pending();
+        let path = gui.app.as_ref().unwrap().archive.root().to_path_buf();
+        assert!(service_tick(&mut gui, Instant::now()).units() > 0);
+        let staged = incoming_stage(&gui, &temporary);
+        gui.last_user_input = Instant::now();
+        assert_eq!(
+            update(&mut gui, Message::SyncFinished(Ok(staged))).units(),
+            0
+        );
+        assert!(gui.sync_ready.is_some());
+        git(
+            &path,
+            &[
+                "config",
+                "remote.carta-sync.pushurl",
+                "synthetic-new-destination",
+            ],
+        );
+        let quiet_at = gui.last_user_input + Duration::from_secs(3);
+        assert_eq!(service_tick(&mut gui, quiet_at).units(), 0);
+        assert!(gui.sync_ready.is_none());
+        assert!(gui.sync_error.is_some());
+        assert!(gui.app.as_ref().unwrap().scheduler.is_sync_pending());
+    }
+
+    #[test]
+    fn repeated_failures_have_capped_backoff() {
+        let (mut gui, _temporary) = fixture();
+        let now = Instant::now();
+        for _ in 0..100 {
+            sync_backoff(&mut gui, now);
+            assert!(gui.next_sync_at > now);
+            assert!(gui.next_sync_at <= now + Duration::from_secs(480));
+        }
+        assert_eq!(gui.next_sync_at, now + Duration::from_secs(480));
+    }
+
+    #[test]
+    fn adoption_failure_opens_editor_and_retries_without_clearing_warning() {
+        let (mut gui, temporary) = fixture();
+        let path = gui.app.as_ref().unwrap().archive.root().to_path_buf();
+        gui.app
+            .as_ref()
+            .unwrap()
+            .archive
+            .clear_sync_remote()
+            .unwrap();
+        git(&path, &["config", "--unset", "carta.sync-disabled"]);
+        let lock = path.join(".git/config.lock");
+        std::fs::write(&lock, "synthetic config lock").unwrap();
+        gui.app = None;
+        gui.install_archive(Archive::open(&path).unwrap());
+        assert!(gui.error.is_none());
+        assert!(gui.sync_error.is_some());
+        assert!(gui
+            .app
+            .as_mut()
+            .unwrap()
+            .editor
+            .insert("writing despite adoption failure"));
+        let retry_at = gui.next_sync_at;
+        assert_eq!(service_tick(&mut gui, Instant::now()).units(), 0);
+        assert_eq!(service_tick(&mut gui, retry_at).units(), 0);
+        assert!(gui.next_sync_at > retry_at);
+        std::fs::remove_file(lock).unwrap();
+        let retry_at = gui.next_sync_at;
+        assert!(service_tick(&mut gui, retry_at).units() > 0);
+        assert!(gui.sync_error.is_some());
+        assert_eq!(
+            gui.app
+                .as_ref()
+                .unwrap()
+                .archive
+                .sync_remote()
+                .unwrap()
+                .as_deref(),
+            temporary.0.join("remote.git").to_str()
+        );
+    }
+
+    #[test]
+    fn conflict_retains_pending_and_backs_off_while_editor_remains_available() {
+        let (mut gui, temporary) = fixture();
+        let path = gui.app.as_ref().unwrap().archive.root().to_path_buf();
+        stage_sync(path.clone()).unwrap();
+        let mut peer = Archive::clone_sync_remote(
+            temporary.0.join("remote.git").to_str().unwrap(),
+            temporary.0.join("peer"),
+        )
+        .unwrap();
+        let document = peer.documents().next().unwrap().id();
+        peer.edit_document(document, "remote concurrent content")
+            .unwrap();
+        peer.checkpoint(CheckpointKind::Structural, None).unwrap();
+        peer.sync().unwrap();
+        let app = gui.app.as_mut().unwrap();
+        app.archive
+            .edit_document(document, "local concurrent content")
+            .unwrap();
+        app.archive
+            .checkpoint(CheckpointKind::Structural, None)
+            .unwrap();
+        app.scheduler.sync_pending();
+        assert!(service_tick(&mut gui, Instant::now()).units() > 0);
+        let staged = stage_sync(path).unwrap();
+        assert_eq!(staged.outcome(), SyncOutcome::Conflict);
+        assert_eq!(
+            update(&mut gui, Message::SyncFinished(Ok(staged))).units(),
+            0
+        );
+        assert!(gui.app.as_ref().unwrap().scheduler.is_sync_pending());
+        assert!(gui.sync_error.is_some());
+        for _ in 0..10 {
+            assert_eq!(service_tick(&mut gui, Instant::now()).units(), 0);
+        }
+        assert!(gui
+            .app
+            .as_mut()
+            .unwrap()
+            .editor
+            .insert("writing through a conflict"));
+        let retry_at = gui.next_sync_at;
+        assert!(service_tick(&mut gui, retry_at).units() > 0);
+        assert!(gui.sync_error.is_some());
+    }
+
+    #[test]
+    fn outbound_success_while_dirty_or_in_palette_does_not_pause_periodic_sync() {
+        for synced in [false, true] {
+            for palette in [false, true] {
+                let (mut gui, _temporary) = fixture();
+                let path = gui.app.as_ref().unwrap().archive.root().to_path_buf();
+                if synced {
+                    stage_sync(path.clone()).unwrap();
+                }
+                gui.app.as_mut().unwrap().scheduler.sync_pending();
+                assert!(service_tick(&mut gui, Instant::now()).units() > 0);
+                let staged = stage_sync(path.clone()).unwrap();
+                assert_eq!(
+                    staged.outcome(),
+                    if synced {
+                        SyncOutcome::Synced
+                    } else {
+                        SyncOutcome::Published
+                    }
+                );
+                let app = gui.app.as_mut().unwrap();
+                assert!(app.editor.insert("continuous writing"));
+                if palette {
+                    app.open_palette();
+                }
+                let revision = app.editor.content_revision();
+                let head = git(&path, &["rev-parse", "HEAD"]);
+                gui.last_user_input = Instant::now();
+                gui.pointer_down = true;
+                gui.sync_error = Some("previous failure".into());
+                gui.sync_failures = 2;
+                assert_eq!(
+                    update(&mut gui, Message::SyncFinished(Ok(staged))).units(),
+                    0
+                );
+                assert!(gui.sync_ready.is_none());
+                assert!(!gui.sync_active);
+                assert!(gui.sync_error.is_none());
+                assert_eq!(gui.sync_failures, 0);
+                let app = gui.app.as_ref().unwrap();
+                assert!(!app.scheduler.is_sync_pending());
+                assert!(app.editor.is_dirty());
+                assert_eq!(app.editor.content_revision(), revision);
+                assert_eq!(git(&path, &["rev-parse", "HEAD"]), head);
+                assert_eq!(matches!(app.mode, AppMode::Palette { .. }), palette);
+                let periodic_at = gui.next_sync_at;
+                gui.last_user_input = periodic_at;
+                assert!(service_tick(&mut gui, periodic_at).units() > 0);
+                assert!(gui.sync_active);
+            }
+        }
+    }
+
+    #[test]
+    fn older_publication_keeps_new_checkpoint_queued_and_starts_next_job() {
+        let (mut gui, _temporary) = fixture();
+        let path = gui.app.as_ref().unwrap().archive.root().to_path_buf();
+        gui.app.as_mut().unwrap().scheduler.sync_pending();
+        assert!(service_tick(&mut gui, Instant::now()).units() > 0);
+        let staged = stage_sync(path.clone()).unwrap();
+        assert_eq!(staged.outcome(), SyncOutcome::Published);
+        let started_generation = gui.sync_started_generation;
+        let app = gui.app.as_mut().unwrap();
+        app.archive
+            .create_document("newer committed document")
+            .unwrap();
+        app.archive
+            .checkpoint(CheckpointKind::Structural, None)
+            .unwrap();
+        app.scheduler.sync_pending();
+        let newer_generation = app.scheduler.sync_generation();
+        assert_ne!(newer_generation, started_generation);
+        assert!(app.editor.insert("still typing"));
+        app.open_palette();
+        gui.last_user_input = Instant::now();
+        assert!(update(&mut gui, Message::SyncFinished(Ok(staged))).units() > 0);
+        assert!(gui.sync_ready.is_none());
+        assert!(gui.sync_active);
+        assert_eq!(gui.sync_started_generation, newer_generation);
+        assert!(gui.app.as_ref().unwrap().scheduler.is_sync_pending());
+        let newer_stage = stage_sync(path).unwrap();
+        assert_eq!(
+            update(&mut gui, Message::SyncFinished(Ok(newer_stage))).units(),
+            0
+        );
+        assert!(!gui.app.as_ref().unwrap().scheduler.is_sync_pending());
+        assert!(gui.sync_ready.is_none());
+    }
+
+    #[test]
+    fn result_from_changed_configuration_never_acknowledges_pending() {
+        for change in ["disabled", "push-url", "fetch-url", "rewrite"] {
+            let (mut gui, temporary) = fixture();
+            gui.app.as_mut().unwrap().scheduler.sync_pending();
+            let path = gui.app.as_ref().unwrap().archive.root().to_path_buf();
+            assert!(service_tick(&mut gui, Instant::now()).units() > 0);
+            let staged = stage_sync(path.clone()).unwrap();
+            if change == "push-url" {
+                git(
+                    &path,
+                    &[
+                        "config",
+                        "remote.carta-sync.pushurl",
+                        "synthetic-different-destination",
+                    ],
+                );
+            } else if change == "disabled" {
+                gui.app
+                    .as_ref()
+                    .unwrap()
+                    .archive
+                    .clear_sync_remote()
+                    .unwrap();
+            } else if change == "fetch-url" {
+                gui.app
+                    .as_ref()
+                    .unwrap()
+                    .archive
+                    .set_sync_remote("synthetic-new-fetch-destination")
+                    .unwrap();
+            } else {
+                git(
+                    &path,
+                    &[
+                        "config",
+                        "url.synthetic-new-destination.insteadOf",
+                        temporary.0.join("remote.git").to_str().unwrap(),
+                    ],
+                );
+            }
+            assert_eq!(
+                update(&mut gui, Message::SyncFinished(Ok(staged))).units(),
+                0
+            );
+            assert!(gui.app.as_ref().unwrap().scheduler.is_sync_pending());
+            assert!(gui.sync_error.is_some());
+            assert_eq!(service_tick(&mut gui, Instant::now()).units(), 0);
+            assert!(gui.app.as_mut().unwrap().editor.insert("still editable"));
+        }
+    }
+
+    #[test]
+    fn detached_worker_does_not_delay_runtime_shutdown() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let (finished_tx, finished_rx) = std::sync::mpsc::channel();
+        runtime.block_on(async {
+            let task = tokio::spawn(detached_job(move || {
+                started_tx.send(()).unwrap();
+                release_rx.recv().unwrap();
+                finished_tx.send(()).unwrap();
+                Ok(())
+            }));
+            tokio::task::yield_now().await;
+            started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            task.abort();
+        });
+        let before = Instant::now();
+        drop(runtime);
+        assert!(before.elapsed() < Duration::from_secs(1));
+        release_tx.send(()).unwrap();
+        finished_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    }
+
+    #[test]
+    fn clone_requests_are_single_flight_and_close_does_not_wait() {
+        let (mut gui, temporary) = fixture();
+        gui.app = None;
+        gui.setup_path = Some(temporary.0.join("clone"));
+        gui.clone_url = temporary.0.join("remote.git").to_str().unwrap().into();
+        assert!(update(&mut gui, Message::CloneDefaultArchive).units() > 0);
+        assert!(gui.clone_active);
+        assert_eq!(update(&mut gui, Message::CloneDefaultArchive).units(), 0);
+        assert_eq!(update(&mut gui, Message::CreateDefaultArchive).units(), 0);
+        assert!(update(&mut gui, Message::QuitRequested).units() > 0);
+    }
 
     #[test]
     fn pasted_line_endings_are_normalized() {

@@ -12,6 +12,250 @@ const SYNC_TRACKING_REF: &str = "refs/remotes/carta-sync/carta";
 const CARTA_AUTHOR_NAME: &str = "Carta Space";
 const CARTA_AUTHOR_EMAIL: &str = "history@carta.space";
 
+/// Resolved once in the live repository. Network commands use a private Git
+/// config snapshot without routing rules, so later URL/config changes cannot
+/// redirect an already validated publication (including insteadOf rewrites).
+pub(crate) struct SyncEndpoints {
+    pub(crate) fetch: String,
+    pub(crate) pushes: Vec<String>,
+    transport: tempfile::TempDir,
+}
+
+impl SyncEndpoints {
+    pub(crate) fn resolve(root: &Path) -> Result<Self, Error> {
+        let (fetch, pushes) = resolved_sync_urls(root)?;
+        let transport = tempfile::tempdir().map_err(|error| Error::io(root, error))?;
+        let output = Command::new("git")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env(
+                "GIT_CONFIG_GLOBAL",
+                transport.path().join("no-global-config"),
+            )
+            .args(["init", "--bare", "--quiet", "--template="])
+            .arg(transport.path())
+            .output()
+            .map_err(|error| Error::io(root, error))?;
+        if !output.status.success() {
+            return Err(command_failed("prepare sync transport", output));
+        }
+        // Preserve authentication/SSH and other effective Git settings, but
+        // never inherit URL rewrites, includes, remotes or worktree geometry.
+        let config = crate::history::git_output(
+            root,
+            "snapshot sync transport config",
+            &["config", "--null", "--list"],
+        )?;
+        for entry in config
+            .stdout
+            .split(|byte| *byte == 0)
+            .filter(|entry| !entry.is_empty())
+        {
+            let entry = std::str::from_utf8(entry)
+                .map_err(|error| Error::InvalidSyncRemote(error.to_string()))?;
+            let (key, value) = entry.split_once('\n').unwrap_or((entry, ""));
+            if key != "core.sshcommand"
+                && [
+                    "url.",
+                    "remote.",
+                    "include.",
+                    "includeif.",
+                    "core.",
+                    "extensions.",
+                ]
+                .iter()
+                .any(|prefix| key.starts_with(prefix))
+            {
+                continue;
+            }
+            let output = Command::new("git")
+                .current_dir(transport.path())
+                .env("GIT_CONFIG_NOSYSTEM", "1")
+                .env(
+                    "GIT_CONFIG_GLOBAL",
+                    transport.path().join("no-global-config"),
+                )
+                .args(["config", "--local", "--add", key, value])
+                .output()
+                .map_err(|error| Error::io(root, error))?;
+            if !output.status.success() {
+                return Err(command_failed("snapshot sync transport config", output));
+            }
+        }
+        Ok(Self {
+            fetch,
+            pushes,
+            transport,
+        })
+    }
+
+    fn network(
+        &self,
+        root: &Path,
+        operation: &'static str,
+        args: &[&str],
+    ) -> Result<Output, Error> {
+        let objects = required_git_text(
+            root,
+            "locate sync objects",
+            &["rev-parse", "--git-path", "objects"],
+        )?;
+        let objects =
+            fs::canonicalize(root.join(objects)).map_err(|error| Error::io(root, error))?;
+        // Local imports must see the same borrowed ancestors as the network
+        // fetch. Only this disposable transport's object database is changed.
+        let alternates = self.transport.path().join("objects/info/alternates");
+        fs::write(&alternates, format!("{}\n", objects.display()))
+            .map_err(|error| Error::io(&alternates, error))?;
+        let output = Command::new("git")
+            .current_dir(self.transport.path())
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env(
+                "GIT_CONFIG_GLOBAL",
+                self.transport.path().join("no-global-config"),
+            )
+            .args(args)
+            .output()
+            .map_err(|error| Error::io(root, error))?;
+        if !output.status.success() {
+            return Err(command_failed(operation, output));
+        }
+        Ok(output)
+    }
+
+    pub(crate) fn head(&self, root: &Path, url: &str) -> Result<Option<String>, Error> {
+        let output = self.network(
+            root,
+            "inspect sync destination",
+            &["ls-remote", "--refs", "--", url],
+        )?;
+        let text = text_output(output, "inspect sync destination")?;
+        for line in text.lines() {
+            let mut fields = line.split_whitespace();
+            let hash = fields.next().unwrap_or_default();
+            if fields.next() == Some("refs/heads/carta") {
+                return Ok(Some(hash.to_owned()));
+            }
+        }
+        if !text.is_empty() {
+            return Err(Error::SyncRemoteNotEmpty);
+        }
+        Ok(None)
+    }
+
+    pub(crate) fn validate(
+        &self,
+        root: &Path,
+        local: &str,
+        fetch_unknown: bool,
+    ) -> Result<bool, Error> {
+        let mut known = true;
+        for url in std::iter::once(&self.fetch).chain(&self.pushes) {
+            if let Some(head) = self.head(root, url)? {
+                let output =
+                    raw_git_output(root, &["cat-file", "-e", &format!("{head}^{{commit}}")])?;
+                if !output.status.success() {
+                    if !fetch_unknown {
+                        known = false;
+                        continue;
+                    }
+                    self.fetch_into(root, url, &head, None)?;
+                }
+                validate_committed_archive_ids(root, local, &head)?;
+            }
+        }
+        Ok(known)
+    }
+
+    fn fetch_into(
+        &self,
+        root: &Path,
+        url: &str,
+        head: &str,
+        tracking: Option<&str>,
+    ) -> Result<(), Error> {
+        self.network(
+            root,
+            "fetch pinned sync history",
+            &["fetch", "--quiet", "--no-tags", "--", url, head],
+        )?;
+        let transport = self.transport.path().to_string_lossy();
+        let refspec = tracking
+            .map(|reference| format!("+{head}:{reference}"))
+            .unwrap_or_else(|| head.to_owned());
+        crate::history::git_output(
+            root,
+            "import pinned sync history",
+            &["fetch", "--quiet", "--no-tags", "--", &transport, &refspec],
+        )?;
+        Ok(())
+    }
+
+    pub(crate) fn publish(&self, root: &Path, head: &str) -> Result<(), Error> {
+        // All destinations must have been validated before the first push.
+        for url in &self.pushes {
+            self.network(
+                root,
+                "push sync destination",
+                &[
+                    "push",
+                    "--quiet",
+                    "--",
+                    url,
+                    &format!("{head}:refs/heads/carta"),
+                ],
+            )?;
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn resolved_sync_urls(root: &Path) -> Result<(String, Vec<String>), Error> {
+    let resolve = |args: &[&str]| -> Result<Vec<String>, Error> {
+        let urls = required_git_text(root, "resolve sync URLs", args)?;
+        let root = fs::canonicalize(root).map_err(|error| Error::io(root, error))?;
+        Ok(urls
+            .lines()
+            .map(|url| {
+                // Git's local-path form has neither a scheme nor SCP's colon.
+                if !url.contains(':') && !Path::new(url).is_absolute() {
+                    root.join(url).to_string_lossy().into_owned()
+                } else {
+                    url.to_owned()
+                }
+            })
+            .collect())
+    };
+    Ok((
+        resolve(&["remote", "get-url", SYNC_REMOTE])?.remove(0),
+        resolve(&["remote", "get-url", "--push", "--all", SYNC_REMOTE])?,
+    ))
+}
+
+pub(crate) fn validate_committed_archive_ids(
+    root: &Path,
+    local: &str,
+    remote: &str,
+) -> Result<(), Error> {
+    let read = |head: &str| -> Result<ArchiveMetadata, Error> {
+        let output = crate::history::git_output(
+            root,
+            "read committed Archive identity",
+            &["show", &format!("{head}:carta.json")],
+        )?;
+        ArchiveMetadata::read_from(Cursor::new(output.stdout))
+            .map_err(|error| Error::InvalidSyncRemote(error.to_string()))
+    };
+    let local = read(local)?.archive_id();
+    let remote = read(remote)?.archive_id();
+    if local != remote {
+        return Err(Error::SyncArchiveMismatch {
+            local: local.to_string(),
+            remote: remote.to_string(),
+        });
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SyncOutcome {
     Disabled,
@@ -107,11 +351,104 @@ impl Archive {
     }
 
     pub fn sync_remote(&self) -> Result<Option<String>, Error> {
-        optional_git_text(
+        configured_sync_remote(&self.root)
+    }
+
+    /// Opt in to adopting origin for a branch tracking origin/carta.
+    /// Frontends call this explicitly; it changes only device-local Git config.
+    /// Returns true only when a missing dedicated remote was configured.
+    pub fn enable_origin_sync_remote(&self) -> Result<bool, Error> {
+        let snapshot = sync_config_snapshot(&self.root)?;
+        if self.sync_remote()?.is_some() || sync_disabled(&self.root)? {
+            return Ok(false);
+        }
+        let Some(branch) = optional_git_text(
             &self.root,
-            "read sync remote",
-            &["config", "--get", "remote.carta-sync.url"],
-        )
+            "read current branch for sync adoption",
+            &["branch", "--show-current"],
+        )?
+        else {
+            return Ok(false);
+        };
+        for (key, expected) in [
+            (format!("branch.{branch}.remote"), "origin"),
+            (format!("branch.{branch}.merge"), "refs/heads/carta"),
+        ] {
+            if optional_git_text(
+                &self.root,
+                "read branch upstream for sync adoption",
+                &["config", "--local", "--get", &key],
+            )?
+            .as_deref()
+                != Some(expected)
+            {
+                return Ok(false);
+            }
+        }
+        let read_urls = |key: &str| -> Result<Vec<String>, Error> {
+            let output = raw_git_output(&self.root, &["config", "--null", "--get-all", key])?;
+            if output.status.code() == Some(1) && output.stdout.is_empty() {
+                return Ok(Vec::new());
+            }
+            if !output.status.success() {
+                return Err(command_failed("read origin URLs for sync adoption", output));
+            }
+            let text = text_output(output, "read origin URLs for sync adoption")?;
+            Ok(text
+                .strip_suffix('\0')
+                .unwrap_or(&text)
+                .split('\0')
+                .map(str::to_owned)
+                .collect())
+        };
+        let urls = read_urls("remote.origin.url")?;
+        if urls.is_empty() || (urls.len() == 1 && urls[0].trim().is_empty()) {
+            return Ok(false);
+        }
+        let push_urls = read_urls("remote.origin.pushurl")?;
+        if urls
+            .iter()
+            .chain(&push_urls)
+            .any(|url| url.trim().is_empty() || url.contains(['\n', '\r']))
+        {
+            return Err(Error::InvalidSyncRemote(
+                "Origin has an empty or multiline synchronization URL".into(),
+            ));
+        }
+        // Resolve before taking the lock, but copy every raw value so includes,
+        // relative paths and Git's insteadOf/pushInsteadOf behavior survive.
+        required_git_text(
+            &self.root,
+            "resolve origin fetch URL",
+            &["remote", "get-url", "origin"],
+        )?;
+        required_git_text(
+            &self.root,
+            "resolve origin push URLs",
+            &["remote", "get-url", "--push", "--all", "origin"],
+        )?;
+
+        let mut commands = vec![vec!["--unset-all", "remote.carta-sync.pushurl"]];
+        for (key, values) in [
+            ("remote.carta-sync.url", &urls),
+            ("remote.carta-sync.pushurl", &push_urls),
+        ] {
+            for (index, value) in values.iter().enumerate() {
+                commands.push(vec![
+                    if index == 0 { "--replace-all" } else { "--add" },
+                    key,
+                    value,
+                ]);
+            }
+        }
+        commands.push(vec![
+            "--replace-all",
+            "remote.carta-sync.fetch",
+            "+refs/heads/*:refs/remotes/carta-sync/*",
+        ]);
+        commands.push(vec!["--replace-all", "carta.sync-disabled", "false"]);
+        update_sync_config(&self.root, &snapshot, Some(&branch), None, &commands)?;
+        Ok(true)
     }
 
     pub fn set_sync_remote(&self, url: &str) -> Result<(), Error> {
@@ -119,33 +456,48 @@ impl Archive {
         if url.is_empty() {
             return self.clear_sync_remote().map(|_| ());
         }
-        crate::history::git_output(
+        let snapshot = sync_config_snapshot(&self.root)?;
+        update_sync_config(
             &self.root,
-            "configure sync remote URL",
-            &["config", "remote.carta-sync.url", url],
-        )?;
-        crate::history::git_output(
-            &self.root,
-            "configure sync remote fetch",
+            &snapshot,
+            None,
+            Some(url),
             &[
-                "config",
-                "--replace-all",
-                "remote.carta-sync.fetch",
-                "+refs/heads/*:refs/remotes/carta-sync/*",
+                vec!["--unset-all", "remote.carta-sync.pushurl"],
+                vec!["--replace-all", "remote.carta-sync.url", url],
+                vec![
+                    "--replace-all",
+                    "remote.carta-sync.fetch",
+                    "+refs/heads/*:refs/remotes/carta-sync/*",
+                ],
+                vec!["carta.sync-disabled", "false"],
             ],
-        )?;
-        Ok(())
+        )
     }
 
     pub fn clear_sync_remote(&self) -> Result<bool, Error> {
-        if self.sync_remote()?.is_none() {
+        let snapshot = sync_config_snapshot(&self.root)?;
+        let configured = self.sync_remote()?.is_some();
+        let mut commands = vec![vec!["--replace-all", "carta.sync-disabled", "true"]];
+        if optional_git_text(
+            &self.root,
+            "inspect local sync section",
+            &[
+                "config",
+                "--local",
+                "--no-includes",
+                "--get-regexp",
+                "^remote\\.carta-sync\\.",
+            ],
+        )?
+        .is_some()
+        {
+            commands.push(vec!["--remove-section", "remote.carta-sync"]);
+        }
+        update_sync_config(&self.root, &snapshot, None, None, &commands)?;
+        if !configured {
             return Ok(false);
         }
-        crate::history::git_output(
-            &self.root,
-            "remove sync remote",
-            &["config", "--remove-section", "remote.carta-sync"],
-        )?;
         let _ = crate::history::git_output(
             &self.root,
             "remove sync tracking reference",
@@ -161,29 +513,48 @@ impl Archive {
         if crate::history::is_dirty_at(&self.root)? {
             return Err(Error::SyncRequiresCleanArchive);
         }
+        let endpoints = SyncEndpoints::resolve(&self.root)?;
+        self.sync_with_endpoints(&endpoints)
+    }
 
-        match remote_state(&self.root)? {
-            RemoteState::Empty => {
-                push_head(&self.root)?;
+    pub(crate) fn sync_with_endpoints(
+        &mut self,
+        endpoints: &SyncEndpoints,
+    ) -> Result<SyncReport, Error> {
+        let local = current_head(&self.root)?;
+        endpoints.validate(&self.root, &local, true)?;
+        match endpoints.head(&self.root, &endpoints.fetch)? {
+            None => {
+                endpoints.publish(&self.root, &local)?;
                 Ok(SyncReport::new(SyncOutcome::Published))
             }
-            RemoteState::OtherBranches => Err(Error::SyncRemoteNotEmpty),
-            RemoteState::Carta => {
-                fetch_carta(&self.root)?;
-                validate_remote_archive(self)?;
+            Some(head) => {
+                endpoints.fetch_into(
+                    &self.root,
+                    &endpoints.fetch,
+                    &head,
+                    Some(SYNC_TRACKING_REF),
+                )?;
+                validate_committed_archive_ids(&self.root, &local, &head)?;
 
                 let local = current_head(&self.root)?;
                 let remote = current_tracking_head(&self.root)?;
                 if local == remote {
+                    if endpoints.pushes != [endpoints.fetch.clone()] {
+                        endpoints.publish(&self.root, &local)?;
+                    }
                     return Ok(SyncReport::new(SyncOutcome::Synced));
                 }
 
                 if is_ancestor(&self.root, &remote, &local)? {
-                    push_head(&self.root)?;
+                    endpoints.publish(&self.root, &local)?;
                     return Ok(SyncReport::new(SyncOutcome::Published));
                 }
 
                 if is_ancestor(&self.root, &local, &remote)? {
+                    if endpoints.pushes != [endpoints.fetch.clone()] {
+                        endpoints.publish(&self.root, &remote)?;
+                    }
                     reset_to(&self.root, &remote)?;
                     self.refresh()?;
                     return Ok(SyncReport::new(SyncOutcome::UpdatedFromRemote));
@@ -195,7 +566,7 @@ impl Archive {
                         let merge = create_merge_commit(&self.root, &tree, &local, &remote)?;
                         reset_to(&self.root, &merge)?;
                         self.refresh()?;
-                        push_head(&self.root)?;
+                        endpoints.publish(&self.root, &merge)?;
                         Ok(SyncReport::new(SyncOutcome::Merged))
                     }
                 }
@@ -204,71 +575,200 @@ impl Archive {
     }
 }
 
-enum RemoteState {
-    Empty,
-    OtherBranches,
-    Carta,
+fn sync_disabled(root: &Path) -> Result<bool, Error> {
+    // A top-level device preference must not be undone by an included setting.
+    let local = optional_git_text(
+        root,
+        "read local sync disable preference",
+        &[
+            "config",
+            "--local",
+            "--no-includes",
+            "--bool",
+            "--get",
+            "carta.sync-disabled",
+        ],
+    )?;
+    let value = match local {
+        Some(value) => Some(value),
+        None => optional_git_text(
+            root,
+            "read inherited sync disable preference",
+            &["config", "--bool", "--get", "carta.sync-disabled"],
+        )?,
+    };
+    Ok(value.as_deref() == Some("true"))
+}
+
+pub(crate) fn configured_sync_remote(root: &Path) -> Result<Option<String>, Error> {
+    if sync_disabled(root)? {
+        return Ok(None);
+    }
+    optional_git_text(
+        root,
+        "read sync remote",
+        &["config", "--get", "remote.carta-sync.url"],
+    )
+}
+
+fn sync_config_snapshot(root: &Path) -> Result<(Vec<u8>, Vec<u8>), Error> {
+    let config = root.join(".git/config");
+    Ok((
+        fs::read(&config).map_err(|error| Error::io(&config, error))?,
+        crate::history::git_output(
+            root,
+            "inspect synchronization configuration",
+            &["config", "--null", "--list"],
+        )?
+        .stdout,
+    ))
+}
+
+/// Publish all routing/preference changes together under Git's normal lock.
+/// Snapshot comparisons prevent overwriting edits made before lock acquisition.
+fn update_sync_config(
+    root: &Path,
+    snapshot: &(Vec<u8>, Vec<u8>),
+    branch: Option<&str>,
+    replacement_url: Option<&str>,
+    commands: &[Vec<&str>],
+) -> Result<(), Error> {
+    let config_path = root.join(".git/config");
+    let lock_path = root.join(".git/config.lock");
+    let lock = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&lock_path)
+        .map_err(|error| Error::io(&lock_path, error))?;
+    let result: Result<(), Error> = (|| {
+        let unchanged = || -> Result<(), Error> {
+            if sync_config_snapshot(root)? != *snapshot
+                || (branch.is_some()
+                    && optional_git_text(
+                        root,
+                        "recheck branch for sync adoption",
+                        &["branch", "--show-current"],
+                    )?
+                    .as_deref()
+                        != branch)
+            {
+                return Err(Error::InvalidSyncRemote("Git configuration changed during synchronization configuration update; retry later".into()));
+            }
+            Ok(())
+        };
+        unchanged()?;
+        let staged = tempfile::NamedTempFile::new_in(root.join(".git"))
+            .map_err(|error| Error::io(&config_path, error))?;
+        fs::write(staged.path(), &snapshot.0).map_err(|error| Error::io(staged.path(), error))?;
+        for args in commands {
+            let output = crate::history::git_command(root)
+                .args(["config", "--file"])
+                .arg(staged.path())
+                .args(args)
+                .output()
+                .map_err(|error| Error::io(staged.path(), error))?;
+            if !output.status.success()
+                && !(args.first() == Some(&"--unset-all") && output.status.code() == Some(5))
+            {
+                return Err(command_failed(
+                    "prepare synchronization configuration",
+                    output,
+                ));
+            }
+        }
+        if let Some(url) = replacement_url {
+            // Local writes cannot remove values from global/included files.
+            // Reject inherited routing, and also inspect the staged includes
+            // in case changing the URL activates a conditional include.
+            let local_config =
+                fs::canonicalize(&config_path).map_err(|error| Error::io(&config_path, error))?;
+            for key in ["remote.carta-sync.url", "remote.carta-sync.pushurl"] {
+                // Project the requested URL into Git's full config evaluation
+                // so global hasconfig includes cannot appear only after commit.
+                let projected_url = format!("remote.carta-sync.url={url}");
+                let output = raw_git_output(
+                    root,
+                    &[
+                        "-c",
+                        &projected_url,
+                        "config",
+                        "--show-origin",
+                        "--null",
+                        "--get-all",
+                        key,
+                    ],
+                )?;
+                if !output.status.success()
+                    && !(output.status.code() == Some(1) && output.stdout.is_empty())
+                {
+                    return Err(command_failed("inspect inherited sync routing", output));
+                }
+                let text = text_output(output, "inspect inherited sync routing")?;
+                let entries: Vec<_> = text.split_terminator('\0').collect();
+                for (index, entry) in entries.chunks_exact(2).enumerate() {
+                    let origin = entry[0];
+                    if key == "remote.carta-sync.url"
+                        && index * 2 + 2 == entries.len()
+                        && origin == "command line:"
+                        && entry[1] == url
+                    {
+                        continue;
+                    }
+                    let local = origin
+                        .strip_prefix("file:")
+                        .and_then(|path| fs::canonicalize(root.join(path)).ok())
+                        .as_ref()
+                        == Some(&local_config);
+                    if !local {
+                        return Err(Error::InvalidSyncRemote("Synchronization routing is inherited from another Git configuration file; remove it there before changing the remote".into()));
+                    }
+                }
+                let output = crate::history::git_command(root)
+                    .args(["config", "--file"])
+                    .arg(staged.path())
+                    .args(["--includes", "--null", "--get-all", key])
+                    .output()
+                    .map_err(|error| Error::io(staged.path(), error))?;
+                if !output.status.success()
+                    && !(output.status.code() == Some(1) && output.stdout.is_empty())
+                {
+                    return Err(command_failed("verify replacement sync routing", output));
+                }
+                let expected = if key == "remote.carta-sync.url" {
+                    format!("{url}\0").into_bytes()
+                } else {
+                    Vec::new()
+                };
+                if output.stdout != expected {
+                    return Err(Error::InvalidSyncRemote("Included Git configuration prevents replacing synchronization routing; remove it there before changing the remote".into()));
+                }
+            }
+        }
+        fs::set_permissions(
+            staged.path(),
+            fs::metadata(&config_path)
+                .map_err(|error| Error::io(&config_path, error))?
+                .permissions(),
+        )
+        .map_err(|error| Error::io(staged.path(), error))?;
+        fs::File::open(staged.path())
+            .and_then(|file| file.sync_all())
+            .map_err(|error| Error::io(staged.path(), error))?;
+        unchanged()?;
+        staged
+            .persist(&config_path)
+            .map_err(|error| Error::io(&config_path, error.error))?;
+        Ok(())
+    })();
+    drop(lock);
+    let cleanup = fs::remove_file(&lock_path).map_err(|error| Error::io(&lock_path, error));
+    result?;
+    cleanup
 }
 
 enum MergeTree {
     Clean(String),
     Conflict,
-}
-
-fn remote_state(root: &Path) -> Result<RemoteState, Error> {
-    let output = crate::history::git_output(
-        root,
-        "inspect sync remote",
-        &["ls-remote", "--heads", SYNC_REMOTE],
-    )?;
-    let text = text_output(output, "inspect sync remote")?;
-    let mut any = false;
-    for line in text.lines() {
-        any = true;
-        if line.split_whitespace().nth(1) == Some("refs/heads/carta") {
-            return Ok(RemoteState::Carta);
-        }
-    }
-    if any {
-        Ok(RemoteState::OtherBranches)
-    } else {
-        Ok(RemoteState::Empty)
-    }
-}
-
-fn fetch_carta(root: &Path) -> Result<(), Error> {
-    crate::history::git_output(
-        root,
-        "fetch sync remote",
-        &[
-            "fetch",
-            "--quiet",
-            "--no-tags",
-            SYNC_REMOTE,
-            "+refs/heads/carta:refs/remotes/carta-sync/carta",
-        ],
-    )?;
-    Ok(())
-}
-
-fn validate_remote_archive(archive: &Archive) -> Result<(), Error> {
-    let object = format!("{SYNC_TRACKING_REF}:carta.json");
-    let output = crate::history::git_output(
-        &archive.root,
-        "read sync remote Archive metadata",
-        &["show", &object],
-    )?;
-    let remote = ArchiveMetadata::read_from(Cursor::new(output.stdout))
-        .map_err(|error| Error::InvalidSyncRemote(error.to_string()))?;
-    let local_id = archive.metadata().archive_id();
-    let remote_id = remote.archive_id();
-    if local_id != remote_id {
-        return Err(Error::SyncArchiveMismatch {
-            local: local_id.to_string(),
-            remote: remote_id.to_string(),
-        });
-    }
-    Ok(())
 }
 
 fn current_head(root: &Path) -> Result<String, Error> {
@@ -287,7 +787,7 @@ fn current_tracking_head(root: &Path) -> Result<String, Error> {
     )
 }
 
-fn is_ancestor(root: &Path, ancestor: &str, descendant: &str) -> Result<bool, Error> {
+pub(crate) fn is_ancestor(root: &Path, ancestor: &str, descendant: &str) -> Result<bool, Error> {
     let output = raw_git_output(root, &["merge-base", "--is-ancestor", ancestor, descendant])?;
     match output.status.code() {
         Some(0) => Ok(true),
@@ -438,15 +938,6 @@ fn reset_to(root: &Path, commit: &str) -> Result<(), Error> {
     Ok(())
 }
 
-fn push_head(root: &Path) -> Result<(), Error> {
-    crate::history::git_output(
-        root,
-        "push sync remote",
-        &["push", "--quiet", SYNC_REMOTE, "HEAD:refs/heads/carta"],
-    )?;
-    Ok(())
-}
-
 fn required_git_text(root: &Path, operation: &'static str, args: &[&str]) -> Result<String, Error> {
     let output = crate::history::git_output(root, operation, args)?;
     let text = text_output(output, operation)?;
@@ -460,7 +951,7 @@ fn required_git_text(root: &Path, operation: &'static str, args: &[&str]) -> Res
     }
 }
 
-fn optional_git_text(
+pub(crate) fn optional_git_text(
     root: &Path,
     operation: &'static str,
     args: &[&str],
@@ -505,7 +996,7 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::process::Command;
 
-    use super::SyncOutcome;
+    use super::{required_git_text, SyncOutcome};
     use crate::{Archive, CheckpointKind, Error};
 
     fn run_git(directory: &Path, args: &[&str]) {
@@ -539,6 +1030,485 @@ mod tests {
         let archive = Archive::open(destination).unwrap();
         archive.set_sync_remote(remote.to_str().unwrap()).unwrap();
         archive
+    }
+
+    fn configure_tracking_origin(root: &Path, remote: &Path) {
+        run_git(root, &["remote", "add", "origin", remote.to_str().unwrap()]);
+        run_git(root, &["branch", "-M", "writing"]);
+        run_git(root, &["config", "branch.writing.remote", "origin"]);
+        run_git(
+            root,
+            &["config", "branch.writing.merge", "refs/heads/carta"],
+        );
+    }
+
+    #[test]
+    fn adopts_origin_tracking_and_publishes_local_checkpoint() {
+        let temporary = tempfile::tempdir().unwrap();
+        let remote = bare_remote(temporary.path());
+        let source_path = temporary.path().join("source");
+        let source = Archive::create(&source_path).unwrap();
+        configure_tracking_origin(&source_path, &remote);
+        run_git(
+            &source_path,
+            &["push", "--quiet", "origin", "HEAD:refs/heads/carta"],
+        );
+        run_git(&remote, &["symbolic-ref", "HEAD", "refs/heads/carta"]);
+        let cloned_path = temporary.path().join("cloned");
+        run_git(
+            temporary.path(),
+            &[
+                "clone",
+                "--quiet",
+                remote.to_str().unwrap(),
+                cloned_path.to_str().unwrap(),
+            ],
+        );
+        drop(source);
+        let mut archive = Archive::open(&cloned_path).unwrap();
+        let before = required_git_text(&cloned_path, "test HEAD", &["rev-parse", "HEAD"]).unwrap();
+        assert_eq!(archive.sync_remote().unwrap(), None);
+        assert!(archive.enable_origin_sync_remote().unwrap());
+        assert_eq!(archive.sync_remote().unwrap().as_deref(), remote.to_str());
+        assert_eq!(
+            required_git_text(&cloned_path, "test HEAD", &["rev-parse", "HEAD"]).unwrap(),
+            before
+        );
+        assert!(!archive.is_dirty().unwrap());
+        assert!(!archive.enable_origin_sync_remote().unwrap());
+        archive.create_document("synthetic publication").unwrap();
+        archive
+            .checkpoint(CheckpointKind::Structural, Some("publication"))
+            .unwrap();
+        assert_eq!(archive.sync().unwrap().outcome(), SyncOutcome::Published);
+        assert_eq!(
+            required_git_text(
+                &remote,
+                "test remote HEAD",
+                &["--git-dir=.", "rev-parse", "HEAD"],
+            )
+            .unwrap(),
+            required_git_text(&cloned_path, "test local HEAD", &["rev-parse", "HEAD"]).unwrap(),
+        );
+    }
+
+    #[test]
+    fn adoption_preserves_origin_push_destinations() {
+        let temporary = tempfile::tempdir().unwrap();
+        let remote = bare_remote(temporary.path());
+        let push_remote = bare_remote(&temporary.path().join("push"));
+        let other_push_remote = bare_remote(&temporary.path().join("other-push"));
+        let root = temporary.path().join("archive");
+        let mut archive = Archive::create(&root).unwrap();
+        configure_tracking_origin(&root, &remote);
+        for destination in [&push_remote, &other_push_remote] {
+            run_git(
+                &root,
+                &[
+                    "config",
+                    "--add",
+                    "remote.origin.pushurl",
+                    destination.to_str().unwrap(),
+                ],
+            );
+        }
+        assert!(archive.enable_origin_sync_remote().unwrap());
+        assert_eq!(
+            required_git_text(
+                &root,
+                "test push URLs",
+                &["config", "--get-all", "remote.carta-sync.pushurl"]
+            )
+            .unwrap(),
+            format!("{}\n{}", push_remote.display(), other_push_remote.display()),
+        );
+        assert_eq!(archive.sync().unwrap().outcome(), SyncOutcome::Published);
+        for destination in [&push_remote, &other_push_remote] {
+            assert_eq!(
+                required_git_text(
+                    destination,
+                    "test published head",
+                    &["--git-dir=.", "rev-parse", "refs/heads/carta"]
+                )
+                .unwrap(),
+                required_git_text(&root, "test local HEAD", &["rev-parse", "HEAD"]).unwrap(),
+            );
+        }
+        assert!(super::optional_git_text(
+            &remote,
+            "test fetch destination",
+            &[
+                "--git-dir=.",
+                "rev-parse",
+                "--verify",
+                "--quiet",
+                "refs/heads/carta",
+            ]
+        )
+        .unwrap()
+        .is_none());
+    }
+
+    #[test]
+    fn origin_adoption_with_locked_config_is_unchanged_and_retryable() {
+        let temporary = tempfile::tempdir().unwrap();
+        let remote = bare_remote(temporary.path());
+        let root = temporary.path().join("archive");
+        let archive = Archive::create(&root).unwrap();
+        configure_tracking_origin(&root, &remote);
+        run_git(
+            &root,
+            &[
+                "config",
+                "remote.origin.pushurl",
+                "synthetic-explicit-publication",
+            ],
+        );
+        run_git(
+            &root,
+            &["config", "synthetic.concurrent-setting", "preserved"],
+        );
+        let config = root.join(".git/config");
+        let before = std::fs::read(&config).unwrap();
+        let lock = root.join(".git/config.lock");
+        std::fs::write(&lock, "synthetic existing writer lock").unwrap();
+        assert!(archive.enable_origin_sync_remote().is_err());
+        assert_eq!(std::fs::read(&config).unwrap(), before);
+        assert_eq!(
+            std::fs::read_to_string(&lock).unwrap(),
+            "synthetic existing writer lock"
+        );
+        assert_eq!(archive.sync_remote().unwrap(), None);
+        std::fs::remove_file(&lock).unwrap();
+        assert!(archive.enable_origin_sync_remote().unwrap());
+        assert_eq!(
+            required_git_text(
+                &root,
+                "test preserved concurrent setting",
+                &["config", "--get", "synthetic.concurrent-setting"]
+            )
+            .unwrap(),
+            "preserved"
+        );
+        assert_eq!(
+            required_git_text(
+                &root,
+                "test adopted push destination",
+                &["remote", "get-url", "--push", "--all", "carta-sync"]
+            )
+            .unwrap(),
+            "synthetic-explicit-publication"
+        );
+        assert!(!lock.exists());
+    }
+
+    #[test]
+    fn origin_adoption_preserves_all_default_urls_rewrites_and_includes() {
+        for rewrite_mode in ["none", "instead-of", "push-instead-of"] {
+            let temporary = tempfile::tempdir().unwrap();
+            let remote = bare_remote(temporary.path());
+            let other = bare_remote(&temporary.path().join("other"));
+            let root = temporary.path().join("archive");
+            let mut archive = Archive::create(&root).unwrap();
+            configure_tracking_origin(&root, &remote);
+            run_git(
+                &root,
+                &[
+                    "config",
+                    "--add",
+                    "remote.origin.url",
+                    other.to_str().unwrap(),
+                ],
+            );
+            let included = root.join(".git/synthetic-settings");
+            let content = "# untouched include\n[synthetic]\n\tunknown = retained\n";
+            std::fs::write(&included, content).unwrap();
+            run_git(&root, &["config", "include.path", "synthetic-settings"]);
+            if rewrite_mode != "none" {
+                run_git(
+                    &root,
+                    &[
+                        "config",
+                        "--replace-all",
+                        "remote.origin.url",
+                        "synthetic-fetch",
+                    ],
+                );
+                run_git(
+                    &root,
+                    &["config", "--add", "remote.origin.url", "synthetic-other"],
+                );
+                for (url, prefix) in [(&remote, "synthetic-fetch"), (&other, "synthetic-other")] {
+                    run_git(
+                        &root,
+                        &[
+                            "config",
+                            &format!("url.{}.insteadOf", url.display()),
+                            prefix,
+                        ],
+                    );
+                }
+                if rewrite_mode == "push-instead-of" {
+                    run_git(
+                        &root,
+                        &[
+                            "config",
+                            &format!("url.{}.pushInsteadOf", remote.display()),
+                            "synthetic-fetch",
+                        ],
+                    );
+                }
+            }
+            let fetch =
+                required_git_text(&root, "test origin fetch", &["remote", "get-url", "origin"])
+                    .unwrap();
+            let pushes = required_git_text(
+                &root,
+                "test origin pushes",
+                &["remote", "get-url", "--push", "--all", "origin"],
+            )
+            .unwrap();
+            let raw = required_git_text(
+                &root,
+                "test raw origin URLs",
+                &["config", "--get-all", "remote.origin.url"],
+            )
+            .unwrap();
+            assert!(archive.enable_origin_sync_remote().unwrap());
+            assert_eq!(
+                required_git_text(
+                    &root,
+                    "test adopted raw URLs",
+                    &["config", "--get-all", "remote.carta-sync.url"]
+                )
+                .unwrap(),
+                raw
+            );
+            assert_eq!(
+                required_git_text(
+                    &root,
+                    "test adopted fetch",
+                    &["remote", "get-url", "carta-sync"]
+                )
+                .unwrap(),
+                fetch
+            );
+            assert_eq!(
+                required_git_text(
+                    &root,
+                    "test adopted pushes",
+                    &["remote", "get-url", "--push", "--all", "carta-sync"]
+                )
+                .unwrap(),
+                pushes
+            );
+            assert_eq!(std::fs::read_to_string(&included).unwrap(), content);
+            assert_eq!(
+                required_git_text(
+                    &root,
+                    "test preserved include",
+                    &["config", "--get", "include.path"]
+                )
+                .unwrap(),
+                "synthetic-settings"
+            );
+            assert_eq!(
+                required_git_text(
+                    &root,
+                    "test included setting",
+                    &["config", "--get", "synthetic.unknown"]
+                )
+                .unwrap(),
+                "retained"
+            );
+            assert_eq!(archive.sync().unwrap().outcome(), SyncOutcome::Published);
+            for destination in pushes.lines().map(Path::new) {
+                assert_eq!(
+                    required_git_text(
+                        destination,
+                        "test published checkpoint",
+                        &["--git-dir=.", "rev-parse", "refs/heads/carta"]
+                    )
+                    .unwrap(),
+                    required_git_text(&root, "test local checkpoint", &["rev-parse", "HEAD"])
+                        .unwrap()
+                );
+            }
+            assert!(!root.join(".git/config.lock").exists());
+        }
+    }
+
+    #[test]
+    fn malformed_origin_adoption_never_leaves_partial_config() {
+        for malformed in [
+            "empty-push",
+            "multiline-push",
+            "empty-second-url",
+            "malformed-config",
+        ] {
+            let temporary = tempfile::tempdir().unwrap();
+            let remote = bare_remote(temporary.path());
+            let root = temporary.path().join("archive");
+            let archive = Archive::create(&root).unwrap();
+            configure_tracking_origin(&root, &remote);
+            let config = root.join(".git/config");
+            match malformed {
+                "empty-push" => run_git(&root, &["config", "remote.origin.pushurl", ""]),
+                "multiline-push" => run_git(
+                    &root,
+                    &[
+                        "config",
+                        "remote.origin.pushurl",
+                        "synthetic-one\nsynthetic-two",
+                    ],
+                ),
+                "empty-second-url" => run_git(&root, &["config", "--add", "remote.origin.url", ""]),
+                _ => {
+                    let mut bytes = std::fs::read(&config).unwrap();
+                    bytes.extend_from_slice(b"\n[malformed\n");
+                    std::fs::write(&config, bytes).unwrap();
+                }
+            }
+            let before = std::fs::read(&config).unwrap();
+            assert!(archive.enable_origin_sync_remote().is_err(), "{malformed}");
+            assert_eq!(std::fs::read(&config).unwrap(), before);
+            assert!(!root.join(".git/config.lock").exists());
+            if malformed != "malformed-config" {
+                assert_eq!(archive.sync_remote().unwrap(), None);
+                assert_eq!(
+                    super::optional_git_text(
+                        &root,
+                        "test no partial enable preference",
+                        &["config", "--local", "--get", "carta.sync-disabled"]
+                    )
+                    .unwrap(),
+                    None
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn dedicated_remote_takes_precedence_over_origin() {
+        let temporary = tempfile::tempdir().unwrap();
+        let remote = bare_remote(temporary.path());
+        let dedicated = bare_remote(&temporary.path().join("dedicated"));
+        let root = temporary.path().join("archive");
+        let archive = Archive::create(&root).unwrap();
+        configure_tracking_origin(&root, &remote);
+        archive
+            .set_sync_remote(dedicated.to_str().unwrap())
+            .unwrap();
+        run_git(
+            &root,
+            &[
+                "config",
+                "remote.carta-sync.pushurl",
+                dedicated.to_str().unwrap(),
+            ],
+        );
+        let config = std::fs::read(root.join(".git/config")).unwrap();
+        assert!(!archive.enable_origin_sync_remote().unwrap());
+        assert_eq!(std::fs::read(root.join(".git/config")).unwrap(), config);
+    }
+
+    #[test]
+    fn explicit_remote_after_adoption_clears_all_old_push_urls() {
+        let temporary = tempfile::tempdir().unwrap();
+        let remote = bare_remote(temporary.path());
+        let root = temporary.path().join("archive");
+        let archive = Archive::create(&root).unwrap();
+        configure_tracking_origin(&root, &remote);
+        for url in ["synthetic-old-one", "synthetic-old-two"] {
+            run_git(&root, &["config", "--add", "remote.origin.pushurl", url]);
+        }
+        assert!(archive.enable_origin_sync_remote().unwrap());
+        archive
+            .set_sync_remote("synthetic-new-destination")
+            .unwrap();
+        assert_eq!(
+            archive.sync_remote().unwrap().as_deref(),
+            Some("synthetic-new-destination")
+        );
+        assert_eq!(
+            super::optional_git_text(
+                &root,
+                "test cleared push URLs",
+                &["config", "--get-all", "remote.carta-sync.pushurl"],
+            )
+            .unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn origin_adoption_requires_current_matching_upstream_and_url() {
+        let temporary = tempfile::tempdir().unwrap();
+        let remote = bare_remote(temporary.path());
+        for (index, args) in [
+            vec!["config", "--unset", "branch.writing.remote"],
+            vec!["config", "branch.writing.remote", "other"],
+            vec!["config", "--unset", "branch.writing.merge"],
+            vec!["config", "branch.writing.merge", "refs/heads/main"],
+            vec!["config", "--unset", "remote.origin.url"],
+            vec!["config", "remote.origin.url", ""],
+            vec!["checkout", "--quiet", "--detach"],
+            vec!["checkout", "--quiet", "-b", "untracked"],
+        ]
+        .iter()
+        .enumerate()
+        {
+            let root = temporary.path().join(format!("archive-{index}"));
+            let archive = Archive::create(&root).unwrap();
+            configure_tracking_origin(&root, &remote);
+            run_git(&root, args);
+            let config = std::fs::read(root.join(".git/config")).unwrap();
+            assert!(!archive.enable_origin_sync_remote().unwrap(), "{args:?}");
+            assert_eq!(archive.sync_remote().unwrap(), None);
+            assert_eq!(std::fs::read(root.join(".git/config")).unwrap(), config);
+        }
+    }
+
+    #[test]
+    fn explicit_disable_survives_reopen_and_explicit_reenable() {
+        let temporary = tempfile::tempdir().unwrap();
+        let remote = bare_remote(temporary.path());
+        for initially_enabled in [false, true] {
+            let root = temporary
+                .path()
+                .join(format!("archive-{initially_enabled}"));
+            let archive = Archive::create(&root).unwrap();
+            configure_tracking_origin(&root, &remote);
+            if initially_enabled {
+                assert!(archive.enable_origin_sync_remote().unwrap());
+            }
+            assert_eq!(archive.clear_sync_remote().unwrap(), initially_enabled);
+            drop(archive);
+            let archive = Archive::open(&root).unwrap();
+            assert!(!archive.enable_origin_sync_remote().unwrap());
+            assert_eq!(archive.sync_remote().unwrap(), None);
+            assert_eq!(
+                required_git_text(
+                    &root,
+                    "test disabled flag",
+                    &["config", "--local", "--bool", "carta.sync-disabled"]
+                )
+                .unwrap(),
+                "true"
+            );
+            archive.set_sync_remote(remote.to_str().unwrap()).unwrap();
+            assert_eq!(
+                required_git_text(
+                    &root,
+                    "test enabled flag",
+                    &["config", "--local", "--bool", "carta.sync-disabled"]
+                )
+                .unwrap(),
+                "false"
+            );
+            run_git(&root, &["config", "--remove-section", "remote.carta-sync"]);
+            assert!(archive.enable_origin_sync_remote().unwrap());
+        }
     }
 
     #[test]
@@ -584,6 +1554,261 @@ mod tests {
 
         assert!(matches!(error, Error::GitCloneFailed { .. }));
         assert!(!destination.exists());
+    }
+
+    #[test]
+    fn explicit_sync_configuration_updates_are_locked_and_retryable() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        archive.set_sync_remote("synthetic-original-fetch").unwrap();
+        run_git(
+            archive.root(),
+            &[
+                "config",
+                "remote.carta-sync.pushurl",
+                "synthetic-original-push",
+            ],
+        );
+        run_git(
+            archive.root(),
+            &["config", "synthetic.unknown", "preserved"],
+        );
+        let config = archive.root().join(".git/config");
+        let before = std::fs::read(&config).unwrap();
+        let lock = archive.root().join(".git/config.lock");
+        std::fs::write(&lock, "synthetic other writer").unwrap();
+        assert!(archive.set_sync_remote("synthetic-new-fetch").is_err());
+        assert_eq!(std::fs::read(&config).unwrap(), before);
+        assert!(archive.clear_sync_remote().is_err());
+        assert_eq!(std::fs::read(&config).unwrap(), before);
+        assert!(archive.set_sync_remote("").is_err());
+        assert_eq!(std::fs::read(&config).unwrap(), before);
+        assert_eq!(
+            std::fs::read_to_string(&lock).unwrap(),
+            "synthetic other writer"
+        );
+        std::fs::remove_file(&lock).unwrap();
+        archive.set_sync_remote("synthetic-new-fetch").unwrap();
+        assert_eq!(
+            archive.sync_remote().unwrap().as_deref(),
+            Some("synthetic-new-fetch")
+        );
+        assert_eq!(
+            super::optional_git_text(
+                archive.root(),
+                "test removed push URL",
+                &["config", "--get-all", "remote.carta-sync.pushurl"]
+            )
+            .unwrap(),
+            None
+        );
+        assert!(archive.clear_sync_remote().unwrap());
+        assert_eq!(archive.sync_remote().unwrap(), None);
+        assert_eq!(
+            required_git_text(
+                archive.root(),
+                "test preserved setting",
+                &["config", "--get", "synthetic.unknown"]
+            )
+            .unwrap(),
+            "preserved"
+        );
+        assert!(!lock.exists());
+    }
+
+    #[test]
+    fn failed_explicit_configuration_commands_do_not_publish_partial_changes() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        archive.set_sync_remote("synthetic-original-fetch").unwrap();
+        run_git(
+            archive.root(),
+            &[
+                "config",
+                "remote.carta-sync.pushurl",
+                "synthetic-original-push",
+            ],
+        );
+        run_git(
+            archive.root(),
+            &["config", "--add", "carta.sync-disabled", "true"],
+        );
+        let config = archive.root().join(".git/config");
+        let before = std::fs::read(&config).unwrap();
+        // The final preference write fails after staging the URL/push changes.
+        assert!(archive.set_sync_remote("synthetic-new-fetch").is_err());
+        assert_eq!(std::fs::read(&config).unwrap(), before);
+        assert!(!archive.root().join(".git/config.lock").exists());
+    }
+
+    #[test]
+    fn inherited_routing_blocks_replacement_but_can_be_disabled() {
+        for local in [false, true] {
+            for routing in ["url", "pushurl", "both"] {
+                let temporary = tempfile::tempdir().unwrap();
+                let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+                if local {
+                    archive.set_sync_remote("synthetic-local-fetch").unwrap();
+                    run_git(
+                        archive.root(),
+                        &[
+                            "config",
+                            "remote.carta-sync.pushurl",
+                            "synthetic-local-push",
+                        ],
+                    );
+                }
+                let include = archive.root().join(".git/synthetic-settings");
+                let mut content = String::from("[synthetic]\n\tunknown = preserved\n[carta]\n\tsync-disabled = false\n[remote \"carta-sync\"]\n");
+                if routing != "pushurl" {
+                    content.push_str("\turl = synthetic-inherited-fetch\n");
+                }
+                if routing != "url" {
+                    content.push_str("\tpushurl = synthetic-inherited-push\n");
+                }
+                std::fs::write(&include, &content).unwrap();
+                run_git(
+                    archive.root(),
+                    &["config", "include.path", "synthetic-settings"],
+                );
+                let config = archive.root().join(".git/config");
+                let before = std::fs::read(&config).unwrap();
+                let enabled = archive.sync_remote().unwrap().is_some();
+                let error = archive
+                    .set_sync_remote("synthetic-requested-fetch")
+                    .unwrap_err();
+                assert!(matches!(error, Error::InvalidSyncRemote(_)), "{error:?}");
+                assert_eq!(std::fs::read(&config).unwrap(), before);
+                assert_eq!(std::fs::read_to_string(&include).unwrap(), content);
+                assert!(!archive.root().join(".git/config.lock").exists());
+                assert_eq!(archive.clear_sync_remote().unwrap(), enabled);
+                assert_eq!(archive.sync_remote().unwrap(), None);
+                assert_eq!(archive.sync().unwrap().outcome(), SyncOutcome::Disabled);
+                assert!(crate::background_sync::stage_sync(archive.root().to_path_buf()).is_err());
+                assert!(!archive.clear_sync_remote().unwrap());
+                assert_eq!(std::fs::read_to_string(&include).unwrap(), content);
+                assert_eq!(
+                    required_git_text(
+                        archive.root(),
+                        "test preserved include",
+                        &["config", "--get", "synthetic.unknown"]
+                    )
+                    .unwrap(),
+                    "preserved"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn global_sync_routing_is_rejected_and_disable_is_authoritative() {
+        // Isolate process-wide Git environment changes from parallel tests.
+        if std::env::var_os("CARTA_TEST_SYNC_GLOBAL_CONFIG").is_none() {
+            for conditional in [false, true] {
+                let temporary = tempfile::tempdir().unwrap();
+                let global = temporary.path().join("synthetic-global-config");
+                let include = temporary.path().join("synthetic-conditional-settings");
+                std::fs::write(
+                    &include,
+                    "[remote \"carta-sync\"]\n\tpushurl = synthetic-conditional-push\n",
+                )
+                .unwrap();
+                if conditional {
+                    std::fs::write(&global, "[carta]\n\tsync-disabled = false\n[includeIf \"hasconfig:remote.*.url:synthetic-requested-fetch\"]\n\tpath = synthetic-conditional-settings\n").unwrap();
+                } else {
+                    std::fs::write(&global, "[carta]\n\tsync-disabled = false\n[remote \"carta-sync\"]\n\turl = synthetic-global-fetch\n\tpushurl = synthetic-global-push\n").unwrap();
+                }
+                let before = std::fs::read(&global).unwrap();
+                let status = Command::new(std::env::current_exe().unwrap())
+                    .args([
+                        "--exact",
+                        "sync::tests::global_sync_routing_is_rejected_and_disable_is_authoritative",
+                    ])
+                    .env(
+                        "CARTA_TEST_SYNC_GLOBAL_CONFIG",
+                        if conditional { "conditional" } else { "plain" },
+                    )
+                    .env("GIT_CONFIG_GLOBAL", &global)
+                    .env("GIT_CONFIG_NOSYSTEM", "1")
+                    .status()
+                    .unwrap();
+                assert!(status.success());
+                assert_eq!(std::fs::read(&global).unwrap(), before);
+                assert_eq!(
+                    std::fs::read_to_string(&include).unwrap(),
+                    "[remote \"carta-sync\"]\n\tpushurl = synthetic-conditional-push\n"
+                );
+            }
+            return;
+        }
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        run_git(
+            archive.root(),
+            &[
+                "config",
+                "--local",
+                "remote.carta-sync.url",
+                "synthetic-local-fetch",
+            ],
+        );
+        run_git(
+            archive.root(),
+            &[
+                "config",
+                "--local",
+                "remote.carta-sync.pushurl",
+                "synthetic-local-push",
+            ],
+        );
+        let config = archive.root().join(".git/config");
+        let before = std::fs::read(&config).unwrap();
+        assert!(matches!(
+            archive.set_sync_remote("synthetic-requested-fetch"),
+            Err(Error::InvalidSyncRemote(_))
+        ));
+        assert_eq!(std::fs::read(&config).unwrap(), before);
+        assert!(archive.clear_sync_remote().unwrap());
+        assert_eq!(archive.sync_remote().unwrap(), None);
+        assert_eq!(archive.sync().unwrap().outcome(), SyncOutcome::Disabled);
+        assert!(crate::background_sync::stage_sync(archive.root().to_path_buf()).is_err());
+        assert!(!archive.clear_sync_remote().unwrap());
+        if std::env::var_os("CARTA_TEST_SYNC_GLOBAL_CONFIG").as_deref()
+            == Some(std::ffi::OsStr::new("plain"))
+        {
+            assert_eq!(
+                required_git_text(
+                    archive.root(),
+                    "test inherited raw URL remains",
+                    &["config", "--get", "remote.carta-sync.url"]
+                )
+                .unwrap(),
+                "synthetic-global-fetch"
+            );
+        }
+    }
+
+    #[test]
+    fn stale_config_transaction_preserves_intervening_settings() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let snapshot = super::sync_config_snapshot(archive.root()).unwrap();
+        run_git(
+            archive.root(),
+            &["config", "synthetic.concurrent-setting", "newer value"],
+        );
+        let config = archive.root().join(".git/config");
+        let before = std::fs::read(&config).unwrap();
+        assert!(super::update_sync_config(
+            archive.root(),
+            &snapshot,
+            None,
+            None,
+            &[vec!["carta.sync-disabled", "true"]]
+        )
+        .is_err());
+        assert_eq!(std::fs::read(&config).unwrap(), before);
+        assert!(!archive.root().join(".git/config.lock").exists());
     }
 
     #[test]
