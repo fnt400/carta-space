@@ -80,6 +80,8 @@ sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
     build-essential \
     ca-certificates \
+    curl \
+    hunspell \
     cargo \
     rust-clippy \
     git \

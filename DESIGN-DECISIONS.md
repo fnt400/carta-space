@@ -707,3 +707,19 @@ new language-specific metadata format is introduced.
 each computer. Missing backends must never block writing. Concurrent additions
 use Git union merge for personal lists; this is not a general conflict strategy
 for arbitrary files. Avoid using union semantics to infer deletion intent.
+
+## DD-0XX — On-demand, device-local dictionary distribution (v0.2)
+
+**Decision:** Keep the canonical Document language metadata and Archive personal
+word lists unchanged. Provide a frontend-independent asynchronous dictionary
+manager in `carta-app`, using an immutable public dictionary snapshot and
+verification against pinned Git blob identifiers. Install the original license
+next to each system dictionary in a disposable device-local cache. Prefer an
+already installed Hunspell dictionary to an unnecessary download. Never fetch
+at startup. A missing language is retrieved after explicit language selection
+or a spelling command; a pending check resumes when download completes.
+
+**Constraints:** Do not access the Archive from downloader workers, do not put
+the downloaded corpus in Git, do not run network transfers on the UI thread,
+and do not interpret a missing runtime executable as a missing dictionary.
+External Hunspell remains a package/runtime requirement for this version.

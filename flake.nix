@@ -27,6 +27,7 @@
           ];
           cartaEditorPath = lib.makeBinPath [
             pkgs.git
+            pkgs.curl
             pkgs.typst
             cartaHunspell
           ];

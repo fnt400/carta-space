@@ -404,32 +404,36 @@ The working rule is:
 
 ## Optional spelling (v0.2)
 
-Carta invokes Hunspell on demand, without loading it into the Rust editor process.
-The v0.2 Nix packages bundle the external Hunspell executable and Italian,
-French, UK/US English, German and Spanish dictionaries into Carta's private
-runtime PATH. Other source/Distrobox installations must provide Hunspell and
-language dictionaries in their own environment. Missing tools never block
-ordinary writing; the palette reports an error without modifying text.
+Carta checks spelling only when requested. Each Document saves an optional
+language in its canonical metadata, and Work spelling respects each member's
+language. Choose **Set Document Language…** or **Check Document Spelling**.
 
-Commands in the shared palette (TUI and GUI):
+**Dictionary installation is automatic and device-local.** If Hunspell already
+has a system dictionary for the chosen language, Carta reuses it. Otherwise a
+background worker downloads only the required dictionary and its original
+license over HTTPS. Every file comes from a pinned revision of
+`wooorm/dictionaries` and is verified against its Git object ID before an
+atomic cache publication. Carta never downloads anything at startup, and an
+error does not prevent writing. After the initial download, the dictionary
+works offline. The pending spelling review resumes automatically once all
+required languages are ready.
 
-- **Check Document Spelling**: review the current Document.
-- **Check Work Spelling**: review all member Documents in Work order.
-- **Set Document Language…**: choose `it_IT`, `fr_FR`, `en_GB`,
-  `en_US`, `de_DE`, `es_ES` or inherit the system language.
-- **Remove Dictionary Word…**: remove a word from the current language's
-  personal list.
+The download uses the cross-platform `curl` command and verifies the source
+files with `git hash-object`. The Hunspell executable is still necessary:
+this implementation downloads **dictionaries**, not executable binaries.
+The Nix Carta wrappers supply Git, curl and Hunspell themselves, with the
+common languages preinstalled. Distrobox development setup supplies Git,
+curl and Hunspell without preinstalling dictionaries. Other distribution
+packages must provide these three tools at runtime.
 
-Suggestions, Ignore once, Ignore all (this check) and Add to personal dictionary
-are available during review. Escape cancels without further changes. Replacements
-use the ordinary undoable editor path. The checker does not autocorrect while typing.
+The supported automatic downloads are `it_IT`, `fr_FR`, `en_GB`,
+`en_US`, `de_DE` and `es_ES`. The cache is outside the Archive at
+`$XDG_DATA_HOME/carta/dictionaries`, falling back to
+`~/.local/share/carta/dictionaries` on Unix or the local application data
+directory on Windows. It is never committed to Git or included in `.cat`.
 
-Document language is optional canonical metadata (`meta.json` member
-`"language": "fr_FR"`); Documents without that property use the current system
-locale. Personal additions are canonical UTF-8 text lists under
-`spelling/<language>.dic`, one word per line, checked into the Archive Git
-history. Git's built-in union merge is enabled for these lists via the
-Archive-local `.gitattributes` when a personal word is added. The reader
-deduplicates merged words; concurrent removals deserve care because Git union
-favors preservation. Standard language dictionaries are local dependencies,
-not copied to the Archive. Portable `.cat` packages include the personal lists.
+Personal words remain in `Archive/spelling/<language>.dic`, synchronized
+through ordinary Git checkpoints. The general dictionary, the personal list,
+and the per-Document language are distinct. Each downloaded dictionary's
+`LICENSE.txt` retains the upstream licensing terms; see the source
+catalog in `crates/carta-app/src/dictionary_manager.rs`.

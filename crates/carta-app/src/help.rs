@@ -196,7 +196,7 @@ Carta uses fetch, Archive-identity validation, fast-forward or a normal three-wa
     },
     HelpDocument {
         title: "12. Spelling",
-        body: r#"Spelling is optional and available on request, not while typing. Install Hunspell and the system dictionaries for the languages you use; Carta does not download or bundle them.
+        body: r#"Spelling is optional and available on request, not while typing. Carta uses Hunspell; the Nix package supplies it, and the Distrobox development setup can install it. When the chosen language is not installed, Carta automatically downloads a verified open-source dictionary in a background worker. Downloaded dictionaries are cached locally, not added to the Archive. After the first download, spelling works offline. No download occurs merely by opening Carta. Other builds must provide the Git, curl and Hunspell runtime programs.
 
 Choose Check Document Spelling in the palette for the current Document, or Check Work Spelling in a Work View to check all its member Documents in order. Each Document uses its own spelling language.
 
