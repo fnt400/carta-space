@@ -103,7 +103,7 @@ pub fn scan_document(
         if matches!(output.chars().next(), Some('*' | '+' | '-')) { continue; }
         let suggestions = if output.starts_with("& ") || output.starts_with("? ") {
             output.split_once(": ").map(|(_, alternatives)| alternatives
-                .split(", ").filter(|part| !part.is_empty()).take(15)
+                .split(", ").filter(|part| !part.is_empty()).take(6)
                 .map(str::to_owned).collect()).unwrap_or_default()
         } else if output.starts_with("# ") {
             Vec::new()

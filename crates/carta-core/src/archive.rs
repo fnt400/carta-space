@@ -1682,6 +1682,11 @@ fn spelling_path(root: &Path, language: &str) -> Result<PathBuf, Error> {
 /// Git's built-in union driver preserves independently appended words on concurrent devices.
 fn ensure_spelling_merge_attribute(root: &Path) -> Result<(), Error> {
     let path = root.join(".gitattributes");
+    if let Ok(metadata) = fs::symlink_metadata(&path) {
+        if !metadata.is_file() || metadata.file_type().is_symlink() {
+            return Err(Error::UnsafeDestination(path));
+        }
+    }
     let text = match fs::read_to_string(&path) {
         Ok(text) => text,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
