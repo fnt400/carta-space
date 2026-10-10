@@ -695,8 +695,8 @@ and physical window/keyboard testing remain separate from synthetic tests.
 ## DD-021 — Optional, on-demand spelling without a second editor model (v0.2)
 
 **Decision:** spelling is an optional frontend-independent operation exposed
-through \`carta-app\` command palette, backed by the installed Hunspell binary.
-Each Document has an optional language in \`meta.json\`; a Work uses each
+through `carta-app` command palette, backed by the installed Hunspell binary.
+Each Document has an optional language in `meta.json`; a Work uses each
 member Document's language and never copies member content. Personal additions
 are portable canonical text lists in the Archive and travel through Git. The
 existing editor performs all replacements, preserving Undo/Redo and locking.

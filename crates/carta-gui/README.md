@@ -203,7 +203,7 @@ After local Clippy/test/build verification, confirm on a Wayland/X11 desktop:
 ### Optional spelling
 
 The desktop GUI receives the same Document/Work spelling and language commands
-from \`carta-app\` as the TUI. The spell checker invokes the **system** Hunspell
+from `carta-app` as the TUI. The spell checker invokes the **system** Hunspell
 binary on request; there is no GUI-specific spelling engine or automatic
 underlining. Install Hunspell and language dictionaries in the GUI environment.
 Personal word additions and per-Document language metadata follow Archive Git

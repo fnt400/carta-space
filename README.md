@@ -394,8 +394,8 @@ Commands in the shared palette (TUI and GUI):
 
 - **Check Document Spelling**: review the current Document.
 - **Check Work Spelling**: review all member Documents in Work order.
-- **Set Document Language…**: choose \`it_IT\`, \`fr_FR\`, \`en_GB\`,
-  \`en_US\`, \`de_DE\`, \`es_ES\` or inherit the system language.
+- **Set Document Language…**: choose `it_IT`, `fr_FR`, `en_GB`,
+  `en_US`, `de_DE`, `es_ES` or inherit the system language.
 - **Remove Dictionary Word…**: remove a word from the current language's
   personal list.
 
@@ -403,12 +403,12 @@ Suggestions, Ignore once, Ignore all (this check) and Add to personal dictionary
 are available during review. Escape cancels without further changes. Replacements
 use the ordinary undoable editor path. The checker does not autocorrect while typing.
 
-Document language is optional canonical metadata (\`meta.json\` member
-\`"language": "fr_FR"\`); Documents without that property use the current system
+Document language is optional canonical metadata (`meta.json` member
+`"language": "fr_FR"`); Documents without that property use the current system
 locale. Personal additions are canonical UTF-8 text lists under
-\`spelling/<language>.dic\`, one word per line, checked into the Archive Git
+`spelling/<language>.dic`, one word per line, checked into the Archive Git
 history. Git's built-in union merge is enabled for these lists via the
-Archive-local \`.gitattributes\` when a personal word is added. The reader
+Archive-local `.gitattributes` when a personal word is added. The reader
 deduplicates merged words; concurrent removals deserve care because Git union
 favors preservation. Standard language dictionaries are local dependencies,
-not copied to the Archive. Portable \`.cat\` packages include the personal lists.
+not copied to the Archive. Portable `.cat` packages include the personal lists.

@@ -157,7 +157,9 @@ pub fn scan_document(
         // Refuse ambiguous splits rather than assign suggestions to the wrong word.
         let mut extra = 0;
         for response in lines.by_ref() {
-            if response.trim().is_empty() { break; }
+            if response.trim().is_empty() {
+                break;
+            }
             extra += 1;
         }
         if extra != 0 {
