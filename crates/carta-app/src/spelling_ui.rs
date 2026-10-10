@@ -381,7 +381,6 @@ impl App {
 mod spelling_quit_tests {
     use super::*;
 
-
     #[test]
     fn late_spelling_completion_does_not_interrupt_after_typing_and_cursor_return() {
         let temporary = tempfile::tempdir().unwrap();
