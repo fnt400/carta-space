@@ -1307,7 +1307,10 @@ impl App {
             return Ok(false);
         }
         let mut redraw = self.poll_dictionary_downloads()?;
-        redraw |= self.expire_status(now);
+        // Keep the download status visible until the worker has finished.
+        if !self.dictionaries.is_downloading() {
+            redraw |= self.expire_status(now);
+        }
         if self.scheduler.autosave_due(now, self.editor.is_dirty()) {
             self.autosave()?;
             redraw = true;
@@ -1363,6 +1366,10 @@ impl App {
     /// for native pointer input that bypasses dispatch_action.
     pub fn note_user_interaction(&mut self) {
         self.interaction_revision = self.interaction_revision.wrapping_add(1);
+    }
+
+    pub fn dictionary_download_in_progress(&self) -> bool {
+        self.dictionaries.is_downloading()
     }
 
     /// Apply a frontend-neutral semantic action.

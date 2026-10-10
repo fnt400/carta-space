@@ -95,6 +95,10 @@ impl Default for DictionaryManager {
 }
 
 impl DictionaryManager {
+    pub fn is_downloading(&self) -> bool {
+        !self.active.is_empty()
+    }
+
     pub fn location(&self, locale: &str) -> Option<&DictionaryLocation> {
         self.available.get(locale)
     }

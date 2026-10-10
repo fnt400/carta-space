@@ -303,7 +303,11 @@ fn subscription(state: &Gui) -> Subscription<Message> {
     // Avoid periodic reconstruction of the entire rich-text view while idle.
     // Dirty buffers are saved promptly; transient statuses still expire; an
     // otherwise idle window needs only infrequent local maintenance.
-    let interval = if state.app.as_ref().is_some_and(|app| app.editor.is_dirty()) {
+    let interval = if state
+        .app
+        .as_ref()
+        .is_some_and(|app| app.editor.is_dirty() || app.dictionary_download_in_progress())
+    {
         Duration::from_secs(1)
     } else if state.app.as_ref().is_some_and(|app| !app.status.is_empty()) {
         Duration::from_secs(2)
@@ -849,6 +853,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                             state.font_size,
                         ) {
                             if cursor != app.editor.cursor() {
+                                app.note_user_interaction();
                                 app.editor.set_cursor(cursor, true);
                             }
                         }
@@ -878,6 +883,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                         state.window_size,
                         state.font_size,
                     ) {
+                        app.note_user_interaction();
                         app.cat_navigation();
                         app.editor.set_cursor(cursor, false);
                         state.pointer_down = true;
