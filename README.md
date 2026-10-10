@@ -117,7 +117,7 @@ nix profile install github:fnt400/carta-space
 carta
 ```
 
-The Nix package builds Carta natively. The v0.2 GUI and terminal packages provide Git, Typst and dictionary-enabled Hunspell inside their own wrappers (Italian, French, UK/US English, German and Spanish); no separate NixOS system packages are needed.
+The Nix package builds Carta natively. The v0.2 GUI and terminal wrappers supply Git, curl, Typst and the Hunspell executable; each language dictionary is fetched automatically the first time it is needed. No global NixOS packages are required.
 
 On first launch, `carta` opens the default XDG archive location and offers to create an empty Archive or import an existing Git Archive when none exists.
 
@@ -131,10 +131,10 @@ nix build
 ./result/bin/carta-gui
 ```
 
-The GUI wrapper adds Git, Typst and Hunspell with dictionaries to its runtime
-`PATH`. It uses Nixpkgs' `hunspellWithDicts` (including `DICPATH`) so the
-spell-checker's locale codes such as `it_IT`, `fr_FR` and `en_GB` work without
-installing those packages on the host. PDF export uses the same bundled Typst.
+The GUI wrapper adds Git, curl, Typst and Hunspell to its runtime `PATH`.
+Carta downloads the dictionary for `it_IT`, `fr_FR`, `en_GB` or another
+supported language only when selected, without installing anything on
+the host. PDF export uses the wrapped Typst executable.
 
 A quick isolated spelling test (without opening your real Archive):
 
@@ -147,9 +147,9 @@ nix run .#carta-cli -- create "$TEST_ARCHIVE"
 Enter a sentence with a typo, choose `Set Document Language…` in the palette,
 then `Check Document Spelling`. To test PDF publishing, use
 `Export Document PDF` on the same disposable Archive.
-When running `cargo run` inside Distrobox instead of a Nix wrapper, install
-Hunspell and dictionaries **inside the Distrobox**; Nix's wrapped tools
-are not injected into that environment.
+When running `cargo run` inside Distrobox instead of a Nix wrapper,
+the development setup provides Hunspell, Git and curl inside the container;
+no separate dictionary installation is needed.
 
 The GUI uses the existing Archive under
 `${XDG_DATA_HOME:-$HOME/.local/share}/carta/archive when launched without
@@ -421,8 +421,8 @@ required languages are ready.
 The download uses the cross-platform `curl` command and verifies the source
 files with `git hash-object`. The Hunspell executable is still necessary:
 this implementation downloads **dictionaries**, not executable binaries.
-The Nix Carta wrappers supply Git, curl and Hunspell themselves, with the
-common languages preinstalled. Distrobox development setup supplies Git,
+The Nix Carta wrappers supply Git, curl and Hunspell themselves, with no
+language corpus preinstalled. Distrobox development setup also supplies Git,
 curl and Hunspell without preinstalling dictionaries. Other distribution
 packages must provide these three tools at runtime.
 

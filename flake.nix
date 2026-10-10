@@ -14,22 +14,14 @@
           pkgs = import nixpkgs { inherit system; };
           inherit (pkgs) lib stdenv;
 
-          # Runtime tools are private to the Carta editor wrappers. The
-          # dictionary-enabled Hunspell wrapper sets DICPATH itself, so the
-          # selected languages work without global host packages or symlinks.
-          cartaHunspell = pkgs.hunspellWithDicts [
-            pkgs.hunspellDicts.it_IT
-            pkgs.hunspellDicts."fr-moderne"
-            pkgs.hunspellDicts."en_GB-ise"
-            pkgs.hunspellDicts.en_US
-            pkgs.hunspellDicts.de_DE
-            pkgs.hunspellDicts.es_ES
-          ];
+          # Bundle executables only. General dictionaries are fetched and
+          # verified on demand, so each user's Nix installation stays small
+          # and has exactly the same behavior as other platforms.
           cartaEditorPath = lib.makeBinPath [
             pkgs.git
             pkgs.curl
             pkgs.typst
-            cartaHunspell
+            pkgs.hunspell
           ];
 
           # Preserve the frozen terminal frontend and CLI as a separate package.
