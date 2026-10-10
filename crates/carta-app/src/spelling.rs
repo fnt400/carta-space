@@ -207,10 +207,7 @@ fn read_hunspell_replies<'a>(
 /// Suggestions are only safe when Hunspell checked the complete input as a
 /// single token. A compound/split response must never supply a replacement
 /// for one fragment as though it replaced the author's entire word.
-fn classify_hunspell_replies(
-    word: &str,
-    replies: &[&str],
-) -> Result<Option<Vec<String>>, String> {
+fn classify_hunspell_replies(word: &str, replies: &[&str]) -> Result<Option<Vec<String>>, String> {
     let mut misspelled = false;
     for reply in replies {
         if reply.starts_with("& ") || reply.starts_with("? ") || reply.starts_with("# ") {
@@ -262,11 +259,9 @@ mod tests {
 
     #[test]
     fn hunspell_split_word_does_not_reuse_fragment_suggestions() {
-        let result = classify_hunspell_replies(
-            "l’éléphant",
-            &["*", "& éléphnt 2 2: éléphant, éléphante"],
-        )
-        .unwrap();
+        let result =
+            classify_hunspell_replies("l’éléphant", &["*", "& éléphnt 2 2: éléphant, éléphante"])
+                .unwrap();
         assert_eq!(result, Some(Vec::new()));
     }
 
@@ -277,7 +272,10 @@ mod tests {
         assert!(lines.next().unwrap().starts_with("@(#)"));
         let multiple = read_hunspell_replies(&mut lines, "interfaccia").unwrap();
         assert_eq!(multiple, vec!["*", "*"]);
-        assert_eq!(classify_hunspell_replies("interfaccia", &multiple).unwrap(), None);
+        assert_eq!(
+            classify_hunspell_replies("interfaccia", &multiple).unwrap(),
+            None
+        );
         let typo = read_hunspell_replies(&mut lines, "erore").unwrap();
         assert_eq!(
             classify_hunspell_replies("erore", &typo).unwrap(),
