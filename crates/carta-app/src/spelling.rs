@@ -94,6 +94,54 @@ fn words(source: &str) -> Vec<(Range<usize>, String)> {
     results
 }
 
+/// Hunspell does not consistently accept elided compounds as one word. In
+/// Italian and French, the part before an apostrophe can be a grammatical
+/// clitic rather than an independent spelling token (l'umanità, d'accord,
+/// qu'elle). Check the lexical part after a recognized elision, preserving
+/// its *original byte range* for highlighting and safe replacement.
+///
+/// Do not split English contractions or unknown compounds: "don't" and
+/// "O'Brien" must still reach their dictionary intact. A terminal apostrophe
+/// (Italian po') is part of its word, not an elision.
+fn spelling_words(source: &str, language: &str) -> Vec<(Range<usize>, String)> {
+    words(source)
+        .into_iter()
+        .map(|(mut span, mut word)| {
+            while let Some((apostrophe, mark)) = word
+                .char_indices()
+                .find(|(_, ch)| matches!(ch, '\'' | '’'))
+            {
+                let prefix = &word[..apostrophe];
+                let rest = &word[apostrophe + mark.len_utf8()..];
+                if !is_elision_prefix(prefix, language)
+                    || !rest.chars().next().is_some_and(char::is_alphabetic)
+                {
+                    break;
+                }
+                let shift = apostrophe + mark.len_utf8();
+                span.start += shift;
+                word = rest.to_owned();
+            }
+            (span, word)
+        })
+        .collect()
+}
+
+fn is_elision_prefix(prefix: &str, language: &str) -> bool {
+    let allowed: &[&str] = match language {
+        "it_IT" => &[
+            "l", "d", "all", "dall", "dell", "nell", "sull", "un", "quest",
+            "quell", "c", "m", "t", "s", "v", "gl", "ch", "anch", "senz",
+        ],
+        "fr_FR" => &[
+            "l", "d", "j", "m", "t", "s", "n", "c", "qu", "jusqu", "lorsqu",
+            "puisqu", "quelqu", "entr", "presqu", "quoiqu",
+        ],
+        _ => return false,
+    };
+    allowed.iter().any(|candidate| prefix.eq_ignore_ascii_case(candidate))
+}
+
 pub fn scan_document(
     document: DocumentId,
     region: usize,
@@ -105,7 +153,7 @@ pub fn scan_document(
     if !valid_language(language) {
         return Err(format!("invalid language {language}"));
     }
-    let words = words(source);
+    let words = spelling_words(source, language);
     if words.is_empty() {
         return Ok(Vec::new());
     }
@@ -340,6 +388,65 @@ mod tests {
             .map(|(_, word)| word.as_str())
             .collect::<Vec<_>>();
         assert_eq!(terms, vec!["po'", "po’", "l'éléphant", "l’éléphant"]);
+        for (range, word) in found {
+            assert_eq!(&source[range], word);
+        }
+    }
+
+    #[test]
+    fn italian_apostrophe_elisions_check_the_lexical_word_only() {
+        let source = "l'umanità l’umanità dell'amore un'amica c'è quest'anno l'ummanità";
+        let found = spelling_words(source, "it_IT");
+        let terms = found
+            .iter()
+            .map(|(_, word)| word.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            terms,
+            vec![
+                "umanità", "umanità", "amore", "amica", "è", "anno", "ummanità"
+            ]
+        );
+        for (range, word) in found {
+            assert_eq!(&source[range], word);
+        }
+    }
+
+    #[test]
+    fn italian_apostrophe_keeps_truncations_and_unknown_compounds() {
+        let source = "po' po’ rock'n'roll l''umanità";
+        let terms = spelling_words(source, "it_IT")
+            .into_iter()
+            .map(|(_, word)| word)
+            .collect::<Vec<_>>();
+        assert_eq!(terms, vec!["po'", "po’", "rock'n'roll", "l''umanità"]);
+    }
+
+    #[test]
+    fn french_elisions_split_but_english_contractions_remain_intact() {
+        let source = "l'éléphant qu’elle n'est";
+        let terms = spelling_words(source, "fr_FR")
+            .into_iter()
+            .map(|(_, word)| word)
+            .collect::<Vec<_>>();
+        assert_eq!(terms, vec!["éléphant", "elle", "est"]);
+
+        let english = "don't it's O'Brien";
+        let terms = spelling_words(english, "en_GB")
+            .into_iter()
+            .map(|(_, word)| word)
+            .collect::<Vec<_>>();
+        assert_eq!(terms, vec!["don't", "it's", "O'Brien"]);
+    }
+
+    #[test]
+    fn elision_preserves_unicode_byte_spans_and_combining_accents() {
+        let source = "L’umanita\\u{300} l'umanità l’un'amica";
+        let found = spelling_words(source, "it_IT");
+        assert_eq!(found[0].1, "umanita\\u{300}");
+        assert_eq!(found[0].0.start, "L’".len());
+        assert_eq!(found[1].1, "umanità");
+        assert_eq!(found[2].1, "amica");
         for (range, word) in found {
             assert_eq!(&source[range], word);
         }
