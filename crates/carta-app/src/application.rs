@@ -1,3 +1,4 @@
+use crate::dictionary_manager::DictionaryManager;
 use crate::editor::{CompositeEditor, Cursor, Region};
 use crate::help::{documents as help_documents, HelpKind};
 use crate::palette;
@@ -202,6 +203,8 @@ pub struct App {
     pub view: View,
     pub editor: CompositeEditor,
     spelling: Option<spelling_ui::SpellSession>,
+    dictionaries: DictionaryManager,
+    pending_spelling_review: Option<bool>,
     pub mode: AppMode,
     pub status: String,
     status_observed: String,
@@ -302,6 +305,8 @@ impl App {
             view,
             editor,
             spelling: None,
+            dictionaries: DictionaryManager::default(),
+            pending_spelling_review: None,
             mode: AppMode::Editing,
             status: String::new(),
             status_observed: String::new(),
@@ -1297,7 +1302,8 @@ impl App {
         if self.quit {
             return Ok(false);
         }
-        let mut redraw = self.expire_status(now);
+        let mut redraw = self.poll_dictionary_downloads()?;
+        redraw |= self.expire_status(now);
         if self.scheduler.autosave_due(now, self.editor.is_dirty()) {
             self.autosave()?;
             redraw = true;

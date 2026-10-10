@@ -7,6 +7,7 @@
 pub mod action;
 pub mod application;
 pub mod editor;
+pub mod dictionary_manager;
 pub mod help;
 pub mod mode;
 pub mod palette;

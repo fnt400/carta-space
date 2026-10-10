@@ -55,14 +55,12 @@ impl App {
             CheckpointKind::Structural,
             Some("Changed Document spelling language"),
         )?;
-        self.status = if selected.is_empty() {
-            format!(
-                "Document language: system ({})",
-                spelling::system_language()
-            )
+        let language = if selected.is_empty() {
+            spelling::system_language()
         } else {
-            format!("Document language: {selected}")
+            selected.to_owned()
         };
+        self.queue_dictionary(&language);
         Ok(())
     }
 
@@ -104,12 +102,71 @@ impl App {
         Ok(())
     }
 
+
+    fn queue_dictionary(&mut self, language: &str) {
+        self.status = match self.dictionaries.ensure(language) {
+            Ok(true) => format!("Dictionary {language} ready"),
+            Ok(false) => format!("Preparing dictionary {language} in background…"),
+            Err(error) => format!("Spelling unavailable ({language}): {error}"),
+        };
+    }
+
+    pub(super) fn poll_dictionary_downloads(&mut self) -> AppResult<bool> {
+        let completed = self.dictionaries.poll();
+        if completed.is_empty() {
+            return Ok(false);
+        }
+        let mut failure = None;
+        for (language, result) in completed {
+            match result {
+                Ok(()) => self.status = format!("Spelling dictionary {language} ready"),
+                Err(error) => {
+                    failure = Some(format!("Spelling unavailable ({language}): {error}"));
+                }
+            }
+        }
+        if let Some(error) = failure {
+            self.pending_spelling_review = None;
+            self.status = error;
+        } else if let Some(work) = self.pending_spelling_review {
+            // start_spelling checks for other still-running languages, then
+            // launches the review once all dictionaries have been prepared.
+            self.start_spelling(work)?;
+        }
+        Ok(true)
+    }
+
     pub(super) fn start_spelling(&mut self, work: bool) -> AppResult {
         if work && !matches!(self.view, View::Work(_)) {
             self.status = "Check Work Spelling requires Work View".into();
             return Ok(());
         }
         let current = self.editor.cursor().region;
+        // Request every needed language before reviewing any words. All
+        // missing dictionaries are prepared by workers, never on the UI loop.
+        let languages: HashSet<String> = self.editor.regions().iter()
+            .enumerate()
+            .filter(|(index, _)| work || *index == current)
+            .map(|(_, region)| self.document_language(region.document))
+            .collect();
+        let mut pending = false;
+        for language in &languages {
+            match self.dictionaries.ensure(language) {
+                Ok(true) => {}
+                Ok(false) => pending = true,
+                Err(error) => {
+                    self.pending_spelling_review = None;
+                    self.status = format!("Spelling unavailable ({language}): {error}");
+                    return Ok(());
+                }
+            }
+        }
+        if pending {
+            self.pending_spelling_review = Some(work);
+            self.status = "Preparing spelling dictionaries in background…".into();
+            return Ok(());
+        }
+        self.pending_spelling_review = None;
         let mut issues = Vec::new();
         for (index, region) in self.editor.regions().iter().enumerate() {
             if !work && index != current {
@@ -122,6 +179,7 @@ impl App {
                 &region.text,
                 &language,
                 self.archive.root(),
+                self.dictionaries.location(&language).expect("all languages verified"),
             ) {
                 Ok(found) => issues.extend(found),
                 Err(error) => {

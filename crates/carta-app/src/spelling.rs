@@ -4,6 +4,7 @@ use std::ops::Range;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
+use crate::dictionary_manager::DictionaryLocation;
 use carta_core::DocumentId;
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 use unicode_normalization::char::is_combining_mark;
@@ -99,6 +100,7 @@ pub fn scan_document(
     source: &str,
     language: &str,
     archive_root: &Path,
+    dictionary: &DictionaryLocation,
 ) -> Result<Vec<SpellIssue>, String> {
     if !valid_language(language) {
         return Err(format!("invalid language {language}"));
@@ -108,12 +110,11 @@ pub fn scan_document(
         return Ok(Vec::new());
     }
     let mut command = Command::new("hunspell");
-    command
-        .arg("-a")
-        .arg("-i")
-        .arg("UTF-8")
-        .arg("-d")
-        .arg(language);
+    command.arg("-a").arg("-i").arg("UTF-8").arg("-d");
+    match dictionary {
+        DictionaryLocation::System => { command.arg(language); }
+        DictionaryLocation::Managed(base) => { command.arg(base); }
+    }
     let personal = archive_root
         .join("spelling")
         .join(format!("{language}.dic"));
