@@ -280,7 +280,9 @@ impl Archive {
             "Saved state before Split Document",
             owned,
         )?;
-        let metadata = DocumentMetadata::new(target, created).with_modified(Timestamp::now_local());
+        let metadata = DocumentMetadata::new(target, created)
+            .with_language(source_info.metadata.language())
+            .with_modified(Timestamp::now_local());
         let (before, after) = original.split_at(byte_offset);
         let after = normalize_document_content(after);
         let operation = (|| {
@@ -428,8 +430,13 @@ impl Archive {
     }
 
     pub fn duplicate_document(&mut self, source: DocumentId) -> Result<DocumentId, Error> {
-        let content = self.read_document(source)?.into_content();
-        self.create_document(&content)
+        let original = self.read_document(source)?;
+        let language = original.language().map(str::to_owned);
+        let target = self.create_document(original.content())?;
+        if let Some(language) = language {
+            self.set_document_language(target, Some(&language))?;
+        }
+        Ok(target)
     }
 
     pub fn import_document_bytes(&mut self, bytes: &[u8]) -> Result<DocumentId, Error> {
@@ -605,7 +612,8 @@ impl Archive {
                 info_relative(&self.root, &self.documents[&source].path.join("meta.json"))?,
             ],
         )?;
-        let metadata = DocumentMetadata::new(target, created);
+        let metadata = DocumentMetadata::new(target, created)
+            .with_language(self.documents[&source].metadata.language());
         let operation = (|| {
             fs::create_dir_all(&month_path).map_err(|error| Error::io(&month_path, error))?;
             fs::create_dir(&staging).map_err(|error| Error::io(&staging, error))?;
