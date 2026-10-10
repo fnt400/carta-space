@@ -60,6 +60,12 @@ pub enum Error {
     #[error("timestamp cannot be represented as a YYYY/MM volume: {0}")]
     InvalidVolumeDate(carta_format::Timestamp),
 
+    #[error("invalid spelling language: {0}")]
+    InvalidSpellingLanguage(String),
+
+    #[error("invalid personal dictionary word: {0}")]
+    InvalidSpellingWord(String),
+
     #[error("document does not exist: {0}")]
     MissingDocument(DocumentId),
 

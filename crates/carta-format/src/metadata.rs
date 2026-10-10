@@ -187,6 +187,20 @@ impl DocumentMetadata {
         &self.extensions
     }
 
+    pub fn language(&self) -> Option<&str> {
+        self.extensions.get("language").and_then(Value::as_str)
+    }
+
+    pub fn with_language(&self, language: Option<&str>) -> Self {
+        let mut metadata = self.clone();
+        if let Some(language) = language {
+            metadata.extensions.insert("language".to_owned(), Value::String(language.to_owned()));
+        } else {
+            metadata.extensions.remove("language");
+        }
+        metadata
+    }
+
     pub fn locked(&self) -> bool {
         self.extensions
             .get("locked")

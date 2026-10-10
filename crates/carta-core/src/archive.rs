@@ -761,6 +761,66 @@ impl Archive {
         Ok(self.works.get(&id).ok_or(Error::MissingWork(id))?.locked())
     }
 
+    /// Change only administrative metadata, leaving text and modified timestamp intact.
+    pub fn set_document_language(&mut self, id: DocumentId, language: Option<&str>) -> Result<(), Error> {
+        if let Some(lang) = language { validate_spelling_language(lang)?; }
+        self.ensure_document_unlocked(id)?;
+        let info = self.documents.get(&id).ok_or(Error::MissingDocument(id))?;
+        self.ensure_document_current(info)?;
+        let metadata = info.metadata.with_language(language);
+        if metadata == info.metadata { return Ok(()); }
+        let path = info.path.join("meta.json");
+        let mut bytes = Vec::new();
+        metadata.write_to(&mut bytes).map_err(|error| Error::format(&path, error))?;
+        atomic_replace(&path, &bytes)?;
+        let info = self.documents.get_mut(&id).expect("checked above");
+        info.metadata = metadata;
+        info.metadata_bytes = bytes;
+        Ok(())
+    }
+
+    /// System dictionaries live outside the Archive. Only user-added words are versioned.
+    pub fn personal_words(&self, language: &str) -> Result<Vec<String>, Error> {
+        let path = spelling_path(&self.root, language)?;
+        let content = match fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => return Err(Error::io(&path, error)),
+        };
+        let mut words = std::collections::BTreeSet::new();
+        for word in content.lines() {
+            if !word.is_empty() {
+                validate_spelling_word(word)?;
+                words.insert(word.to_owned());
+            }
+        }
+        Ok(words.into_iter().collect())
+    }
+
+    pub fn add_personal_word(&mut self, language: &str, word: &str) -> Result<bool, Error> {
+        self.change_personal_word(language, word, true)
+    }
+
+    pub fn remove_personal_word(&mut self, language: &str, word: &str) -> Result<bool, Error> {
+        self.change_personal_word(language, word, false)
+    }
+
+    fn change_personal_word(&mut self, language: &str, word: &str, add: bool) -> Result<bool, Error> {
+        validate_spelling_word(word)?;
+        let path = spelling_path(&self.root, language)?;
+        let mut words: std::collections::BTreeSet<_> =
+            self.personal_words(language)?.into_iter().collect();
+        let changed = if add { words.insert(word.to_owned()) } else { words.remove(word) };
+        if !changed { return Ok(false); }
+        let directory = self.root.join("spelling");
+        fs::create_dir_all(&directory).map_err(|error| Error::io(&directory, error))?;
+        let content = if words.is_empty() { String::new() }
+                      else { words.into_iter().collect::<Vec<_>>().join("\n") + "\n" };
+        atomic_replace(&path, content.as_bytes())?;
+        ensure_spelling_merge_attribute(&self.root)?;
+        Ok(true)
+    }
+
     pub fn set_document_locked(&mut self, id: DocumentId, locked: bool) -> Result<(), Error> {
         let info = self.documents.get(&id).ok_or(Error::MissingDocument(id))?;
         self.ensure_document_current(info)?;
@@ -1571,4 +1631,59 @@ mod tests {
         assert!(!archive.root().join(".git/carta-transaction.json").exists());
         Archive::validate(archive.root()).unwrap();
     }
+}
+
+fn validate_spelling_language(language: &str) -> Result<(), Error> {
+    let bytes = language.as_bytes();
+    if bytes.len() != 5 || !bytes[0..2].iter().all(u8::is_ascii_lowercase)
+        || bytes[2] != b'_' || !bytes[3..5].iter().all(u8::is_ascii_uppercase)
+    {
+        return Err(Error::InvalidSpellingLanguage(language.to_owned()));
+    }
+    Ok(())
+}
+
+fn validate_spelling_word(word: &str) -> Result<(), Error> {
+    if word.is_empty() || word.len() > 128 || !word.chars().any(char::is_alphabetic)
+       || word.chars().any(|c| !(c.is_alphabetic() || matches!(c, '\'' | '’' | '-')))
+       || !word.chars().next().is_some_and(char::is_alphabetic)
+       || !word.chars().next_back().is_some_and(char::is_alphabetic)
+    {
+        return Err(Error::InvalidSpellingWord(word.to_owned()));
+    }
+    Ok(())
+}
+
+fn spelling_path(root: &Path, language: &str) -> Result<PathBuf, Error> {
+    validate_spelling_language(language)?;
+    let directory = root.join("spelling");
+    if let Ok(metadata) = fs::symlink_metadata(&directory) {
+        if !metadata.is_dir() || metadata.file_type().is_symlink() {
+            return Err(Error::UnsafeDestination(directory));
+        }
+    }
+    let path = directory.join(format!("{language}.dic"));
+    if let Ok(metadata) = fs::symlink_metadata(&path) {
+        if !metadata.is_file() || metadata.file_type().is_symlink() {
+            return Err(Error::UnsafeDestination(path));
+        }
+    }
+    Ok(path)
+}
+
+/// Git's built-in union driver preserves independently appended words on concurrent devices.
+fn ensure_spelling_merge_attribute(root: &Path) -> Result<(), Error> {
+    let path = root.join(".gitattributes");
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(error) => return Err(Error::io(&path, error)),
+    };
+    if text.lines().any(|line| line.trim() == "spelling/*.dic merge=union") {
+        return Ok(());
+    }
+    let mut updated = text;
+    if !updated.is_empty() && !updated.ends_with('\n') { updated.push('\n'); }
+    updated.push_str("spelling/*.dic merge=union\n");
+    atomic_replace(&path, updated.as_bytes())
 }

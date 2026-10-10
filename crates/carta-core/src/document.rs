@@ -105,6 +105,10 @@ impl Document {
         self.metadata.modified()
     }
 
+    pub fn language(&self) -> Option<&str> {
+        self.metadata.language()
+    }
+
     pub fn locked(&self) -> bool {
         self.metadata.locked()
     }
