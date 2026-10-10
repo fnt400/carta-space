@@ -160,6 +160,7 @@ dependencies = [
  "carta-core",
  "carta-publish",
  "chrono",
+ "pulldown-cmark",
  "serde",
  "serde_json",
  "tempfile",
