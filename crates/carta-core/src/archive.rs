@@ -1695,3 +1695,57 @@ fn ensure_spelling_merge_attribute(root: &Path) -> Result<(), Error> {
     updated.push_str("spelling/*.dic merge=union\n");
     atomic_replace(&path, updated.as_bytes())
 }
+
+#[cfg(test)]
+mod spelling_archive_tests {
+    use super::*;
+
+    #[test]
+    fn personal_words_and_languages_survive_checkpoint_and_reopen() {
+        let scratch = tempfile::tempdir().unwrap();
+        let root = scratch.path().join("archive");
+        let mut archive = Archive::create(&root).unwrap();
+        let original = archive.create_document("Café français.\n").unwrap();
+        assert_eq!(archive.read_document(original).unwrap().language(), None);
+        archive.set_document_language(original, Some("fr_FR")).unwrap();
+        assert_eq!(archive.read_document(original).unwrap().language(), Some("fr_FR"));
+
+        assert!(archive.add_personal_word("fr_FR", "Proxmox").unwrap());
+        assert!(archive.add_personal_word("fr_FR", "Éléphant").unwrap());
+        assert!(!archive.add_personal_word("fr_FR", "Proxmox").unwrap());
+        assert_eq!(archive.personal_words("fr_FR").unwrap(),
+            vec!["Proxmox".to_owned(), "Éléphant".to_owned()]);
+        assert_eq!(archive.personal_words("it_IT").unwrap(), Vec::<String>::new());
+        assert!(root.join(".gitattributes").is_file());
+        archive.checkpoint(crate::CheckpointKind::Structural, Some("Spelling test")).unwrap();
+
+        let mut restored = Archive::open(&root).unwrap();
+        assert_eq!(restored.read_document(original).unwrap().language(), Some("fr_FR"));
+        assert_eq!(restored.personal_words("fr_FR").unwrap().len(), 2);
+        assert!(restored.remove_personal_word("fr_FR", "Proxmox").unwrap());
+        assert_eq!(restored.personal_words("fr_FR").unwrap(), vec!["Éléphant".to_owned()]);
+    }
+
+    #[test]
+    fn language_follows_derived_documents_without_changing_source() {
+        let scratch = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(scratch.path().join("archive")).unwrap();
+        let source = archive.create_document("Bonjour le monde.\n").unwrap();
+        archive.set_document_language(source, Some("fr_FR")).unwrap();
+        let duplicate = archive.duplicate_document(source).unwrap();
+        assert_eq!(archive.read_document(duplicate).unwrap().language(), Some("fr_FR"));
+        let split = archive.split_document_at(source, 8).unwrap();
+        assert_eq!(archive.read_document(split).unwrap().language(), Some("fr_FR"));
+        assert_eq!(archive.read_document(source).unwrap().language(), Some("fr_FR"));
+    }
+
+    #[test]
+    fn rejects_unsafe_dictionary_inputs() {
+        let scratch = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(scratch.path().join("archive")).unwrap();
+        assert!(archive.add_personal_word("../..", "word").is_err());
+        assert!(archive.add_personal_word("it_IT", "two\nlines").is_err());
+        assert!(archive.add_personal_word("it_IT", "../../evil").is_err());
+        assert!(!archive.root().join("spelling").exists());
+    }
+}
