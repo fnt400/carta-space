@@ -410,6 +410,113 @@ mod spelling_quit_tests {
     use super::*;
 
     #[test]
+    fn spelling_language_choice_can_be_cancelled_without_losing_review() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let document = archive.create_document("interfaccia erore").unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let region = app
+            .editor
+            .regions()
+            .iter()
+            .position(|region| region.document == document)
+            .unwrap();
+        let start = app.editor.regions()[region].text.find("erore").unwrap();
+        app.spelling = Some(SpellSession {
+            issues: vec![SpellIssue {
+                document,
+                region,
+                language: "it_IT".into(),
+                start,
+                end: start + "erore".len(),
+                word: "erore".into(),
+                suggestions: vec!["errore".into()],
+            }],
+            next: 0,
+            ignored: HashSet::new(),
+            work: true,
+        });
+        app.advance_spelling().unwrap();
+
+        let AppMode::Selector {
+            choices, action, ..
+        } = &mut app.mode
+        else {
+            panic!("expected spelling suggestion selector");
+        };
+        assert_eq!(*action, SelectAction::SpellingSuggestion);
+        let choice = choices
+            .iter()
+            .position(|choice| choice.value == "change-language")
+            .expect("language option offered alongside suggestions");
+        if let AppMode::Selector { selected, .. } = &mut app.mode {
+            *selected = choice;
+        }
+        app.submit_selector().unwrap();
+
+        let AppMode::Selector {
+            choices, action, ..
+        } = &app.mode
+        else {
+            panic!("expected language selector");
+        };
+        assert_eq!(*action, SelectAction::SetSpellingDocumentLanguage);
+        assert!(choices.iter().any(|choice| choice.value == "fr_FR"));
+        assert!(app.spelling.as_ref().unwrap().work);
+        assert_eq!(app.spelling.as_ref().unwrap().next, 0);
+
+        app.cancel_mode();
+        let AppMode::Selector {
+            choices, action, ..
+        } = &app.mode
+        else {
+            panic!("Escape should restore spelling suggestion selector");
+        };
+        assert_eq!(*action, SelectAction::SpellingSuggestion);
+        assert!(choices.iter().any(|choice| choice.value == "change-language"));
+        assert_eq!(app.spelling.as_ref().unwrap().next, 0);
+        assert_eq!(
+            app.archive
+                .document_info(document)
+                .unwrap()
+                .metadata()
+                .language(),
+            None
+        );
+        // A second Escape closes the entire review, as before.
+        app.cancel_mode();
+        assert!(matches!(app.mode, AppMode::Editing));
+        assert!(app.spelling.is_none());
+    }
+
+    #[test]
+    fn quit_from_nested_spelling_language_selector_closes_review() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        archive.create_document("original text").unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        assert!(app.editor.insert("modified "));
+        app.spelling = Some(SpellSession {
+            issues: Vec::new(),
+            next: 0,
+            ignored: HashSet::new(),
+            work: false,
+        });
+        app.mode = AppMode::Selector {
+            title: "Document spelling language".into(),
+            query: String::new(),
+            selected: 0,
+            choices: Vec::new(),
+            action: SelectAction::SetSpellingDocumentLanguage,
+        };
+        app.execute(Command::Quit).unwrap();
+        assert!(app.quit);
+        assert!(app.spelling.is_none());
+        assert!(matches!(app.mode, AppMode::Editing));
+        assert!(!app.editor.is_dirty());
+    }
+
+    #[test]
     fn late_spelling_completion_does_not_interrupt_after_typing_and_cursor_return() {
         let temporary = tempfile::tempdir().unwrap();
         let mut archive = Archive::create(temporary.path().join("archive")).unwrap();

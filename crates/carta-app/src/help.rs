@@ -202,7 +202,7 @@ Choose Check Document Spelling in the palette for the current Document, or Check
 
 Set Document Language assigns Italian, French, English or another offered locale to a Document; System default removes the override. The choice lives in Document metadata and follows Git synchronization. New, legacy Documents without a language use the host locale.
 
-When a suspicious word is found, choose a suggested replacement, Ignore once, Ignore all (this check), or Add to personal dictionary. A replacement uses the normal editor selection and is undoable. Locked Documents cannot be changed. Esc ends the review.
+When a suspicious word is found, choose a suggested replacement, Ignore once, Ignore all (this check), Add to personal dictionary, or Change Document Language. The language option opens the same language selector and rechecks the Document (or the current Work) using the new dictionary; it never applies suggestions from the previous language. Esc in the language selector returns to the same spelling issue; Esc from the spelling selector ends the review. A replacement uses the normal editor selection and is undoable. Locked Documents cannot be changed.
 
 The Archive stores personal word lists under spelling/<language>.dic. Additions and removals are checkpointed and synced with the Archive. Remove Dictionary Word from the palette removes an entry in the current Document's language. Standard Hunspell dictionaries remain installed locally and are never duplicated in the Archive.
 
