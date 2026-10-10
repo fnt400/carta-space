@@ -76,13 +76,16 @@ pub fn scan_document(
     let mut child = command.stdin(Stdio::piped()).stdout(Stdio::piped())
         .stderr(Stdio::piped()).spawn()
         .map_err(|error| format!("cannot start hunspell: {error}"))?;
-    {
-        let mut input = child.stdin.take().ok_or("cannot open Hunspell input")?;
-        for (_, word) in &words {
-            writeln!(input, "{word}").map_err(|error| format!("hunspell input: {error}"))?;
-        }
-    }
+    // Drain stdout while feeding stdin: large Documents must not deadlock on full pipes.
+    let mut input = child.stdin.take().ok_or("cannot open Hunspell input")?;
+    let input_words = words.iter().map(|(_, word)| word.clone()).collect::<Vec<_>>();
+    let writer = std::thread::spawn(move || -> std::io::Result<()> {
+        for word in input_words { writeln!(input, "{word}")?; }
+        Ok(())
+    });
     let output = child.wait_with_output().map_err(|error| format!("hunspell process: {error}"))?;
+    writer.join().map_err(|_| "Hunspell writer panicked".to_owned())?
+        .map_err(|error| format!("hunspell input: {error}"))?;
     if !output.status.success() {
         return Err(format!("hunspell failed: {}", String::from_utf8_lossy(&output.stderr).trim()));
     }
