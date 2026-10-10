@@ -41,6 +41,7 @@ pub enum SelectAction {
     OpenBacklink,
     SpellingSuggestion,
     SetDocumentLanguage,
+    SetSpellingDocumentLanguage,
     RemoveDictionaryWord,
     OpenSearchResult,
     RestoreHistory,

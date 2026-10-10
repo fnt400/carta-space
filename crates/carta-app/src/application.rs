@@ -529,6 +529,24 @@ impl App {
         };
     }
     pub fn cancel_mode(&mut self) {
+        // Escape from the nested language selector returns to the word being
+        // reviewed; Escape from the spelling selector ends the check.
+        if matches!(
+            &self.mode,
+            AppMode::Selector {
+                action: SelectAction::SetSpellingDocumentLanguage,
+                ..
+            }
+        ) {
+            self.mode = AppMode::Editing;
+            self.status.clear();
+            if let Err(error) = self.advance_spelling() {
+                self.spelling = None;
+                self.editor.clear_cat_highlight();
+                self.status = format!("Spelling unavailable: {error}");
+            }
+            return;
+        }
         if matches!(
             &self.mode,
             AppMode::Selector {
@@ -1225,6 +1243,9 @@ impl App {
             SelectAction::InsertLink => self.insert_link_choice(&value, &label)?,
             SelectAction::OpenBacklink => self.open_backlink_choice(&value)?,
             SelectAction::SetDocumentLanguage => self.apply_document_language(&value)?,
+            SelectAction::SetSpellingDocumentLanguage => {
+                self.apply_spelling_document_language(&value)?
+            }
             SelectAction::RemoveDictionaryWord => self.remove_dictionary_word(&value)?,
             SelectAction::SpellingSuggestion => self.apply_spelling_choice(&value)?,
             _ => {}
@@ -3145,17 +3166,20 @@ impl App {
         Ok(())
     }
     fn finish_quit(&mut self) -> AppResult {
-        // Quit is an explicit command even when a spelling selector is open.
-        // Close that transient review before checking the final Git publication:
-        // incoming sync is deliberately rejected while any selector is active.
+        // Quit from either spelling selector must close the entire transient
+        // review, without returning to a nested language selector.
         if matches!(
             &self.mode,
             AppMode::Selector {
-                action: SelectAction::SpellingSuggestion,
+                action: SelectAction::SpellingSuggestion
+                    | SelectAction::SetSpellingDocumentLanguage,
                 ..
             }
         ) {
-            self.cancel_mode();
+            self.spelling = None;
+            self.editor.clear_cat_highlight();
+            self.cat_navigation();
+            self.mode = AppMode::Editing;
         }
         self.autosave()?;
         self.checkpoint(CheckpointKind::Quit, None)?;

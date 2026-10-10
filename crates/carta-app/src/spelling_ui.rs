@@ -7,6 +7,7 @@ pub(super) struct SpellSession {
     issues: Vec<SpellIssue>,
     next: usize,
     ignored: HashSet<(String, String)>,
+    work: bool,
 }
 
 #[derive(Clone)]
@@ -29,6 +30,10 @@ impl App {
     }
 
     pub(super) fn select_document_language(&mut self) -> AppResult {
+        self.select_document_language_with_action(SelectAction::SetDocumentLanguage)
+    }
+
+    fn select_document_language_with_action(&mut self, action: SelectAction) -> AppResult {
         self.current_document()?;
         let languages = [
             ("System default", ""),
@@ -50,7 +55,7 @@ impl App {
                     value: value.into(),
                 })
                 .collect(),
-            action: SelectAction::SetDocumentLanguage,
+            action,
         };
         Ok(())
     }
@@ -71,6 +76,17 @@ impl App {
         };
         self.queue_dictionary(&language);
         Ok(())
+    }
+
+    /// A language change invalidates every suggestion from the previous
+    /// dictionary. The affected Document is the one at the current spelling
+    /// issue, also when reviewing a multi-Document Work.
+    pub(super) fn apply_spelling_document_language(&mut self, selected: &str) -> AppResult {
+        let work = self.spelling.as_ref().is_some_and(|session| session.work);
+        self.spelling = None;
+        self.editor.clear_cat_highlight();
+        self.apply_document_language(selected)?;
+        self.start_spelling(work)
     }
 
     pub(super) fn select_dictionary_word(&mut self) -> AppResult {
@@ -226,6 +242,7 @@ impl App {
             issues,
             next: 0,
             ignored: HashSet::new(),
+            work,
         });
         self.advance_spelling()
     }
@@ -292,6 +309,10 @@ impl App {
                     label: "Add to personal dictionary".into(),
                     value: "add".into(),
                 },
+                Choice {
+                    label: "Change Document Language…".into(),
+                    value: "change-language".into(),
+                },
             ]);
             let remaining = session.issues.len() - session.next;
             self.mode = AppMode::Selector {
@@ -317,6 +338,13 @@ impl App {
         else {
             return Ok(());
         };
+        if choice == "change-language" {
+            // Keep the current review intact so cancelling the language
+            // selector returns to precisely this suspicious word.
+            return self.select_document_language_with_action(
+                SelectAction::SetSpellingDocumentLanguage,
+            );
+        }
         if let Some(index) = choice.strip_prefix("replace:") {
             let index: usize = index.parse()?;
             if let Some(replacement) = issue.suggestions.get(index) {
@@ -445,6 +473,7 @@ mod spelling_quit_tests {
             issues: Vec::new(),
             next: 0,
             ignored: HashSet::new(),
+            work: false,
         });
         app.mode = AppMode::Selector {
             title: "Spelling".into(),
