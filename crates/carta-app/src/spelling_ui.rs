@@ -285,3 +285,51 @@ impl App {
         self.advance_spelling()
     }
 }
+
+#[cfg(test)]
+mod spelling_quit_tests {
+    use super::*;
+
+    #[test]
+    fn quit_from_spelling_selector_permits_verification_of_last_push() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("archive");
+        let remote = temp.path().join("remote.git");
+        assert!(std::process::Command::new("git")
+            .args(["init", "--bare", "--quiet"])
+            .arg(&remote)
+            .status()
+            .unwrap()
+            .success());
+        let mut archive = Archive::create(&root).unwrap();
+        archive.create_document("original text").unwrap();
+        archive
+            .checkpoint(CheckpointKind::Structural, Some("Initial Document"))
+            .unwrap();
+        archive.set_sync_remote(remote.to_str().unwrap()).unwrap();
+        archive.sync().unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        assert!(app.editor.insert("modified "));
+        app.spelling = Some(SpellSession {
+            issues: Vec::new(),
+            next: 0,
+            ignored: HashSet::new(),
+        });
+        app.mode = AppMode::Selector {
+            title: "Spelling".into(),
+            query: String::new(),
+            selected: 0,
+            choices: Vec::new(),
+            action: SelectAction::SpellingSuggestion,
+        };
+        app.execute(Command::Quit).unwrap();
+        assert!(app.quit);
+        assert!(app.spelling.is_none());
+        assert!(matches!(app.mode, AppMode::Editing));
+        let staged = carta_core::stage_sync(root).unwrap();
+        assert!(matches!(
+            app.apply_background_sync(&staged).unwrap(),
+            SyncApply::Unchanged
+        ));
+    }
+}

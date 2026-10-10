@@ -3120,6 +3120,18 @@ impl App {
         Ok(())
     }
     fn finish_quit(&mut self) -> AppResult {
+        // Quit is an explicit command even when a spelling selector is open.
+        // Close that transient review before checking the final Git publication:
+        // incoming sync is deliberately rejected while any selector is active.
+        if matches!(
+            &self.mode,
+            AppMode::Selector {
+                action: SelectAction::SpellingSuggestion,
+                ..
+            }
+        ) {
+            self.cancel_mode();
+        }
         self.autosave()?;
         self.checkpoint(CheckpointKind::Quit, None)?;
         self.quit = true;

@@ -5,7 +5,8 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 use carta_core::DocumentId;
-use pulldown_cmark::{Event, Parser};
+use pulldown_cmark::{Event, Parser, Tag, TagEnd};
+use unicode_normalization::char::is_combining_mark;
 
 #[derive(Debug, Clone)]
 pub struct SpellIssue {
@@ -48,9 +49,19 @@ pub fn system_language() -> String {
 /// This intentionally skips code, HTML, URL destinations and escaped entities.
 fn words(source: &str) -> Vec<(Range<usize>, String)> {
     let mut results = Vec::new();
+    let mut in_code_block = false;
     for (event, range) in Parser::new(source).into_offset_iter() {
-        let Event::Text(rendered) = event else {
-            continue;
+        let rendered = match event {
+            Event::Start(Tag::CodeBlock(_)) => {
+                in_code_block = true;
+                continue;
+            }
+            Event::End(TagEnd::CodeBlock) => {
+                in_code_block = false;
+                continue;
+            }
+            Event::Text(rendered) if !in_code_block => rendered,
+            _ => continue,
         };
         let Some(raw) = source.get(range.clone()) else {
             continue;
@@ -59,12 +70,12 @@ fn words(source: &str) -> Vec<(Range<usize>, String)> {
             continue;
         }
         let mut begin = None;
-        let mut chars = raw.char_indices().peekable();
-        while let Some((index, ch)) = chars.next() {
-            let joiner = matches!(ch, '\'' | '’')
-                && begin.is_some()
-                && chars.peek().is_some_and(|(_, next)| next.is_alphabetic());
-            if ch.is_alphabetic() || joiner {
+        for (index, ch) in raw.char_indices() {
+            // Keep elisions (l'éléphant), Italian truncations (po') and
+            // decomposed accents in the same source range as their word.
+            let apostrophe = matches!(ch, '\'' | '’') && begin.is_some();
+            let combining = is_combining_mark(ch) && begin.is_some();
+            if ch.is_alphabetic() || apostrophe || combining {
                 if begin.is_none() {
                     begin = Some(index);
                 }
@@ -228,6 +239,38 @@ mod tests {
         let text = "L'éléphant è qui.";
         for (range, word) in words(text) {
             assert_eq!(&text[range], word);
+        }
+    }
+
+    #[test]
+    fn code_blocks_are_not_prose() {
+        let text = "~~~rust\nsyntheticcode\n~~~\n\nproseword\n\n    indentedcode\n";
+        let found = words(text).into_iter().map(|(_, word)| word).collect::<Vec<_>>();
+        assert!(found.contains(&"proseword".to_owned()));
+        assert!(!found.contains(&"syntheticcode".to_owned()));
+        assert!(!found.contains(&"indentedcode".to_owned()));
+    }
+
+    #[test]
+    fn italian_trailing_apostrophe_is_part_of_word() {
+        let source = "po' po’ l'éléphant l’éléphant";
+        let found = words(source);
+        let terms = found.iter().map(|(_, word)| word.as_str()).collect::<Vec<_>>();
+        assert_eq!(terms, vec!["po'", "po’", "l'éléphant", "l’éléphant"]);
+        for (range, word) in found {
+            assert_eq!(&source[range], word);
+        }
+    }
+
+    #[test]
+    fn decomposed_unicode_marks_remain_inside_replacement_span() {
+        let source = "cafe\u{301} cafe\u{301}\u{308} élan";
+        let found = words(source);
+        assert_eq!(found[0].1, "cafe\u{301}");
+        assert_eq!(found[0].0, 0..6);
+        assert_eq!(found[1].1, "cafe\u{301}\u{308}");
+        for (range, word) in found {
+            assert_eq!(&source[range], word);
         }
     }
 }
