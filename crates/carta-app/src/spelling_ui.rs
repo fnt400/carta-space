@@ -9,6 +9,15 @@ pub(super) struct SpellSession {
     ignored: HashSet<(String, String)>,
 }
 
+#[derive(Clone)]
+pub(super) struct PendingSpellReview {
+    work: bool,
+    cursor: Cursor,
+    view: View,
+    content_revision: u64,
+    interaction_revision: u64,
+}
+
 impl App {
     fn document_language(&self, document: DocumentId) -> String {
         self.archive
@@ -127,17 +136,26 @@ impl App {
         if let Some(error) = failure {
             self.pending_spelling_review = None;
             self.status = error;
-        } else if let Some((work, cursor)) = self.pending_spelling_review {
-            // Do not unexpectedly seize the keyboard if the author continued
-            // typing, navigated elsewhere, or entered another palette.
-            if matches!(self.mode, AppMode::Editing) && self.editor.cursor() == cursor {
-                self.start_spelling(work)?;
+        } else if let Some(pending) = self.pending_spelling_review.clone() {
+            // Neither matching coordinates nor matching text are enough to
+            // prove inactivity: movement, typing and Undo can return to the
+            // same state while the user continues working.
+            if self.can_resume_spelling(&pending) {
+                self.start_spelling(pending.work)?;
             } else {
                 self.pending_spelling_review = None;
                 self.status = "Dictionary ready · Check Spelling when convenient".into();
             }
         }
         Ok(true)
+    }
+
+    fn can_resume_spelling(&self, pending: &PendingSpellReview) -> bool {
+        matches!(self.mode, AppMode::Editing)
+            && self.editor.cursor() == pending.cursor
+            && self.view == pending.view
+            && self.editor.content_revision() == pending.content_revision
+            && self.interaction_revision == pending.interaction_revision
     }
 
     pub(super) fn start_spelling(&mut self, work: bool) -> AppResult {
@@ -169,7 +187,13 @@ impl App {
             }
         }
         if pending {
-            self.pending_spelling_review = Some((work, self.editor.cursor()));
+            self.pending_spelling_review = Some(PendingSpellReview {
+                work,
+                cursor: self.editor.cursor(),
+                view: self.view.clone(),
+                content_revision: self.editor.content_revision(),
+                interaction_revision: self.interaction_revision,
+            });
             self.status = "Preparing spelling dictionaries in background…".into();
             return Ok(());
         }
@@ -356,6 +380,47 @@ impl App {
 #[cfg(test)]
 mod spelling_quit_tests {
     use super::*;
+
+
+    #[test]
+    fn late_spelling_completion_does_not_interrupt_after_typing_and_cursor_return() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        archive.create_document("éléphnt").unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let pending = PendingSpellReview {
+            work: false,
+            cursor: app.editor.cursor(),
+            view: app.view.clone(),
+            content_revision: app.editor.content_revision(),
+            interaction_revision: app.interaction_revision,
+        };
+        assert!(app.can_resume_spelling(&pending));
+        assert!(app.dispatch_action(Action::InsertText("écriture ".into()), Instant::now()));
+        app.editor.set_cursor(pending.cursor, false);
+        assert_eq!(app.editor.cursor(), pending.cursor);
+        assert!(!app.can_resume_spelling(&pending));
+    }
+
+    #[test]
+    fn late_spelling_completion_does_not_interrupt_after_navigation_back() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        archive.create_document("bonjour le monde").unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let pending = PendingSpellReview {
+            work: false,
+            cursor: app.editor.cursor(),
+            view: app.view.clone(),
+            content_revision: app.editor.content_revision(),
+            interaction_revision: app.interaction_revision,
+        };
+        app.dispatch_action(Action::MoveCharacterForward, Instant::now());
+        app.dispatch_action(Action::MoveCharacterBackward, Instant::now());
+        assert_eq!(app.editor.cursor(), pending.cursor);
+        assert_eq!(app.editor.content_revision(), pending.content_revision);
+        assert!(!app.can_resume_spelling(&pending));
+    }
 
     #[test]
     fn quit_from_spelling_selector_permits_verification_of_last_push() {

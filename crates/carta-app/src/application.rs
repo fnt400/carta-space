@@ -204,7 +204,8 @@ pub struct App {
     pub editor: CompositeEditor,
     spelling: Option<spelling_ui::SpellSession>,
     dictionaries: DictionaryManager,
-    pending_spelling_review: Option<(bool, Cursor)>,
+    pending_spelling_review: Option<spelling_ui::PendingSpellReview>,
+    interaction_revision: u64,
     pub mode: AppMode,
     pub status: String,
     status_observed: String,
@@ -307,6 +308,7 @@ impl App {
             spelling: None,
             dictionaries: DictionaryManager::default(),
             pending_spelling_review: None,
+            interaction_revision: 0,
             mode: AppMode::Editing,
             status: String::new(),
             status_observed: String::new(),
@@ -543,6 +545,7 @@ impl App {
     }
 
     pub fn dispatch_mode_action(&mut self, action: ModeAction) -> AppResult<bool> {
+        self.note_user_interaction();
         match action {
             ModeAction::Cancel => match self.mode {
                 AppMode::Prompt { .. } | AppMode::Selector { .. } => {
@@ -672,6 +675,7 @@ impl App {
     }
 
     pub fn execute(&mut self, command: Command) -> AppResult {
+        self.note_user_interaction();
         use Command::*;
         match command {
             NewDocument => self.new_document()?,
@@ -1354,11 +1358,19 @@ impl App {
         self.scheduler.edited(now);
     }
 
+    /// User input invalidates a deferred spelling review even if the caret
+    /// eventually returns to its original coordinates. Frontends call this
+    /// for native pointer input that bypasses dispatch_action.
+    pub fn note_user_interaction(&mut self) {
+        self.interaction_revision = self.interaction_revision.wrapping_add(1);
+    }
+
     /// Apply a frontend-neutral semantic action.
     ///
     /// This is the first v0.2 input seam: platform frontends translate native
     /// events into `Action` values before invoking Carta behavior.
     pub fn dispatch_action(&mut self, action: Action, now: Instant) -> bool {
+        self.note_user_interaction();
         let changed = match action {
             Action::InsertText(value) => self.cat_insert(&value),
             Action::InsertLineBreak => self.cat_insert_newline(),
