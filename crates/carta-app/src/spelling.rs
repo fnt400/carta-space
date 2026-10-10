@@ -165,41 +165,9 @@ pub fn scan_document(
     }
     let mut issues = Vec::new();
     for (span, word) in words {
-        let output = lines
-            .by_ref()
-            .find(|line| !line.trim().is_empty())
-            .ok_or_else(|| format!("hunspell response truncated at {word}"))?;
-        // Hunspell terminates each input line with a blank output line.
-        // Refuse ambiguous splits rather than assign suggestions to the wrong word.
-        let mut extra = 0;
-        for response in lines.by_ref() {
-            if response.trim().is_empty() {
-                break;
-            }
-            extra += 1;
-        }
-        if extra != 0 {
-            return Err(format!("Hunspell split {word} into multiple tokens"));
-        }
-        if matches!(output.chars().next(), Some('*' | '+' | '-')) {
+        let replies = read_hunspell_replies(&mut lines, &word)?;
+        let Some(suggestions) = classify_hunspell_replies(&word, &replies)? else {
             continue;
-        }
-        let suggestions = if output.starts_with("& ") || output.starts_with("? ") {
-            output
-                .split_once(": ")
-                .map(|(_, alternatives)| {
-                    alternatives
-                        .split(", ")
-                        .filter(|part| !part.is_empty())
-                        .take(6)
-                        .map(str::to_owned)
-                        .collect()
-                })
-                .unwrap_or_default()
-        } else if output.starts_with("# ") {
-            Vec::new()
-        } else {
-            return Err(format!("unexpected Hunspell response for {word}"));
         };
         issues.push(SpellIssue {
             document,
@@ -214,9 +182,115 @@ pub fn scan_document(
     Ok(issues)
 }
 
+/// Hunspell -a emits one status for *each token* recognized on an input line,
+/// then a blank line. One input word is not guaranteed to be one Hunspell
+/// token: dictionary-specific WORDCHARS, apostrophes and Unicode may split it.
+fn read_hunspell_replies<'a>(
+    lines: &mut impl Iterator<Item = &'a str>,
+    word: &str,
+) -> Result<Vec<&'a str>, String> {
+    let first = lines
+        .by_ref()
+        .find(|line| !line.trim().is_empty())
+        .ok_or_else(|| format!("hunspell response truncated at {word}"))?;
+    let mut replies = vec![first];
+    for line in lines {
+        if line.trim().is_empty() {
+            break;
+        }
+        replies.push(line);
+    }
+    Ok(replies)
+}
+
+/// Returns None for an accepted word, Some(suggestions) for a spelling issue.
+/// Suggestions are only safe when Hunspell checked the complete input as a
+/// single token. A compound/split response must never supply a replacement
+/// for one fragment as though it replaced the author's entire word.
+fn classify_hunspell_replies(
+    word: &str,
+    replies: &[&str],
+) -> Result<Option<Vec<String>>, String> {
+    let mut misspelled = false;
+    for reply in replies {
+        if reply.starts_with("& ") || reply.starts_with("? ") || reply.starts_with("# ") {
+            misspelled = true;
+        } else if !matches!(reply.chars().next(), Some('*' | '+' | '-')) {
+            return Err(format!("unexpected Hunspell response for {word}: {reply}"));
+        }
+    }
+    if !misspelled {
+        return Ok(None);
+    }
+    if replies.len() != 1 {
+        // At least one fragment failed, but suggestions and offsets belong to
+        // individual fragments rather than to this complete source word.
+        return Ok(Some(Vec::new()));
+    }
+    let reply = replies[0];
+    let suggestions = if reply.starts_with("& ") || reply.starts_with("? ") {
+        reply
+            .split_once(": ")
+            .map(|(_, alternatives)| {
+                alternatives
+                    .split(", ")
+                    .filter(|part| !part.is_empty())
+                    .take(6)
+                    .map(str::to_owned)
+                    .collect()
+            })
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    Ok(Some(suggestions))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn italian_interfaccia_with_multiple_hunspell_statuses_is_not_unavailable() {
+        // A dictionary is allowed to tokenize one supplied word into more
+        // than one token. All accepted fragments mean no spelling issue.
+        assert_eq!(
+            classify_hunspell_replies("interfaccia", &["*", "+ inter", "*"]).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn hunspell_split_word_does_not_reuse_fragment_suggestions() {
+        let result = classify_hunspell_replies(
+            "l’éléphant",
+            &["*", "& éléphnt 2 2: éléphant, éléphante"],
+        )
+        .unwrap();
+        assert_eq!(result, Some(Vec::new()));
+    }
+
+    #[test]
+    fn hunspell_multiline_group_keeps_next_word_aligned() {
+        let response = "@(#) Hunspell 1.7\n*\n*\n\n& erore 1 0: errore\n\n*\n\n";
+        let mut lines = response.lines();
+        assert!(lines.next().unwrap().starts_with("@(#)"));
+        let multiple = read_hunspell_replies(&mut lines, "interfaccia").unwrap();
+        assert_eq!(multiple, vec!["*", "*"]);
+        assert_eq!(classify_hunspell_replies("interfaccia", &multiple).unwrap(), None);
+        let typo = read_hunspell_replies(&mut lines, "erore").unwrap();
+        assert_eq!(
+            classify_hunspell_replies("erore", &typo).unwrap(),
+            Some(vec!["errore".to_owned()])
+        );
+        let good = read_hunspell_replies(&mut lines, "testo").unwrap();
+        assert_eq!(classify_hunspell_replies("testo", &good).unwrap(), None);
+    }
+
+    #[test]
+    fn hunspell_unexpected_reply_still_reports_protocol_error() {
+        assert!(classify_hunspell_replies("interfaccia", &["UNEXPECTED"]).is_err());
+    }
 
     #[test]
     fn locale_validation() {
