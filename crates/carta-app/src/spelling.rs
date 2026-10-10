@@ -112,8 +112,12 @@ pub fn scan_document(
     let mut command = Command::new("hunspell");
     command.arg("-a").arg("-i").arg("UTF-8").arg("-d");
     match dictionary {
-        DictionaryLocation::System => { command.arg(language); }
-        DictionaryLocation::Managed(base) => { command.arg(base); }
+        DictionaryLocation::System => {
+            command.arg(language);
+        }
+        DictionaryLocation::Managed(base) => {
+            command.arg(base);
+        }
     }
     let personal = archive_root
         .join("spelling")

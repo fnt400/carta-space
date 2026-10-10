@@ -102,7 +102,6 @@ impl App {
         Ok(())
     }
 
-
     fn queue_dictionary(&mut self, language: &str) {
         self.status = match self.dictionaries.ensure(language) {
             Ok(true) => format!("Dictionary {language} ready"),
@@ -144,7 +143,10 @@ impl App {
         let current = self.editor.cursor().region;
         // Request every needed language before reviewing any words. All
         // missing dictionaries are prepared by workers, never on the UI loop.
-        let languages: HashSet<String> = self.editor.regions().iter()
+        let languages: HashSet<String> = self
+            .editor
+            .regions()
+            .iter()
             .enumerate()
             .filter(|(index, _)| work || *index == current)
             .map(|(_, region)| self.document_language(region.document))
@@ -179,7 +181,9 @@ impl App {
                 &region.text,
                 &language,
                 self.archive.root(),
-                self.dictionaries.location(&language).expect("all languages verified"),
+                self.dictionaries
+                    .location(&language)
+                    .expect("all languages verified"),
             ) {
                 Ok(found) => issues.extend(found),
                 Err(error) => {
