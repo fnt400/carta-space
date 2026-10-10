@@ -341,9 +341,8 @@ impl App {
         if choice == "change-language" {
             // Keep the current review intact so cancelling the language
             // selector returns to precisely this suspicious word.
-            return self.select_document_language_with_action(
-                SelectAction::SetSpellingDocumentLanguage,
-            );
+            return self
+                .select_document_language_with_action(SelectAction::SetSpellingDocumentLanguage);
         }
         if let Some(index) = choice.strip_prefix("replace:") {
             let index: usize = index.parse()?;
@@ -473,7 +472,9 @@ mod spelling_quit_tests {
             panic!("Escape should restore spelling suggestion selector");
         };
         assert_eq!(*action, SelectAction::SpellingSuggestion);
-        assert!(choices.iter().any(|choice| choice.value == "change-language"));
+        assert!(choices
+            .iter()
+            .any(|choice| choice.value == "change-language"));
         assert_eq!(app.spelling.as_ref().unwrap().next, 0);
         assert_eq!(
             app.archive
