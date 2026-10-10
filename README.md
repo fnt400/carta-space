@@ -1,5 +1,7 @@
 # Carta Space
 
+<img src="assets/carta-space.png" alt="Carta Space logo" width="160">
+
 > **Current release:** v0.1.2  
 > **Format draft:** 0.1  
 > **Platforms:** Linux and macOS  
@@ -130,6 +132,19 @@ repository checkout:
 nix build
 ./result/bin/carta-gui
 ```
+
+To install the graphical development version directly from GitHub on NixOS:
+
+```bash
+nix profile install 'github:fnt400/carta-space/opencode/v0.2#carta-gui'
+```
+
+The package installs `carta-space.desktop` and the Carta Space icon in
+`share/icons/hicolor/256x256/apps/carta-space.png`. Desktop environments
+that discover the profile's application entries, including a suitably
+configured GNOME session, will show the Carta Space launcher with its logo.
+For a system-wide NixOS installation, add the `carta-gui` flake package to
+`environment.systemPackages`.
 
 The GUI wrapper adds Git, curl, Typst and Hunspell to its runtime `PATH`.
 Carta downloads the dictionary for `it_IT`, `fr_FR`, `en_GB` or another

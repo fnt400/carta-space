@@ -104,7 +104,7 @@
                 desktopName = "Carta Space";
                 genericName = "Text Editor";
                 comment = "Distraction-free writing inspired by the Canon Cat";
-                icon = "accessories-text-editor";
+                icon = "carta-space";
                 exec = "carta-gui";
                 categories = [ "Office" "TextEditor" ];
                 terminal = false;
@@ -113,6 +113,11 @@
             ];
 
             postInstall = ''
+              # Install the project logo under the freedesktop icon theme
+              # directory, so Icon=carta-space resolves in GNOME and other DEs.
+              install -Dm644 ${./assets/carta-space.png} \
+                "$out/share/icons/hicolor/256x256/apps/carta-space.png"
+
               # The desktop entry launches with no arguments. In that case
               # open the same XDG default Archive as the TUI; keep explicitly
               # provided Archive paths working from the command line.
