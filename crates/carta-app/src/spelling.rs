@@ -107,9 +107,8 @@ fn spelling_words(source: &str, language: &str) -> Vec<(Range<usize>, String)> {
     words(source)
         .into_iter()
         .map(|(mut span, mut word)| {
-            while let Some((apostrophe, mark)) = word
-                .char_indices()
-                .find(|(_, ch)| matches!(ch, '\'' | '’'))
+            while let Some((apostrophe, mark)) =
+                word.char_indices().find(|(_, ch)| matches!(ch, '\'' | '’'))
             {
                 let prefix = &word[..apostrophe];
                 let rest = &word[apostrophe + mark.len_utf8()..];
@@ -130,18 +129,19 @@ fn spelling_words(source: &str, language: &str) -> Vec<(Range<usize>, String)> {
 fn is_elision_prefix(prefix: &str, language: &str) -> bool {
     let allowed: &[&str] = match language {
         "it_IT" => &[
-            "l", "d", "all", "dall", "dell", "nell", "sull", "un", "quest",
-            "quell", "c", "m", "t", "s", "v", "gl", "ch", "anch", "senz",
-            "com", "cos", "dov", "bell", "grand", "mezz", "sant", "nessun",
-            "tutt", "gliel",
+            "l", "d", "all", "dall", "dell", "nell", "sull", "un", "quest", "quell", "c", "m", "t",
+            "s", "v", "gl", "ch", "anch", "senz", "com", "cos", "dov", "bell", "grand", "mezz",
+            "sant", "nessun", "tutt", "gliel",
         ],
         "fr_FR" => &[
-            "l", "d", "j", "m", "t", "s", "n", "c", "qu", "jusqu", "lorsqu",
-            "puisqu", "quelqu", "entr", "presqu", "quoiqu",
+            "l", "d", "j", "m", "t", "s", "n", "c", "qu", "jusqu", "lorsqu", "puisqu", "quelqu",
+            "entr", "presqu", "quoiqu",
         ],
         _ => return false,
     };
-    allowed.iter().any(|candidate| prefix.eq_ignore_ascii_case(candidate))
+    allowed
+        .iter()
+        .any(|candidate| prefix.eq_ignore_ascii_case(candidate))
 }
 
 pub fn scan_document(
@@ -406,7 +406,13 @@ mod tests {
         assert_eq!(
             terms,
             vec![
-                "umanità", "umanità", "amore", "amica", "è", "anno", "ummanità"
+                "umanità",
+                "umanità",
+                "amore",
+                "amica",
+                "è",
+                "anno",
+                "ummanità"
             ]
         );
         for (range, word) in found {
