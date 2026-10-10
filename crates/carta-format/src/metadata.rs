@@ -194,7 +194,9 @@ impl DocumentMetadata {
     pub fn with_language(&self, language: Option<&str>) -> Self {
         let mut metadata = self.clone();
         if let Some(language) = language {
-            metadata.extensions.insert("language".to_owned(), Value::String(language.to_owned()));
+            metadata
+                .extensions
+                .insert("language".to_owned(), Value::String(language.to_owned()));
         } else {
             metadata.extensions.remove("language");
         }

@@ -770,16 +770,26 @@ impl Archive {
     }
 
     /// Change only administrative metadata, leaving text and modified timestamp intact.
-    pub fn set_document_language(&mut self, id: DocumentId, language: Option<&str>) -> Result<(), Error> {
-        if let Some(lang) = language { validate_spelling_language(lang)?; }
+    pub fn set_document_language(
+        &mut self,
+        id: DocumentId,
+        language: Option<&str>,
+    ) -> Result<(), Error> {
+        if let Some(lang) = language {
+            validate_spelling_language(lang)?;
+        }
         self.ensure_document_unlocked(id)?;
         let info = self.documents.get(&id).ok_or(Error::MissingDocument(id))?;
         self.ensure_document_current(info)?;
         let metadata = info.metadata.with_language(language);
-        if metadata == info.metadata { return Ok(()); }
+        if metadata == info.metadata {
+            return Ok(());
+        }
         let path = info.path.join("meta.json");
         let mut bytes = Vec::new();
-        metadata.write_to(&mut bytes).map_err(|error| Error::format(&path, error))?;
+        metadata
+            .write_to(&mut bytes)
+            .map_err(|error| Error::format(&path, error))?;
         atomic_replace(&path, &bytes)?;
         let info = self.documents.get_mut(&id).expect("checked above");
         info.metadata = metadata;
@@ -813,17 +823,31 @@ impl Archive {
         self.change_personal_word(language, word, false)
     }
 
-    fn change_personal_word(&mut self, language: &str, word: &str, add: bool) -> Result<bool, Error> {
+    fn change_personal_word(
+        &mut self,
+        language: &str,
+        word: &str,
+        add: bool,
+    ) -> Result<bool, Error> {
         validate_spelling_word(word)?;
         let path = spelling_path(&self.root, language)?;
         let mut words: std::collections::BTreeSet<_> =
             self.personal_words(language)?.into_iter().collect();
-        let changed = if add { words.insert(word.to_owned()) } else { words.remove(word) };
-        if !changed { return Ok(false); }
+        let changed = if add {
+            words.insert(word.to_owned())
+        } else {
+            words.remove(word)
+        };
+        if !changed {
+            return Ok(false);
+        }
         let directory = self.root.join("spelling");
         fs::create_dir_all(&directory).map_err(|error| Error::io(&directory, error))?;
-        let content = if words.is_empty() { String::new() }
-                      else { words.into_iter().collect::<Vec<_>>().join("\n") + "\n" };
+        let content = if words.is_empty() {
+            String::new()
+        } else {
+            words.into_iter().collect::<Vec<_>>().join("\n") + "\n"
+        };
         atomic_replace(&path, content.as_bytes())?;
         ensure_spelling_merge_attribute(&self.root)?;
         Ok(true)
@@ -1643,8 +1667,10 @@ mod tests {
 
 fn validate_spelling_language(language: &str) -> Result<(), Error> {
     let bytes = language.as_bytes();
-    if bytes.len() != 5 || !bytes[0..2].iter().all(u8::is_ascii_lowercase)
-        || bytes[2] != b'_' || !bytes[3..5].iter().all(u8::is_ascii_uppercase)
+    if bytes.len() != 5
+        || !bytes[0..2].iter().all(u8::is_ascii_lowercase)
+        || bytes[2] != b'_'
+        || !bytes[3..5].iter().all(u8::is_ascii_uppercase)
     {
         return Err(Error::InvalidSpellingLanguage(language.to_owned()));
     }
@@ -1652,10 +1678,14 @@ fn validate_spelling_language(language: &str) -> Result<(), Error> {
 }
 
 fn validate_spelling_word(word: &str) -> Result<(), Error> {
-    if word.is_empty() || word.len() > 128 || !word.chars().any(char::is_alphabetic)
-       || word.chars().any(|c| !(c.is_alphabetic() || matches!(c, '\'' | '’' | '-')))
-       || !word.chars().next().is_some_and(char::is_alphabetic)
-       || !word.chars().next_back().is_some_and(char::is_alphabetic)
+    if word.is_empty()
+        || word.len() > 128
+        || !word.chars().any(char::is_alphabetic)
+        || word
+            .chars()
+            .any(|c| !(c.is_alphabetic() || matches!(c, '\'' | '’' | '-')))
+        || !word.chars().next().is_some_and(char::is_alphabetic)
+        || !word.chars().next_back().is_some_and(char::is_alphabetic)
     {
         return Err(Error::InvalidSpellingWord(word.to_owned()));
     }
@@ -1692,11 +1722,16 @@ fn ensure_spelling_merge_attribute(root: &Path) -> Result<(), Error> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
         Err(error) => return Err(Error::io(&path, error)),
     };
-    if text.lines().any(|line| line.trim() == "spelling/*.dic merge=union") {
+    if text
+        .lines()
+        .any(|line| line.trim() == "spelling/*.dic merge=union")
+    {
         return Ok(());
     }
     let mut updated = text;
-    if !updated.is_empty() && !updated.ends_with('\n') { updated.push('\n'); }
+    if !updated.is_empty() && !updated.ends_with('\n') {
+        updated.push('\n');
+    }
     updated.push_str("spelling/*.dic merge=union\n");
     atomic_replace(&path, updated.as_bytes())
 }
@@ -1712,23 +1747,41 @@ mod spelling_archive_tests {
         let mut archive = Archive::create(&root).unwrap();
         let original = archive.create_document("Café français.\n").unwrap();
         assert_eq!(archive.read_document(original).unwrap().language(), None);
-        archive.set_document_language(original, Some("fr_FR")).unwrap();
-        assert_eq!(archive.read_document(original).unwrap().language(), Some("fr_FR"));
+        archive
+            .set_document_language(original, Some("fr_FR"))
+            .unwrap();
+        assert_eq!(
+            archive.read_document(original).unwrap().language(),
+            Some("fr_FR")
+        );
 
         assert!(archive.add_personal_word("fr_FR", "Proxmox").unwrap());
         assert!(archive.add_personal_word("fr_FR", "Éléphant").unwrap());
         assert!(!archive.add_personal_word("fr_FR", "Proxmox").unwrap());
-        assert_eq!(archive.personal_words("fr_FR").unwrap(),
-            vec!["Proxmox".to_owned(), "Éléphant".to_owned()]);
-        assert_eq!(archive.personal_words("it_IT").unwrap(), Vec::<String>::new());
+        assert_eq!(
+            archive.personal_words("fr_FR").unwrap(),
+            vec!["Proxmox".to_owned(), "Éléphant".to_owned()]
+        );
+        assert_eq!(
+            archive.personal_words("it_IT").unwrap(),
+            Vec::<String>::new()
+        );
         assert!(root.join(".gitattributes").is_file());
-        archive.checkpoint(crate::CheckpointKind::Structural, Some("Spelling test")).unwrap();
+        archive
+            .checkpoint(crate::CheckpointKind::Structural, Some("Spelling test"))
+            .unwrap();
 
         let mut restored = Archive::open(&root).unwrap();
-        assert_eq!(restored.read_document(original).unwrap().language(), Some("fr_FR"));
+        assert_eq!(
+            restored.read_document(original).unwrap().language(),
+            Some("fr_FR")
+        );
         assert_eq!(restored.personal_words("fr_FR").unwrap().len(), 2);
         assert!(restored.remove_personal_word("fr_FR", "Proxmox").unwrap());
-        assert_eq!(restored.personal_words("fr_FR").unwrap(), vec!["Éléphant".to_owned()]);
+        assert_eq!(
+            restored.personal_words("fr_FR").unwrap(),
+            vec!["Éléphant".to_owned()]
+        );
     }
 
     #[test]
@@ -1736,12 +1789,23 @@ mod spelling_archive_tests {
         let scratch = tempfile::tempdir().unwrap();
         let mut archive = Archive::create(scratch.path().join("archive")).unwrap();
         let source = archive.create_document("Bonjour le monde.\n").unwrap();
-        archive.set_document_language(source, Some("fr_FR")).unwrap();
+        archive
+            .set_document_language(source, Some("fr_FR"))
+            .unwrap();
         let duplicate = archive.duplicate_document(source).unwrap();
-        assert_eq!(archive.read_document(duplicate).unwrap().language(), Some("fr_FR"));
+        assert_eq!(
+            archive.read_document(duplicate).unwrap().language(),
+            Some("fr_FR")
+        );
         let split = archive.split_document_at(source, 8).unwrap();
-        assert_eq!(archive.read_document(split).unwrap().language(), Some("fr_FR"));
-        assert_eq!(archive.read_document(source).unwrap().language(), Some("fr_FR"));
+        assert_eq!(
+            archive.read_document(split).unwrap().language(),
+            Some("fr_FR")
+        );
+        assert_eq!(
+            archive.read_document(source).unwrap().language(),
+            Some("fr_FR")
+        );
     }
 
     #[test]

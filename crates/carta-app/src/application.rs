@@ -522,7 +522,13 @@ impl App {
         };
     }
     pub fn cancel_mode(&mut self) {
-        if matches!(&self.mode, AppMode::Selector { action: SelectAction::SpellingSuggestion, .. }) {
+        if matches!(
+            &self.mode,
+            AppMode::Selector {
+                action: SelectAction::SpellingSuggestion,
+                ..
+            }
+        ) {
             self.spelling = None;
             self.editor.clear_cat_highlight();
             self.cat_navigation();
