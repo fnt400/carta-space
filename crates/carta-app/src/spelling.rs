@@ -245,7 +245,10 @@ mod tests {
     #[test]
     fn code_blocks_are_not_prose() {
         let text = "~~~rust\nsyntheticcode\n~~~\n\nproseword\n\n    indentedcode\n";
-        let found = words(text).into_iter().map(|(_, word)| word).collect::<Vec<_>>();
+        let found = words(text)
+            .into_iter()
+            .map(|(_, word)| word)
+            .collect::<Vec<_>>();
         assert!(found.contains(&"proseword".to_owned()));
         assert!(!found.contains(&"syntheticcode".to_owned()));
         assert!(!found.contains(&"indentedcode".to_owned()));
@@ -255,7 +258,10 @@ mod tests {
     fn italian_trailing_apostrophe_is_part_of_word() {
         let source = "po' po’ l'éléphant l’éléphant";
         let found = words(source);
-        let terms = found.iter().map(|(_, word)| word.as_str()).collect::<Vec<_>>();
+        let terms = found
+            .iter()
+            .map(|(_, word)| word.as_str())
+            .collect::<Vec<_>>();
         assert_eq!(terms, vec!["po'", "po’", "l'éléphant", "l’éléphant"]);
         for (range, word) in found {
             assert_eq!(&source[range], word);
