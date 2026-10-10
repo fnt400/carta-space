@@ -692,7 +692,7 @@ can delay further sync attempts, but not writing or Quit. Runtime responsiveness
 and physical window/keyboard testing remain separate from synthetic tests.
 
 
-## DD-021 — Optional, on-demand spelling without a second editor model (v0.2)
+## DD-055 — Optional, on-demand spelling without a second editor model (v0.2)
 
 **Decision:** spelling is an optional frontend-independent operation exposed
 through `carta-app` command palette, backed by the installed Hunspell binary.
@@ -708,7 +708,7 @@ each computer. Missing backends must never block writing. Concurrent additions
 use Git union merge for personal lists; this is not a general conflict strategy
 for arbitrary files. Avoid using union semantics to infer deletion intent.
 
-## DD-0XX — On-demand, device-local dictionary distribution (v0.2)
+## DD-056 — On-demand, device-local dictionary distribution (v0.2)
 
 **Decision:** Keep the canonical Document language metadata and Archive personal
 word lists unchanged. Provide a frontend-independent asynchronous dictionary
