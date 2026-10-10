@@ -198,3 +198,13 @@ After local Clippy/test/build verification, confirm on a Wayland/X11 desktop:
 4. In Work View, verify an uninterrupted generated separator across the writing width, without changing or copying authored text.
 5. Extend a Cat highlight with both LEAP keys, paste the selection into another application, use Right Control+C on an extended highlight for Cat COPY, and use Right Control+C without one to paste clipboard text, including CRLF line endings.
 
+
+
+### Optional spelling
+
+The desktop GUI receives the same Document/Work spelling and language commands
+from \`carta-app\` as the TUI. The spell checker invokes the **system** Hunspell
+binary on request; there is no GUI-specific spelling engine or automatic
+underlining. Install Hunspell and language dictionaries in the GUI environment.
+Personal word additions and per-Document language metadata follow Archive Git
+checkpoints and synchronization.

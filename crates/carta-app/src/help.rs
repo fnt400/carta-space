@@ -195,7 +195,21 @@ Carta attempts synchronization at startup when the Archive is clean, after check
 Carta uses fetch, Archive-identity validation, fast-forward or a normal three-way merge, then push. It does not normally rebase or force-push. If Git cannot merge diverged histories cleanly, Carta leaves the working tree untouched, preserves both histories, and reports a sync conflict that cannot complete until the histories are reconciled."#,
     },
     HelpDocument {
-        title: "12. Keyboard and terminal notes",
+        title: "12. Spelling",
+        body: r#"Spelling is optional and available on request, not while typing. Install Hunspell and the system dictionaries for the languages you use; Carta does not download or bundle them.
+
+Choose Check Document Spelling in the palette for the current Document, or Check Work Spelling in a Work View to check all its member Documents in order. Each Document uses its own spelling language.
+
+Set Document Language assigns Italian, French, English or another offered locale to a Document; System default removes the override. The choice lives in Document metadata and follows Git synchronization. New, legacy Documents without a language use the host locale.
+
+When a suspicious word is found, choose a suggested replacement, Ignore once, Ignore all (this check), or Add to personal dictionary. A replacement uses the normal editor selection and is undoable. Locked Documents cannot be changed. Esc ends the review.
+
+The Archive stores personal word lists under spelling/<language>.dic. Additions and removals are checkpointed and synced with the Archive. Remove Dictionary Word from the palette removes an entry in the current Document's language. Standard Hunspell dictionaries remain installed locally and are never duplicated in the Archive.
+
+The scanner considers CommonMark readable Text spans and skips code, raw HTML and URL destinations. It conservatively skips source ranges that differ from their rendered Markdown text. This feature is not grammar checking."#,
+    },
+    HelpDocument {
+        title: "13. Keyboard and terminal notes",
         body: r#"Carta Space relies on terminals that can distinguish physical modifier keys and press/release events.
 
 Left Control and Left Alt are the two LEAP keys. Right Alt/AltGr is reserved for normal international text entry and is never LEAP. Right Control is the Carta command modifier.

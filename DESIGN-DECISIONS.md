@@ -690,3 +690,20 @@ Git network work never runs in Drop or the event loop. This change introduces
 no network deadline or child-process cancellation policy: a stalled transfer
 can delay further sync attempts, but not writing or Quit. Runtime responsiveness
 and physical window/keyboard testing remain separate from synthetic tests.
+
+
+## DD-021 — Optional, on-demand spelling without a second editor model (v0.2)
+
+**Decision:** spelling is an optional frontend-independent operation exposed
+through \`carta-app\` command palette, backed by the installed Hunspell binary.
+Each Document has an optional language in \`meta.json\`; a Work uses each
+member Document's language and never copies member content. Personal additions
+are portable canonical text lists in the Archive and travel through Git. The
+existing editor performs all replacements, preserving Undo/Redo and locking.
+No network model, grammar engine, live underlining, background process or
+new language-specific metadata format is introduced.
+
+**Tradeoff:** Hunspell and base language dictionaries must be installed on
+each computer. Missing backends must never block writing. Concurrent additions
+use Git union merge for personal lists; this is not a general conflict strategy
+for arbitrary files. Avoid using union semantics to infer deletion intent.
