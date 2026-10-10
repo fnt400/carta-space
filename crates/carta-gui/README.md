@@ -203,8 +203,11 @@ After local Clippy/test/build verification, confirm on a Wayland/X11 desktop:
 ### Optional spelling
 
 The desktop GUI receives the same Document/Work spelling and language commands
-from `carta-app` as the TUI. The spell checker invokes the **system** Hunspell
-binary on request; there is no GUI-specific spelling engine or automatic
-underlining. Install Hunspell and language dictionaries in the GUI environment.
-Personal word additions and per-Document language metadata follow Archive Git
-checkpoints and synchronization.
+from `carta-app` as the TUI. The spell checker invokes **external** Hunspell on
+request; there is no GUI-specific spelling engine or automatic underlining.
+The Nix GUI wrapper supplies Git, Typst and a Hunspell executable already
+configured with Italian, French, British/US English, German and Spanish
+dictionaries. The host does not need to install these globally. When starting
+the GUI with `cargo run` inside Distrobox, the container must supply Hunspell
+and the appropriate dictionaries separately. Personal word additions and
+per-Document language metadata follow Archive Git checkpoints and synchronization.

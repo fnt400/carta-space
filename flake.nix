@@ -14,6 +14,23 @@
           pkgs = import nixpkgs { inherit system; };
           inherit (pkgs) lib stdenv;
 
+          # Runtime tools are private to the Carta editor wrappers. The
+          # dictionary-enabled Hunspell wrapper sets DICPATH itself, so the
+          # selected languages work without global host packages or symlinks.
+          cartaHunspell = pkgs.hunspellWithDicts [
+            pkgs.hunspellDicts.it_IT
+            pkgs.hunspellDicts."fr-moderne"
+            pkgs.hunspellDicts."en_GB-ise"
+            pkgs.hunspellDicts.en_US
+            pkgs.hunspellDicts.de_DE
+            pkgs.hunspellDicts.es_ES
+          ];
+          cartaEditorPath = lib.makeBinPath [
+            pkgs.git
+            pkgs.typst
+            cartaHunspell
+          ];
+
           # Preserve the frozen terminal frontend and CLI as a separate package.
           cartaSpace = pkgs.rustPlatform.buildRustPackage {
             pname = "carta-space";
@@ -43,7 +60,7 @@
                 "$out/bin/carta-cli"
 
               wrapProgram "$out/bin/carta" \
-                --prefix PATH : ${lib.makeBinPath [ pkgs.git pkgs.typst ]}
+                --prefix PATH : ${cartaEditorPath}
               wrapProgram "$out/bin/carta-cli" \
                 --prefix PATH : ${lib.makeBinPath [ pkgs.git ]}
 
@@ -107,7 +124,7 @@
               # open the same XDG default Archive as the TUI; keep explicitly
               # provided Archive paths working from the command line.
               wrapProgram "$out/bin/carta-gui" \
-                --prefix PATH : ${lib.makeBinPath [ pkgs.git ]} \
+                --prefix PATH : ${cartaEditorPath} \
                 --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath guiLibraries} \
                 --run 'if [ "$#" -eq 0 ]; then set -- "''${XDG_DATA_HOME:-$HOME/.local/share}/carta/archive"; fi'
             '';

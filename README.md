@@ -28,7 +28,7 @@ Carta Space supports Linux and macOS. Nix is one installation option, not a requ
 - **build from source** — the broadest route across Linux distributions, architectures, and macOS;
 - **Nix / NixOS** — native flake packaging, without `steam-run` or `nix-ld`.
 
-Git is a runtime dependency because Carta archive history and synchronization are Git-backed. Builds with built-in PDF publication additionally require Typst 0.15.1 or newer at runtime; Markdown export does not require Typst. The Nix package supplies both dependencies automatically.
+Git is a runtime dependency because Carta archive history and synchronization are Git-backed. PDF publication additionally requires Typst 0.15.1 or newer at runtime; optional spelling requires Hunspell and language dictionaries. The v0.2 Nix editor packages provide Git, Typst, Hunspell and the dictionaries automatically, without installing these tools globally.
 
 ### Prebuilt Linux x86_64
 
@@ -117,7 +117,7 @@ nix profile install github:fnt400/carta-space
 carta
 ```
 
-The Nix package builds Carta natively and supplies its Git and Typst runtime dependencies.
+The Nix package builds Carta natively. The v0.2 GUI and terminal packages provide Git, Typst and dictionary-enabled Hunspell inside their own wrappers (Italian, French, UK/US English, German and Spanish); no separate NixOS system packages are needed.
 
 On first launch, `carta` opens the default XDG archive location and offers to create an empty Archive or import an existing Git Archive when none exists.
 
@@ -130,6 +130,26 @@ repository checkout:
 nix build
 ./result/bin/carta-gui
 ```
+
+The GUI wrapper adds Git, Typst and Hunspell with dictionaries to its runtime
+`PATH`. It uses Nixpkgs' `hunspellWithDicts` (including `DICPATH`) so the
+spell-checker's locale codes such as `it_IT`, `fr_FR` and `en_GB` work without
+installing those packages on the host. PDF export uses the same bundled Typst.
+
+A quick isolated spelling test (without opening your real Archive):
+
+```bash
+TEST_ARCHIVE="$(mktemp -d)/archive"
+nix run .#carta-cli -- create "$TEST_ARCHIVE"
+./result/bin/carta-gui "$TEST_ARCHIVE"
+```
+
+Enter a sentence with a typo, choose `Set Document Language…` in the palette,
+then `Check Document Spelling`. To test PDF publishing, use
+`Export Document PDF` on the same disposable Archive.
+When running `cargo run` inside Distrobox instead of a Nix wrapper, install
+Hunspell and dictionaries **inside the Distrobox**; Nix's wrapped tools
+are not injected into that environment.
 
 The GUI uses the existing Archive under
 `${XDG_DATA_HOME:-$HOME/.local/share}/carta/archive when launched without
@@ -384,11 +404,12 @@ The working rule is:
 
 ## Optional spelling (v0.2)
 
-Carta uses the **system Hunspell** binary and installed Hunspell dictionaries; neither
-is bundled or required for ordinary editing. Install Hunspell and the appropriate
-language packages (for example Italian, French, British English) in the environment
-where Carta runs. If a dictionary is absent, the palette reports the error without
-modifying any text.
+Carta invokes Hunspell on demand, without loading it into the Rust editor process.
+The v0.2 Nix packages bundle the external Hunspell executable and Italian,
+French, UK/US English, German and Spanish dictionaries into Carta's private
+runtime PATH. Other source/Distrobox installations must provide Hunspell and
+language dictionaries in their own environment. Missing tools never block
+ordinary writing; the palette reports an error without modifying text.
 
 Commands in the shared palette (TUI and GUI):
 
