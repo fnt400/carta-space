@@ -204,7 +204,7 @@ pub struct App {
     pub editor: CompositeEditor,
     spelling: Option<spelling_ui::SpellSession>,
     dictionaries: DictionaryManager,
-    pending_spelling_review: Option<bool>,
+    pending_spelling_review: Option<(bool, Cursor)>,
     pub mode: AppMode,
     pub status: String,
     status_observed: String,

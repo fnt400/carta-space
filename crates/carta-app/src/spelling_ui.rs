@@ -127,10 +127,15 @@ impl App {
         if let Some(error) = failure {
             self.pending_spelling_review = None;
             self.status = error;
-        } else if let Some(work) = self.pending_spelling_review {
-            // start_spelling checks for other still-running languages, then
-            // launches the review once all dictionaries have been prepared.
-            self.start_spelling(work)?;
+        } else if let Some((work, cursor)) = self.pending_spelling_review {
+            // Do not unexpectedly seize the keyboard if the author continued
+            // typing, navigated elsewhere, or entered another palette.
+            if matches!(self.mode, AppMode::Editing) && self.editor.cursor() == cursor {
+                self.start_spelling(work)?;
+            } else {
+                self.pending_spelling_review = None;
+                self.status = "Dictionary ready · Check Spelling when convenient".into();
+            }
         }
         Ok(true)
     }
@@ -164,7 +169,7 @@ impl App {
             }
         }
         if pending {
-            self.pending_spelling_review = Some(work);
+            self.pending_spelling_review = Some((work, self.editor.cursor()));
             self.status = "Preparing spelling dictionaries in background…".into();
             return Ok(());
         }
