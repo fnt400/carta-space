@@ -2,6 +2,8 @@ use crate::editor::{CompositeEditor, Cursor, Region};
 use crate::help::{documents as help_documents, HelpKind};
 use crate::palette;
 use crate::session::{Position, SavedView, Session};
+#[path = "spelling_ui.rs"]
+mod spelling_ui;
 use crate::Action;
 use carta_core::{
     Archive, CartaLinkTarget, CheckpointKind, Conflict, ConflictChoice, DocumentId, LeapDirection,
@@ -68,6 +70,10 @@ pub enum Command {
     InsertLink,
     OpenLink,
     ShowBacklinks,
+    CheckDocumentSpelling,
+    CheckWorkSpelling,
+    SetDocumentLanguage,
+    RemoveDictionaryWord,
     Back,
     Forward,
     History,
@@ -140,6 +146,10 @@ impl Command {
             Self::InsertLink => "Insert Link…",
             Self::OpenLink => "Open Link",
             Self::ShowBacklinks => "Show Backlinks",
+            Self::CheckDocumentSpelling => "Check Document Spelling",
+            Self::CheckWorkSpelling => "Check Work Spelling",
+            Self::SetDocumentLanguage => "Set Document Language…",
+            Self::RemoveDictionaryWord => "Remove Dictionary Word…",
             Self::Back => "Back",
             Self::Forward => "Forward",
             Self::History => "Document History",
@@ -191,6 +201,7 @@ pub struct App {
     pub archive: Archive,
     pub view: View,
     pub editor: CompositeEditor,
+    spelling: Option<spelling_ui::SpellSession>,
     pub mode: AppMode,
     pub status: String,
     status_observed: String,
@@ -290,6 +301,7 @@ impl App {
             archive,
             view,
             editor,
+            spelling: None,
             mode: AppMode::Editing,
             status: String::new(),
             status_observed: String::new(),
@@ -423,6 +435,9 @@ impl App {
                 AddToWork,
                 InsertLink,
                 ShowBacklinks,
+                CheckDocumentSpelling,
+                SetDocumentLanguage,
+                RemoveDictionaryWord,
                 History,
                 InsertDateTime,
                 Trash,
@@ -458,6 +473,7 @@ impl App {
                 MoveAfter,
                 ExportWorkMarkdown,
                 ExportWorkPdf,
+                CheckWorkSpelling,
             ]);
         }
         if has_doc && self.link_under_cursor().is_some() {
@@ -506,6 +522,11 @@ impl App {
         };
     }
     pub fn cancel_mode(&mut self) {
+        if matches!(&self.mode, AppMode::Selector { action: SelectAction::SpellingSuggestion, .. }) {
+            self.spelling = None;
+            self.editor.clear_cat_highlight();
+            self.cat_navigation();
+        }
         self.mode = AppMode::Editing;
         self.status.clear();
     }
@@ -768,6 +789,10 @@ impl App {
             }
             InsertLink => self.select_links()?,
             OpenLink => self.open_link()?,
+            CheckDocumentSpelling => self.start_spelling(false)?,
+            CheckWorkSpelling => self.start_spelling(true)?,
+            SetDocumentLanguage => self.select_document_language()?,
+            RemoveDictionaryWord => self.select_dictionary_word()?,
             ShowBacklinks => {
                 self.autosave_for_destructive()?;
                 self.show_backlinks()?
@@ -1184,6 +1209,9 @@ impl App {
             }
             SelectAction::InsertLink => self.insert_link_choice(&value, &label)?,
             SelectAction::OpenBacklink => self.open_backlink_choice(&value)?,
+            SelectAction::SetDocumentLanguage => self.apply_document_language(&value)?,
+            SelectAction::RemoveDictionaryWord => self.remove_dictionary_word(&value)?,
+            SelectAction::SpellingSuggestion => self.apply_spelling_choice(&value)?,
             _ => {}
         }
         Ok(())

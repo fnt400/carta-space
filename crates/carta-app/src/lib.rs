@@ -11,6 +11,7 @@ pub mod help;
 pub mod mode;
 pub mod palette;
 pub mod session;
+pub mod spelling;
 pub mod status;
 pub mod view;
 
