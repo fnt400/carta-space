@@ -59,8 +59,12 @@ fn words(source: &str) -> Vec<(Range<usize>, String)> {
             continue;
         }
         let mut begin = None;
-        for (index, ch) in raw.char_indices() {
-            if ch.is_alphabetic() {
+        let mut chars = raw.char_indices().peekable();
+        while let Some((index, ch)) = chars.next() {
+            let joiner = matches!(ch, '\'' | '’')
+                && begin.is_some()
+                && chars.peek().is_some_and(|(_, next)| next.is_alphabetic());
+            if ch.is_alphabetic() || joiner {
                 if begin.is_none() {
                     begin = Some(index);
                 }
@@ -126,16 +130,16 @@ pub fn scan_document(
     let output = child
         .wait_with_output()
         .map_err(|error| format!("hunspell process: {error}"))?;
-    writer
+    let written = writer
         .join()
-        .map_err(|_| "Hunspell writer panicked".to_owned())?
-        .map_err(|error| format!("hunspell input: {error}"))?;
+        .map_err(|_| "Hunspell writer panicked".to_owned())?;
     if !output.status.success() {
         return Err(format!(
             "hunspell failed: {}",
             String::from_utf8_lossy(&output.stderr).trim()
         ));
     }
+    written.map_err(|error| format!("hunspell input: {error}"))?;
     let response = String::from_utf8(output.stdout)
         .map_err(|_| "hunspell returned invalid UTF-8".to_owned())?;
     let mut lines = response.lines();
@@ -149,6 +153,16 @@ pub fn scan_document(
             .by_ref()
             .find(|line| !line.trim().is_empty())
             .ok_or_else(|| format!("hunspell response truncated at {word}"))?;
+        // Hunspell terminates each input line with a blank output line.
+        // Refuse ambiguous splits rather than assign suggestions to the wrong word.
+        let mut extra = 0;
+        for response in lines.by_ref() {
+            if response.trim().is_empty() { break; }
+            extra += 1;
+        }
+        if extra != 0 {
+            return Err(format!("Hunspell split {word} into multiple tokens"));
+        }
         if matches!(output.chars().next(), Some('*' | '+' | '-')) {
             continue;
         }
