@@ -198,7 +198,7 @@ Carta uses fetch, Archive-identity validation, fast-forward or a normal three-wa
         title: "12. Spelling",
         body: r#"Spelling is optional and available on request, not while typing. Carta uses Hunspell; the Nix package supplies it, and the Distrobox development setup can install it. When the chosen language is not installed, Carta automatically downloads a verified open-source dictionary in a background worker. Downloaded dictionaries are cached locally, not added to the Archive. After the first download, spelling works offline. No download occurs merely by opening Carta. Other builds must provide the Git, curl and Hunspell runtime programs.
 
-Choose Check Document Spelling in the palette for the current Document, or Check Work Spelling in a Work View to check all its member Documents in order. Each Document uses its own spelling language.
+Choose Check Document Spelling in the palette for the current Document, or Check Work Spelling in a Work View to check all its member Documents in order. Each Document uses its own spelling language. For Italian and French, common apostrophe elisions (for example l'umanità or l’éléphant) are checked on the lexical word after the apostrophe; replacement spans exclude the article or preposition. English contractions remain intact.
 
 Set Document Language assigns Italian, French, English or another offered locale to a Document; System default removes the override. The choice lives in Document metadata and follows Git synchronization. New, legacy Documents without a language use the host locale.
 

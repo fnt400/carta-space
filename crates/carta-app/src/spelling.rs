@@ -132,6 +132,8 @@ fn is_elision_prefix(prefix: &str, language: &str) -> bool {
         "it_IT" => &[
             "l", "d", "all", "dall", "dell", "nell", "sull", "un", "quest",
             "quell", "c", "m", "t", "s", "v", "gl", "ch", "anch", "senz",
+            "com", "cos", "dov", "bell", "grand", "mezz", "sant", "nessun",
+            "tutt", "gliel",
         ],
         "fr_FR" => &[
             "l", "d", "j", "m", "t", "s", "n", "c", "qu", "jusqu", "lorsqu",
@@ -441,9 +443,9 @@ mod tests {
 
     #[test]
     fn elision_preserves_unicode_byte_spans_and_combining_accents() {
-        let source = "L’umanita\\u{300} l'umanità l’un'amica";
+        let source = "L’umanita\u{300} l'umanità l’un'amica";
         let found = spelling_words(source, "it_IT");
-        assert_eq!(found[0].1, "umanita\\u{300}");
+        assert_eq!(found[0].1, "umanita\u{300}");
         assert_eq!(found[0].0.start, "L’".len());
         assert_eq!(found[1].1, "umanità");
         assert_eq!(found[2].1, "amica");
