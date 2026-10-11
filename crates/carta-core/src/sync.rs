@@ -793,8 +793,7 @@ fn update_sync_config(
         .map_err(|error| {
             Error::InvalidSyncRemote(format!("set staging Git permissions: {error}"))
         })?;
-        fs::File::open(&staged_path)
-            .and_then(|file| file.sync_all())
+        crate::durability::sync_file(&staged_path)
             .map_err(|error| {
                 Error::InvalidSyncRemote(format!("fsync staging Git config: {error}"))
             })?;

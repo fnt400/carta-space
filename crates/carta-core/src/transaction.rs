@@ -520,8 +520,7 @@ fn write_manifest(root: &Path, manifest: &TransactionManifest) -> Result<(), Err
         file.sync_all()
             .map_err(|error| Error::io(&temporary, error))?;
         fs::rename(&temporary, &destination).map_err(|error| Error::io(&destination, error))?;
-        File::open(&git)
-            .and_then(|directory| directory.sync_all())
+        crate::durability::sync_directory(&git)
             .map_err(|error| Error::io(&git, error))
     })();
     if result.is_err() {
@@ -533,8 +532,7 @@ fn write_manifest(root: &Path, manifest: &TransactionManifest) -> Result<(), Err
 fn remove_manifest(root: &Path) -> Result<(), Error> {
     let path = manifest_path(root);
     match fs::remove_file(&path) {
-        Ok(()) => File::open(root.join(".git"))
-            .and_then(|directory| directory.sync_all())
+        Ok(()) => crate::durability::sync_directory(&root.join(".git"))
             .map_err(|error| Error::io(root.join(".git"), error)),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(error) => Err(Error::io(path, error)),

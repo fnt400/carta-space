@@ -1264,8 +1264,7 @@ pub(crate) fn atomic_replace(path: &Path, content: &[u8]) -> Result<(), Error> {
         .map_err(|error| Error::io(&temporary, error))?;
     fs::rename(&temporary, path).map_err(|error| Error::io(path, error))?;
     guard.disarm();
-    File::open(parent)
-        .and_then(|directory| directory.sync_all())
+    crate::durability::sync_directory(parent)
         .map_err(|error| Error::io(parent, error))
 }
 
@@ -1513,16 +1512,13 @@ fn create_writer(path: &Path) -> Result<BufWriter<File>, Error> {
 fn sync_created_directory(path: &Path) -> Result<(), Error> {
     for name in ["meta.json", "content.md"] {
         let file = path.join(name);
-        File::open(&file)
-            .and_then(|file| file.sync_all())
+        crate::durability::sync_file(&file)
             .map_err(|error| Error::io(&file, error))?;
     }
-    File::open(path)
-        .and_then(|directory| directory.sync_all())
+    crate::durability::sync_directory(path)
         .map_err(|error| Error::io(path, error))?;
     let parent = path.parent().expect("created directory has a parent");
-    File::open(parent)
-        .and_then(|directory| directory.sync_all())
+    crate::durability::sync_directory(parent)
         .map_err(|error| Error::io(parent, error))
 }
 

@@ -4,6 +4,7 @@ mod backlinks;
 mod conflict;
 mod content;
 mod document;
+mod durability;
 mod error;
 mod history;
 mod package;

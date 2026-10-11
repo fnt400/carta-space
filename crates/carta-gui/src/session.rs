@@ -13,8 +13,13 @@ pub fn data_root() -> io::Result<PathBuf> {
             return Ok(dir.join("carta"));
         }
     }
+    #[cfg(windows)]
+    if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+        return Ok(PathBuf::from(local).join("Carta"));
+    }
     let home = std::env::var_os("HOME")
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "HOME is unset"))?;
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "HOME/USERPROFILE is unset"))?;
     Ok(PathBuf::from(home).join(".local/share/carta"))
 }
 
