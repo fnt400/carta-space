@@ -1770,16 +1770,8 @@ mod tests {
             let version = String::from_utf8_lossy(&git_version.stdout);
             let number = version.split_whitespace().nth(2).unwrap_or("0.0");
             let mut components = number.split('.');
-            let major = components
-                .next()
-                .unwrap_or("0")
-                .parse::<u32>()
-                .unwrap_or(0);
-            let minor = components
-                .next()
-                .unwrap_or("0")
-                .parse::<u32>()
-                .unwrap_or(0);
+            let major = components.next().unwrap_or("0").parse::<u32>().unwrap_or(0);
+            let minor = components.next().unwrap_or("0").parse::<u32>().unwrap_or(0);
             let supports_hasconfig = major > 2 || (major == 2 && minor >= 36);
             for conditional in [false, true] {
                 if conditional && !supports_hasconfig {
