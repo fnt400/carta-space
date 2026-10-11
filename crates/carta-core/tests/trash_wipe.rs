@@ -289,13 +289,9 @@ fn wipe_rewrites_all_local_refs_prunes_objects_and_preserves_unrelated_state() {
         .strip_prefix(archive.root())
         .unwrap()
         .join("content.md");
-    let object = git(
-        &archive,
-        &[
-            "rev-parse",
-            &format!("HEAD:{}", target_path.to_string_lossy()),
-        ],
-    );
+    // Git tree paths always use '/', including when the test runs on Windows.
+    let tracked = target_path.to_string_lossy().replace('\\', "/");
+    let object = git(&archive, &["rev-parse", &format!("HEAD:{tracked}")]);
     assert_git_ok(&object);
     let content_object = String::from_utf8(object.stdout).unwrap().trim().to_owned();
     let branch = git(&archive, &["branch", "retained-copy", "HEAD"]);
