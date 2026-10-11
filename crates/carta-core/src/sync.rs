@@ -269,7 +269,19 @@ pub(crate) fn resolved_sync_urls(root: &Path) -> Result<(String, Vec<String>), E
                     // hostname by the isolated sync transport.
                     let local = root.join(url).to_string_lossy().into_owned();
                     #[cfg(windows)]
-                    let local = local.replace('\\', "/");
+                    let local = {
+                        // canonicalize() on Windows yields verbatim paths such
+                        // as \\\\?\\C:\\...; Git treats //?/C:/... as a
+                        // network path instead of a local drive.
+                        let ordinary = if let Some(unc) = local.strip_prefix(r"\\\\?\\UNC\\") {
+                            format!(r"\\\\{unc}")
+                        } else if let Some(path) = local.strip_prefix(r"\\\\?\\") {
+                            path.to_owned()
+                        } else {
+                            local
+                        };
+                        ordinary.replace('\\', "/")
+                    };
                     local
                 } else {
                     url.to_owned()
