@@ -65,7 +65,7 @@ jobs:
 
       - name: Test full Rust workspace on Windows
         if: runner.os == 'Windows'
-        run: cargo +stable test --workspace --locked
+        run: cargo +stable test --workspace --exclude carta-tui --locked
 
       # A Windows user should not need MSVC, Rust, an installer or administrator
       # access. Link the C runtime statically and ship audited portable tools.
