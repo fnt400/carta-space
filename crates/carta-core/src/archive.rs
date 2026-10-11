@@ -1271,8 +1271,7 @@ pub(crate) fn atomic_replace(path: &Path, content: &[u8]) -> Result<(), Error> {
         .map_err(|error| Error::io(&temporary, error))?;
     fs::rename(&temporary, path).map_err(|error| Error::io(path, error))?;
     guard.disarm();
-    crate::durability::sync_directory(parent)
-        .map_err(|error| Error::io(parent, error))
+    crate::durability::sync_directory(parent).map_err(|error| Error::io(parent, error))
 }
 
 fn recover_creation_staging(root: &Path) -> Result<(), Error> {
@@ -1519,14 +1518,11 @@ fn create_writer(path: &Path) -> Result<BufWriter<File>, Error> {
 fn sync_created_directory(path: &Path) -> Result<(), Error> {
     for name in ["meta.json", "content.md"] {
         let file = path.join(name);
-        crate::durability::sync_file(&file)
-            .map_err(|error| Error::io(&file, error))?;
+        crate::durability::sync_file(&file).map_err(|error| Error::io(&file, error))?;
     }
-    crate::durability::sync_directory(path)
-        .map_err(|error| Error::io(path, error))?;
+    crate::durability::sync_directory(path).map_err(|error| Error::io(path, error))?;
     let parent = path.parent().expect("created directory has a parent");
-    crate::durability::sync_directory(parent)
-        .map_err(|error| Error::io(parent, error))
+    crate::durability::sync_directory(parent).map_err(|error| Error::io(parent, error))
 }
 
 struct CleanupDirectory {

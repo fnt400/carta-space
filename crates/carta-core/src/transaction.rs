@@ -520,8 +520,7 @@ fn write_manifest(root: &Path, manifest: &TransactionManifest) -> Result<(), Err
         file.sync_all()
             .map_err(|error| Error::io(&temporary, error))?;
         fs::rename(&temporary, &destination).map_err(|error| Error::io(&destination, error))?;
-        crate::durability::sync_directory(&git)
-            .map_err(|error| Error::io(&git, error))
+        crate::durability::sync_directory(&git).map_err(|error| Error::io(&git, error))
     })();
     if result.is_err() {
         let _ = fs::remove_file(temporary);

@@ -265,8 +265,7 @@ pub(crate) fn sync_parent(destination: &Path) -> Result<(), Error> {
     let parent = destination
         .parent()
         .expect("safe destinations have a parent");
-    crate::durability::sync_directory(parent)
-        .map_err(|error| Error::io(parent, error))
+    crate::durability::sync_directory(parent).map_err(|error| Error::io(parent, error))
 }
 
 fn relative_name(root: &Path, path: &Path) -> Option<String> {
@@ -456,6 +455,5 @@ fn registry_path(root: &Path) -> PathBuf {
 
 fn sync_git_directory(root: &Path) -> Result<(), Error> {
     let git = root.join(".git");
-    crate::durability::sync_directory(&git)
-        .map_err(|error| Error::io(git, error))
+    crate::durability::sync_directory(&git).map_err(|error| Error::io(git, error))
 }

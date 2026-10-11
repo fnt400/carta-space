@@ -928,9 +928,12 @@ pub(crate) fn git_with_input(
 
 pub(crate) fn git_command(root: &Path) -> Command {
     let mut command = Command::new("git");
-    command
-        .current_dir(root)
-        .args(["-c", "core.autocrlf=false", "--git-dir=.git", "--work-tree=."]);
+    command.current_dir(root).args([
+        "-c",
+        "core.autocrlf=false",
+        "--git-dir=.git",
+        "--work-tree=.",
+    ]);
     command
 }
 

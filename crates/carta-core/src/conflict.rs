@@ -597,8 +597,7 @@ fn write_conflict(root: &Path, conflict: StoredConflict) -> Result<String, Error
         file.sync_all()
             .map_err(|error| Error::io(&temporary, error))?;
         fs::rename(&temporary, &path).map_err(|error| Error::io(&path, error))?;
-        crate::durability::sync_directory(&directory)
-            .map_err(|error| Error::io(&directory, error))
+        crate::durability::sync_directory(&directory).map_err(|error| Error::io(&directory, error))
     })();
     if result.is_err() {
         let _ = fs::remove_file(&temporary);

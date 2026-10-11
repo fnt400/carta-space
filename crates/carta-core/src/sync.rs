@@ -178,10 +178,27 @@ impl SyncEndpoints {
             "fetch pinned sync history",
             &["fetch", "--quiet", "--no-tags", "--", url, head],
         )?;
+        // Older Git versions refuse fetching a non-advertised SHA, even
+        // when the transport has it in FETCH_HEAD. Publish a private ref
+        // before importing the verified object into the live Archive.
+        const PINNED_REF: &str = "refs/carta-transport/pinned";
+        let output = Command::new("git")
+            .current_dir(self.transport.path())
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env(
+                "GIT_CONFIG_GLOBAL",
+                self.transport.path().join("no-global-config"),
+            )
+            .args(["update-ref", PINNED_REF, head])
+            .output()
+            .map_err(|error| Error::io(root, error))?;
+        if !output.status.success() {
+            return Err(command_failed("pin private sync history", output));
+        }
         let transport = self.transport.path().to_string_lossy();
         let refspec = tracking
-            .map(|reference| format!("+{head}:{reference}"))
-            .unwrap_or_else(|| head.to_owned());
+            .map(|reference| format!("+{PINNED_REF}:{reference}"))
+            .unwrap_or_else(|| PINNED_REF.to_owned());
         crate::history::git_output(
             root,
             "import pinned sync history",
@@ -795,10 +812,9 @@ fn update_sync_config(
         .map_err(|error| {
             Error::InvalidSyncRemote(format!("set staging Git permissions: {error}"))
         })?;
-        crate::durability::sync_file(&staged_path)
-            .map_err(|error| {
-                Error::InvalidSyncRemote(format!("fsync staging Git config: {error}"))
-            })?;
+        crate::durability::sync_file(&staged_path).map_err(|error| {
+            Error::InvalidSyncRemote(format!("fsync staging Git config: {error}"))
+        })?;
         unchanged()?;
         staged
             .persist(&config_path)

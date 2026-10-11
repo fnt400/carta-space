@@ -108,7 +108,14 @@ pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
     let status = Command::new("git")
         // The *remote* branch is called carta. The local Archive branch
         // may have a different name, so clone its actual checked-out HEAD.
-        .args(["clone", "--config", "core.autocrlf=false", "--quiet", "--no-hardlinks", "--"])
+        .args([
+            "clone",
+            "--config",
+            "core.autocrlf=false",
+            "--quiet",
+            "--no-hardlinks",
+            "--",
+        ])
         .arg(&source)
         .arg(&clone)
         .status()
@@ -747,13 +754,14 @@ mod tests {
             &["config", "url.../push.git.pushInsteadOf", "synthetic-fetch"],
         );
         let endpoints = SyncEndpoints::resolve(archive.root()).unwrap();
+        // macOS may spell the same temp directory as /var or /private/var.
         assert_eq!(
-            endpoints.fetch,
-            archive.root().join("../fetch.git").to_string_lossy()
+            std::fs::canonicalize(&endpoints.fetch).unwrap(),
+            std::fs::canonicalize(archive.root().join("../fetch.git")).unwrap()
         );
         assert_eq!(
-            endpoints.pushes,
-            vec![archive.root().join("../push.git").to_string_lossy()]
+            std::fs::canonicalize(&endpoints.pushes[0]).unwrap(),
+            std::fs::canonicalize(archive.root().join("../push.git")).unwrap()
         );
         let staged = stage_sync(archive.root().to_path_buf()).unwrap();
         assert!(staged.data.clone.is_none());
