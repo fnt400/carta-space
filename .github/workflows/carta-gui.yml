@@ -102,6 +102,7 @@ jobs:
           & (Join-Path $portable 'tools/typst.exe') --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $archive = Join-Path $portable 'data/carta/archive'
+          New-Item -Path (Split-Path $archive -Parent) -ItemType Directory -Force | Out-Null
           & (Join-Path $portable 'carta-cli.exe') create $archive
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & (Join-Path $portable 'carta-cli.exe') --archive $archive validate
