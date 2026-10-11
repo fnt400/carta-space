@@ -1765,7 +1765,26 @@ mod tests {
     fn global_sync_routing_is_rejected_and_disable_is_authoritative() {
         // Isolate process-wide Git environment changes from parallel tests.
         if std::env::var_os("CARTA_TEST_SYNC_GLOBAL_CONFIG").is_none() {
+            // hasconfig conditional includes require Git 2.36 or newer.
+            let git_version = Command::new("git").arg("--version").output().unwrap();
+            let version = String::from_utf8_lossy(&git_version.stdout);
+            let number = version.split_whitespace().nth(2).unwrap_or("0.0");
+            let mut components = number.split('.');
+            let major = components
+                .next()
+                .unwrap_or("0")
+                .parse::<u32>()
+                .unwrap_or(0);
+            let minor = components
+                .next()
+                .unwrap_or("0")
+                .parse::<u32>()
+                .unwrap_or(0);
+            let supports_hasconfig = major > 2 || (major == 2 && minor >= 36);
             for conditional in [false, true] {
+                if conditional && !supports_hasconfig {
+                    continue;
+                }
                 let temporary = tempfile::tempdir().unwrap();
                 let global = temporary.path().join("synthetic-global-config");
                 let include = temporary.path().join("synthetic-conditional-settings");

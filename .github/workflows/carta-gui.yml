@@ -63,6 +63,10 @@ jobs:
       - name: Build GUI
         run: cargo +stable build --manifest-path crates/carta-gui/Cargo.toml
 
+      - name: Test full Rust workspace on Windows
+        if: runner.os == 'Windows'
+        run: cargo +stable test --workspace --locked
+
       # A Windows user should not need MSVC, Rust, an installer or administrator
       # access. Link the C runtime statically and ship audited portable tools.
       - name: Build Windows portable executables
@@ -91,7 +95,7 @@ jobs:
           $portable = Join-Path $dest 'CartaSpace'
           if (-not (Test-Path (Join-Path $portable 'Start-Carta.cmd'))) { throw 'Launcher missing' }
           if (-not (Test-Path (Join-Path $portable 'carta-gui.exe'))) { throw 'GUI missing' }
-          $env:PATH = "$portable\git\cmd;$portable\git\ucrt64\bin;$portable\git\mingw64\bin;$portable\tools;$env:PATH"
+          $env:PATH = "$portable\git\cmd;$portable\git\ucrt64\bin;$portable\git\mingw64\bin;$portable\git\usr\bin;$portable\tools;$env:PATH"
           $env:XDG_DATA_HOME = Join-Path $portable 'data'
           & (Join-Path $portable 'git/cmd/git.exe') --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

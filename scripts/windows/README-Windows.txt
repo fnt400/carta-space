@@ -27,6 +27,8 @@ Important limitations:
 - Corporate execution restrictions (AppLocker, Defender policy, etc.) may
   block unsigned software. Do not bypass your employer's security policy.
 - Internet access or a Git remote may be blocked by workplace networking.
+- SSH remotes require working Windows user SSH credentials; private HTTPS
+  remotes need suitable credentials as well. No keys or tokens are bundled.
 - Windows directory durability is not identical to Unix directory fsync;
   file contents are explicitly flushed before atomic replacements.
 - Keep backups. Verify a successful push before editing the same archive
