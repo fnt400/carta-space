@@ -45,6 +45,14 @@ Copy-Item -LiteralPath (Join-Path $repo "target/release/carta-cli.exe") -Destina
 Copy-Item -LiteralPath (Join-Path $repo "crates/carta-gui/target/release/carta-gui.exe") -Destination $stage
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "Start-Carta.cmd") -Destination $stage
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "README-Windows.txt") -Destination $stage
+# Carry third-party notices with the executables; sources are pinned to
+# exactly the same tags as the verified binary downloads above.
+$licenses = Join-Path $stage "licenses"
+New-Item -Path $licenses -ItemType Directory -Force | Out-Null
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/git-for-windows/git/v2.56.0.windows.2/COPYING" -OutFile (Join-Path $licenses "Git-COPYING")
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/typst/typst/v0.15.1/LICENSE" -OutFile (Join-Path $licenses "Typst-LICENSE")
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/typst/typst/v0.15.1/NOTICE" -OutFile (Join-Path $licenses "Typst-NOTICE")
+Copy-Item -LiteralPath (Join-Path $repo "LICENSES/OFL-iosevka.txt") -Destination (Join-Path $licenses "Iosevka-OFL.txt")
 if (Test-Path $Output) { Remove-Item -LiteralPath $Output -Force }
 Compress-Archive -Path $stage -DestinationPath $Output -CompressionLevel Optimal
 Write-Host "Created $Output"

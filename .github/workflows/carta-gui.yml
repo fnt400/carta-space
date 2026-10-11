@@ -10,6 +10,7 @@ on:
       - "crates/carta-core/**"
       - "crates/carta-format/**"
       - ".github/workflows/carta-gui.yml"
+      - "scripts/windows/**"
   pull_request:
     paths:
       - "crates/carta-gui/**"
@@ -17,6 +18,7 @@ on:
       - "crates/carta-core/**"
       - "crates/carta-format/**"
       - ".github/workflows/carta-gui.yml"
+      - "scripts/windows/**"
   workflow_dispatch:
 
 permissions:

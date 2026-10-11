@@ -335,6 +335,8 @@ impl Archive {
         let status = Command::new("git")
             .args([
                 "clone",
+                "--config",
+                "core.autocrlf=false",
                 "--branch",
                 "carta",
                 "--single-branch",

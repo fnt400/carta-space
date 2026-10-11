@@ -71,6 +71,13 @@ impl Archive {
             });
         }
 
+        // Markdown/JSON in a Carta Archive must retain canonical LF endings.
+        // Do not inherit Git for Windows' global core.autocrlf=true policy.
+        crate::history::git_output(
+            &staging,
+            "configure canonical Archive line endings",
+            &["config", "--local", "core.autocrlf", "false"],
+        )?;
         crate::history::create_initial_checkpoint(&staging)?;
 
         scan_archive(&guard.path)?;

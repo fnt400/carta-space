@@ -108,7 +108,7 @@ pub fn stage_sync(source: PathBuf) -> Result<StagedSync, Error> {
     let status = Command::new("git")
         // The *remote* branch is called carta. The local Archive branch
         // may have a different name, so clone its actual checked-out HEAD.
-        .args(["clone", "--quiet", "--no-hardlinks", "--"])
+        .args(["clone", "--config", "core.autocrlf=false", "--quiet", "--no-hardlinks", "--"])
         .arg(&source)
         .arg(&clone)
         .status()
