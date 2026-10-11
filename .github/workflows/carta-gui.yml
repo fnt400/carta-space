@@ -60,3 +60,52 @@ jobs:
 
       - name: Build GUI
         run: cargo +stable build --manifest-path crates/carta-gui/Cargo.toml
+
+      # A Windows user should not need MSVC, Rust, an installer or administrator
+      # access. Link the C runtime statically and ship audited portable tools.
+      - name: Build Windows portable executables
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+        run: |
+          cargo +stable build --release --locked --manifest-path crates/carta-gui/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo +stable build --release --locked -p carta-cli
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Package pinned Windows tools
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/windows/package-portable.ps1
+
+      - name: Smoke-test extracted Windows ZIP without installed Git
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dest = Join-Path $env:RUNNER_TEMP 'carta-portable-extracted'
+          Expand-Archive -LiteralPath 'carta-space-windows-x64-portable.zip' -DestinationPath $dest
+          $portable = Join-Path $dest 'CartaSpace'
+          if (-not (Test-Path (Join-Path $portable 'Start-Carta.cmd'))) { throw 'Launcher missing' }
+          if (-not (Test-Path (Join-Path $portable 'carta-gui.exe'))) { throw 'GUI missing' }
+          $env:PATH = "$portable\git\cmd;$portable\git\ucrt64\bin;$portable\git\mingw64\bin;$portable\tools;$env:PATH"
+          $env:XDG_DATA_HOME = Join-Path $portable 'data'
+          & (Join-Path $portable 'git/cmd/git.exe') --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & (Join-Path $portable 'tools/typst.exe') --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $archive = Join-Path $portable 'data/carta/archive'
+          & (Join-Path $portable 'carta-cli.exe') create $archive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & (Join-Path $portable 'carta-cli.exe') --archive $archive validate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload Windows portable preview
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: carta-space-windows-x64-portable
+          path: carta-space-windows-x64-portable.zip
+          retention-days: 30
+          if-no-files-found: error
