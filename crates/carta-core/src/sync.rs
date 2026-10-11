@@ -1088,7 +1088,14 @@ mod tests {
 
     fn clone_archive(remote: &Path, destination: &Path) -> Archive {
         let status = Command::new("git")
-            .args(["clone", "--config", "core.autocrlf=false", "--quiet", "--branch", "carta"])
+            .args([
+                "clone",
+                "--config",
+                "core.autocrlf=false",
+                "--quiet",
+                "--branch",
+                "carta",
+            ])
             .arg(remote)
             .arg(destination)
             .status()
