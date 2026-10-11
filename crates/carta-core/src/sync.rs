@@ -264,7 +264,13 @@ pub(crate) fn resolved_sync_urls(root: &Path) -> Result<(String, Vec<String>), E
             .map(|url| {
                 // Git's local-path form has neither a scheme nor SCP's colon.
                 if !url.contains(':') && !Path::new(url).is_absolute() {
-                    root.join(url).to_string_lossy().into_owned()
+                    // Git for Windows understands forward-slashed drive paths.
+                    // A backslashed C:\\... may instead be parsed as an SCP
+                    // hostname by the isolated sync transport.
+                    let local = root.join(url).to_string_lossy().into_owned();
+                    #[cfg(windows)]
+                    let local = local.replace('\\', "/");
+                    local
                 } else {
                     url.to_owned()
                 }
@@ -1082,7 +1088,7 @@ mod tests {
 
     fn clone_archive(remote: &Path, destination: &Path) -> Archive {
         let status = Command::new("git")
-            .args(["clone", "--quiet", "--branch", "carta"])
+            .args(["clone", "--config", "core.autocrlf=false", "--quiet", "--branch", "carta"])
             .arg(remote)
             .arg(destination)
             .status()
@@ -1120,6 +1126,8 @@ mod tests {
             temporary.path(),
             &[
                 "clone",
+                "--config",
+                "core.autocrlf=false",
                 "--quiet",
                 remote.to_str().unwrap(),
                 cloned_path.to_str().unwrap(),
