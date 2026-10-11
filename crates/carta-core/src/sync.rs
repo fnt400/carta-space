@@ -271,11 +271,11 @@ pub(crate) fn resolved_sync_urls(root: &Path) -> Result<(String, Vec<String>), E
                     #[cfg(windows)]
                     let local = {
                         // canonicalize() on Windows yields verbatim paths such
-                        // as \\\\?\\C:\\...; Git treats //?/C:/... as a
+                        // as \\?\C:\...; Git treats //?/C:/... as a
                         // network path instead of a local drive.
-                        let ordinary = if let Some(unc) = local.strip_prefix(r"\\\\?\\UNC\\") {
-                            format!(r"\\\\{unc}")
-                        } else if let Some(path) = local.strip_prefix(r"\\\\?\\") {
+                        let ordinary = if let Some(unc) = local.strip_prefix(r"\\?\UNC\") {
+                            format!(r"\\{unc}")
+                        } else if let Some(path) = local.strip_prefix(r"\\?\") {
                             path.to_owned()
                         } else {
                             local
