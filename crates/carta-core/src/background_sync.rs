@@ -774,13 +774,16 @@ mod tests {
         );
         assert_eq!(staged.apply(&mut archive).unwrap(), SyncApply::Stale);
         let endpoints = SyncEndpoints::resolve(archive.root()).unwrap();
-        assert_eq!(
-            endpoints.pushes,
-            vec![
-                archive.root().join("../fetch.git").to_string_lossy(),
-                archive.root().join("../other.git").to_string_lossy()
-            ]
-        );
+        let actual: Vec<_> = endpoints
+            .pushes
+            .iter()
+            .map(|path| std::fs::canonicalize(path).unwrap())
+            .collect();
+        let expected = vec![
+            std::fs::canonicalize(archive.root().join("../fetch.git")).unwrap(),
+            std::fs::canonicalize(archive.root().join("../other.git")).unwrap(),
+        ];
+        assert_eq!(actual, expected);
         let staged = stage_sync(archive.root().to_path_buf()).unwrap();
         assert!(staged.data.clone.is_none());
         assert_eq!(bare_head(&other), bare_head(&fetch));
