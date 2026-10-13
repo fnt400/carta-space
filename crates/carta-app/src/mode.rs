@@ -38,6 +38,7 @@ pub enum SelectAction {
     AddToWork,
     MoveAfter,
     InsertLink,
+    InsertBacklink,
     OpenBacklink,
     SpellingSuggestion,
     SetDocumentLanguage,
