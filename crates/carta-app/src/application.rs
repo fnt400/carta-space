@@ -2783,7 +2783,7 @@ impl App {
         let text = &self.editor.regions()[region].text;
         let empty = text.trim().is_empty();
         let insert_at = if empty { 0 } else { text.len() };
-        let insertion = if empty { link } else { format!("\\n{link}") };
+        let insertion = if empty { link } else { format!("\n{link}") };
         let link_at = insert_at + usize::from(!empty);
         self.editor.set_cursor(Cursor { region, byte: insert_at }, false);
         if !self.cat_insert(&insertion) {
@@ -4362,6 +4362,60 @@ mod tests {
         assert_eq!(app.editor.cursor().byte, 6);
         app.cancel_leap();
         assert_eq!(app.editor.cursor(), origin);
+    }
+
+    #[test]
+    fn insert_backlink_appends_to_destination_and_back_restores_source() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let source = archive.create_document("Source note").unwrap();
+        let destination = archive.create_document("Destination note").unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let source_region = app.editor.regions().iter()
+            .position(|region| region.document == source).unwrap();
+        app.editor.set_cursor(Cursor { region: source_region, byte: 3 }, false);
+        app.scroll = 7;
+        let previous_view = app.view.clone();
+
+        app.execute(Command::InsertBacklink).unwrap();
+        let AppMode::Selector { choices, selected, .. } = &mut app.mode else {
+            panic!("expected inverse-link selector");
+        };
+        *selected = choices.iter()
+            .position(|choice| choice.value == destination.to_string()).unwrap();
+        app.submit_selector().unwrap();
+
+        assert_eq!(app.editor.current_document(), Some(destination));
+        let expected = format!("[Source note](carta:doc:{source})");
+        let saved = app.archive.read_document(destination).unwrap();
+        assert!(saved.content().ends_with(&format!("\n{expected}\n")));
+        let cursor = app.editor.cursor();
+        assert!(app.editor.current_text().unwrap()[cursor.byte..].starts_with(&expected));
+        app.execute(Command::Back).unwrap();
+        assert_eq!(app.view, previous_view);
+        assert_eq!(app.editor.current_document(), Some(source));
+        assert_eq!(app.editor.cursor().byte, 3);
+        assert_eq!(app.scroll, 7);
+        assert_eq!(app.archive.read_document(source).unwrap().content(), "Source note\n");
+    }
+
+    #[test]
+    fn collapsed_navigation_keeps_document_sequence_and_does_not_wrap_month() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let first = archive.create_document("first").unwrap();
+        let second = archive.create_document("second").unwrap();
+        let volume = archive.document_info(first).unwrap().volume();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        app.switch_view(View::CreationDate(volume), Some((first, 0)), false).unwrap();
+        app.execute(Command::CollapseView).unwrap();
+        app.collapsed_move_document(LeapDirection::Forward).unwrap();
+        assert_eq!(app.editor.current_document(), Some(second));
+        app.collapsed_move_document(LeapDirection::Forward).unwrap();
+        assert_eq!(app.editor.current_document(), Some(second));
+        app.collapsed_move_document(LeapDirection::Backward).unwrap();
+        assert_eq!(app.editor.current_document(), Some(first));
+        assert!(app.collapsed);
     }
 
     #[test]
