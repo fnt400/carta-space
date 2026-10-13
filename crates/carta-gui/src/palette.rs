@@ -31,33 +31,63 @@ impl Section {
 fn section(command: Command) -> Section {
     use Command::*;
     match command {
-        PreviousMonth | NextMonth | GoToMonth | OpenCreationDateView
-        | OpenModificationDateView | GoToStartOfView | GoToEndOfView
-        | CollapseView | ExpandView | Back | Forward | LeapForward
-        | LeapBackward | LeapAgainForward | LeapAgainBackward => Section::Navigation,
+        PreviousMonth
+        | NextMonth
+        | GoToMonth
+        | OpenCreationDateView
+        | OpenModificationDateView
+        | GoToStartOfView
+        | GoToEndOfView
+        | CollapseView
+        | ExpandView
+        | Back
+        | Forward
+        | LeapForward
+        | LeapBackward
+        | LeapAgainForward
+        | LeapAgainBackward => Section::Navigation,
 
-        NewDocument | DuplicateAsNew | NewLinkedDocument | SplitDocument
-        | LockDocument | UnlockDocument | CheckDocumentSpelling
-        | SetDocumentLanguage | RemoveDictionaryWord | InsertDateTime
-        | Undo | Redo => Section::Documents,
+        NewDocument
+        | DuplicateAsNew
+        | NewLinkedDocument
+        | SplitDocument
+        | LockDocument
+        | UnlockDocument
+        | CheckDocumentSpelling
+        | SetDocumentLanguage
+        | RemoveDictionaryWord
+        | InsertDateTime
+        | Undo
+        | Redo => Section::Documents,
 
-        CreateWork | RenameWork | OpenWork | LockWork | UnlockWork
-        | ShowMemberships | AddToWork | RemoveFromWork | MoveEarlier
-        | MoveLater | MoveAfter | CheckWorkSpelling => Section::Works,
+        CreateWork | RenameWork | OpenWork | LockWork | UnlockWork | ShowMemberships
+        | AddToWork | RemoveFromWork | MoveEarlier | MoveLater | MoveAfter | CheckWorkSpelling => {
+            Section::Works
+        }
 
-        SearchArchive | InsertLink | InsertBacklink | OpenLink
-        | ShowBacklinks => Section::Links,
+        SearchArchive | InsertLink | InsertBacklink | OpenLink | ShowBacklinks => Section::Links,
 
-        History | WorkHistory | ReturnToPreviousView | RestoreThisVersion
-        | RestoreAsNew | RestoreWorkVersion | Trash | TrashWork
-        | ShowTrash | RestoreTrash | Wipe => Section::History,
+        History | WorkHistory | ReturnToPreviousView | RestoreThisVersion | RestoreAsNew
+        | RestoreWorkVersion | Trash | TrashWork | ShowTrash | RestoreTrash | Wipe => {
+            Section::History
+        }
 
-        Import | ExportDocumentMarkdown | ExportWorkMarkdown
-        | ExportDocumentPdf | ExportWorkPdf | PrintDocument | Package
+        Import
+        | ExportDocumentMarkdown
+        | ExportWorkMarkdown
+        | ExportDocumentPdf
+        | ExportWorkPdf
+        | PrintDocument
+        | Package
         | CreateCheckpoint => Section::Export,
 
-        SyncNow | SyncSettings | ShowConflicts | UseLocal | UseExternal
-        | UseLocalPreserveOther | UseExternalPreserveOther => Section::Sync,
+        SyncNow
+        | SyncSettings
+        | ShowConflicts
+        | UseLocal
+        | UseExternal
+        | UseLocalPreserveOther
+        | UseExternalPreserveOther => Section::Sync,
 
         Cheatsheet | Manual | Quit => Section::Help,
     }
@@ -155,9 +185,15 @@ mod tests {
             ]
         );
         let entries = rows(&sorted);
-        assert!(matches!(entries.first(), Some(Row::Heading("WRITING & DOCUMENTS"))));
+        assert!(matches!(
+            entries.first(),
+            Some(Row::Heading("WRITING & DOCUMENTS"))
+        ));
         assert_eq!(
-            entries.iter().filter(|row| matches!(row, Row::Heading(_))).count(),
+            entries
+                .iter()
+                .filter(|row| matches!(row, Row::Heading(_)))
+                .count(),
             3
         );
     }
@@ -185,7 +221,9 @@ mod tests {
             let visible = visible_rows(&commands, selected, 5);
             assert!(visible.len() <= 5);
             assert!(
-                visible.iter().any(|row| matches!(row, Row::Command { index, .. } if *index == selected)),
+                visible
+                    .iter()
+                    .any(|row| matches!(row, Row::Command { index, .. } if *index == selected)),
                 "selection {selected} scrolled outside the palette"
             );
         }

@@ -189,9 +189,7 @@ fn help_view(
             .font(IOSEVKA)
             .size(STATUS_SIZE)
             .color(palette_section_color(mode)),
-        text(document.title)
-            .font(IOSEVKA)
-            .size(EDITOR_SIZE + 2.0),
+        text(document.title).font(IOSEVKA).size(EDITOR_SIZE + 2.0),
         text(document.body)
             .font(IOSEVKA)
             .size(STATUS_SIZE + 2.0)
@@ -475,16 +473,15 @@ fn modal_overlay(app: &App, mode: ThemeMode, window_height: f32) -> Option<Eleme
         AppMode::Palette { query, selected } => {
             let commands = crate::palette::commands(app, query);
             let max_rows = ((window_height * 0.64 / 27.0) as usize).clamp(5, 16);
-            let mut content = column![
-                text(format!("> {query}"))
-                    .font(IOSEVKA)
-                    .size(EDITOR_SIZE)
-                    .width(Length::Fill),
-            ]
+            let mut content = column![text(format!("> {query}"))
+                .font(IOSEVKA)
+                .size(EDITOR_SIZE)
+                .width(Length::Fill),]
             .spacing(3)
             .width(Length::Fill);
             if commands.is_empty() {
-                content = content.push(text("No matching commands").font(IOSEVKA).size(EDITOR_SIZE));
+                content =
+                    content.push(text("No matching commands").font(IOSEVKA).size(EDITOR_SIZE));
             } else {
                 for entry in crate::palette::visible_rows(&commands, *selected, max_rows) {
                     match entry {
