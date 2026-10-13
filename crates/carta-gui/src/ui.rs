@@ -376,6 +376,9 @@ fn status_bar<'a>(app: &App, mode: ThemeMode, sync_error: Option<&'a str>) -> El
     } else {
         status.left
     };
+    // The fallback first line can be arbitrarily long. Limit only the
+    // presentation; do not alter the Document or its derived title.
+    let left = truncate_status(&left, 96);
     let line = row![
         text(left)
             .font(IOSEVKA)
@@ -394,6 +397,16 @@ fn status_bar<'a>(app: &App, mode: ThemeMode, sync_error: Option<&'a str>) -> El
                 .color(foreground)
         })
         .into()
+}
+
+fn truncate_status(value: &str, limit: usize) -> String {
+    let mut chars = value.chars();
+    let prefix: String = chars.by_ref().take(limit).collect();
+    if chars.next().is_some() {
+        format!("{prefix}…")
+    } else {
+        prefix
+    }
 }
 
 fn modal_overlay(app: &App, mode: ThemeMode) -> Option<Element<'_, Message>> {

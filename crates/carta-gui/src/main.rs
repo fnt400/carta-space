@@ -1,4 +1,5 @@
 mod input;
+mod instance;
 mod layout;
 mod markdown;
 mod profile;
@@ -20,6 +21,17 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 fn main() -> iced::Result {
+    let _instance = match instance::acquire() {
+        Ok(Some(file)) => file,
+        Ok(None) => {
+            eprintln!("Carta Space is already running for this user");
+            return Ok(());
+        }
+        Err(error) => {
+            eprintln!("Carta Space: cannot acquire instance lock: {error}");
+            std::process::exit(1);
+        }
+    };
     iced::application(Gui::boot, update, ui::view)
         .title("Carta Space")
         .theme(theme)

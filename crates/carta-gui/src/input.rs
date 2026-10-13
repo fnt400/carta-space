@@ -118,7 +118,7 @@ impl GuiInputState {
                 let is_backward = self
                     .active_leap
                     .is_some_and(|leap| leap.direction == LeapDirection::Backward);
-                let fallback = leap_query_text(text.as_deref(), &modified_key, is_backward);
+                let fallback = leap_query_text(text.as_deref(), &modified_key, code, is_backward);
                 self.handle_key_press(app, code, fallback.as_deref(), columns)?;
             }
             KeyboardEvent::KeyReleased { physical_key, .. } => {
@@ -532,7 +532,12 @@ impl GuiInputState {
 /// Winit may suppress the typed text when Left Control is held. The
 /// modified logical key retains the user's keyboard layout and Shift state,
 /// unlike converting physical key codes to hard-coded US characters.
-fn leap_query_text(text: Option<&str>, key: &Key, backward: bool) -> Option<String> {
+fn leap_query_text(text: Option<&str>, key: &Key, code: Code, backward: bool) -> Option<String> {
+    // Under Ctrl+Space some window systems report neither text nor a
+    // character logical key. Space is still a valid literal LEAP query.
+    if backward && code == Code::Space {
+        return Some(" ".to_owned());
+    }
     if backward {
         if let Key::Character(character) = key {
             let value = character.as_str();
@@ -556,21 +561,30 @@ mod tests {
     #[test]
     fn backward_leap_recovers_modified_key_when_control_suppresses_text() {
         assert_eq!(
-            leap_query_text(None, &Key::Character("é".into()), true),
+            leap_query_text(None, &Key::Character("é".into()), Code::KeyE, true),
             Some("é".into())
         );
         assert_eq!(
-            leap_query_text(Some("\u{1}"), &Key::Character("A".into()), true),
+            leap_query_text(Some("\u{1}"), &Key::Character("A".into()), Code::KeyA, true),
             Some("A".into())
         );
         assert_eq!(
-            leap_query_text(None, &Key::Character("a".into()), false),
+            leap_query_text(None, &Key::Character("a".into()), Code::KeyA, false),
             None
         );
         assert_eq!(
-            leap_query_text(Some("à"), &Key::Character("a".into()), false),
+            leap_query_text(Some("à"), &Key::Character("a".into()), Code::KeyA, false),
             Some("à".into())
         );
+    }
+
+    #[test]
+    fn backward_leap_accepts_space_when_control_suppresses_text() {
+        assert_eq!(
+            leap_query_text(None, &Key::Named(iced::keyboard::key::Named::Space), Code::Space, true),
+            Some(" ".into())
+        );
+        assert_eq!(leap_query_text(None, &Key::Unidentified, Code::Space, false), None);
     }
 
     #[test]

@@ -10,6 +10,7 @@ publish = false
 base64 = "0.22"
 carta-app = { path = "../carta-app" }
 carta-core = { path = "../carta-core" }
+fs2 = "0.4"
 chrono = { version = "0.4.42", default-features = false, features = ["clock", "std"] }
 pulldown-cmark = { version = "0.13.4", default-features = false }
 serde_json = { version = "1.0.145", features = ["arbitrary_precision"] }
