@@ -28,6 +28,8 @@ This is not yet the finished editor surface. Pixel-exact soft wrapping, complete
 
 ### Cursor and font
 
+In collapsed Creation Date View, Up/Down navigates between Documents and crosses month boundaries to the nearest populated month without expanding. `Insert Backlink…` uses the normal fuzzy selector to append a link to the current Document in another editable Document and jump to the new link; `Back` restores the source location. GUI import/export use native open/save dialogs through `rfd` and XDG Desktop Portal on Linux, allowing directory and filename selection (rather than forcing Downloads). Cancel leaves the Archive unchanged.
+
 The editor paints the character at the logical caret without inserting fake Unicode squares into the authored text. Narrow (at-point highlight), wide (highlight behind the insertion point) and extended highlight behaviors follow the Cat semantics in the shared application model. The caret is permanently visible, without a blink timer. At end-of-line or end-of-document a stable blank cell is reserved for caret visibility; the text itself is never modified. Auto-follow scrolling uses a presentation-only visual-row estimate based on the fixed Iosevka advance and line height. It adds virtual blank space above and below the rendered text and does not modify the Archive. Exact positioning for tabs, East Asian wide characters, grapheme clusters and mixed font metrics awaits a renderer-measured layout.
 
 ### GUI interactions and persistence
