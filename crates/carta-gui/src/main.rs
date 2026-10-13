@@ -73,6 +73,7 @@ pub(crate) struct Gui {
     pointer_down: bool,
     sync_active: bool,
     clone_active: bool,
+    file_dialog_active: bool,
     sync_ready: Option<StagedSync>,
     next_sync_at: Instant,
     last_user_input: Instant,
@@ -105,6 +106,7 @@ pub(crate) enum Message {
     CreateDefaultArchive,
     CloneDefaultArchive,
     CloneFinished(Result<(), String>),
+    FileChosen(Command, Option<PathBuf>),
 }
 
 impl Gui {
@@ -144,6 +146,7 @@ impl Gui {
             pointer_down: false,
             sync_active: false,
             clone_active: false,
+            file_dialog_active: false,
             sync_ready: None,
             next_sync_at: Instant::now(),
             last_user_input: Instant::now(),
@@ -211,6 +214,7 @@ impl Gui {
             pointer_down: false,
             sync_active: false,
             clone_active: false,
+            file_dialog_active: false,
             sync_ready: None,
             next_sync_at: Instant::now()
                 + if sync_error.is_some() {
@@ -643,8 +647,54 @@ fn normalize_clipboard(value: &str) -> String {
     value.replace("\r\n", "\n").replace('\r', "\n")
 }
 
+fn native_file_dialog(command: Command, suggested: Option<String>) -> Task<Message> {
+    Task::perform(
+        async move {
+            let mut dialog = rfd::AsyncFileDialog::new();
+            if let Some(downloads) =
+                env::var_os("HOME").map(|home| PathBuf::from(home).join("Downloads"))
+            {
+                if downloads.is_dir() {
+                    dialog = dialog.set_directory(downloads);
+                }
+            }
+            match command {
+                Command::Import => dialog
+                    .add_filter("Markdown or text", &["md", "txt"])
+                    .pick_file()
+                    .await
+                    .map(|file| file.path().to_path_buf()),
+                Command::ExportDocumentMarkdown | Command::ExportWorkMarkdown => dialog
+                    .add_filter("Markdown", &["md"])
+                    .set_file_name(suggested.as_deref().unwrap_or("document.md"))
+                    .save_file()
+                    .await
+                    .map(|file| file.path().to_path_buf()),
+                Command::ExportDocumentPdf | Command::ExportWorkPdf => dialog
+                    .add_filter("PDF", &["pdf"])
+                    .set_file_name(suggested.as_deref().unwrap_or("document.pdf"))
+                    .save_file()
+                    .await
+                    .map(|file| file.path().to_path_buf()),
+                _ => None,
+            }
+        },
+        move |path| Message::FileChosen(command, path),
+    )
+}
+
 fn update(state: &mut Gui, message: Message) -> Task<Message> {
     match message {
+        Message::FileChosen(command, path) => {
+            state.file_dialog_active = false;
+            if let (Some(app), Some(path)) = (state.app.as_mut(), path) {
+                if let Err(error) = app.complete_file_dialog(command, &path) {
+                    app.status = format!("File operation failed: {error}");
+                }
+                return Task::batch([scroll_to_caret(state), service_tick(state, Instant::now())]);
+            }
+            return Task::none();
+        }
         Message::QuitRequested => return request_quit(state),
         Message::QuitRetry => {
             if matches!(&state.quit_state, QuitState::Failed(_)) {
@@ -968,6 +1018,10 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
         _ => {}
     }
 
+    if state.file_dialog_active {
+        // Keep the selected Document and Work stable until the OS dialog returns.
+        return Task::none();
+    }
     if state.quit_state != QuitState::Idle {
         // Freeze editor input while publishing or showing the failure warning.
         return Task::none();
@@ -1011,9 +1065,31 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
         }
         _ => Ok(()),
     };
+    let succeeded = result.is_ok();
     if let Err(error) = result {
         app.status = format!("Error: {error}");
     }
+    let dialog_task = if succeeded {
+        state.input.take_file_dialog_request().and_then(|command| {
+            match app.execute(command) {
+                Ok(()) => {
+                    let suggested = match &app.mode {
+                        AppMode::Prompt { input, .. } if !input.is_empty() => Some(input.clone()),
+                        _ => None,
+                    };
+                    app.mode = AppMode::Editing;
+                    state.file_dialog_active = true;
+                    Some(native_file_dialog(command, suggested))
+                }
+                Err(error) => {
+                    app.status = format!("File dialog: {error}");
+                    None
+                }
+            }
+        })
+    } else {
+        None
+    };
     let follow_caret = zoomed
         || (keyboard_event
             && (app.editor.cursor() != before_cursor
@@ -1026,9 +1102,9 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
     } else {
         let auto_sync = service_tick(state, Instant::now());
         if follow_caret {
-            Task::batch([clipboard, scroll_to_caret(state), auto_sync])
+            Task::batch([clipboard, scroll_to_caret(state), auto_sync, dialog_task.unwrap_or_else(Task::none)])
         } else {
-            Task::batch([clipboard, auto_sync])
+            Task::batch([clipboard, auto_sync, dialog_task.unwrap_or_else(Task::none)])
         }
     }
 }
@@ -1132,6 +1208,7 @@ mod tests {
             pointer_down: false,
             sync_active: false,
             clone_active: false,
+            file_dialog_active: false,
             sync_ready: None,
             next_sync_at: now,
             last_user_input: now,
