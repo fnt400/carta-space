@@ -2780,6 +2780,9 @@ impl App {
             escape_markdown_link_label(&source_label)
         );
         self.open_document(destination, true)?;
+        // The previous Document's selection must never be applied to B.
+        self.editor.clear_cat_highlight();
+        self.cat_navigation();
         // The inserted link may lie below the three rows shown by Collapse.
         self.collapsed = false;
         let region = self.editor.cursor().region;
