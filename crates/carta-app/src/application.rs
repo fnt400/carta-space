@@ -95,6 +95,7 @@ pub enum Command {
     ExportWorkMarkdown,
     ExportDocumentPdf,
     ExportWorkPdf,
+    PrintDocument,
     Package,
     CreateCheckpoint,
     SyncNow,
@@ -171,6 +172,7 @@ impl Command {
             Self::ExportDocumentMarkdown => "Export Document as Markdown…",
             Self::ExportWorkMarkdown => "Export Work as Markdown…",
             Self::ExportDocumentPdf => "Export Document as PDF…",
+            Self::PrintDocument => "Print Document…",
             Self::ExportWorkPdf => "Export Work as PDF…",
             Self::Package => "Package Archive…",
             Self::CreateCheckpoint => "Create Checkpoint…",
@@ -237,6 +239,7 @@ pub struct App {
     work_positions: BTreeMap<WorkId, Position>,
     work_mru: Vec<WorkId>,
     background_sync_enabled: bool,
+    pending_external_url: Option<String>,
 }
 
 impl App {
@@ -340,6 +343,7 @@ impl App {
             work_positions: session.map_or_else(BTreeMap::new, |s| s.work_positions.clone()),
             work_mru: session.map_or_else(Vec::new, |s| s.work_mru.clone()),
             background_sync_enabled: false,
+            pending_external_url: None,
         })
     }
 
@@ -454,6 +458,7 @@ impl App {
                 Trash,
                 ExportDocumentMarkdown,
                 ExportDocumentPdf,
+                PrintDocument,
             ]);
         }
         if editable && !doc_locked && self.editor.can_undo() {
@@ -487,7 +492,7 @@ impl App {
                 CheckWorkSpelling,
             ]);
         }
-        if has_doc && self.link_under_cursor().is_some() {
+        if has_doc && (self.link_under_cursor().is_some() || self.web_url_under_cursor().is_some()) {
             commands.push(OpenLink);
         }
         if matches!(self.view, View::History { .. }) {
@@ -871,6 +876,7 @@ impl App {
                     PromptAction::ExportWorkMarkdown,
                 )
             }
+            PrintDocument => self.autosave_for_destructive()?,
             ExportDocumentPdf => {
                 self.autosave_for_destructive()?;
                 let label = self
@@ -2958,7 +2964,7 @@ impl App {
         {
             return Ok(());
         }
-        if self.link_under_cursor().is_some() {
+        if self.link_under_cursor().is_some() || self.web_url_under_cursor().is_some() {
             self.open_link()
         } else {
             self.select_links()
@@ -2966,7 +2972,7 @@ impl App {
     }
 
     fn open_link(&mut self) -> AppResult {
-        let Some(link) = self.link_under_cursor() else {
+        let Some(link) = self.link_under_cursor().or_else(|| self.web_url_under_cursor()) else {
             return Ok(());
         };
         match self.archive.resolve_link(&link) {
@@ -2977,10 +2983,26 @@ impl App {
             Some(carta_core::LinkResolution::Unresolved(_)) => {
                 self.status = "Unresolved Carta link".into()
             }
-            None => self.status = "External links are not executed by this build".into(),
+            None => {
+                if carta_core::supported_external_url(link.destination()) {
+                    self.pending_external_url = Some(link.destination().to_owned());
+                } else {
+                    self.status = "Unsupported external link scheme".into();
+                }
+            },
         }
         Ok(())
     }
+    pub fn take_external_url_request(&mut self) -> Option<String> {
+        self.pending_external_url.take()
+    }
+
+    fn web_url_under_cursor(&self) -> Option<carta_core::MarkdownLink> {
+        self.editor
+            .current_text()
+            .and_then(|text| carta_core::web_url_at_byte_offset(text, self.editor.cursor().byte))
+    }
+
     fn link_under_cursor(&self) -> Option<carta_core::MarkdownLink> {
         self.editor
             .current_text()

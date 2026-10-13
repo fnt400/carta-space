@@ -19,7 +19,8 @@ pub use archive::Archive;
 pub use background_sync::{stage_sync, StagedSync, SyncApply};
 pub use conflict::{Conflict, ConflictChoice, DocumentConflict, WorkConflict};
 pub use content::{
-    extract_markdown_links, link_at_byte_offset, CartaLinkTarget, LinkResolution, MarkdownLink,
+    extract_markdown_links, extract_web_urls, link_at_byte_offset, supported_external_url,
+    web_url_at_byte_offset, CartaLinkTarget, LinkResolution, MarkdownLink,
 };
 pub use document::{Document, DocumentInfo, Volume};
 pub use error::{Error, ValidationErrors, ValidationIssue, ValidationIssueKind};

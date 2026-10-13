@@ -51,6 +51,10 @@ fn parse(text: &str) -> Vec<Range> {
             _ => {}
         }
     }
+    for link in carta_core::extract_web_urls(text) {
+        let source_range = link.source_range();
+        ranges.push(Range { start: source_range.start, end: source_range.end, syntax: Syntax::Link });
+    }
     ranges
 }
 
@@ -212,6 +216,14 @@ mod tests {
         let soft = text.find("soft").unwrap();
         assert_eq!(style_at(&resolved, soft), Some(Syntax::Emphasis));
         assert_eq!(style_at(&resolved, 0), Some(Syntax::Heading));
+    }
+
+    #[test]
+    fn plain_web_urls_are_highlighted_without_rewriting_text() {
+        let text = "Source: https://example.org/page, then code `https://ignored.org`";
+        let highlighted = resolve(parse(text));
+        assert_eq!(style_at(&highlighted, text.find("https://example.org").unwrap()), Some(Syntax::Link));
+        assert_eq!(style_at(&highlighted, text.find("https://ignored.org").unwrap()), Some(Syntax::Code));
     }
 
     #[test]
