@@ -695,6 +695,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
             }
             return Task::none();
         }
+        Message::QuitRequested if state.file_dialog_active => return Task::none(),
         Message::QuitRequested => return request_quit(state),
         Message::QuitRetry => {
             if matches!(&state.quit_state, QuitState::Failed(_)) {
