@@ -3939,13 +3939,25 @@ mod tests {
         let source = app.editor.current_text().unwrap().to_owned();
         let region = app.editor.cursor().region;
         let markdown = source.find("[site]").unwrap();
-        app.editor.set_cursor(Cursor { region, byte: markdown }, false);
+        app.editor.set_cursor(
+            Cursor {
+                region,
+                byte: markdown,
+            },
+            false,
+        );
         app.execute(Command::OpenLink).unwrap();
         assert_eq!(app.status, "External links are not executed by this build");
         assert!(app.take_external_url_request().is_none());
 
         let plain = source.find("https://example.org").unwrap();
-        app.editor.set_cursor(Cursor { region, byte: plain + 7 }, false);
+        app.editor.set_cursor(
+            Cursor {
+                region,
+                byte: plain + 7,
+            },
+            false,
+        );
         assert!(!app.commands().contains(&Command::OpenLink));
 
         app.enable_external_url_opening();
