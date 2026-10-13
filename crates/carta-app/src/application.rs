@@ -944,11 +944,7 @@ impl App {
 
     /// Native GUI file dialogs select an absolute path. The TUI continues to
     /// use its historical text prompts and Downloads-only export rule.
-    pub fn complete_file_dialog(
-        &mut self,
-        command: Command,
-        path: &std::path::Path,
-    ) -> AppResult {
+    pub fn complete_file_dialog(&mut self, command: Command, path: &std::path::Path) -> AppResult {
         let action = match command {
             Command::Import => PromptAction::Import,
             Command::ExportDocumentMarkdown => PromptAction::ExportDocumentMarkdown,
@@ -984,27 +980,37 @@ impl App {
         let path = if native_dialog {
             input.to_path_buf()
         } else {
-            downloads_export_path(
-                input.to_str().ok_or("export filename is not valid UTF-8")?
-            )?
+            downloads_export_path(input.to_str().ok_or("export filename is not valid UTF-8")?)?
         };
         if native_dialog {
             self.autosave_for_destructive()?;
         }
         match action {
             PromptAction::ExportDocumentMarkdown => {
-                self.archive.export_document_markdown_file(self.current_document()?, &path)?;
+                self.archive
+                    .export_document_markdown_file(self.current_document()?, &path)?;
             }
             PromptAction::ExportWorkMarkdown => {
-                self.archive.export_work_markdown_file(self.current_work()?, &path)?;
+                self.archive
+                    .export_work_markdown_file(self.current_work()?, &path)?;
             }
             PromptAction::ExportDocumentPdf => {
-                let markdown = self.archive.export_document_markdown(self.current_document()?)?;
-                export_pdf(Publication::Document { markdown: &markdown }, &path)?;
+                let markdown = self
+                    .archive
+                    .export_document_markdown(self.current_document()?)?;
+                export_pdf(
+                    Publication::Document {
+                        markdown: &markdown,
+                    },
+                    &path,
+                )?;
             }
             PromptAction::ExportWorkPdf => {
                 let work_id = self.current_work()?;
-                let work = self.archive.work(work_id).ok_or("current Work no longer exists")?;
+                let work = self
+                    .archive
+                    .work(work_id)
+                    .ok_or("current Work no longer exists")?;
                 let title = work.title().to_owned();
                 let document_ids = work.documents().to_vec();
                 let mut documents = Vec::with_capacity(document_ids.len());
@@ -1012,7 +1018,10 @@ impl App {
                     documents.push(self.archive.read_document(document)?.into_content());
                 }
                 export_pdf(
-                    Publication::Work { title: &title, documents: &documents },
+                    Publication::Work {
+                        title: &title,
+                        documents: &documents,
+                    },
                     &path,
                 )?;
             }
@@ -2568,7 +2577,11 @@ impl App {
             .map(|info| info.volume())
             .filter(|volume| {
                 let date = (volume.year(), volume.month());
-                if backward { date < this } else { date > this }
+                if backward {
+                    date < this
+                } else {
+                    date > this
+                }
             });
         let next = if backward {
             neighbor.max_by_key(|v| (v.year(), v.month()))
@@ -2791,11 +2804,23 @@ impl App {
         let insert_at = if empty { 0 } else { text.len() };
         let insertion = if empty { link } else { format!("\n{link}") };
         let link_at = insert_at + usize::from(!empty);
-        self.editor.set_cursor(Cursor { region, byte: insert_at }, false);
+        self.editor.set_cursor(
+            Cursor {
+                region,
+                byte: insert_at,
+            },
+            false,
+        );
         if !self.cat_insert(&insertion) {
             return Err("could not insert backlink in destination Document".into());
         }
-        self.editor.set_cursor(Cursor { region, byte: link_at }, false);
+        self.editor.set_cursor(
+            Cursor {
+                region,
+                byte: link_at,
+            },
+            false,
+        );
         self.cat_navigation();
         self.edited(Instant::now());
         self.autosave()?;
@@ -4382,7 +4407,8 @@ mod tests {
         let selected_directory = temporary.path().join("selected");
         fs::create_dir_all(&selected_directory).unwrap();
         let output = selected_directory.join("Chosen document.md");
-        app.complete_file_dialog(Command::ExportDocumentMarkdown, &output).unwrap();
+        app.complete_file_dialog(Command::ExportDocumentMarkdown, &output)
+            .unwrap();
         assert_eq!(fs::read_to_string(output).unwrap(), "Saved file\n");
     }
 
@@ -4393,18 +4419,33 @@ mod tests {
         let source = archive.create_document("Source note").unwrap();
         let destination = archive.create_document("Destination note").unwrap();
         let mut app = App::open(archive, None, Instant::now()).unwrap();
-        let source_region = app.editor.regions().iter()
-            .position(|region| region.document == source).unwrap();
-        app.editor.set_cursor(Cursor { region: source_region, byte: 3 }, false);
+        let source_region = app
+            .editor
+            .regions()
+            .iter()
+            .position(|region| region.document == source)
+            .unwrap();
+        app.editor.set_cursor(
+            Cursor {
+                region: source_region,
+                byte: 3,
+            },
+            false,
+        );
         app.scroll = 7;
         let previous_view = app.view.clone();
 
         app.execute(Command::InsertBacklink).unwrap();
-        let AppMode::Selector { choices, selected, .. } = &mut app.mode else {
+        let AppMode::Selector {
+            choices, selected, ..
+        } = &mut app.mode
+        else {
             panic!("expected inverse-link selector");
         };
-        *selected = choices.iter()
-            .position(|choice| choice.value == destination.to_string()).unwrap();
+        *selected = choices
+            .iter()
+            .position(|choice| choice.value == destination.to_string())
+            .unwrap();
         app.submit_selector().unwrap();
 
         assert_eq!(app.editor.current_document(), Some(destination));
@@ -4418,7 +4459,10 @@ mod tests {
         assert_eq!(app.editor.current_document(), Some(source));
         assert_eq!(app.editor.cursor().byte, 3);
         assert_eq!(app.scroll, 7);
-        assert_eq!(app.archive.read_document(source).unwrap().content(), "Source note\n");
+        assert_eq!(
+            app.archive.read_document(source).unwrap().content(),
+            "Source note\n"
+        );
     }
 
     #[test]
@@ -4429,13 +4473,15 @@ mod tests {
         let second = archive.create_document("second").unwrap();
         let volume = archive.document_info(first).unwrap().volume();
         let mut app = App::open(archive, None, Instant::now()).unwrap();
-        app.switch_view(View::CreationDate(volume), Some((first, 0)), false).unwrap();
+        app.switch_view(View::CreationDate(volume), Some((first, 0)), false)
+            .unwrap();
         app.execute(Command::CollapseView).unwrap();
         app.collapsed_move_document(LeapDirection::Forward).unwrap();
         assert_eq!(app.editor.current_document(), Some(second));
         app.collapsed_move_document(LeapDirection::Forward).unwrap();
         assert_eq!(app.editor.current_document(), Some(second));
-        app.collapsed_move_document(LeapDirection::Backward).unwrap();
+        app.collapsed_move_document(LeapDirection::Backward)
+            .unwrap();
         assert_eq!(app.editor.current_document(), Some(first));
         assert!(app.collapsed);
     }

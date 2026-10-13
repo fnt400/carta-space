@@ -1071,8 +1071,10 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
         app.status = format!("Error: {error}");
     }
     let dialog_task = if succeeded {
-        state.input.take_file_dialog_request().and_then(|command| {
-            match app.execute(command) {
+        state
+            .input
+            .take_file_dialog_request()
+            .and_then(|command| match app.execute(command) {
                 Ok(()) => {
                     let suggested = match &app.mode {
                         AppMode::Prompt { input, .. } if !input.is_empty() => Some(input.clone()),
@@ -1086,8 +1088,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                     app.status = format!("File dialog: {error}");
                     None
                 }
-            }
-        })
+            })
     } else {
         None
     };
@@ -1103,7 +1104,12 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
     } else {
         let auto_sync = service_tick(state, Instant::now());
         if follow_caret {
-            Task::batch([clipboard, scroll_to_caret(state), auto_sync, dialog_task.unwrap_or_else(Task::none)])
+            Task::batch([
+                clipboard,
+                scroll_to_caret(state),
+                auto_sync,
+                dialog_task.unwrap_or_else(Task::none),
+            ])
         } else {
             Task::batch([clipboard, auto_sync, dialog_task.unwrap_or_else(Task::none)])
         }
