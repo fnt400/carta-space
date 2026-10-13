@@ -575,6 +575,30 @@ mod tests {
     use super::*;
 
     #[test]
+    fn palette_export_requests_native_dialog_without_a_prompt() {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let root = std::env::temp_dir()
+            .join(format!("carta-dialog-test-{}-{stamp}", std::process::id()));
+        let archive = carta_core::Archive::create(root.join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        app.open_palette();
+        if let AppMode::Palette { query, selected } = &mut app.mode {
+            *query = "Export Document as Markdown".into();
+            *selected = 0;
+        }
+        let mut input = GuiInputState::default();
+        assert!(input.handle_mode_key(&mut app, Code::Enter, None).unwrap());
+        assert_eq!(
+            input.take_file_dialog_request(),
+            Some(Command::ExportDocumentMarkdown)
+        );
+        assert!(matches!(app.mode, AppMode::Editing));
+        drop(app);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn backward_leap_recovers_modified_key_when_control_suppresses_text() {
         assert_eq!(
             leap_query_text(None, &Key::Character("é".into()), Code::KeyE, true),
