@@ -4822,6 +4822,7 @@ mod tests {
             },
             cursor: Cursor { region: 0, byte: 0 },
             scroll: 0,
+            collapsed: false,
         });
         app.forward.push(Location {
             view: View::Search {
@@ -4830,6 +4831,7 @@ mod tests {
             },
             cursor: Cursor { region: 0, byte: 0 },
             scroll: 0,
+            collapsed: false,
         });
         app.archive.trash_document(target).unwrap();
         app.show_trash().unwrap();
