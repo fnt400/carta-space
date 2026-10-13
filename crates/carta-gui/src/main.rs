@@ -709,12 +709,31 @@ async fn print_document_source(markdown: String) -> Result<(), String> {
         let portal = ashpd::desktop::print::PrintProxy::new()
             .await
             .map_err(|error| format!("print portal unavailable: {error}"))?;
-        portal
-            .print(None, "Carta Space — Print Document", &pdf, None, true)
+        let prepared = portal
+            .prepare_print(
+                None,
+                "Carta Space — Print Document",
+                Default::default(),
+                Default::default(),
+                None,
+                true,
+            )
             .await
             .map_err(|error| format!("print dialog failed: {error}"))?
             .response()
             .map_err(|error| format!("print cancelled or failed: {error}"))?;
+        portal
+            .print(
+                None,
+                "Carta Space — Print Document",
+                &pdf,
+                Some(prepared.token),
+                true,
+            )
+            .await
+            .map_err(|error| format!("printing failed: {error}"))?
+            .response()
+            .map_err(|error| format!("printing failed: {error}"))?;
     }
 
     #[cfg(target_os = "macos")]
