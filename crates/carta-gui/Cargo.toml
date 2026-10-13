@@ -7,7 +7,6 @@ license = "GPL-3.0-or-later"
 publish = false
 
 [dependencies]
-ashpd = { version = "=0.11.1", default-features = false, features = ["tokio"] }
 base64 = "0.22"
 carta-app = { path = "../carta-app" }
 carta-core = { path = "../carta-core" }
@@ -28,3 +27,6 @@ iced = { version = "=0.14.0", default-features = false, features = [
 ] }
 
 rfd = { version = "=0.16.0", default-features = false, features = ["xdg-portal", "tokio"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ashpd = { version = "=0.11.1", default-features = false, features = ["tokio"] }

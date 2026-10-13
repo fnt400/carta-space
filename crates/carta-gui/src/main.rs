@@ -10,12 +10,12 @@ mod viewport;
 use base64::Engine as _;
 use carta_app::{App, AppMode, Command, Session, View};
 use carta_core::{stage_sync, Archive, StagedSync, SyncApply, SyncOutcome};
+use carta_publish::{export_pdf, Publication};
 use iced::event::{self, Status};
 use iced::theme::Mode as ThemeMode;
 use iced::widget::operation::{self, AbsoluteOffset};
 use iced::{system, window, Event, Font, Point, Settings, Size, Subscription, Task, Theme};
 use input::{ClipboardRequest, GuiInputState};
-use carta_publish::{export_pdf, Publication};
 use std::cell::RefCell;
 use std::env;
 use std::path::PathBuf;
@@ -654,7 +654,6 @@ fn normalize_clipboard(value: &str) -> String {
     value.replace("\r\n", "\n").replace('\r', "\n")
 }
 
-
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 async fn open_external_url(url: String) -> Result<(), String> {
     if !carta_core::supported_external_url(&url) {
@@ -690,8 +689,13 @@ async fn print_document_source(markdown: String) -> Result<(), String> {
     let (scratch, pdf) = tokio::task::spawn_blocking(move || {
         let scratch = tempfile::tempdir().map_err(|error| error.to_string())?;
         let path = scratch.path().join("document.pdf");
-        export_pdf(Publication::Document { markdown: &markdown }, &path)
-            .map_err(|error| error.to_string())?;
+        export_pdf(
+            Publication::Document {
+                markdown: &markdown,
+            },
+            &path,
+        )
+        .map_err(|error| error.to_string())?;
         let pdf = std::fs::File::open(&path).map_err(|error| error.to_string())?;
         Ok::<_, String>((scratch, pdf))
     })
@@ -814,7 +818,9 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
             }
             return Task::none();
         }
-        Message::QuitRequested if state.file_dialog_active || state.print_active => return Task::none(),
+        Message::QuitRequested if state.file_dialog_active || state.print_active => {
+            return Task::none()
+        }
         Message::QuitRequested => return request_quit(state),
         Message::QuitRetry => {
             if matches!(&state.quit_state, QuitState::Failed(_)) {
@@ -1245,7 +1251,13 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                 print_task,
             ])
         } else {
-            Task::batch([clipboard, auto_sync, dialog_task.unwrap_or_else(Task::none), external_task, print_task])
+            Task::batch([
+                clipboard,
+                auto_sync,
+                dialog_task.unwrap_or_else(Task::none),
+                external_task,
+                print_task,
+            ])
         }
     }
 }

@@ -498,7 +498,8 @@ impl App {
                 CheckWorkSpelling,
             ]);
         }
-        if has_doc && (self.link_under_cursor().is_some() || self.web_url_under_cursor().is_some()) {
+        if has_doc && (self.link_under_cursor().is_some() || self.web_url_under_cursor().is_some())
+        {
             commands.push(OpenLink);
         }
         if matches!(self.view, View::History { .. }) {
@@ -2982,7 +2983,10 @@ impl App {
     }
 
     fn open_link(&mut self) -> AppResult {
-        let Some(link) = self.link_under_cursor().or_else(|| self.web_url_under_cursor()) else {
+        let Some(link) = self
+            .link_under_cursor()
+            .or_else(|| self.web_url_under_cursor())
+        else {
             return Ok(());
         };
         match self.archive.resolve_link(&link) {
@@ -2999,7 +3003,7 @@ impl App {
                 } else {
                     self.status = "Unsupported external link scheme".into();
                 }
-            },
+            }
         }
         Ok(())
     }
@@ -3924,7 +3928,13 @@ mod tests {
         let source = app.editor.current_text().unwrap().to_owned();
         let region = app.editor.cursor().region;
         let plain = source.find("https://example.org").unwrap();
-        app.editor.set_cursor(Cursor { region, byte: plain + 7 }, false);
+        app.editor.set_cursor(
+            Cursor {
+                region,
+                byte: plain + 7,
+            },
+            false,
+        );
         assert!(app.take_external_url_request().is_none());
         assert!(app.commands().contains(&Command::OpenLink));
         app.execute(Command::OpenLink).unwrap();
@@ -3933,14 +3943,26 @@ mod tests {
             Some("https://example.org/path")
         );
         let markdown = source.find("[site]").unwrap();
-        app.editor.set_cursor(Cursor { region, byte: markdown }, false);
+        app.editor.set_cursor(
+            Cursor {
+                region,
+                byte: markdown,
+            },
+            false,
+        );
         app.execute(Command::OpenLink).unwrap();
         assert_eq!(
             app.take_external_url_request().as_deref(),
             Some("https://example.net")
         );
         let blocked = source.find("[unsafe]").unwrap();
-        app.editor.set_cursor(Cursor { region, byte: blocked }, false);
+        app.editor.set_cursor(
+            Cursor {
+                region,
+                byte: blocked,
+            },
+            false,
+        );
         app.execute(Command::OpenLink).unwrap();
         assert!(app.take_external_url_request().is_none());
     }
@@ -3959,7 +3981,10 @@ mod tests {
         app.enable_native_printing();
         assert!(app.commands().contains(&Command::PrintDocument));
         app.execute(Command::PrintDocument).unwrap();
-        assert_eq!(app.take_print_source().as_deref(), Some("# Example title\n\nBody.\n"));
+        assert_eq!(
+            app.take_print_source().as_deref(),
+            Some("# Example title\n\nBody.\n")
+        );
         assert!(app.take_print_source().is_none());
         assert!(!app.commands().contains(&Command::ExportWorkPdf));
         app.execute(Command::ExportDocumentPdf).unwrap();

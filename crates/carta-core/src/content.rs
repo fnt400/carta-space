@@ -78,7 +78,6 @@ pub fn link_at_byte_offset(markdown: &str, byte_offset: usize) -> Option<Markdow
         .min_by_key(|link| link.source_range.end - link.source_range.start)
 }
 
-
 /** External web references, including plain URLs in CommonMark text.
  * Offsets always refer to the unmodified UTF-8 Markdown source.
  */
@@ -116,7 +115,10 @@ pub fn extract_web_urls(markdown: &str) -> Vec<MarkdownLink> {
                     let length = candidate
                         .find(|ch: char| {
                             ch.is_whitespace()
-                                || matches!(ch, '<' | '>' | '"' | '\'' | '`' | '[' | ']' | '(' | ')')
+                                || matches!(
+                                    ch,
+                                    '<' | '>' | '"' | '\'' | '`' | '[' | ']' | '(' | ')'
+                                )
                         })
                         .unwrap_or(candidate.len());
                     let raw = &candidate[..length];
@@ -202,9 +204,17 @@ mod web_url_tests {
     fn finds_plain_and_markdown_web_links_by_utf8_offsets() {
         let text = "è https://example.org/café, [site](https://example.net) fine";
         let first = text.find("https://").unwrap();
-        assert_eq!(web_url_at_byte_offset(text, first + 6).unwrap().destination(), "https://example.org/café");
+        assert_eq!(
+            web_url_at_byte_offset(text, first + 6)
+                .unwrap()
+                .destination(),
+            "https://example.org/café"
+        );
         let label = text.find("[site]").unwrap();
-        assert_eq!(web_url_at_byte_offset(text, label).unwrap().destination(), "https://example.net");
+        assert_eq!(
+            web_url_at_byte_offset(text, label).unwrap().destination(),
+            "https://example.net"
+        );
         assert!(web_url_at_byte_offset(text, text.find("fine").unwrap()).is_none());
     }
 
