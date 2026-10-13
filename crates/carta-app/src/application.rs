@@ -69,6 +69,7 @@ pub enum Command {
     MoveAfter,
     SearchArchive,
     InsertLink,
+    InsertBacklink,
     OpenLink,
     ShowBacklinks,
     CheckDocumentSpelling,
@@ -145,6 +146,7 @@ impl Command {
             Self::MoveAfter => "Move This Document After…",
             Self::SearchArchive => "Search Archive…",
             Self::InsertLink => "Insert Link…",
+            Self::InsertBacklink => "Insert Backlink…",
             Self::OpenLink => "Open Link",
             Self::ShowBacklinks => "Show Backlinks",
             Self::CheckDocumentSpelling => "Check Document Spelling",
@@ -441,6 +443,7 @@ impl App {
                 ShowMemberships,
                 AddToWork,
                 InsertLink,
+                InsertBacklink,
                 ShowBacklinks,
                 CheckDocumentSpelling,
                 SetDocumentLanguage,
@@ -821,6 +824,7 @@ impl App {
                 self.prompt("Search Archive", PromptAction::Search)
             }
             InsertLink => self.select_links()?,
+            InsertBacklink => self.select_backlink_destination()?,
             OpenLink => self.open_link()?,
             CheckDocumentSpelling => self.start_spelling(false)?,
             CheckWorkSpelling => self.start_spelling(true)?,
@@ -937,6 +941,86 @@ impl App {
         Ok(())
     }
 
+    /// Native GUI file dialogs select an absolute path. The TUI continues to
+    /// use its historical text prompts and Downloads-only export rule.
+    pub fn complete_file_dialog(
+        &mut self,
+        command: Command,
+        path: &std::path::Path,
+    ) -> AppResult {
+        let action = match command {
+            Command::Import => PromptAction::Import,
+            Command::ExportDocumentMarkdown => PromptAction::ExportDocumentMarkdown,
+            Command::ExportWorkMarkdown => PromptAction::ExportWorkMarkdown,
+            Command::ExportDocumentPdf => PromptAction::ExportDocumentPdf,
+            Command::ExportWorkPdf => PromptAction::ExportWorkPdf,
+            _ => return Err("unsupported file dialog action".into()),
+        };
+        self.mode = AppMode::Editing;
+        self.complete_file_action(action, path, true)
+    }
+
+    fn complete_file_action(
+        &mut self,
+        action: PromptAction,
+        input: &std::path::Path,
+        native_dialog: bool,
+    ) -> AppResult {
+        if action == PromptAction::Import {
+            let extension = input
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .map(str::to_ascii_lowercase);
+            if !matches!(extension.as_deref(), Some("md" | "txt")) {
+                return Err("Import supports only .md and .txt files".into());
+            }
+            let bytes = fs::read(input)?;
+            let id = self.archive.import_document_bytes(&bytes)?;
+            self.structural("Imported Document")?;
+            self.open_document(id, true)?;
+            return Ok(());
+        }
+        let path = if native_dialog {
+            input.to_path_buf()
+        } else {
+            downloads_export_path(
+                input.to_str().ok_or("export filename is not valid UTF-8")?
+            )?
+        };
+        if native_dialog {
+            self.autosave_for_destructive()?;
+        }
+        match action {
+            PromptAction::ExportDocumentMarkdown => {
+                self.archive.export_document_markdown_file(self.current_document()?, &path)?;
+            }
+            PromptAction::ExportWorkMarkdown => {
+                self.archive.export_work_markdown_file(self.current_work()?, &path)?;
+            }
+            PromptAction::ExportDocumentPdf => {
+                let markdown = self.archive.export_document_markdown(self.current_document()?)?;
+                export_pdf(Publication::Document { markdown: &markdown }, &path)?;
+            }
+            PromptAction::ExportWorkPdf => {
+                let work_id = self.current_work()?;
+                let work = self.archive.work(work_id).ok_or("current Work no longer exists")?;
+                let title = work.title().to_owned();
+                let document_ids = work.documents().to_vec();
+                let mut documents = Vec::with_capacity(document_ids.len());
+                for document in document_ids {
+                    documents.push(self.archive.read_document(document)?.into_content());
+                }
+                export_pdf(
+                    Publication::Work { title: &title, documents: &documents },
+                    &path,
+                )?;
+            }
+            _ => return Err("unsupported export action".into()),
+        }
+        self.status = format!("Exported to {}", path.display());
+        Ok(())
+    }
+
     pub fn submit_prompt(&mut self) -> AppResult {
         let AppMode::Prompt { input, action, .. } = &self.mode else {
             return Ok(());
@@ -960,63 +1044,12 @@ impl App {
                 self.archive.rename_work(self.current_work()?, input)?;
                 self.structural("Renamed Work")?;
             }
-            PromptAction::Import => {
-                let extension = std::path::Path::new(&input)
-                    .extension()
-                    .and_then(|extension| extension.to_str())
-                    .map(str::to_ascii_lowercase);
-                if !matches!(extension.as_deref(), Some("md" | "txt")) {
-                    return Err("Import supports only .md and .txt files".into());
-                }
-                let bytes = fs::read(&input)?;
-                let id = self.archive.import_document_bytes(&bytes)?;
-                self.structural("Imported Document")?;
-                self.open_document(id, true)?;
-            }
-            PromptAction::ExportDocumentMarkdown => {
-                let path = downloads_export_path(&input)?;
-                self.archive
-                    .export_document_markdown_file(self.current_document()?, path)?;
-            }
-            PromptAction::ExportWorkMarkdown => {
-                let path = downloads_export_path(&input)?;
-                self.archive
-                    .export_work_markdown_file(self.current_work()?, path)?;
-            }
-            PromptAction::ExportDocumentPdf => {
-                let path = downloads_export_path(&input)?;
-                let markdown = self
-                    .archive
-                    .export_document_markdown(self.current_document()?)?;
-                export_pdf(
-                    Publication::Document {
-                        markdown: &markdown,
-                    },
-                    &path,
-                )?;
-                self.status = format!("Exported PDF to {}", path.display());
-            }
-            PromptAction::ExportWorkPdf => {
-                let path = downloads_export_path(&input)?;
-                let work_id = self.current_work()?;
-                let work = self
-                    .archive
-                    .work(work_id)
-                    .ok_or("current Work no longer exists")?;
-                let title = work.title().to_owned();
-                let document_ids = work.documents().to_vec();
-                let mut documents = Vec::with_capacity(document_ids.len());
-                for document in document_ids {
-                    documents.push(self.archive.read_document(document)?.into_content());
-                }
-                export_pdf(
-                    Publication::Work {
-                        title: &title,
-                        documents: &documents,
-                    },
-                    &path,
-                )?;
-                self.status = format!("Exported PDF to {}", path.display());
+            PromptAction::Import
+            | PromptAction::ExportDocumentMarkdown
+            | PromptAction::ExportWorkMarkdown
+            | PromptAction::ExportDocumentPdf
+            | PromptAction::ExportWorkPdf => {
+                self.complete_file_action(action, std::path::Path::new(&input), false)?;
             }
             PromptAction::Package => {
                 self.autosave()?;
@@ -1241,6 +1274,7 @@ impl App {
                 self.reload_view(None)?;
             }
             SelectAction::InsertLink => self.insert_link_choice(&value, &label)?,
+            SelectAction::InsertBacklink => self.insert_backlink_choice(&value)?,
             SelectAction::OpenBacklink => self.open_backlink_choice(&value)?,
             SelectAction::SetDocumentLanguage => self.apply_document_language(&value)?,
             SelectAction::SetSpellingDocumentLanguage => {
@@ -2509,6 +2543,55 @@ impl App {
         }
         Ok(())
     }
+    /// Collapsed Creation Date navigation crosses monthly boundaries, skipping
+    /// empty months. Other collapsed Views retain their existing boundaries.
+    pub fn collapsed_move_document(&mut self, direction: LeapDirection) -> AppResult {
+        if !self.collapsed {
+            self.leap_document_start(direction);
+            return Ok(());
+        }
+        let cursor = self.editor.cursor();
+        let count = self.editor.regions().len();
+        let backward = matches!(direction, LeapDirection::Backward);
+        if (backward && cursor.region > 0) || (!backward && cursor.region + 1 < count) {
+            self.leap_document_start(direction);
+            return Ok(());
+        }
+        let View::CreationDate(current) = self.view else {
+            return Ok(());
+        };
+        let this = (current.year(), current.month());
+        let neighbor = self
+            .archive
+            .documents()
+            .map(|info| info.volume())
+            .filter(|volume| {
+                let date = (volume.year(), volume.month());
+                if backward { date < this } else { date > this }
+            });
+        let next = if backward {
+            neighbor.max_by_key(|v| (v.year(), v.month()))
+        } else {
+            neighbor.min_by_key(|v| (v.year(), v.month()))
+        };
+        let Some(next) = next else {
+            return Ok(());
+        };
+        self.switch_view(View::CreationDate(next), None, false)?;
+        self.collapsed = true;
+        if !self.editor.regions().is_empty() {
+            let region = if backward {
+                self.editor.regions().len() - 1
+            } else {
+                0
+            };
+            self.editor.set_cursor(Cursor { region, byte: 0 }, false);
+        }
+        self.cat_navigation();
+        self.scroll = 0;
+        Ok(())
+    }
+
     fn change_month(&mut self, delta: i32) -> AppResult {
         let View::CreationDate(v) = self.view else {
             return Ok(());
@@ -2653,6 +2736,67 @@ impl App {
         };
         Ok(())
     }
+    fn select_backlink_destination(&mut self) -> AppResult {
+        let source = self.current_document()?;
+        let mut choices = Vec::new();
+        for info in self.archive.documents() {
+            if info.id() == source || self.archive.document_is_locked(info.id())? {
+                continue;
+            }
+            choices.push(Choice {
+                label: self.archive.read_document(info.id())?.derived_label(),
+                value: info.id().to_string(),
+            });
+        }
+        if choices.is_empty() {
+            self.status = "No editable destination Documents".into();
+            return Ok(());
+        }
+        self.mode = AppMode::Selector {
+            title: "Insert Backlink into Document".into(),
+            query: String::new(),
+            selected: 0,
+            choices,
+            action: SelectAction::InsertBacklink,
+        };
+        Ok(())
+    }
+
+    fn insert_backlink_choice(&mut self, value: &str) -> AppResult {
+        let source = self.current_document()?;
+        let destination: DocumentId = value.parse()?;
+        if source == destination {
+            return Err("the destination must differ from the source Document".into());
+        }
+        if self.archive.document_is_locked(destination)? {
+            return Err("destination Document is locked".into());
+        }
+        // Preserve A's exact location through the existing Back/Forward history.
+        self.autosave_for_destructive()?;
+        let source_label = self.archive.read_document(source)?.derived_label();
+        let link = format!(
+            "[{}](carta:doc:{source})",
+            escape_markdown_link_label(&source_label)
+        );
+        self.open_document(destination, true)?;
+        let region = self.editor.cursor().region;
+        let text = &self.editor.regions()[region].text;
+        let empty = text.trim().is_empty();
+        let insert_at = if empty { 0 } else { text.len() };
+        let insertion = if empty { link } else { format!("\\n{link}") };
+        let link_at = insert_at + usize::from(!empty);
+        self.editor.set_cursor(Cursor { region, byte: insert_at }, false);
+        if !self.cat_insert(&insertion) {
+            return Err("could not insert backlink in destination Document".into());
+        }
+        self.editor.set_cursor(Cursor { region, byte: link_at }, false);
+        self.cat_navigation();
+        self.edited(Instant::now());
+        self.autosave()?;
+        self.status = "Backlink inserted; Back returns to source".into();
+        Ok(())
+    }
+
     fn insert_link_choice(&mut self, value: &str, target_label: &str) -> AppResult {
         let (kind, id) = value.split_once(':').ok_or("invalid link choice")?;
         let selected = self.editor.selected_text();
