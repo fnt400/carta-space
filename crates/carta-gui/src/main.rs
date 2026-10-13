@@ -764,13 +764,17 @@ async fn print_document_source(markdown: String) -> Result<(), String> {
 
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     {
-        let _ = (&scratch, &pdf);
-        return Err("native printing is unsupported on this platform".into());
+        drop(pdf);
+        drop(scratch);
+        Err("native printing is unsupported on this platform".into())
     }
 
-    drop(pdf);
-    drop(scratch);
-    Ok(())
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    {
+        drop(pdf);
+        drop(scratch);
+        Ok(())
+    }
 }
 
 fn native_file_dialog(command: Command, suggested: Option<String>) -> Task<Message> {
