@@ -4371,6 +4371,19 @@ mod tests {
     }
 
     #[test]
+    fn native_export_writes_to_the_selected_directory() {
+        let temporary = tempfile::tempdir().unwrap();
+        let archive = Archive::create(temporary.path().join("archive")).unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        assert!(app.cat_insert("Saved file"));
+        let selected_directory = temporary.path().join("selected");
+        fs::create_dir_all(&selected_directory).unwrap();
+        let output = selected_directory.join("Chosen document.md");
+        app.complete_file_dialog(Command::ExportDocumentMarkdown, &output).unwrap();
+        assert_eq!(fs::read_to_string(output).unwrap(), "Saved file\n");
+    }
+
+    #[test]
     fn insert_backlink_appends_to_destination_and_back_restores_source() {
         let temporary = tempfile::tempdir().unwrap();
         let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
