@@ -215,6 +215,8 @@ While collapsed:
 
 `Expand View` restores the normal continuous editable surface. Collapse state is device-local UI state and never changes canonical content.
 
+**v0.2 graphical behavior:** in collapsed Creation Date View, moving Up from the first Document opens the nearest earlier nonempty monthly Volume and selects its last Document; moving Down from the last Document opens the nearest later nonempty monthly Volume and selects its first Document. The View stays collapsed. Non-Creation Views retain their own boundaries. No circular wrapping occurs at the beginning or end of the Archive.
+
 ### 3.7 Writing position
 
 In normal editable Views, the TUI keeps the cursor approximately two thirds of the way down the writing area. It MAY render empty screen space above the first available line or below the last available line to preserve that writing position.
@@ -564,6 +566,8 @@ If text is selected, it becomes the visible link label. Otherwise Carta uses the
 
 In the TUI, the complete Markdown source span of a link uses the configured Markdown link style. This is presentation only: the canonical Markdown text is unchanged.
 
+**v0.2 — Insert Backlink…:** from source Document A, a fuzzy Document selector chooses an editable, different Document B. Carta appends a plain Markdown link to A at the end of B, opens B with the cursor at the inserted link, and records the original View, cursor and scroll in navigation history so `Back` restores A exactly. A locked destination cannot be modified. The resulting backlink is derived from B's outgoing Markdown link, not stored separately as canonical relationship metadata.
+
 ### 8.2 Open Link
 
 When the cursor is inside a Markdown link, the contextual palette exposes `Open Link`.
@@ -815,6 +819,8 @@ The filename prompt is a normal editable text field. Left/Right move by characte
 All Document and Work exports are written under `$HOME/Downloads`. Carta creates that directory if it does not exist. Any directory component typed into the filename prompt is discarded so export cannot escape the Downloads directory.
 
 Exports live outside the Archive.
+
+**v0.2 graphical behavior:** GUI Import uses the operating system's open-file dialog with `.md` and `.txt` filters. GUI Document/Work export uses the operating system's Save dialog with the suggested Carta filename and appropriate `.md` or `.pdf` filter. Users may select both directory and filename; cancel changes nothing. Native GUI paths are not restricted to `~/Downloads`; the v0.1 TUI text prompt and Downloads restriction remain unchanged. File dialog logic belongs to the GUI adapter; import and publication semantics remain shared.
 
 ---
 
