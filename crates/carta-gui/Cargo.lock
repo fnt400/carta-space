@@ -447,15 +447,18 @@ dependencies = [
 name = "carta-gui"
 version = "0.2.0"
 dependencies = [
+ "ashpd",
  "base64",
  "carta-app",
  "carta-core",
+ "carta-publish",
  "chrono",
  "fs2",
  "iced",
  "pulldown-cmark",
  "rfd",
  "serde_json",
+ "tempfile",
  "tokio",
 ]
 

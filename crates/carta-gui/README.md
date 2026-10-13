@@ -17,7 +17,7 @@ During this first stage it is excluded from the main Rust 1.85 workspace because
 - show the shared command palette, prompts, confirmations, selectors and LEAP query;
 - support Left/Right/Up/Down editor navigation with a visual-width adapter, and center the caret near two-thirds of the available editor height;
 - support Ctrl-Right+C Cat Copy or clipboard paste, and automatically export newly extended Cat selections to the system clipboard;
-- color Markdown headings, emphasis, strong text, links, quotes and code **without hiding markup or modifying authored text**; a versioned syntax cache avoids parsing unchanged Documents;
+- color Markdown headings, emphasis, strong text, links (including bare HTTP(S) URLs), quotes and code **without hiding markup or modifying authored text**; a versioned syntax cache avoids parsing unchanged Documents;
 - zoom the writing font using physical Right Ctrl + minus (smaller) or Right Ctrl + equals (larger), from 12 to 32 pixels in 2-pixel steps, adjusting the screen-space row geometry without changing document content;
 - position the caret by clicking, and select with left-button drag, sharing the canonical editor selection model rather than maintaining a second text buffer;
 - restore the previous View, document and UTF-8 cursor byte position from the same XDG session sidecar used by the TUI (saved when the application closes and during maintenance);
@@ -215,3 +215,5 @@ immutable, verified upstream snapshot into device-local cache, outside the Archi
 All downloads occur on a worker thread, without blocking the GUI event loop.
 Personal word additions and per-Document language metadata follow Archive Git
 checkpoints and synchronization.
+
+The contextual `Open Link` palette action and RightCtrl+L launch HTTP(S) URLs (including bare URLs) in the system default browser. Moving the caret alone never launches a browser; non-web schemes are not executed. `Print Document…` is a GUI-only palette action: it snapshots the current Document, renders a temporary PDF with the existing Typst publication backend, and opens the native print dialog via the XDG desktop Print portal on Linux or Preview's printing interface on macOS. No PDF is saved to the Archive or the Downloads folder. Printing can be cancelled; a missing print portal or printer is reported in the status bar. The temporary PDF is removed after the print dialog returns.

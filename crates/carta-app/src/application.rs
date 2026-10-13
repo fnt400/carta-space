@@ -240,6 +240,8 @@ pub struct App {
     work_mru: Vec<WorkId>,
     background_sync_enabled: bool,
     pending_external_url: Option<String>,
+    native_print_enabled: bool,
+    print_requested: bool,
 }
 
 impl App {
@@ -344,6 +346,8 @@ impl App {
             work_mru: session.map_or_else(Vec::new, |s| s.work_mru.clone()),
             background_sync_enabled: false,
             pending_external_url: None,
+            native_print_enabled: false,
+            print_requested: false,
         })
     }
 
@@ -458,8 +462,10 @@ impl App {
                 Trash,
                 ExportDocumentMarkdown,
                 ExportDocumentPdf,
-                PrintDocument,
             ]);
+            if self.native_print_enabled {
+                commands.push(PrintDocument);
+            }
         }
         if editable && !doc_locked && self.editor.can_undo() {
             commands.push(Undo);
@@ -876,7 +882,11 @@ impl App {
                     PromptAction::ExportWorkMarkdown,
                 )
             }
-            PrintDocument => self.autosave_for_destructive()?,
+            PrintDocument if self.native_print_enabled => {
+                self.print_requested = true;
+                self.status = "Preparing print dialog…".into();
+            }
+            PrintDocument => return Err("printing requires a graphical frontend".into()),
             ExportDocumentPdf => {
                 self.autosave_for_destructive()?;
                 let label = self
@@ -2993,6 +3003,21 @@ impl App {
         }
         Ok(())
     }
+    /// Native printing is opt-in, so frozen TUI adapters never show an inert command.
+    pub fn enable_native_printing(&mut self) {
+        self.native_print_enabled = true;
+    }
+
+    /// Copy the visible Document, including edits not yet checkpointed,
+    /// without mutating the canonical Archive.
+    pub fn take_print_source(&mut self) -> Option<String> {
+        if std::mem::take(&mut self.print_requested) {
+            self.editor.current_text().map(str::to_owned)
+        } else {
+            None
+        }
+    }
+
     pub fn take_external_url_request(&mut self) -> Option<String> {
         self.pending_external_url.take()
     }
@@ -3895,6 +3920,12 @@ mod tests {
         let mut app = App::open(archive, None, Instant::now()).unwrap();
 
         assert!(app.commands().contains(&Command::ExportDocumentPdf));
+        assert!(!app.commands().contains(&Command::PrintDocument));
+        app.enable_native_printing();
+        assert!(app.commands().contains(&Command::PrintDocument));
+        app.execute(Command::PrintDocument).unwrap();
+        assert_eq!(app.take_print_source().as_deref(), Some("# Example title\n\nBody.\n"));
+        assert!(app.take_print_source().is_none());
         assert!(!app.commands().contains(&Command::ExportWorkPdf));
         app.execute(Command::ExportDocumentPdf).unwrap();
         let AppMode::Prompt {

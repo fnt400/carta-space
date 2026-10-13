@@ -7,13 +7,16 @@ license = "GPL-3.0-or-later"
 publish = false
 
 [dependencies]
+ashpd = { version = "=0.11.1", default-features = false, features = ["tokio"] }
 base64 = "0.22"
 carta-app = { path = "../carta-app" }
 carta-core = { path = "../carta-core" }
+carta-publish = { path = "../carta-publish" }
 fs2 = "0.4"
 chrono = { version = "0.4.42", default-features = false, features = ["clock", "std"] }
 pulldown-cmark = { version = "0.13.4", default-features = false }
 serde_json = { version = "1.0.145", features = ["arbitrary_precision"] }
+tempfile = "3"
 tokio = { version = "1", features = ["rt"] }
 iced = { version = "=0.14.0", default-features = false, features = [
     "advanced",

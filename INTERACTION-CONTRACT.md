@@ -580,6 +580,8 @@ For Carta links:
 
 For external links, v0.1 may delegate `http`, `https`, and `mailto` to the operating system. Unknown URI schemes are not executed automatically.
 
+**v0.2 GUI:** `Open Link` and RightCtrl+L when point is on an authored HTTP(S) link or plain `http://` / `https://` URL open the URL in the default browser. URL highlighting is presentation-only. Moving point alone never opens a browser. Unsupported URI schemes are never executed.
+
 ### 8.3 Navigation history
 
 Following links and opening search results pushes a volatile navigation history.
@@ -820,7 +822,9 @@ All Document and Work exports are written under `$HOME/Downloads`. Carta creates
 
 Exports live outside the Archive.
 
-**v0.2 graphical behavior:** GUI Import uses the operating system's open-file dialog with `.md` and `.txt` filters. GUI Document/Work export uses the operating system's Save dialog with the suggested Carta filename and appropriate `.md` or `.pdf` filter. Users may select both directory and filename; cancel changes nothing. Native GUI paths are not restricted to `~/Downloads`; the v0.1 TUI text prompt and Downloads restriction remain unchanged. File dialog logic belongs to the GUI adapter; import and publication semantics remain shared.
+**v0.2 graphical behavior:** GUI palette additionally exposes `Print Document…` when a Document is current. This snapshots the visible Document, generates a temporary PDF through the same publication backend, and invokes the native print dialog (XDG desktop Print portal on Linux, Preview print dialog on macOS). Cancellation does not print or export a permanent file. Printing is not offered in the frozen terminal interface.
+
+GUI Import uses the operating system's open-file dialog with `.md` and `.txt` filters. GUI Document/Work export uses the operating system's Save dialog with the suggested Carta filename and appropriate `.md` or `.pdf` filter. Users may select both directory and filename; cancel changes nothing. Native GUI paths are not restricted to `~/Downloads`; the v0.1 TUI text prompt and Downloads restriction remain unchanged. File dialog logic belongs to the GUI adapter; import and publication semantics remain shared.
 
 ---
 

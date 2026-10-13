@@ -15,6 +15,7 @@ use iced::theme::Mode as ThemeMode;
 use iced::widget::operation::{self, AbsoluteOffset};
 use iced::{system, window, Event, Font, Point, Settings, Size, Subscription, Task, Theme};
 use input::{ClipboardRequest, GuiInputState};
+use carta_publish::{export_pdf, Publication};
 use std::cell::RefCell;
 use std::env;
 use std::path::PathBuf;
@@ -74,6 +75,7 @@ pub(crate) struct Gui {
     sync_active: bool,
     clone_active: bool,
     file_dialog_active: bool,
+    print_active: bool,
     sync_ready: Option<StagedSync>,
     next_sync_at: Instant,
     last_user_input: Instant,
@@ -107,6 +109,8 @@ pub(crate) enum Message {
     CloneDefaultArchive,
     CloneFinished(Result<(), String>),
     FileChosen(Command, Option<PathBuf>),
+    PrintFinished(Result<(), String>),
+    ExternalUrlOpened(Result<(), String>),
 }
 
 impl Gui {
@@ -147,6 +151,7 @@ impl Gui {
             sync_active: false,
             clone_active: false,
             file_dialog_active: false,
+            print_active: false,
             sync_ready: None,
             next_sync_at: Instant::now(),
             last_user_input: Instant::now(),
@@ -185,6 +190,7 @@ impl Gui {
                     App::open(archive, previous.as_ref(), Instant::now())
                         .map(|mut app| {
                             app.enable_background_sync();
+                            app.enable_native_printing();
                             (app, previous)
                         })
                         .map_err(|error| error.to_string())
@@ -215,6 +221,7 @@ impl Gui {
             sync_active: false,
             clone_active: false,
             file_dialog_active: false,
+            print_active: false,
             sync_ready: None,
             next_sync_at: Instant::now()
                 + if sync_error.is_some() {
@@ -647,6 +654,102 @@ fn normalize_clipboard(value: &str) -> String {
     value.replace("\r\n", "\n").replace('\r', "\n")
 }
 
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+async fn open_external_url(url: String) -> Result<(), String> {
+    if !carta_core::supported_external_url(&url) {
+        return Err("unsupported URL scheme".into());
+    }
+    tokio::task::spawn_blocking(move || {
+        #[cfg(target_os = "linux")]
+        let launcher = "xdg-open";
+        #[cfg(target_os = "macos")]
+        let launcher = "open";
+        let status = std::process::Command::new(launcher)
+            .arg(&url)
+            .status()
+            .map_err(|error| format!("cannot launch default browser: {error}"))?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(format!("default browser launcher exited with {status}"))
+        }
+    })
+    .await
+    .map_err(|error| format!("browser launcher worker stopped: {error}"))?
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+async fn open_external_url(_url: String) -> Result<(), String> {
+    Err("opening web links is unsupported on this platform".into())
+}
+
+/// Render on a worker so Typst cannot freeze the GUI. The temporary PDF and
+/// its directory stay alive until the native print request finishes.
+async fn print_document_source(markdown: String) -> Result<(), String> {
+    let (scratch, pdf) = tokio::task::spawn_blocking(move || {
+        let scratch = tempfile::tempdir().map_err(|error| error.to_string())?;
+        let path = scratch.path().join("document.pdf");
+        export_pdf(Publication::Document { markdown: &markdown }, &path)
+            .map_err(|error| error.to_string())?;
+        let pdf = std::fs::File::open(&path).map_err(|error| error.to_string())?;
+        Ok::<_, String>((scratch, pdf))
+    })
+    .await
+    .map_err(|error| format!("PDF renderer worker stopped: {error}"))??;
+
+    #[cfg(target_os = "linux")]
+    {
+        // XDG Print portal: shows the desktop print dialog and receives the
+        // already-rendered PDF via a file descriptor, with no shell evaluation.
+        let portal = ashpd::desktop::print::PrintProxy::new()
+            .await
+            .map_err(|error| format!("print portal unavailable: {error}"))?;
+        portal
+            .print(None, "Carta Space — Print Document", &pdf, None, true)
+            .await
+            .map_err(|error| format!("print dialog failed: {error}"))?
+            .response()
+            .map_err(|error| format!("print cancelled or failed: {error}"))?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let path = scratch.path().join("document.pdf");
+        // Preview's native print dialog. argv avoids interpolating a filename
+        // into AppleScript source; Preview may remain open afterwards.
+        let output = tokio::task::spawn_blocking(move || {
+            std::process::Command::new("osascript")
+                .args([
+                    "-e", "on run argv",
+                    "-e", "tell application \"Preview\" to print POSIX file (item 1 of argv) with print dialog",
+                    "-e", "end run",
+                ])
+                .arg(path)
+                .output()
+                .map_err(|error| format!("cannot open Preview print dialog: {error}"))
+        })
+        .await
+        .map_err(|error| format!("print worker stopped: {error}"))??;
+        if !output.status.success() {
+            return Err(format!(
+                "Preview print dialog failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
+        }
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    {
+        let _ = (&scratch, &pdf);
+        return Err("native printing is unsupported on this platform".into());
+    }
+
+    drop(pdf);
+    drop(scratch);
+    Ok(())
+}
+
 fn native_file_dialog(command: Command, suggested: Option<String>) -> Task<Message> {
     Task::perform(
         async move {
@@ -685,6 +788,22 @@ fn native_file_dialog(command: Command, suggested: Option<String>) -> Task<Messa
 
 fn update(state: &mut Gui, message: Message) -> Task<Message> {
     match message {
+        Message::PrintFinished(result) => {
+            state.print_active = false;
+            if let Some(app) = state.app.as_mut() {
+                app.status = match result {
+                    Ok(()) => "Print dialog completed".into(),
+                    Err(error) => format!("Print: {error}"),
+                };
+            }
+            return Task::none();
+        }
+        Message::ExternalUrlOpened(result) => {
+            if let (Some(app), Err(error)) = (state.app.as_mut(), result) {
+                app.status = format!("Open URL: {error}");
+            }
+            return Task::none();
+        }
         Message::FileChosen(command, path) => {
             state.file_dialog_active = false;
             if let (Some(app), Some(path)) = (state.app.as_mut(), path) {
@@ -695,7 +814,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
             }
             return Task::none();
         }
-        Message::QuitRequested if state.file_dialog_active => return Task::none(),
+        Message::QuitRequested if state.file_dialog_active || state.print_active => return Task::none(),
         Message::QuitRequested => return request_quit(state),
         Message::QuitRetry => {
             if matches!(&state.quit_state, QuitState::Failed(_)) {
@@ -1092,6 +1211,19 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
     } else {
         None
     };
+    let external_task = app
+        .take_external_url_request()
+        .map(|url| Task::perform(open_external_url(url), Message::ExternalUrlOpened))
+        .unwrap_or_else(Task::none);
+    let print_task = app.take_print_source().map_or_else(Task::none, |markdown| {
+        if state.print_active {
+            app.status = "A print dialog is already active".into();
+            Task::none()
+        } else {
+            state.print_active = true;
+            Task::perform(print_document_source(markdown), Message::PrintFinished)
+        }
+    });
     let follow_caret = zoomed
         || (keyboard_event
             && (app.editor.cursor() != before_cursor
@@ -1109,9 +1241,11 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                 scroll_to_caret(state),
                 auto_sync,
                 dialog_task.unwrap_or_else(Task::none),
+                external_task,
+                print_task,
             ])
         } else {
-            Task::batch([clipboard, auto_sync, dialog_task.unwrap_or_else(Task::none)])
+            Task::batch([clipboard, auto_sync, dialog_task.unwrap_or_else(Task::none), external_task, print_task])
         }
     }
 }
@@ -1216,6 +1350,7 @@ mod tests {
             sync_active: false,
             clone_active: false,
             file_dialog_active: false,
+            print_active: false,
             sync_ready: None,
             next_sync_at: now,
             last_user_input: now,
