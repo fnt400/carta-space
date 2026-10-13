@@ -2,6 +2,7 @@ mod input;
 mod instance;
 mod layout;
 mod markdown;
+mod palette;
 mod profile;
 mod session;
 mod ui;
@@ -1254,6 +1255,17 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
             Task::perform(print_document_source(markdown), Message::PrintFinished)
         }
     });
+    let help_scroll_task = if app.view != before_view && matches!(app.view, View::Help { .. }) {
+        operation::scroll_to(
+            ui::HELP_SCROLL_ID,
+            AbsoluteOffset {
+                x: None,
+                y: Some(0.0),
+            },
+        )
+    } else {
+        Task::none()
+    };
     let follow_caret = zoomed
         || (keyboard_event
             && (app.editor.cursor() != before_cursor
@@ -1273,6 +1285,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                 dialog_task.unwrap_or_else(Task::none),
                 external_task,
                 print_task,
+                help_scroll_task,
             ])
         } else {
             Task::batch([
@@ -1281,6 +1294,7 @@ fn update(state: &mut Gui, message: Message) -> Task<Message> {
                 dialog_task.unwrap_or_else(Task::none),
                 external_task,
                 print_task,
+                help_scroll_task,
             ])
         }
     }

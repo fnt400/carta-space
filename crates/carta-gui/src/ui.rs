@@ -19,6 +19,7 @@ const STATUS_SIZE: f32 = 14.0;
 const EDITOR_MAX_WIDTH: f32 = viewport::PAGE_WIDTH;
 
 pub(crate) const EDITOR_SCROLL_ID: &str = "carta-editor-scroll";
+pub(crate) const HELP_SCROLL_ID: &str = "carta-help-scroll";
 
 pub(crate) fn view(state: &Gui) -> Element<'_, Message> {
     let started = crate::profile::enabled().then(Instant::now);
@@ -89,7 +90,7 @@ fn build_view(state: &Gui) -> Element<'_, Message> {
 
     if let Some(overlay) = quit_overlay(state) {
         stack![base, overlay].into()
-    } else if let Some(overlay) = modal_overlay(app, state.theme_mode) {
+    } else if let Some(overlay) = modal_overlay(app, state.theme_mode, state.window_size.height) {
         stack![base, overlay].into()
     } else {
         base
@@ -102,6 +103,9 @@ fn editor_view<'a>(
     mode: ThemeMode,
     window: iced::Size,
 ) -> Element<'a, Message> {
+    if let View::Help { kind, selected } = &app.view {
+        return help_view(*kind, *selected, mode);
+    }
     let columns = viewport::columns(window.width, state.font_size);
     let line_height = viewport::line_height(state.font_size);
     let height = viewport::writing_area_height(window.height);
@@ -164,6 +168,62 @@ fn editor_view<'a>(
         .height(Length::Fill)
         .width(Length::Fill)
         .into()
+}
+
+/// Help is a real read-only view. It is not part of the editable Archive.
+fn help_view(
+    kind: carta_app::HelpKind,
+    selected: usize,
+    mode: ThemeMode,
+) -> Element<'static, Message> {
+    let documents = carta_app::help::documents(kind);
+    let Some(document) = documents.get(selected).or_else(|| documents.first()) else {
+        return container(text("No help pages").font(IOSEVKA)).into();
+    };
+    let label = match kind {
+        carta_app::HelpKind::Cheatsheet => "CHEATSHEET",
+        carta_app::HelpKind::Manual => "MANUAL",
+    };
+    let mut content = column![
+        text(label)
+            .font(IOSEVKA)
+            .size(STATUS_SIZE)
+            .color(palette_section_color(mode)),
+        text(document.title)
+            .font(IOSEVKA)
+            .size(EDITOR_SIZE + 2.0),
+        text(document.body)
+            .font(IOSEVKA)
+            .size(STATUS_SIZE + 2.0)
+            .width(Length::Fill),
+    ]
+    .spacing(18)
+    .width(Length::Fill);
+    let navigation = if documents.len() > 1 {
+        format!(
+            "Section {} of {} · ↑↓ Previous/next section · Esc Return",
+            selected + 1,
+            documents.len()
+        )
+    } else {
+        "Scroll to read · Esc Return".to_owned()
+    };
+    content = content.push(
+        text(navigation)
+            .font(IOSEVKA)
+            .size(STATUS_SIZE)
+            .color(secondary_text(mode)),
+    );
+    scrollable(
+        container(content)
+            .max_width(860)
+            .padding([32, 24])
+            .center_x(Length::Fill),
+    )
+    .id(Id::new(HELP_SCROLL_ID))
+    .height(Length::Fill)
+    .width(Length::Fill)
+    .into()
 }
 
 fn syntax_color(mode: ThemeMode, syntax: Syntax) -> Color {
@@ -409,26 +469,81 @@ fn truncate_status(value: &str, limit: usize) -> String {
     }
 }
 
-fn modal_overlay(app: &App, mode: ThemeMode) -> Option<Element<'_, Message>> {
+fn modal_overlay(app: &App, mode: ThemeMode, window_height: f32) -> Option<Element<'_, Message>> {
     let panel: Element<'_, Message> = match &app.mode {
         AppMode::Editing | AppMode::Leap { .. } => return None,
         AppMode::Palette { query, selected } => {
-            let commands = app.palette_commands(query);
-            let mut content =
-                column![text(format!("> {query}")).font(IOSEVKA).size(EDITOR_SIZE),].spacing(4);
+            let commands = crate::palette::commands(app, query);
+            let max_rows = ((window_height * 0.64 / 27.0) as usize).clamp(5, 16);
+            let mut content = column![
+                text(format!("> {query}"))
+                    .font(IOSEVKA)
+                    .size(EDITOR_SIZE)
+                    .width(Length::Fill),
+            ]
+            .spacing(3)
+            .width(Length::Fill);
             if commands.is_empty() {
-                content =
-                    content.push(text("No matching commands").font(IOSEVKA).size(EDITOR_SIZE));
+                content = content.push(text("No matching commands").font(IOSEVKA).size(EDITOR_SIZE));
             } else {
-                for (index, command) in commands.iter().enumerate().take(14) {
-                    let marker = if index == *selected { "▶ " } else { "  " };
-                    content = content.push(
-                        text(format!("{marker}{}", command.label()))
-                            .font(IOSEVKA)
-                            .size(EDITOR_SIZE),
-                    );
+                for entry in crate::palette::visible_rows(&commands, *selected, max_rows) {
+                    match entry {
+                        crate::palette::Row::Heading(title) => {
+                            content = content.push(
+                                container(
+                                    text(title)
+                                        .font(IOSEVKA)
+                                        .size(STATUS_SIZE)
+                                        .color(palette_section_color(mode)),
+                                )
+                                .padding([7, 8])
+                                .width(Length::Fill),
+                            );
+                        }
+                        crate::palette::Row::Command { command, index } => {
+                            let active = *selected == index;
+                            let marker = if active { "▶ " } else { "  " };
+                            let label = text(format!("{marker}{}", command.label()))
+                                .font(IOSEVKA)
+                                .size(EDITOR_SIZE)
+                                .width(Length::Fill);
+                            let shortcut = text(crate::palette::shortcut(command).unwrap_or(""))
+                                .font(IOSEVKA)
+                                .size(STATUS_SIZE)
+                                .color(if active {
+                                    modal_foreground(mode)
+                                } else {
+                                    secondary_text(mode)
+                                });
+                            let line = row![label, shortcut].spacing(14).width(Length::Fill);
+                            let item = container(line).padding([3, 8]).width(Length::Fill);
+                            content = content.push(if active {
+                                item.style(move |_| {
+                                    iced::widget::container::Style::default()
+                                        .background(palette_selected_background(mode))
+                                        .color(modal_foreground(mode))
+                                })
+                            } else {
+                                item
+                            });
+                        }
+                    }
                 }
             }
+            content = content.push(
+                text(if commands.is_empty() {
+                    "Type to search · Esc Close".to_owned()
+                } else {
+                    format!(
+                        "{} / {} commands · ↑↓ Navigate · Enter Run · Esc Close",
+                        selected + 1,
+                        commands.len()
+                    )
+                })
+                .font(IOSEVKA)
+                .size(STATUS_SIZE)
+                .color(secondary_text(mode)),
+            );
             modal_box(content, mode)
         }
         AppMode::Selector {
@@ -568,6 +683,20 @@ fn with_caret(input: &str, cursor: usize) -> String {
     let mut value = input.to_owned();
     value.insert(cursor, '▏');
     value
+}
+
+fn palette_section_color(mode: ThemeMode) -> Color {
+    match mode {
+        ThemeMode::Light => color!(0x315EAB),
+        ThemeMode::Dark | ThemeMode::None => color!(0x8DBAFF),
+    }
+}
+
+fn palette_selected_background(mode: ThemeMode) -> Color {
+    match mode {
+        ThemeMode::Light => color!(0xC6D9EF),
+        ThemeMode::Dark | ThemeMode::None => color!(0x354454),
+    }
 }
 
 fn secondary_text(mode: ThemeMode) -> Color {

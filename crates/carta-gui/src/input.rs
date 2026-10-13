@@ -456,7 +456,7 @@ impl GuiInputState {
         text: Option<&str>,
     ) -> carta_app::AppResult<bool> {
         if let AppMode::Palette { query, selected } = &app.mode {
-            let commands = app.palette_commands(query);
+            let commands = crate::palette::commands(app, query);
             let chosen = commands.get(*selected).copied();
             match code {
                 Code::Escape => app.cancel_mode(),
