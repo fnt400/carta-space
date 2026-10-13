@@ -33,6 +33,7 @@ struct Location {
     view: View,
     cursor: Cursor,
     scroll: usize,
+    collapsed: bool,
 }
 
 pub use crate::{
@@ -2779,6 +2780,8 @@ impl App {
             escape_markdown_link_label(&source_label)
         );
         self.open_document(destination, true)?;
+        // The inserted link may lie below the three rows shown by Collapse.
+        self.collapsed = false;
         let region = self.editor.cursor().region;
         let text = &self.editor.regions()[region].text;
         let empty = text.trim().is_empty();
@@ -3456,6 +3459,7 @@ impl App {
             view: self.view.clone(),
             cursor: self.editor.cursor(),
             scroll: self.scroll,
+            collapsed: self.collapsed,
         };
         if self.back.last() != Some(&location) {
             self.back.push(location);
@@ -3476,6 +3480,7 @@ impl App {
             view: self.view.clone(),
             cursor: self.editor.cursor(),
             scroll: self.scroll,
+            collapsed: self.collapsed,
         };
         if forward {
             self.back.push(current);
@@ -3484,6 +3489,7 @@ impl App {
         }
         self.view = location.view;
         self.reload_view(None)?;
+        self.collapsed = location.collapsed;
         self.editor.set_cursor(location.cursor, false);
         self.scroll = location.scroll;
         Ok(())
