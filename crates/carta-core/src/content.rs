@@ -120,10 +120,13 @@ pub fn extract_web_urls(markdown: &str) -> Vec<MarkdownLink> {
                         })
                         .unwrap_or(candidate.len());
                     let raw = &candidate[..length];
-                    let destination = raw.trim_end_matches(['.', ',', ';', ':', '!', '?']);
+                    let destination = raw.trim_end_matches(|ch: char| {
+                        matches!(ch, '.' | ',' | ';' | ':' | '!' | '?')
+                    });
                     if supported_external_url(destination) {
                         links.push(MarkdownLink {
-                            source_range: (source.start + start)..(source.start + start + destination.len()),
+                            source_range: (source.start + start)
+                                ..(source.start + start + destination.len()),
                             destination: destination.to_owned(),
                             carta_target: None,
                         });

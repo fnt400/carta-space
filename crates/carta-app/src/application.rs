@@ -3910,6 +3910,41 @@ mod tests {
         assert!(!scheduler.sync_due(now + Duration::from_secs(179)));
         assert!(scheduler.sync_due(now + Duration::from_secs(180)));
     }
+
+    #[test]
+    fn external_web_links_are_queued_only_on_explicit_activation() {
+        let temporary = tempfile::tempdir().unwrap();
+        let mut archive = Archive::create(temporary.path().join("archive")).unwrap();
+        archive
+            .create_document(
+                "# Links\n\nhttps://example.org/path. [site](https://example.net) [unsafe](javascript:alert(1))\n",
+            )
+            .unwrap();
+        let mut app = App::open(archive, None, Instant::now()).unwrap();
+        let source = app.editor.current_text().unwrap().to_owned();
+        let region = app.editor.cursor().region;
+        let plain = source.find("https://example.org").unwrap();
+        app.editor.set_cursor(Cursor { region, byte: plain + 7 }, false);
+        assert!(app.take_external_url_request().is_none());
+        assert!(app.commands().contains(&Command::OpenLink));
+        app.execute(Command::OpenLink).unwrap();
+        assert_eq!(
+            app.take_external_url_request().as_deref(),
+            Some("https://example.org/path")
+        );
+        let markdown = source.find("[site]").unwrap();
+        app.editor.set_cursor(Cursor { region, byte: markdown }, false);
+        app.execute(Command::OpenLink).unwrap();
+        assert_eq!(
+            app.take_external_url_request().as_deref(),
+            Some("https://example.net")
+        );
+        let blocked = source.find("[unsafe]").unwrap();
+        app.editor.set_cursor(Cursor { region, byte: blocked }, false);
+        app.execute(Command::OpenLink).unwrap();
+        assert!(app.take_external_url_request().is_none());
+    }
+
     #[test]
     fn pdf_export_commands_are_contextual_and_prefill_pdf_names() {
         let temporary = tempfile::tempdir().unwrap();
