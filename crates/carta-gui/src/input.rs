@@ -581,10 +581,18 @@ mod tests {
     #[test]
     fn backward_leap_accepts_space_when_control_suppresses_text() {
         assert_eq!(
-            leap_query_text(None, &Key::Named(iced::keyboard::key::Named::Space), Code::Space, true),
+            leap_query_text(
+                None,
+                &Key::Named(iced::keyboard::key::Named::Space),
+                Code::Space,
+                true
+            ),
             Some(" ".into())
         );
-        assert_eq!(leap_query_text(None, &Key::Unidentified, Code::Space, false), None);
+        assert_eq!(
+            leap_query_text(None, &Key::Unidentified, Code::Space, false),
+            None
+        );
     }
 
     #[test]
