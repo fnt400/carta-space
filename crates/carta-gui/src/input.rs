@@ -66,6 +66,7 @@ pub struct GuiInputState {
     right_control_held: bool,
     clipboard_request: Option<ClipboardRequest>,
     zoom_request: i8,
+    file_dialog_request: Option<Command>,
 }
 
 impl GuiInputState {
@@ -77,6 +78,10 @@ impl GuiInputState {
 
     pub fn take_clipboard_request(&mut self) -> Option<ClipboardRequest> {
         self.clipboard_request.take()
+    }
+
+    pub fn take_file_dialog_request(&mut self) -> Option<Command> {
+        self.file_dialog_request.take()
     }
 
     pub fn take_zoom_request(&mut self) -> i8 {
@@ -268,10 +273,10 @@ impl GuiInputState {
         if app.collapsed && matches!(app.mode, AppMode::Editing) {
             match code {
                 Code::ArrowUp | Code::PageUp => {
-                    app.leap_document_start(LeapDirection::Backward);
+                    app.collapsed_move_document(LeapDirection::Backward)?;
                 }
                 Code::ArrowDown | Code::PageDown => {
-                    app.leap_document_start(LeapDirection::Forward);
+                    app.collapsed_move_document(LeapDirection::Forward)?;
                 }
                 Code::Enter | Code::NumpadEnter => {
                     app.execute(carta_app::Command::ExpandView)?;
@@ -474,7 +479,18 @@ impl GuiInputState {
                 Code::Enter | Code::NumpadEnter => {
                     if let Some(command) = chosen {
                         app.mode = AppMode::Editing;
-                        app.execute(command)?;
+                        if matches!(
+                            command,
+                            Command::Import
+                                | Command::ExportDocumentMarkdown
+                                | Command::ExportWorkMarkdown
+                                | Command::ExportDocumentPdf
+                                | Command::ExportWorkPdf
+                        ) {
+                            self.file_dialog_request = Some(command);
+                        } else {
+                            app.execute(command)?;
+                        }
                     }
                 }
                 _ => {
