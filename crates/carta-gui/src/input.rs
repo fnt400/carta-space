@@ -580,6 +580,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
         let root = std::env::temp_dir()
             .join(format!("carta-dialog-test-{}-{stamp}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
         let archive = carta_core::Archive::create(root.join("archive")).unwrap();
         let mut app = App::open(archive, None, Instant::now()).unwrap();
         app.open_palette();
