@@ -191,6 +191,7 @@ impl Gui {
                         .map(|mut app| {
                             app.enable_background_sync();
                             app.enable_native_printing();
+                            app.enable_external_url_opening();
                             (app, previous)
                         })
                         .map_err(|error| error.to_string())

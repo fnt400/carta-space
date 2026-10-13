@@ -240,6 +240,7 @@ pub struct App {
     work_mru: Vec<WorkId>,
     background_sync_enabled: bool,
     pending_external_url: Option<String>,
+    external_url_opening_enabled: bool,
     native_print_enabled: bool,
     print_requested: bool,
 }
@@ -346,6 +347,7 @@ impl App {
             work_mru: session.map_or_else(Vec::new, |s| s.work_mru.clone()),
             background_sync_enabled: false,
             pending_external_url: None,
+            external_url_opening_enabled: false,
             native_print_enabled: false,
             print_requested: false,
         })
@@ -2997,16 +2999,22 @@ impl App {
             Some(carta_core::LinkResolution::Unresolved(_)) => {
                 self.status = "Unresolved Carta link".into()
             }
-            None => {
-                if carta_core::supported_external_url(link.destination()) {
-                    self.pending_external_url = Some(link.destination().to_owned());
-                } else {
-                    self.status = "Unsupported external link scheme".into();
-                }
+            None if !self.external_url_opening_enabled => {
+                self.status = "External links are not executed by this build".into();
             }
+            None if carta_core::supported_external_url(link.destination()) => {
+                self.pending_external_url = Some(link.destination().to_owned());
+            }
+            None => self.status = "Unsupported external link scheme".into(),
         }
         Ok(())
     }
+    /// A frontend must explicitly enable external browser dispatch.
+    /// The frozen terminal frontend retains its pre-existing, non-executing behavior.
+    pub fn enable_external_url_opening(&mut self) {
+        self.external_url_opening_enabled = true;
+    }
+
     /// Native printing is opt-in, so frozen TUI adapters never show an inert command.
     pub fn enable_native_printing(&mut self) {
         self.native_print_enabled = true;
@@ -3027,6 +3035,9 @@ impl App {
     }
 
     fn web_url_under_cursor(&self) -> Option<carta_core::MarkdownLink> {
+        if !self.external_url_opening_enabled {
+            return None;
+        }
         self.editor
             .current_text()
             .and_then(|text| carta_core::web_url_at_byte_offset(text, self.editor.cursor().byte))
@@ -3927,7 +3938,17 @@ mod tests {
         let mut app = App::open(archive, None, Instant::now()).unwrap();
         let source = app.editor.current_text().unwrap().to_owned();
         let region = app.editor.cursor().region;
+        let markdown = source.find("[site]").unwrap();
+        app.editor.set_cursor(Cursor { region, byte: markdown }, false);
+        app.execute(Command::OpenLink).unwrap();
+        assert_eq!(app.status, "External links are not executed by this build");
+        assert!(app.take_external_url_request().is_none());
+
         let plain = source.find("https://example.org").unwrap();
+        app.editor.set_cursor(Cursor { region, byte: plain + 7 }, false);
+        assert!(!app.commands().contains(&Command::OpenLink));
+
+        app.enable_external_url_opening();
         app.editor.set_cursor(
             Cursor {
                 region,
@@ -3942,7 +3963,6 @@ mod tests {
             app.take_external_url_request().as_deref(),
             Some("https://example.org/path")
         );
-        let markdown = source.find("[site]").unwrap();
         app.editor.set_cursor(
             Cursor {
                 region,

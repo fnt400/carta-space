@@ -196,6 +196,16 @@ pub(crate) fn document_label(content: &str, created: Timestamp) -> String {
     first_line.to_owned()
 }
 
+fn parse_carta_target(destination: &str) -> Option<CartaLinkTarget> {
+    if let Some(id) = destination.strip_prefix("carta:doc:") {
+        DocumentId::from_str(id).ok().map(CartaLinkTarget::Document)
+    } else if let Some(id) = destination.strip_prefix("carta:work:") {
+        WorkId::from_str(id).ok().map(CartaLinkTarget::Work)
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod web_url_tests {
     use super::*;
@@ -224,15 +234,5 @@ mod web_url_tests {
         assert!(extract_web_urls(text).is_empty());
         assert!(!supported_external_url("file:///etc/passwd"));
         assert!(!supported_external_url("https://somewhere\nmalicious"));
-    }
-}
-
-fn parse_carta_target(destination: &str) -> Option<CartaLinkTarget> {
-    if let Some(id) = destination.strip_prefix("carta:doc:") {
-        DocumentId::from_str(id).ok().map(CartaLinkTarget::Document)
-    } else if let Some(id) = destination.strip_prefix("carta:work:") {
-        WorkId::from_str(id).ok().map(CartaLinkTarget::Work)
-    } else {
-        None
     }
 }
