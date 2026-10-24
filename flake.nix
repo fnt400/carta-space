@@ -118,13 +118,12 @@
               install -Dm644 ${./assets/carta-space.png} \
                 "$out/share/icons/hicolor/256x256/apps/carta-space.png"
 
-              # The desktop entry launches with no arguments. In that case
-              # open the same XDG default Archive as the TUI; keep explicitly
-              # provided Archive paths working from the command line.
+              # Let the GUI resolve the default XDG Archive when no path is
+              # supplied. Injecting a path here would suppress its first-run
+              # Create/Clone screen by turning it into an explicit argument.
               wrapProgram "$out/bin/carta-gui" \
                 --prefix PATH : ${cartaEditorPath} \
-                --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath guiLibraries} \
-                --run 'if [ "$#" -eq 0 ]; then set -- "''${XDG_DATA_HOME:-$HOME/.local/share}/carta/archive"; fi'
+                --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath guiLibraries}
             '';
 
             meta = {
